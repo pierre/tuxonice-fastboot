@@ -432,7 +432,7 @@ static void __init pagetable_init (void)
 	paravirt_pagetable_setup_done(pgd_base);
 }
 
-#if defined(CONFIG_SOFTWARE_SUSPEND) || defined(CONFIG_ACPI_SLEEP)
+#if defined(CONFIG_SUSPEND_SHARED) || defined(CONFIG_ACPI_SLEEP)
 /*
  * Swap suspend & friends need this for resume because things like the intel-agp
  * driver might have split up a kernel 4MB mapping.
@@ -838,13 +838,13 @@ void free_init_pages(char *what, unsigned long begin, unsigned long end)
 	unsigned long addr;
 
 	for (addr = begin; addr < end; addr += PAGE_SIZE) {
-		ClearPageReserved(virt_to_page(addr));
-		init_page_count(virt_to_page(addr));
+		//ClearPageReserved(virt_to_page(addr));
+		//init_page_count(virt_to_page(addr));
 		memset((void *)addr, POISON_FREE_INITMEM, PAGE_SIZE);
-		free_page(addr);
-		totalram_pages++;
+		//free_page(addr);
+		//totalram_pages++;
 	}
-	printk(KERN_INFO "Freeing %s: %luk freed\n", what, (end - begin) >> 10);
+	//printk(KERN_INFO "Freeing %s: %luk freed\n", what, (end - begin) >> 10);
 }
 
 void free_initmem(void)

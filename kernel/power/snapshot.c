@@ -45,6 +45,11 @@ static void swsusp_unset_page_forbidden(struct page *);
  */
 struct pbe *restore_pblist;
 
+#ifdef CONFIG_SUSPEND2
+#include "pagedir.h"
+int suspend_post_context_save(void);
+#endif
+
 /* Pointer to an auxiliary buffer (1 page) */
 static void *buffer;
 
@@ -86,6 +91,11 @@ static void *get_image_page(gfp_t gfp_mask, int safe_needed)
 
 unsigned long get_safe_page(gfp_t gfp_mask)
 {
+#ifdef CONFIG_SUSPEND2
+	if (suspend2_running)
+		return suspend_get_nonconflicting_page();
+#endif
+
 	return (unsigned long)get_image_page(gfp_mask, PG_SAFE);
 }
 
@@ -598,7 +608,9 @@ struct nosave_region {
 	unsigned long end_pfn;
 };
 
-static LIST_HEAD(nosave_regions);
+LIST_HEAD(nosave_regions);
+
+EXPORT_SYMBOL_GPL(nosave_regions);
 
 /**
  *	register_nosave_region - register a range of page frames the contents
@@ -827,7 +839,7 @@ static unsigned int count_free_highmem_pages(void)
  *	and it isn't a part of a free chunk of pages.
  */
 
-static struct page *saveable_highmem_page(unsigned long pfn)
+struct page *saveable_highmem_page(unsigned long pfn)
 {
 	struct page *page;
 
@@ -870,7 +882,6 @@ unsigned int count_highmem_pages(void)
 	return n;
 }
 #else
-static inline void *saveable_highmem_page(unsigned long pfn) { return NULL; }
 static inline unsigned int count_highmem_pages(void) { return 0; }
 #endif /* CONFIG_HIGHMEM */
 
@@ -883,7 +894,7 @@ static inline unsigned int count_highmem_pages(void) { return 0; }
  *	a free chunk of pages.
  */
 
-static struct page *saveable_page(unsigned long pfn)
+struct page *saveable_page(unsigned long pfn)
 {
 	struct page *page;
 
@@ -1199,6 +1210,11 @@ static struct memory_bitmap copy_bm;
 asmlinkage int swsusp_save(void)
 {
 	unsigned int nr_pages, nr_highmem;
+
+#ifdef CONFIG_SUSPEND2
+	if (suspend2_running)
+		return suspend_post_context_save();
+#endif
 
 	printk("swsusp: critical section: \n");
 

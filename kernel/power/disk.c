@@ -24,6 +24,7 @@
 
 #include "power.h"
 
+#include "suspend.h"
 
 static int noresume = 0;
 char resume_file[256] = CONFIG_PM_STD_PARTITION;
@@ -152,6 +153,11 @@ int hibernate(void)
 {
 	int error;
 
+#ifdef CONFIG_SUSPEND2
+	if (test_action_state(SUSPEND_REPLACE_SWSUSP))
+		return suspend2_try_suspend(1);
+#endif
+
 	/* The snapshot device should not be opened while we're running */
 	if (!atomic_add_unless(&snapshot_device_available, -1, 0))
 		return -EBUSY;
@@ -250,9 +256,19 @@ int hibernate(void)
  *
  */
 
-static int software_resume(void)
+int software_resume(void)
 {
 	int error;
+
+#ifdef CONFIG_SUSPEND2
+	/* 
+	 * We can't know (until an image header - if any - is loaded), whether
+	 * we did override swsusp. We therefore ensure that both are tried.
+	 */
+	if (test_action_state(SUSPEND_REPLACE_SWSUSP))
+		printk("Replacing swsusp.\n");
+		suspend2_try_resume();
+#endif
 
 	mutex_lock(&pm_mutex);
 	if (!swsusp_resume_device) {
@@ -335,9 +351,6 @@ static int software_resume(void)
 	pr_debug("PM: Resume from disk failed.\n");
 	return 0;
 }
-
-late_initcall(software_resume);
-
 
 static const char * const hibernation_modes[] = {
 	[HIBERNATION_PLATFORM]	= "platform",
@@ -544,6 +557,7 @@ static int __init resume_offset_setup(char *str)
 static int __init noresume_setup(char *str)
 {
 	noresume = 1;
+	set_suspend_state(SUSPEND_NORESUME_SPECIFIED);
 	return 1;
 }
 

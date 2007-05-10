@@ -756,6 +756,9 @@ int usb_register_driver(struct usb_driver *new_driver, struct module *owner,
 			usbcore_name, new_driver->name);
 		usbfs_update_special();
 		usb_create_newid_file(new_driver);
+		if (!new_driver->resume)
+			printk("USB driver %s lacks resume support.\n",
+					new_driver->name);
 	} else {
 		printk(KERN_ERR "%s: error %d registering interface "
 			"	driver %s\n",

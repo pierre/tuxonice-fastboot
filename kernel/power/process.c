@@ -14,6 +14,8 @@
 #include <linux/syscalls.h>
 #include <linux/freezer.h>
 
+int freezer_state = 0;
+
 /* 
  * Timeout for stopping processes
  */
@@ -179,10 +181,11 @@ int freeze_processes(void)
 		return nr_unfrozen;
 
 	sys_sync();
+	freezer_state = FREEZER_USERSPACE_FROZEN;
 	nr_unfrozen = try_to_freeze_tasks(FREEZER_KERNEL_THREADS);
 	if (nr_unfrozen)
 		return nr_unfrozen;
-
+	freezer_state = FREEZER_FULLY_ON;
 	printk("done.\n");
 	BUG_ON(in_atomic());
 	return 0;
@@ -209,11 +212,30 @@ static void thaw_tasks(int thaw_user_space)
 
 void thaw_processes(void)
 {
+	int old_state = freezer_state;
+
+	if (old_state == FREEZER_OFF)
+		return;
+
+	/* 
+	 * Change state beforehand because thawed tasks might submit I/O
+	 * immediately.
+	 */
+	freezer_state = FREEZER_OFF;
+
 	printk("Restarting tasks ... ");
-	thaw_tasks(FREEZER_KERNEL_THREADS);
+
+	if (old_state == FREEZER_FULLY_ON)
+		thaw_tasks(FREEZER_KERNEL_THREADS);
 	thaw_tasks(FREEZER_USER_SPACE);
 	schedule();
 	printk("done.\n");
+}
+
+void thaw_kernel_threads(void)
+{
+	freezer_state = FREEZER_USERSPACE_FROZEN;
+	thaw_tasks(FREEZER_KERNEL_THREADS);
 }
 
 EXPORT_SYMBOL(refrigerator);

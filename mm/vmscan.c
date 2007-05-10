@@ -650,6 +650,28 @@ static unsigned long isolate_lru_pages(unsigned long nr_to_scan,
 	return nr_taken;
 }
 
+/* return_lru_pages puts a list of pages back on a zone's lru lists. */
+
+static void return_lru_pages(struct list_head *page_list, struct zone *zone,
+		struct pagevec *pvec)
+{
+	while (!list_empty(page_list)) {
+		struct page *page = lru_to_page(page_list);
+		VM_BUG_ON(PageLRU(page));
+		SetPageLRU(page);
+		list_del(&page->lru);
+		if (PageActive(page))
+			add_page_to_active_list(zone, page);
+		else
+			add_page_to_inactive_list(zone, page);
+		if (!pagevec_add(pvec, page)) {
+			spin_unlock_irq(&zone->lru_lock);
+			__pagevec_release(pvec);
+			spin_lock_irq(&zone->lru_lock);
+		}
+	}
+}
+
 /*
  * shrink_inactive_list() is a helper for shrink_zone().  It returns the number
  * of reclaimed pages
@@ -667,7 +689,6 @@ static unsigned long shrink_inactive_list(unsigned long max_scan,
 	lru_add_drain();
 	spin_lock_irq(&zone->lru_lock);
 	do {
-		struct page *page;
 		unsigned long nr_taken;
 		unsigned long nr_scan;
 		unsigned long nr_freed;
@@ -697,21 +718,7 @@ static unsigned long shrink_inactive_list(unsigned long max_scan,
 		/*
 		 * Put back any unfreeable pages.
 		 */
-		while (!list_empty(&page_list)) {
-			page = lru_to_page(&page_list);
-			VM_BUG_ON(PageLRU(page));
-			SetPageLRU(page);
-			list_del(&page->lru);
-			if (PageActive(page))
-				add_page_to_active_list(zone, page);
-			else
-				add_page_to_inactive_list(zone, page);
-			if (!pagevec_add(&pvec, page)) {
-				spin_unlock_irq(&zone->lru_lock);
-				__pagevec_release(&pvec);
-				spin_lock_irq(&zone->lru_lock);
-			}
-		}
+		return_lru_pages(&page_list, zone, &pvec);
   	} while (nr_scanned < max_scan);
 	spin_unlock(&zone->lru_lock);
 done:
@@ -1272,6 +1279,72 @@ out:
 	return nr_reclaimed;
 }
 
+struct lru_save {
+	struct zone 		*zone;
+	struct list_head	active_list;
+	struct list_head	inactive_list;
+	struct lru_save		*next;
+};
+
+struct lru_save *lru_save_list;
+
+void unlink_lru_lists(void)
+{
+	struct zone *zone;
+
+	for_each_zone(zone) {
+		struct lru_save *this;
+		unsigned long moved, scanned;
+
+		if (!zone->spanned_pages)
+			continue;
+
+		this = (struct lru_save *)
+			kzalloc(sizeof(struct lru_save), GFP_ATOMIC);
+
+		BUG_ON(!this);
+
+		this->next = lru_save_list;
+		lru_save_list = this;
+		
+		this->zone = zone;
+
+		spin_lock_irq(&zone->lru_lock);
+		INIT_LIST_HEAD(&this->active_list);
+		INIT_LIST_HEAD(&this->inactive_list);
+		moved = isolate_lru_pages(zone_page_state(zone, NR_ACTIVE),
+				&zone->active_list, &this->active_list,
+				&scanned);
+		__mod_zone_page_state(zone, NR_ACTIVE, -moved);
+		moved = isolate_lru_pages(zone_page_state(zone, NR_INACTIVE),
+				&zone->inactive_list, &this->inactive_list,
+				&scanned);
+		__mod_zone_page_state(zone, NR_INACTIVE, -moved);
+		spin_unlock_irq(&zone->lru_lock);
+	}
+}
+
+void relink_lru_lists(void)
+{
+	while(lru_save_list) {
+		struct lru_save *this = lru_save_list;
+		struct zone *zone = this->zone;
+		struct pagevec pvec;
+
+		pagevec_init(&pvec, 1);
+
+		lru_save_list = this->next;
+
+		spin_lock_irq(&zone->lru_lock);
+		return_lru_pages(&this->active_list, zone, &pvec);
+		return_lru_pages(&this->inactive_list, zone, &pvec);
+		spin_unlock_irq(&zone->lru_lock);
+		pagevec_release(&pvec);
+
+		kfree(this);
+	}
+}
+
 /*
  * The background pageout daemon, started as a kernel thread
  * from the init process. 
@@ -1356,6 +1429,9 @@ void wakeup_kswapd(struct zone *zone, int order)
 	if (!populated_zone(zone))
 		return;
 
+	if (freezer_is_on())
+		return;
+
 	pgdat = zone->zone_pgdat;
 	if (zone_watermark_ok(zone, order, zone->pages_low, 0, 0))
 		return;
@@ -1369,6 +1445,91 @@ void wakeup_kswapd(struct zone *zone, int order)
 }
 
 #ifdef CONFIG_PM
+void shrink_one_zone(struct zone *zone, int total_to_free)
+{
+	int prio;
+	unsigned long still_to_free = total_to_free;
+	struct scan_control sc = {
+		.gfp_mask = GFP_KERNEL,
+		.may_swap = 0,
+		.may_writepage = 1,
+		.swappiness = vm_swappiness,
+	};
+
+	if (!populated_zone(zone) || zone->all_unreclaimable)
+		return;
+
+	if (still_to_free <= 0)
+		return;
+
+	if (is_highmem(zone))
+		sc.gfp_mask |= __GFP_HIGHMEM;
+
+	for (prio = DEF_PRIORITY; prio >= 0; prio--) {
+		unsigned long to_free, just_freed, orig_size;
+		unsigned long old_nr_active;
+
+		to_free = min(zone_page_state(zone, NR_ACTIVE) +
+				zone_page_state(zone, NR_INACTIVE),
+				still_to_free);
+
+		if (to_free <= 0)
+			return;
+
+		sc.swap_cluster_max = to_free -
+			zone_page_state(zone, NR_INACTIVE);
+
+		do {
+			old_nr_active = zone_page_state(zone, NR_ACTIVE);
+			zone->nr_scan_active = sc.swap_cluster_max - 1;
+			shrink_active_list(sc.swap_cluster_max, zone, &sc,
+					prio);
+			zone->nr_scan_active = 0;
+
+			sc.swap_cluster_max = to_free - zone_page_state(zone,
+					NR_INACTIVE);
+
+		} while (sc.swap_cluster_max > 0 &&
+			 zone_page_state(zone, NR_ACTIVE) > old_nr_active);
+
+		to_free = min(zone_page_state(zone, NR_ACTIVE) +
+				zone_page_state(zone, NR_INACTIVE),
+				still_to_free);
+		
+		do {
+			orig_size = zone_page_state(zone, NR_ACTIVE) +
+				zone_page_state(zone, NR_INACTIVE);
+			zone->nr_scan_inactive = to_free;
+			sc.swap_cluster_max = to_free;
+			shrink_inactive_list(to_free, zone, &sc);
+			just_freed = (orig_size -
+				(zone_page_state(zone, NR_ACTIVE) +
+				 zone_page_state(zone, NR_INACTIVE)));
+			zone->nr_scan_inactive = 0;
+			still_to_free -= just_freed;
+			to_free -= just_freed;
+		} while (just_freed > 0 && still_to_free > 0);
+	};
+
+	while (still_to_free > 0) {
+		unsigned long nr_slab = global_page_state(NR_SLAB_RECLAIMABLE);
+		struct reclaim_state reclaim_state;
+
+		if (nr_slab > still_to_free)
+			nr_slab = still_to_free;
+
+		reclaim_state.reclaimed_slab = 0;
+		shrink_slab(nr_slab, sc.gfp_mask, nr_slab);
+		if (!reclaim_state.reclaimed_slab)
+			break;
+
+		still_to_free -= reclaim_state.reclaimed_slab;
+	}
+
+	return;
+}
+
+
 /*
  * Helper function for shrink_all_memory().  Tries to reclaim 'nr_pages' pages
  * from LRU lists system-wide, for given pass and priority, and returns the

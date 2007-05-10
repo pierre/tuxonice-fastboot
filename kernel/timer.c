@@ -835,6 +835,33 @@ unsigned long avenrun[3];
 
 EXPORT_SYMBOL(avenrun);
 
+static unsigned long avenrun_save[3];
+/*
+ * save_avenrun - Record the values prior to starting a hibernation cycle.
+ * We do this to make the work done in hibernation invisible to userspace
+ * post-suspend. Some programs, including some MTAs, watch the load average
+ * and stop work until it lowers. Without this, they would stop working for
+ * a while post-resume, unnecessarily.
+ */
+
+void save_avenrun(void)
+{
+	avenrun_save[0] = avenrun[0];
+	avenrun_save[1] = avenrun[1];
+	avenrun_save[2] = avenrun[2];
+}
+
+EXPORT_SYMBOL_GPL(save_avenrun);
+
+void restore_avenrun(void)
+{
+	avenrun[0] = avenrun_save[0];
+	avenrun[1] = avenrun_save[1];
+	avenrun[2] = avenrun_save[2];
+}
+
+EXPORT_SYMBOL_GPL(restore_avenrun);
+
 /*
  * calc_load - given tick count, update the avenrun load estimates.
  * This is called while holding a write_lock on xtime_lock.

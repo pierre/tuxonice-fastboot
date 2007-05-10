@@ -1,6 +1,9 @@
-/* Freezer declarations */
+#ifndef LINUX_FREEZER_H
+#define LINUX_FREEZER_H
 
 #include <linux/sched.h>
+
+/* Freezer declarations */
 
 #ifdef CONFIG_PM
 /*
@@ -73,6 +76,18 @@ static inline int try_to_freeze(void)
 
 extern void thaw_some_processes(int all);
 
+extern int freezer_state;
+#define FREEZER_OFF 0
+#define FREEZER_USERSPACE_FROZEN 1
+#define FREEZER_FULLY_ON 2
+
+static inline int freezer_is_on(void)
+{
+	return (freezer_state == FREEZER_FULLY_ON);
+}
+
+extern void thaw_kernel_threads(void);
+
 #else
 static inline int frozen(struct task_struct *p) { return 0; }
 static inline int freezing(struct task_struct *p) { return 0; }
@@ -85,6 +100,9 @@ static inline int freeze_processes(void) { BUG(); return 0; }
 static inline void thaw_processes(void) {}
 
 static inline int try_to_freeze(void) { return 0; }
+static inline int freezer_is_on(void) { return 0; }
+static inline void thaw_kernel_threads(void) { }
 
 
+#endif
 #endif

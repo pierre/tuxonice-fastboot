@@ -1,0 +1,13 @@
+/*
+ * kernel/power/power_off.h
+ *
+ * Copyright (C) 2006-2007 Nigel Cunningham (nigel at suspend2 net)
+ *
+ * This file is released under the GPLv2.
+ *
+ * Support for the powering down.
+ */
+
+int suspend_pm_state_finish(void);
+void suspend_power_down(void);
+extern unsigned long suspend_powerdown_method;

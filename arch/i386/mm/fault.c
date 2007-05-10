@@ -25,6 +25,7 @@
 #include <linux/kprobes.h>
 #include <linux/uaccess.h>
 #include <linux/kdebug.h>
+#include <linux/suspend.h>
 
 #include <asm/system.h>
 #include <asm/desc.h>
@@ -33,6 +34,9 @@
 extern void die(const char *,struct pt_regs *,long);
 
 static ATOMIC_NOTIFIER_HEAD(notify_page_fault_chain);
+
+int suspend2_faulted = 0;
+EXPORT_SYMBOL(suspend2_faulted);
 
 int register_page_fault_notifier(struct notifier_block *nb)
 {
@@ -310,6 +314,20 @@ fastcall void __kprobes do_page_fault(struct pt_regs *regs,
 	tsk = current;
 
 	si_code = SEGV_MAPERR;
+
+	/* During a Suspend2 atomic copy, with DEBUG_SLAB, we will
+	 * get page faults where slab has been unmapped. Map them
+	 * temporarily and set the variable that tells Suspend2 to
+	 * unmap afterwards.
+	 */
+
+	if (unlikely(suspend2_running && !suspend2_faulted)) {
+		struct page *page = NULL;
+		suspend2_faulted = 1;
+		page = virt_to_page(address);
+		kernel_map_pages(page, 1, 1);
+		return;
+	}
 
 	/*
 	 * We fault-in kernel-space virtual memory on-demand. The

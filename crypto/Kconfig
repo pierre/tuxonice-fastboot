@@ -419,6 +419,14 @@ config CRYPTO_DEFLATE
 	  
 	  You will most probably want this if using IPSec.
 
+config CRYPTO_LZF
+	tristate "LZF compression algorithm"
+	default y
+	select CRYPTO_ALGAPI
+	help
+	  This is the LZF algorithm. It is especially useful for Suspend2,
+	  because it achieves good compression quickly.
+
 config CRYPTO_MICHAEL_MIC
 	tristate "Michael MIC keyed digest algorithm"
 	select CRYPTO_ALGAPI

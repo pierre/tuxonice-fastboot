@@ -432,6 +432,10 @@ int __pci_register_driver(struct pci_driver *drv, struct module *owner,
 	if (error)
 		driver_unregister(&drv->driver);
 
+	if (!drv->resume)
+		printk("PCI driver %s lacks driver specific resume support.\n",
+				drv->name);
+
 	return error;
 }
 

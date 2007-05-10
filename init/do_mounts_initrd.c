@@ -6,6 +6,7 @@
 #include <linux/romfs_fs.h>
 #include <linux/initrd.h>
 #include <linux/sched.h>
+#include <linux/suspend.h>
 #include <linux/freezer.h>
 
 #include "do_mounts.h"
@@ -62,6 +63,11 @@ static void __init handle_initrd(void)
 			yield();
 		}
 	}
+
+	if (test_suspend_state(SUSPEND_RESUME_NOT_DONE))
+		printk(KERN_ERR "Suspend2: No attempt was made to resume from "
+				"any image that might exist.\n");
+	clear_suspend_state(SUSPEND_BOOT_TIME);
 
 	/* move initrd to rootfs' /old */
 	sys_fchdir(old_fd);

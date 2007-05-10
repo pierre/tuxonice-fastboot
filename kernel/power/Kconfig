@@ -48,6 +48,17 @@ config DISABLE_CONSOLE_SUSPEND
 	suspend/resume routines, but may itself lead to problems, for example
 	if netconsole is used.
 
+config PRINTK_NOSAVE
+	bool "Preserve printk data from boot kernel when resuming."
+	default n
+	---help---
+	This option gives printk data and the associated variables the
+	attribute __nosave, which means that they will not be saves as
+	part of the image. The net effect is that after resuming, your
+	dmesg will show the messages from prior to the atomic restore,
+	instead of the messages from the resumed kernel. This may be
+	useful for debugging hibernation.
+
 config PM_TRACE
 	bool "Suspend/resume event tracing"
 	depends on PM && PM_DEBUG && X86_32 && EXPERIMENTAL
@@ -167,3 +178,174 @@ config APM_EMULATION
 	  random kernel OOPSes or reboots that don't seem to be related to
 	  anything, try disabling/enabling this option (or disabling/enabling
 	  APM in your BIOS).
+
+menuconfig SUSPEND2_CORE
+	tristate "Suspend2"
+	depends on PM
+	select DYN_PAGEFLAGS
+	select HOTPLUG_CPU if SMP
+	default y
+	---help---
+	  Suspend2 is the 'new and improved' suspend support.
+	  
+	  See the Suspend2 home page (suspend2.net)
+	  for FAQs, HOWTOs and other documentation.
+
+	comment "Image Storage (you need at least one allocator)"
+		depends on SUSPEND2_CORE
+	
+	config SUSPEND2_FILE
+		tristate "File Allocator"
+		depends on SUSPEND2_CORE
+		default y
+		---help---
+		  This option enables support for storing an image in a
+		  simple file. This should be possible, but we're still
+		  testing it.
+
+	config SUSPEND2_SWAP
+		tristate "Swap Allocator"
+		depends on SUSPEND2_CORE
+		default y
+		select SWAP
+		---help---
+		  This option enables support for storing an image in your
+		  swap space.
+
+	comment "General Options"
+		depends on SUSPEND2_CORE
+
+	config SUSPEND2_CRYPTO
+		tristate "Compression support"
+		depends on SUSPEND2_CORE && CRYPTO
+		default y
+		---help---
+		  This option adds support for using cryptoapi compression
+		  algorithms. Compression is particularly useful as
+		  the LZF support that comes with the Suspend2 patch can double
+		  your suspend and resume speed.
+
+		  You probably want this, so say Y here.
+
+	comment "No compression support available without Cryptoapi support."
+		depends on SUSPEND2_CORE && !CRYPTO
+
+	config SUSPEND2_USERUI
+		tristate "Userspace User Interface support"
+		depends on SUSPEND2_CORE && NET
+		default y
+		---help---
+		  This option enabled support for a userspace based user interface
+		  to Suspend2, which allows you to have a nice display while suspending
+		  and resuming, and also enables features such as pressing escape to
+		  cancel a cycle or interactive debugging.
+
+	config SUSPEND2_DEFAULT_RESUME2
+		string "Default resume device name"
+		depends on SUSPEND2_CORE
+		---help---
+		  You normally need to add a resume2= parameter to your lilo.conf or
+		  equivalent. With this option properly set, the kernel has a value
+		  to default. No damage will be done if the value is invalid.
+
+	config SUSPEND2_KEEP_IMAGE
+		bool "Allow Keep Image Mode"
+		depends on SUSPEND2_CORE
+		---help---
+		  This option allows you to keep and image and reuse it. It is intended
+		  __ONLY__ for use with systems where all filesystems are mounted read-
+		  only (kiosks, for example). To use it, compile this option in and boot
+		  normally. Set the KEEP_IMAGE flag in /sys/power/suspend2 and suspend.
+		  When you resume, the image will not be removed. You will be unable to turn
+		  off swap partitions (assuming you are using the swap allocator), but future
+		  suspends simply do a power-down. The image can be updated using the
+		  kernel command line parameter suspend_act= to turn off the keep image
+		  bit. Keep image mode is a little less user friendly on purpose - it
+		  should not be used without thought!
+
+	config SUSPEND2_REPLACE_SWSUSP
+		bool "Replace swsusp by default"
+		default y
+		depends on SUSPEND2_CORE
+		---help---
+		  Suspend2 can replace swsusp. This option makes that the default state,
+		  requiring you to echo 0 > /sys/power/suspend2/replace_swsusp if you want
+		  to use the vanilla kernel functionality. Note that your initrd/ramfs will
+		  need to do this before trying to resume, too.
+		  With overriding swsusp enabled, Suspend2 will use both the resume= and
+		  noresume commandline options _and_ the resume2= and noresume2 ones (for
+		  compatibility). resume= takes precedence over resume2=. Echoing disk 
+		  to /sys/power/state will start a Suspend2 cycle. If resume= doesn't
+		  specify an allocator and both the swap and file allocators are compiled in,
+		  the swap allocator will be used by default.
+
+	config SUSPEND2_CLUSTER
+		tristate "Cluster support"
+		default n
+		depends on SUSPEND2_CORE && NET && BROKEN
+		---help---
+		  Support for linking multiple machines in a cluster so that they suspend
+		  and resume together.
+
+	config SUSPEND2_DEFAULT_CLUSTER_MASTER
+		string "Default cluster master address/port"
+		depends on SUSPEND2_CLUSTER
+		---help---
+		  If this machine will be the master, simply enter a port on which to
+		  listen for slaves.
+		  If this machine will be a slave, enter the ip address and port on
+		  which the master listens with a colon separating them.
+		  If no value is set here, cluster support will be disabled by default.
+
+	config SUSPEND2_CHECKSUM
+		bool "Checksum pageset2"
+		depends on SUSPEND2_CORE
+		select CRYPTO
+		select CRYPTO_ALGAPI
+		select CRYPTO_MD5
+		---help---
+		  Adds support for checksumming pageset2 pages, to ensure you really get an
+		  atomic copy. Should not normally be needed, but here for verification and
+		  diagnostic purposes.
+
+config SUSPEND_SHARED
+	bool
+	depends on SUSPEND2_CORE || SOFTWARE_SUSPEND
+	default y
+
+config SUSPEND2_USERUI_EXPORTS
+	bool
+	depends on SUSPEND2_USERUI=m
+	default y
+
+config SUSPEND2_SWAP_EXPORTS
+	bool
+	depends on SUSPEND2_SWAP=m
+	default y
+
+config SUSPEND2_FILE_EXPORTS
+	bool
+	depends on SUSPEND2_FILE=m
+	default y
+
+config SUSPEND2_CRYPTO_EXPORTS
+	bool
+	depends on SUSPEND2_CRYPTO=m
+	default y
+
+config SUSPEND2_CORE_EXPORTS
+	bool
+	depends on SUSPEND2_CORE=m
+	default y
+
+config SUSPEND2_EXPORTS
+	bool
+	depends on SUSPEND2_SWAP_EXPORTS || SUSPEND2_FILE_EXPORTS || \
+		SUSPEND2_CRYPTO_EXPORTS || SUSPEND2_CLUSTER=m || \
+		SUSPEND2_USERUI_EXPORTS
+	default y
+
+config SUSPEND2
+	bool
+	depends on SUSPEND2_CORE!=n
+	default y

@@ -141,11 +141,16 @@ dev_t name_to_dev_t(char *name)
 	char s[32];
 	char *p;
 	dev_t res = 0;
-	int part;
+	int part, mount_result;
 
 #ifdef CONFIG_SYSFS
 	int mkdir_err = sys_mkdir("/sys", 0700);
-	if (sys_mount("sysfs", "/sys", "sysfs", 0, NULL) < 0)
+	/* 
+	 * When changing resume2 parameter for Software Suspend, sysfs may
+	 * already be mounted. 
+	 */
+	mount_result = sys_mount("sysfs", "/sys", "sysfs", 0, NULL);
+	if (mount_result < 0 && mount_result != -EBUSY)
 		goto out;
 #endif
 
@@ -197,7 +202,8 @@ dev_t name_to_dev_t(char *name)
 	res = try_name(s, part);
 done:
 #ifdef CONFIG_SYSFS
-	sys_umount("/sys", 0);
+	if (mount_result >= 0)
+		sys_umount("/sys", 0);
 out:
 	if (!mkdir_err)
 		sys_rmdir("/sys");
@@ -440,9 +446,27 @@ void __init prepare_namespace(void)
 
 	is_floppy = MAJOR(ROOT_DEV) == FLOPPY_MAJOR;
 
+	/* Suspend2:
+	 * By this point, suspend_early_init has been called to initialise our
+	 * sysfs interface. If modules are built in, they have registered (all
+	 * of the above via initcalls).
+	 * 
+	 * We have not yet looked to see if an image exists, however. If we
+	 * have an initrd, it is expected that the user will have set it up
+	 * to echo > /sys/power/suspend2/do_resume and thus initiate any
+	 * resume. If they don't do that, we do it immediately after the initrd
+	 * is finished (major issues if they mount filesystems rw from the
+	 * initrd! - they are warned. If there's no usable initrd, we do our
+	 * check next.
+	 */
 	if (initrd_load())
 		goto out;
 
+#ifdef CONFIG_SUSPEND2
+	if (test_suspend_state(SUSPEND_RESUME_NOT_DONE))
+		software_resume();
+#endif
+	
 	if (is_floppy && rd_doload && rd_load_disk(0))
 		ROOT_DEV = Root_RAM0;
 

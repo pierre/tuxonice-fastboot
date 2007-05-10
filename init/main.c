@@ -816,7 +816,9 @@ static int __init kernel_init(void * unused)
 
 	/*
 	 * check if there is an early userspace init.  If yes, let it do all
-	 * the work
+	 * the work. For suspend2, we assume that it will do the right thing
+	 * with regard to trying to resume at the right place. When that
+	 * happens, the BOOT_TIME flag will be cleared.
 	 */
 
 	if (!ramdisk_execute_command)

@@ -27,6 +27,8 @@
 int (*platform_notify)(struct device * dev) = NULL;
 int (*platform_notify_remove)(struct device * dev) = NULL;
 
+static int do_dump_stack;
+
 /*
  * sysfs bindings for devices.
  */
@@ -753,6 +755,18 @@ int device_add(struct device *dev)
 				class_intf->add_dev(dev, class_intf);
 		up(&dev->class->sem);
 	}
+
+#ifdef CONFIG_PM
+	if (!((dev->class && dev->class->resume) ||
+	      (dev->bus && (dev->bus->resume || dev->bus->resume_early))) &&
+	    !dev->pm_safe) {
+		printk("Device driver %s lacks bus and class support for "
+				"being resumed.\n", kobject_name(&dev->kobj));
+		if (do_dump_stack)
+			dump_stack();
+	}
+#endif
+
  Done:
 	kfree(class_name);
 	put_device(dev);
@@ -1101,6 +1115,7 @@ struct device *device_create(struct class *class, struct device *parent,
 	dev->class = class;
 	dev->parent = parent;
 	dev->release = device_create_release;
+	dev->pm_safe = 1;
 
 	va_start(args, fmt);
 	vsnprintf(dev->bus_id, BUS_ID_SIZE, fmt, args);
@@ -1309,3 +1324,11 @@ out:
 }
 
 EXPORT_SYMBOL_GPL(device_move);
+
+static int __init pm_debug_dump_stack(char *str)
+{
+	do_dump_stack = 1;
+	return 1;
+}
+
+__setup("pm_debug_dump_stack", pm_debug_dump_stack);

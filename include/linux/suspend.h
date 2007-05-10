@@ -85,4 +85,69 @@ struct saved_context;
 void __save_processor_state(struct saved_context *ctxt);
 void __restore_processor_state(struct saved_context *ctxt);
 
+enum {
+	SUSPEND_CAN_SUSPEND,
+	SUSPEND_CAN_RESUME,
+	SUSPEND_RUNNING,
+	SUSPEND_RESUME_DEVICE_OK,
+	SUSPEND_NORESUME_SPECIFIED,
+	SUSPEND_SANITY_CHECK_PROMPT,
+	SUSPEND_PAGESET2_NOT_LOADED,
+	SUSPEND_CONTINUE_REQ,
+	SUSPEND_RESUMED_BEFORE,
+	SUSPEND_RESUME_NOT_DONE,
+	SUSPEND_BOOT_TIME,
+	SUSPEND_NOW_RESUMING,
+	SUSPEND_IGNORE_LOGLEVEL,
+	SUSPEND_TRYING_TO_RESUME,
+	SUSPEND_TRY_RESUME_RD,
+	SUSPEND_LOADING_ALT_IMAGE,
+	SUSPEND_STOP_RESUME,
+	SUSPEND_IO_STOPPED,
+};
+
+#ifdef CONFIG_SUSPEND2
+
+/* Used in init dir files */
+extern unsigned long suspend_state;
+
+#define set_suspend_state(bit) (set_bit(bit, &suspend_state))
+#define clear_suspend_state(bit) (clear_bit(bit, &suspend_state))
+#define test_suspend_state(bit) (test_bit(bit, &suspend_state))
+
+extern void suspend2_try_resume(void);
+extern int suspend2_running;
+#else
+
+#define suspend_state		(0)
+#define set_suspend_state(bit) do { } while(0)
+#define clear_suspend_state(bit) do { } while (0)
+#define test_suspend_state(bit) (0)
+
+#define suspend2_running (0)
+
+#define suspend2_try_resume() do { } while(0)
+#endif /* CONFIG_SUSPEND2 */
+
+#ifdef CONFIG_SOFTWARE_SUSPEND
+extern int software_resume(void);
+#else
+#ifdef CONFIG_SUSPEND2
+extern void suspend2_try_resume(void);
+static inline int software_resume(void)
+{
+	suspend2_try_resume();
+	return 0;
+}
+#else
+#define software_resume() do { } while(0)
+#endif
+#endif
+
+#ifdef CONFIG_PRINTK_NOSAVE
+#define POSS_NOSAVE __nosavedata
+#else
+#define POSS_NOSAVE
+#endif
+
 #endif /* _LINUX_SWSUSP_H */

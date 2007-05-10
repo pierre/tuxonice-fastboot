@@ -33,6 +33,7 @@
 #include <linux/kernel.h>
 #include <linux/init.h>
 #include <linux/resource.h>
+#include <linux/freezer.h>
 #include <asm/uaccess.h>
 
 extern int max_threads;
@@ -336,6 +337,11 @@ int call_usermodehelper_pipe(char *path, char **argv, char **envp,
 		return PTR_ERR(f);
 	}
 	sub_info.stdin = f;
+
+	if (freezer_is_on()) {
+		printk(KERN_WARNING "Freezer is on. Refusing to start %s.\n", path);
+		return -EBUSY;
+	}
 
 	queue_work(khelper_wq, &sub_info.work);
 	wait_for_completion(&done);

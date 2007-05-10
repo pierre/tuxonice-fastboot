@@ -1,5 +1,10 @@
+/*
+ * Copyright (C) 2004-2007 Nigel Cunningham (nigel at suspend2 net)
+ */
+
 #include <linux/suspend.h>
 #include <linux/utsname.h>
+#include "suspend.h"
 
 struct swsusp_info {
 	struct new_utsname	uts;
@@ -14,6 +19,9 @@ struct swsusp_info {
 
 
 #ifdef CONFIG_SOFTWARE_SUSPEND
+
+extern char resume_file[256];
+
 /*
  * Keep some memory free so that I/O operations can succeed without paging
  * [Might this be more than 4 MB?]
@@ -43,6 +51,8 @@ static struct subsys_attribute _name##_attr = {	\
 }
 
 extern struct kset power_subsys;
+
+extern struct pbe *restore_pblist;
 
 /* Preferred image size in bytes (default 500 MB) */
 extern unsigned long image_size;
@@ -165,3 +175,14 @@ extern int suspend_enter(suspend_state_t state);
 struct timeval;
 extern void swsusp_show_speed(struct timeval *, struct timeval *,
 				unsigned int, char *);
+extern struct page *saveable_page(unsigned long pfn);
+#ifdef CONFIG_HIGHMEM
+extern struct page *saveable_highmem_page(unsigned long pfn);
+#else
+static inline void *saveable_highmem_page(unsigned long pfn) { return NULL; }
+#endif
+extern unsigned long suspend_get_nonconflicting_page(void);
+extern int suspend_post_context_save(void);
+extern int suspend2_try_suspend(int have_pmsem);
+
+#define PBES_PER_PAGE (PAGE_SIZE / sizeof(struct pbe))

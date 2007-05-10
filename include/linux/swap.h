@@ -190,6 +190,7 @@ extern void swap_setup(void);
 /* linux/mm/vmscan.c */
 extern unsigned long try_to_free_pages(struct zone **, gfp_t);
 extern unsigned long shrink_all_memory(unsigned long nr_pages);
+extern void shrink_one_zone(struct zone *zone, int desired_size);
 extern int vm_swappiness;
 extern int remove_mapping(struct address_space *mapping, struct page *page);
 extern long vm_total_pages;
@@ -368,5 +369,10 @@ static inline swp_entry_t get_swap_page(void)
 #define disable_swap_token() do { } while(0)
 
 #endif /* CONFIG_SWAP */
+
+/* For Suspend2 - unlink LRU pages while saving separately */
+void unlink_lru_lists(void);
+void relink_lru_lists(void);
+
 #endif /* __KERNEL__*/
 #endif /* _LINUX_SWAP_H */

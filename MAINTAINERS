@@ -3394,6 +3394,13 @@ M:	sammy@sammy.net
 W:	http://sammy.net/sun3/
 S:	Maintained
 
+SUSPEND2
+P:	Nigel Cunningham
+M:	nigel@suspend2.net
+L:	suspend2-devel@suspend2.net
+W:	http://suspend2.net
+S:	Maintained
+
 SVGA HANDLING
 P:	Martin Mares
 M:	mj@ucw.cz
