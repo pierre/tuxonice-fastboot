@@ -49,11 +49,12 @@ config DISABLE_CONSOLE_SUSPEND
 	if netconsole is used.
 
 config PRINTK_NOSAVE
+	depends on PM && PM_DEBUG
 	bool "Preserve printk data from boot kernel when resuming."
 	default n
 	---help---
 	This option gives printk data and the associated variables the
-	attribute __nosave, which means that they will not be saves as
+	attribute __nosave, which means that they will not be saved as
 	part of the image. The net effect is that after resuming, your
 	dmesg will show the messages from prior to the atomic restore,
 	instead of the messages from the resumed kernel. This may be
