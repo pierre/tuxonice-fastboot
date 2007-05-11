@@ -342,23 +342,6 @@ int suspend_atomic_restore(void)
 
 	suspend2_running = 1;
 
-	suspend_prepare_status(DONT_CLEAR_BAR,	"Prepare console");
-
-	if (test_action_state(SUSPEND_PM_PREPARE_CONSOLE))
-		pm_prepare_console();
-
-	if (!test_action_state(SUSPEND_LATE_CPU_HOTPLUG)) {
-		suspend_prepare_status(DONT_CLEAR_BAR,	"Disable nonboot cpus.");
-		disable_nonboot_cpus();
-	}
-
-	suspend_prepare_status(DONT_CLEAR_BAR,	"Freeze processes.");
-
-	if ((error = freeze_processes())) {
-		printk("Some processes failed to suspend\n");
-		goto thaw_processes;
-	}
-
 	suspend_prepare_status(DONT_CLEAR_BAR,	"Device suspend.");
 
 	if ((error = device_suspend(PMSG_FREEZE))) {
@@ -410,13 +393,6 @@ device_power_up:
 		enable_nonboot_cpus();
 device_resume:
 	device_resume();
-thaw_processes:
-	thaw_processes();
-	if (!test_action_state(SUSPEND_LATE_CPU_HOTPLUG))
-		enable_nonboot_cpus();
-
-	if (test_action_state(SUSPEND_PM_PREPARE_CONSOLE))
-		pm_restore_console();
 	free_pbe_list(&restore_pblist, 0);
 #ifdef CONFIG_HIGHMEM
 	free_pbe_list(&restore_highmem_pblist, 1);
