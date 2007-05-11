@@ -159,7 +159,7 @@ void suspend_mark_pages_for_pageset2(void)
 		if (!this) {
 			printk("Failed to allocate slab for attention list.\n");
 			set_result_state(SUSPEND_ABORTED);
-			break;
+			goto free_attention_list;
 		}
 		this->next = NULL;
 		if (attention_list) {
@@ -183,8 +183,10 @@ void suspend_mark_pages_for_pageset2(void)
 	 * we know that they won't go away under us.
 	 */
 
+free_attention_list:
 	while (attention_list) {
-		suspend_mark_task_as_pageset(attention_list->task, PAGESET1);
+		if (!test_result_state(SUSPEND_ABORTED))
+			suspend_mark_task_as_pageset(attention_list->task, PAGESET1);
 		last = attention_list;
 		attention_list = attention_list->next;
 		kfree(last);
