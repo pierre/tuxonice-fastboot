@@ -476,7 +476,7 @@ static void flag_image_pages(void)
 			else
 				page = saveable_page(pfn);
 
-			if (!page) {
+			if (!page || PageNosave(page)) {
 				num_nosave++;
 				continue;
 			}
