@@ -605,6 +605,8 @@ static int do_rw_loop(int write, int finish_at, dyn_pageflags_t *pageflags,
 		index++;
 	}
 
+	BUG_ON(index < finish_at);
+
 	atomic_set(&io_count, finish_at);
 
 	pfn = max_pfn + 1;
