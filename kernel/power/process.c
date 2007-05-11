@@ -239,3 +239,4 @@ void thaw_kernel_threads(void)
 }
 
 EXPORT_SYMBOL(refrigerator);
+EXPORT_SYMBOL(freezer_state);
