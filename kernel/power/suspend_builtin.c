@@ -80,6 +80,7 @@ EXPORT_SYMBOL_GPL(next_online_pgdat);
 EXPORT_SYMBOL_GPL(machine_restart);
 EXPORT_SYMBOL_GPL(saved_command_line);
 EXPORT_SYMBOL_GPL(tasklist_lock);
+EXPORT_SYMBOL_GPL(console_printk);
 #ifdef CONFIG_SUSPEND_SMP
 EXPORT_SYMBOL_GPL(disable_nonboot_cpus);
 EXPORT_SYMBOL_GPL(enable_nonboot_cpus);
@@ -88,7 +89,6 @@ EXPORT_SYMBOL_GPL(enable_nonboot_cpus);
 
 #ifdef CONFIG_SUSPEND2_USERUI_EXPORTS
 EXPORT_SYMBOL_GPL(kmsg_redirect);
-EXPORT_SYMBOL_GPL(console_printk);
 #ifndef CONFIG_COMPAT
 EXPORT_SYMBOL_GPL(sys_ioctl);
 #endif
