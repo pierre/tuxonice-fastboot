@@ -526,7 +526,6 @@ void suspend_recalculate_image_contents(int atomic_copy)
 		storage_available = suspendActiveAllocator->storage_available();
 		display_stats(0, 0);
 	}
-	return;
 }
 
 /* update_image
