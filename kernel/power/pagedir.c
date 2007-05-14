@@ -26,7 +26,7 @@
 #include "prepare_image.h"
 #include "suspend.h"
 #include "power.h"
-#include "suspend_builtin.h"
+#include "suspend2_builtin.h"
 
 #define PAGESET1 0
 #define PAGESET2 1

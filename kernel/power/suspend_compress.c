@@ -15,7 +15,7 @@
 #include <linux/vmalloc.h>
 #include <linux/crypto.h>
 
-#include "suspend_builtin.h"
+#include "suspend2_builtin.h"
 #include "suspend.h"
 #include "modules.h"
 #include "sysfs.h"

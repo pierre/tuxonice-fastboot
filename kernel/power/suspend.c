@@ -81,7 +81,7 @@
 #include "storage.h"
 #include "checksum.h"
 #include "cluster.h"
-#include "suspend_builtin.h"
+#include "suspend2_builtin.h"
 
 /*! Pageset metadata. */
 struct pagedir pagedir2 = {2}; 

@@ -28,7 +28,7 @@
 #include "sysfs.h"
 #include "pagedir.h"
 #include "modules.h"
-#include "suspend_builtin.h"
+#include "suspend2_builtin.h"
 
 #ifdef CONFIG_SUSPEND2_CORE_EXPORTS
 #ifdef CONFIG_SOFTWARE_SUSPEND

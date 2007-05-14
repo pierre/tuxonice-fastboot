@@ -25,7 +25,7 @@
 #include "power.h"
 
 #include "suspend.h"
-#include "suspend_builtin.h"
+#include "suspend2_builtin.h"
 
 static int noresume = 0;
 char resume_file[256] = CONFIG_PM_STD_PARTITION;

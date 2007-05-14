@@ -22,7 +22,7 @@
 #include "prepare_image.h"
 #include "pageflags.h"
 #include "checksum.h"
-#include "suspend_builtin.h"
+#include "suspend2_builtin.h"
 
 int extra_pd1_pages_used;
 

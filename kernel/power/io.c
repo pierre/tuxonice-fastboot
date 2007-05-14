@@ -30,7 +30,7 @@
 #include "prepare_image.h"
 #include "extent.h"
 #include "sysfs.h"
-#include "suspend_builtin.h"
+#include "suspend2_builtin.h"
 
 char poweroff_resume2[256];
 

@@ -12,7 +12,7 @@ suspend_core-objs := modules.o sysfs.o suspend.o \
 		extent.o pageflags.o ui.o \
 		power_off.o atomic_copy.o
 
-obj-$(CONFIG_SUSPEND2)		+= suspend_builtin.o
+obj-$(CONFIG_SUSPEND2)		+= suspend2_builtin.o
 
 ifdef CONFIG_SUSPEND2_CHECKSUM
 suspend_core-objs	+= checksum.o
