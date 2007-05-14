@@ -552,9 +552,7 @@ abort_reloading_pagedir_two:
 
 static int do_save_image(void)
 {
-	int result;
-
-	result = __save_image();
+	int result = __save_image();
 	if (!suspend2_in_suspend || result)
 		do_cleanup();
 	return result;
