@@ -44,6 +44,13 @@ extern void attempt_to_parse_resume_device2(void);
 extern void attempt_to_parse_po_resume_device2(void);
 int image_exists_read(const char *page, int count);
 int image_exists_write(const char *buffer, int count);
-extern void replace_restore_resume2(int replace, int quiet);
+extern void save_restore_resume2(int replace, int quiet);
+
+/* Args to save_restore_resume2 */
+#define RESTORE 0
+#define SAVE 1
+
+#define NOQUIET 0
+#define QUIET 1
 
 extern dev_t name_to_dev_t(char *line);

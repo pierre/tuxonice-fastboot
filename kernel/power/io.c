@@ -126,7 +126,7 @@ void attempt_to_parse_resume_device2(void)
 	suspend_cleanup_usm();
 }
 
-void replace_restore_resume2(int replace, int quiet)
+void save_restore_resume2(int replace, int quiet)
 {
 	static char resume2_save[255];
 	static unsigned long suspend_state_save;
@@ -151,12 +151,12 @@ void attempt_to_parse_po_resume_device2(void)
 		return;
 
 	printk("=== Trying Poweroff Resume2 ===\n");
-	replace_restore_resume2(1, 0);
+	save_restore_resume2(SAVE, NOQUIET);
 	if (test_suspend_state(SUSPEND_CAN_RESUME))
 		ok = 1;
 	
 	printk("=== Done ===\n");
-	replace_restore_resume2(0, 1);
+	save_restore_resume2(RESTORE, QUIET);
 	
 	/* If not ok, clear the string */
 	if (ok)

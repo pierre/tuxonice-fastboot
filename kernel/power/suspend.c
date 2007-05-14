@@ -664,7 +664,7 @@ static int do_load_atomic_copy(void)
 	return 0;
 }
 
-void prepare_restore_load_alt_image(int prepare)
+static void prepare_restore_load_alt_image(int prepare)
 {
 	static dyn_pageflags_t pageset1_map_save, pageset1_copy_map_save;
 
@@ -748,7 +748,7 @@ int do_suspend2_step(int step)
 		case STEP_RESUME_ALT_IMAGE:
 			printk("Trying to resume alternate image.\n");
 			suspend2_in_suspend = 0;
-			replace_restore_resume2(1, 0);
+			save_restore_resume2(SAVE, NOQUIET);
 			prepare_restore_load_alt_image(1);
 			if (!do_check_can_resume()) {
 				printk("Nothing to resume from.\n");
@@ -760,7 +760,7 @@ int do_suspend2_step(int step)
 			}
 out:
 			prepare_restore_load_alt_image(0);
-			replace_restore_resume2(0, 0);
+			save_restore_resume2(RESTORE, NOQUIET);
 			break;
 	}
 
