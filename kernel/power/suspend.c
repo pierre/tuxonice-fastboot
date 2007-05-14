@@ -616,9 +616,8 @@ static int do_load_atomic_copy(void)
 	int read_image_result = 0;
 
 	if (sizeof(swp_entry_t) != sizeof(long)) {
-		printk(KERN_WARNING "Suspend2: "
-			"The size of swp_entry_t != size of long. "
-			"Please report this!\n");
+		printk(KERN_WARNING "Suspend2: The size of swp_entry_t != size"
+			" of long. Please report this!\n");
 		return 1;
 	}
 	
