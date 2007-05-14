@@ -231,7 +231,7 @@ static int allocate_bitmaps(void)
 	return 0;
 }
 
-static void free_metadata(void)
+static void free_bitmaps(void)
 {
 	free_dyn_pageflags(&pageset1_map);
 	free_dyn_pageflags(&pageset1_copy_map);
@@ -338,7 +338,7 @@ static void suspend_cleanup(void)
 		if (suspendActiveAllocator)
 			suspendActiveAllocator->invalidate_image();
 
-	free_metadata();
+	free_bitmaps();
 
 	if (buffer && i) {
 		/* Printk can only handle 1023 bytes, including
@@ -504,7 +504,7 @@ static int suspend_init(void)
 	suspend_io_time[0][0] = suspend_io_time[0][1] = 
 		suspend_io_time[1][0] =	suspend_io_time[1][1] = 0;
 
-	free_metadata();	/* We might have kept it */
+	free_bitmaps();	/* We might have kept it */
 
 	if (!test_suspend_state(SUSPEND_CAN_SUSPEND) ||
 	    allocate_bitmaps())
