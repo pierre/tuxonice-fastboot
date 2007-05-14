@@ -50,7 +50,7 @@ struct hibernation_ops {
 	void (*finish)(void);
 };
 
-#if defined(CONFIG_PM) && defined(CONFIG_SOFTWARE_SUSPEND)
+#if defined(CONFIG_PM) && defined(CONFIG_SUSPEND_SHARED)
 /* kernel/power/snapshot.c */
 extern void __register_nosave_region(unsigned long b, unsigned long e, int km);
 static inline void register_nosave_region(unsigned long b, unsigned long e)
