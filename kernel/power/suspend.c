@@ -95,10 +95,6 @@
 #include "cluster.h"
 #include "suspend_builtin.h"
 
-#ifdef  CONFIG_X86
-#include <asm/i387.h> /* for kernel_fpu_end */
-#endif
-
 static int had_pmsem = 0;
 
 /* Variables to be preserved over suspend */
