@@ -554,7 +554,6 @@ static int do_save_image(void)
 {
 	int result;
 
-	unlink_lru_lists();
 	result = __save_image();
 	if (!suspend2_in_suspend || result)
 		do_cleanup();
@@ -586,8 +585,10 @@ static int do_prepare_image(void)
 		goto cleanup;
 
 	if (suspend_init() && !suspend_prepare_image() &&
-			!test_result_state(SUSPEND_ABORTED))
+			!test_result_state(SUSPEND_ABORTED)) {
+		unlink_lru_lists();
 		return 0;
+	}
 
 cleanup:
 	do_cleanup();
