@@ -67,28 +67,16 @@
  */
 
 #include <linux/suspend.h>
-#include <linux/module.h>
-#include <linux/console.h>
-#include <linux/version.h>
-#include <linux/reboot.h>
-#include <linux/mm.h>
-#include <linux/highmem.h>
 #include <linux/writeback.h>
 #include <linux/freezer.h>
 #include <linux/utsrelease.h>
-#include <linux/swap.h> /* For LRU unlinking prototypes */
 #include <linux/cpu.h>
-#include <linux/resume-trace.h>
-#include <asm/uaccess.h>
-#include <asm/setup.h>
 
 #include "modules.h"
 #include "sysfs.h"
-#include "pageflags.h"
 #include "prepare_image.h"
 #include "io.h"
 #include "ui.h"
-#include "extent.h"
 #include "power_off.h"
 #include "storage.h"
 #include "checksum.h"
