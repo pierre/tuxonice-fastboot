@@ -87,7 +87,6 @@
 struct pagedir pagedir2 = {2}; 
 
 static int had_pmsem = 0;
-static int orig_system_state;
 static mm_segment_t oldfs;
 static atomic_t actions_running;
 static int block_dump_save;
@@ -306,8 +305,6 @@ static void do_cleanup(void)
 
 	restore_avenrun();
 
-	system_state = orig_system_state;
-
 	thaw_processes();
 
 #ifdef CONFIG_SUSPEND2_KEEP_IMAGE
@@ -483,8 +480,6 @@ static int suspend_init(void)
 
 	nr_suspends++;
 	
-	orig_system_state = system_state;
-
 	save_avenrun();
 
 	suspend_io_time[0][0] = suspend_io_time[0][1] = 
