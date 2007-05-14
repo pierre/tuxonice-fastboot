@@ -688,11 +688,6 @@ static void prepare_restore_load_alt_image(int prepare)
 
 int pre_resume_freeze(void)
 {
-	suspend_prepare_status(DONT_CLEAR_BAR,	"Prepare console");
-
-	if (test_action_state(SUSPEND_PM_PREPARE_CONSOLE))
-		pm_prepare_console();
-
 	if (!test_action_state(SUSPEND_LATE_CPU_HOTPLUG)) {
 		suspend_prepare_status(DONT_CLEAR_BAR,	"Disable nonboot cpus.");
 		disable_nonboot_cpus();
@@ -713,9 +708,6 @@ void post_resume_thaw(void)
 	thaw_processes();
 	if (!test_action_state(SUSPEND_LATE_CPU_HOTPLUG))
 		enable_nonboot_cpus();
-
-	if (test_action_state(SUSPEND_PM_PREPARE_CONSOLE))
-		pm_restore_console();
 }
 
 int do_suspend2_step(int step)

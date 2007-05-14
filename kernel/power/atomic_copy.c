@@ -342,6 +342,11 @@ int suspend_atomic_restore(void)
 
 	suspend2_running = 1;
 
+	suspend_prepare_status(DONT_CLEAR_BAR,	"Prepare console");
+
+	if (test_action_state(SUSPEND_PM_PREPARE_CONSOLE))
+		pm_prepare_console();
+
 	suspend_prepare_status(DONT_CLEAR_BAR,	"Device suspend.");
 
 	if ((error = device_suspend(PMSG_FREEZE))) {
@@ -397,6 +402,8 @@ device_resume:
 #ifdef CONFIG_HIGHMEM
 	free_pbe_list(&restore_highmem_pblist, 1);
 #endif
+	if (test_action_state(SUSPEND_PM_PREPARE_CONSOLE))
+		pm_restore_console();
 	suspend2_running = 0;
 	return 1;
 }
