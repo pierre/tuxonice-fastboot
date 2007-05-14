@@ -71,6 +71,7 @@
 #include <linux/freezer.h>
 #include <linux/utsrelease.h>
 #include <linux/cpu.h>
+#include <asm/uaccess.h>
 
 #include "modules.h"
 #include "sysfs.h"
