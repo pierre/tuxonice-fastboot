@@ -279,10 +279,17 @@ static int get_suspend_debug_info(const char *buffer, int count)
 	return len;
 }
 
-static void suspend_cleanup(void)
+/*
+ * do_cleanup
+ */
+
+static void do_cleanup(void)
 {
 	int i = 0;
 	char *buffer;;
+
+	suspend_prepare_status(DONT_CLEAR_BAR, "Cleaning up...");
+	relink_lru_lists();
 
 	free_checksum_pages();
 
@@ -328,6 +335,8 @@ static void suspend_cleanup(void)
 	if (!test_action_state(SUSPEND_LATE_CPU_HOTPLUG))
 		enable_nonboot_cpus();
 	suspend_cleanup_console();
+
+	suspend_deactivate_storage(0);
 
 	clear_suspend_state(SUSPEND_IGNORE_LOGLEVEL);
 	clear_suspend_state(SUSPEND_TRYING_TO_RESUME);
@@ -521,18 +530,6 @@ static int can_suspend(void)
 	return 1;
 }
 
-/*
- * do_cleanup
- */
-
-static void do_cleanup(void)
-{
-	suspend_prepare_status(DONT_CLEAR_BAR, "Cleaning up...");
-	relink_lru_lists();
-	suspend_cleanup();
-	suspend_deactivate_storage(0);
-}
-
 static int do_power_down(void)
 {
 	/* If switching images fails, do normal powerdown */
@@ -582,7 +579,7 @@ static int do_prepare_image(void)
 		return 1;
 
 	if (!can_suspend())
-		goto cleanup_deactivate_storage;
+		goto cleanup;
 
 	/*
 	 * If kept image and still keeping image and suspending to RAM, we will 
@@ -598,9 +595,7 @@ static int do_prepare_image(void)
 		return 0;
 
 cleanup:
-	suspend_cleanup();
-cleanup_deactivate_storage:
-	suspend_deactivate_storage(0);
+	do_cleanup();
 	return 1;
 }
 
