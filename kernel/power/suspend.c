@@ -343,6 +343,92 @@ static void do_cleanup(void)
 		mutex_unlock(&pm_mutex);
 }
 
+static int check_still_keeping_image(void)
+{
+	if (test_action_state(SUSPEND_KEEP_IMAGE)) {
+		printk("Image already stored: powering down immediately.");
+		do_suspend2_step(STEP_SUSPEND_POWERDOWN);
+		return 1;	/* Just in case we're using S3 */
+	}
+
+	printk("Invalidating previous image.\n");
+	suspendActiveAllocator->invalidate_image();
+
+	return 0;
+}
+
+static int suspend_init(void)
+{
+	suspend_result = 0;
+
+	printk(KERN_INFO "Suspend2: Initiating a software suspend cycle.\n");
+
+	nr_suspends++;
+	
+	save_avenrun();
+
+	suspend_io_time[0][0] = suspend_io_time[0][1] = 
+		suspend_io_time[1][0] =	suspend_io_time[1][1] = 0;
+
+	if (!test_suspend_state(SUSPEND_CAN_SUSPEND) ||
+	    allocate_bitmaps())
+		return 0;
+	
+	mark_nosave_pages();
+
+	suspend_prepare_console();
+	if (!test_action_state(SUSPEND_LATE_CPU_HOTPLUG))
+		disable_nonboot_cpus();
+
+	return 1;
+}
+
+static int can_suspend(void)
+{
+	if (!had_pmsem && !mutex_trylock(&pm_mutex)) {
+		printk("Suspend2: Failed to obtain pm_mutex.\n");
+		set_result_state(SUSPEND_ABORTED);
+		set_result_state(SUSPEND_PM_SEM);
+		return 0;
+	}
+
+	if (!test_suspend_state(SUSPEND_CAN_SUSPEND))
+		suspend_attempt_to_parse_resume_device(0);
+
+	if (!test_suspend_state(SUSPEND_CAN_SUSPEND)) {
+		printk("Suspend2: Software suspend is disabled.\n"
+			"This may be because you haven't put something along "
+			"the lines of\n\nresume2=swap:/dev/hda1\n\n"
+			"in lilo.conf or equivalent. (Where /dev/hda1 is your "
+			"swap partition).\n");
+		set_result_state(SUSPEND_ABORTED);
+		if (!had_pmsem)
+			mutex_unlock(&pm_mutex);
+		return 0;
+	}
+	
+	return 1;
+}
+
+static int do_power_down(void)
+{
+	/* If switching images fails, do normal powerdown */
+	if (poweroff_resume2[0])
+		do_suspend2_step(STEP_RESUME_ALT_IMAGE);
+
+	suspend_cond_pause(1, "About to power down or reboot.");
+	suspend_power_down();
+
+	/* If we return, it's because we suspended to ram */
+	if (read_pageset2(1))
+		panic("Attempt to reload pagedir 2 failed. Try rebooting.");
+
+	barrier();
+	mb();
+	do_cleanup();
+	return 0;
+}
+
 /*
  * __save_image
  * Functionality    : High level routine which performs the steps necessary
@@ -456,92 +542,6 @@ abort_reloading_pagedir_two:
 				"a suspend failed.");
 
 	return 1;
-}
-
-static int check_still_keeping_image(void)
-{
-	if (test_action_state(SUSPEND_KEEP_IMAGE)) {
-		printk("Image already stored: powering down immediately.");
-		do_suspend2_step(STEP_SUSPEND_POWERDOWN);
-		return 1;	/* Just in case we're using S3 */
-	}
-
-	printk("Invalidating previous image.\n");
-	suspendActiveAllocator->invalidate_image();
-
-	return 0;
-}
-
-static int suspend_init(void)
-{
-	suspend_result = 0;
-
-	printk(KERN_INFO "Suspend2: Initiating a software suspend cycle.\n");
-
-	nr_suspends++;
-	
-	save_avenrun();
-
-	suspend_io_time[0][0] = suspend_io_time[0][1] = 
-		suspend_io_time[1][0] =	suspend_io_time[1][1] = 0;
-
-	if (!test_suspend_state(SUSPEND_CAN_SUSPEND) ||
-	    allocate_bitmaps())
-		return 0;
-	
-	mark_nosave_pages();
-
-	suspend_prepare_console();
-	if (!test_action_state(SUSPEND_LATE_CPU_HOTPLUG))
-		disable_nonboot_cpus();
-
-	return 1;
-}
-
-static int can_suspend(void)
-{
-	if (!had_pmsem && !mutex_trylock(&pm_mutex)) {
-		printk("Suspend2: Failed to obtain pm_mutex.\n");
-		set_result_state(SUSPEND_ABORTED);
-		set_result_state(SUSPEND_PM_SEM);
-		return 0;
-	}
-
-	if (!test_suspend_state(SUSPEND_CAN_SUSPEND))
-		suspend_attempt_to_parse_resume_device(0);
-
-	if (!test_suspend_state(SUSPEND_CAN_SUSPEND)) {
-		printk("Suspend2: Software suspend is disabled.\n"
-			"This may be because you haven't put something along "
-			"the lines of\n\nresume2=swap:/dev/hda1\n\n"
-			"in lilo.conf or equivalent. (Where /dev/hda1 is your "
-			"swap partition).\n");
-		set_result_state(SUSPEND_ABORTED);
-		if (!had_pmsem)
-			mutex_unlock(&pm_mutex);
-		return 0;
-	}
-	
-	return 1;
-}
-
-static int do_power_down(void)
-{
-	/* If switching images fails, do normal powerdown */
-	if (poweroff_resume2[0])
-		do_suspend2_step(STEP_RESUME_ALT_IMAGE);
-
-	suspend_cond_pause(1, "About to power down or reboot.");
-	suspend_power_down();
-
-	/* If we return, it's because we suspended to ram */
-	if (read_pageset2(1))
-		panic("Attempt to reload pagedir 2 failed. Try rebooting.");
-
-	barrier();
-	mb();
-	do_cleanup();
-	return 0;
 }
 
 /* 
