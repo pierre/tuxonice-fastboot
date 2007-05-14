@@ -42,6 +42,7 @@ static int header_space_allocated = 0;
 static int main_storage_allocated = 0;
 static int storage_available = 0;
 int extra_pd1_pages_allowance = MIN_EXTRA_PAGES_ALLOWANCE;
+int image_size_limit = 0;
 
 /*
  * The atomic copy of pageset1 is stored in pageset2 pages.

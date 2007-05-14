@@ -83,31 +83,16 @@
 #include "cluster.h"
 #include "suspend_builtin.h"
 
-static int had_pmsem = 0;
-
-int image_size_limit = 0;
-
-static int orig_system_state;
-
-int do_suspend2_step(int step);
-
-/* 
- * ---  Variables -----
- * 
- * The following are used by the arch specific low level routines 
- * and only needed if suspend2 is compiled in. Other variables,
- * used by the freezer even if suspend2 is not compiled in, are
- * found in process.c
- */
-
 /*! Pageset metadata. */
 struct pagedir pagedir2 = {2}; 
 
+static int had_pmsem = 0;
+static int orig_system_state;
 static mm_segment_t oldfs;
-
 static atomic_t actions_running;
+static int block_dump_save;
 
-int block_dump_save;
+int do_suspend2_step(int step);
 
 /*
  * Basic clean-up routine.
