@@ -178,6 +178,13 @@ int suspend2_lowlevel_builtin(void)
 	return error;
 }
 
+#ifndef CONFIG_SOFTWARE_SUSPEND
+int hibernate(void)
+{
+	return suspend2_try_suspend(0);
+}
+#endif
+
 EXPORT_SYMBOL_GPL(suspend2_lowlevel_builtin);
 
 unsigned long suspend_compress_bytes_in, suspend_compress_bytes_out;
