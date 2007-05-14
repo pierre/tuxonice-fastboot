@@ -97,7 +97,6 @@
 
 static int had_pmsem = 0;
 
-/* Variables to be preserved over suspend */
 int image_size_limit = 0;
 
 static int orig_system_state;
