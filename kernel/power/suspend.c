@@ -191,6 +191,9 @@ static void mark_nosave_pages(void)
 	}
 }
 
+/*
+ * Allocate & free bitmaps.
+ */
 static int allocate_bitmaps(void)
 {
 	if (allocate_dyn_pageflags(&pageset1_map) ||
@@ -477,8 +480,6 @@ static int suspend_init(void)
 
 	suspend_io_time[0][0] = suspend_io_time[0][1] = 
 		suspend_io_time[1][0] =	suspend_io_time[1][1] = 0;
-
-	free_bitmaps();	/* We might have kept it */
 
 	if (!test_suspend_state(SUSPEND_CAN_SUSPEND) ||
 	    allocate_bitmaps())
