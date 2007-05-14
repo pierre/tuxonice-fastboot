@@ -302,8 +302,8 @@ static int image_not_ready(int use_image_size_limit)
 	suspend_message(SUSPEND_EAT_MEMORY, SUSPEND_LOW, 1,
 		"Amount still needed (%d) > 0:%d. Header: %d < %d: %d,"
 		" Storage allocd: %d < %d: %d.\n",
-			amount_needed(1),
-			(amount_needed(1) > 0),
+			amount_needed(use_image_size_limit),
+			(amount_needed(use_image_size_limit) > 0),
 			header_space_allocated, header_storage_needed(),
 			header_space_allocated < header_storage_needed(),
 		 	main_storage_allocated,
