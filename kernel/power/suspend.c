@@ -165,6 +165,12 @@ out_err:
 	return -EBUSY;
 }
 
+/*
+ * Nosave page tracking.
+ *
+ * Here rather than in prepare_image because we want to do it once only at the
+ * start of a cycle.
+ */
 extern struct list_head nosave_regions;
 
 struct nosave_region {
