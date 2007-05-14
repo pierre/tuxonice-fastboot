@@ -181,8 +181,5 @@ extern struct page *saveable_highmem_page(unsigned long pfn);
 #else
 static inline void *saveable_highmem_page(unsigned long pfn) { return NULL; }
 #endif
-extern unsigned long suspend_get_nonconflicting_page(void);
-extern int suspend_post_context_save(void);
-extern int suspend2_try_suspend(int have_pmsem);
 
 #define PBES_PER_PAGE (PAGE_SIZE / sizeof(struct pbe))

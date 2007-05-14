@@ -27,9 +27,9 @@ static struct suspend_sysfs_data sysfs_params[];
 
 #define to_sysfs_data(_attr) container_of(_attr, struct suspend_sysfs_data, attr)
 
-static void suspend_main_wrapper(void)
+static void suspend2_main_wrapper(void)
 {
-	__suspend2_try_suspend(0);
+	_suspend2_try_suspend(0);
 }
 
 static ssize_t suspend2_attr_show(struct kobject *kobj, struct attribute *attr,
@@ -208,12 +208,12 @@ decl_subsys(suspend2, &suspend2_ktype, NULL);
 static struct suspend_sysfs_data sysfs_params[] = {
 	{ SUSPEND2_ATTR("do_suspend", SYSFS_WRITEONLY),
 	  SYSFS_CUSTOM(NULL, NULL, SYSFS_SUSPENDING),
-	  .write_side_effect = suspend_main_wrapper
+	  .write_side_effect = suspend2_main_wrapper
 	},
 
 	{ SUSPEND2_ATTR("do_resume", SYSFS_WRITEONLY),
 	  SYSFS_CUSTOM(NULL, NULL, SYSFS_RESUMING),
-	  .write_side_effect = __suspend_try_resume
+	  .write_side_effect = __suspend2_try_resume
 	},
 
 };

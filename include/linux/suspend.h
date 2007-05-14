@@ -115,7 +115,6 @@ extern unsigned long suspend_state;
 #define clear_suspend_state(bit) (clear_bit(bit, &suspend_state))
 #define test_suspend_state(bit) (test_bit(bit, &suspend_state))
 
-extern void suspend2_try_resume(void);
 extern int suspend2_running;
 #else
 

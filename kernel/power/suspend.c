@@ -763,7 +763,7 @@ out:
 /*
  * Check if we have an image and if so try to resume.
  */
-void __suspend_try_resume(void)
+void __suspend2_try_resume(void)
 {
 	set_suspend_state(SUSPEND_TRYING_TO_RESUME);
 	clear_suspend_state(SUSPEND_RESUME_NOT_DONE);
@@ -779,7 +779,7 @@ void __suspend_try_resume(void)
 }
 
 /* Wrapper for when called from init/do_mounts.c */
-void __suspend2_try_resume(void)
+void _suspend2_try_resume(void)
 {
 	clear_suspend_state(SUSPEND_RESUME_NOT_DONE);
 
@@ -787,7 +787,7 @@ void __suspend2_try_resume(void)
 		return;
 
 	mutex_lock(&pm_mutex);
-	__suspend_try_resume();
+	__suspend2_try_resume();
 
 	/* 
 	 * For initramfs, we have to clear the boot time
@@ -801,12 +801,12 @@ void __suspend2_try_resume(void)
 }
 
 /*
- * suspend2_try_suspend
+ * _suspend2_try_suspend
  * Functionality   : 
  * Called From     : drivers/acpi/sleep/main.c
  *                   kernel/reboot.c
  */
-int __suspend2_try_suspend(int have_pmsem)
+int _suspend2_try_suspend(int have_pmsem)
 {
 	int result = 0, sys_power_disk = 0;
 
@@ -957,8 +957,8 @@ static struct suspend_sysfs_data sysfs_params[] = {
 struct suspend2_core_fns my_fns = {
 	.get_nonconflicting_page = __suspend_get_nonconflicting_page,
 	.post_context_save = __suspend_post_context_save,
-	.try_suspend = __suspend2_try_suspend,
-	.try_resume = __suspend2_try_resume,
+	.try_suspend = _suspend2_try_suspend,
+	.try_resume = _suspend2_try_resume,
 };
  
 static __init int core_load(void)

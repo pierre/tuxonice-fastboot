@@ -151,9 +151,8 @@ extern void suspend_finish_anything(int suspend_or_resume);
 extern int save_image_part1(void);
 extern int suspend_atomic_restore(void);
 
-extern int __suspend2_try_suspend(int had_pmsem);
-extern int suspend2_try_suspend(int have_pmsem);
-extern void __suspend_try_resume(void);
+extern int _suspend2_try_suspend(int have_pmsem);
+extern void __suspend2_try_resume(void);
 
 extern int __suspend_post_context_save(void);
 

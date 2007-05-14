@@ -29,3 +29,8 @@ extern dyn_pageflags_t __nosavedata suspend2_nosave_copymap;
 extern __nosavedata struct zone_data *suspend2_nosave_zone_list;
 extern __nosavedata unsigned long suspend2_nosave_max_pfn;
 #endif
+
+extern unsigned long suspend_get_nonconflicting_page(void);
+extern int suspend_post_context_save(void);
+extern int suspend2_try_suspend(int have_pmsem);
+extern void suspend2_try_resume(void);

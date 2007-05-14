@@ -33,6 +33,7 @@
 #include <asm/io.h>
 
 #include "power.h"
+#include "suspend_builtin.h"
 
 static int swsusp_page_is_free(struct page *);
 static void swsusp_set_page_forbidden(struct page *);
