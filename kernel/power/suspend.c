@@ -570,23 +570,20 @@ static int do_prepare_image(void)
 	if (suspend_activate_storage(0))
 		return 1;
 
-	if (!can_suspend())
-		goto cleanup;
-
 	/*
 	 * If kept image and still keeping image and suspending to RAM, we will 
 	 * return 1 after suspending and resuming (provided the power doesn't
 	 * run out.
 	 */
 
-	if (test_result_state(SUSPEND_KEPT_IMAGE) && check_still_keeping_image()) 
+	if (!can_suspend() ||
+	    (test_result_state(SUSPEND_KEPT_IMAGE) &&
+	     check_still_keeping_image()))
 		goto cleanup;
 
 	if (suspend_init() && !suspend_prepare_image() &&
-			!test_result_state(SUSPEND_ABORTED)) {
-		unlink_lru_lists();
+			!test_result_state(SUSPEND_ABORTED))
 		return 0;
-	}
 
 cleanup:
 	do_cleanup();

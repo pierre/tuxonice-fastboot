@@ -778,8 +778,10 @@ int suspend_prepare_image(void)
 			display_stats(1, 0);
 			abort_suspend(SUSPEND_UNABLE_TO_PREPARE_IMAGE,
 				"Unable to successfully prepare the image.\n");
-		} else
+		} else {
+			unlink_lru_lists();
 			suspend_cond_pause(1, "Image preparation complete.");
+		}
 	}
 
 	return result;
