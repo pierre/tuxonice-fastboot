@@ -250,7 +250,7 @@ static int get_suspend_debug_info(const char *buffer, int count)
 	SNPRINTF("- Overall expected compression percentage: %d.\n",
 			100 - suspend_expected_compression_ratio());
 	len+= suspend_print_module_debug_info(((char *) buffer) + len, 
-			PAGE_SIZE - len - 1);
+			count - len - 1);
 	if (suspend_io_time[0][1]) {
 		if ((io_MB_per_second(0) < 5) || (io_MB_per_second(1) < 5)) {
 			SNPRINTF("- I/O speed: Write %d KB/s",
