@@ -203,7 +203,7 @@ static void thaw_tasks(int thaw_user_space)
 		if (is_user_space(p) == !thaw_user_space)
 			continue;
 
-		if (!thaw_process(p))
+		if (!thaw_process(p) && p->state != TASK_TRACED)
 			printk(KERN_WARNING " Strange, %s not stopped\n",
 				p->comm );
 	} while_each_thread(g, p);
