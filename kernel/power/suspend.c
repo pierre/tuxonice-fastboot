@@ -67,7 +67,7 @@
  */
 
 #include <linux/suspend.h>
-#include <linux/writeback.h>
+#include <linux/module.h>
 #include <linux/freezer.h>
 #include <linux/utsrelease.h>
 #include <linux/cpu.h>
@@ -91,6 +91,7 @@ static int had_pmsem = 0;
 static mm_segment_t oldfs;
 static atomic_t actions_running;
 static int block_dump_save;
+extern int block_dump;
 
 int do_suspend2_step(int step);
 

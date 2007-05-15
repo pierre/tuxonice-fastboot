@@ -8,7 +8,7 @@
 
 extern struct suspend2_core_fns *s2_core_fns;
 extern unsigned long suspend_compress_bytes_in, suspend_compress_bytes_out;
-extern unsigned long suspend_action, suspend_state;
+extern unsigned long suspend_action;
 extern unsigned int nr_suspends;
 extern char resume2_file[256];
 extern int suspend2_in_suspend;
@@ -33,4 +33,3 @@ extern __nosavedata unsigned long suspend2_nosave_max_pfn;
 extern unsigned long suspend_get_nonconflicting_page(void);
 extern int suspend_post_context_save(void);
 extern int suspend2_try_suspend(int have_pmsem);
-extern void suspend2_try_resume(void);

@@ -110,37 +110,34 @@ enum {
 
 /* Used in init dir files */
 extern unsigned long suspend_state;
-
 #define set_suspend_state(bit) (set_bit(bit, &suspend_state))
 #define clear_suspend_state(bit) (clear_bit(bit, &suspend_state))
 #define test_suspend_state(bit) (test_bit(bit, &suspend_state))
-
 extern int suspend2_running;
-#else
+
+#else /* !CONFIG_SUSPEND2 */
 
 #define suspend_state		(0)
 #define set_suspend_state(bit) do { } while(0)
 #define clear_suspend_state(bit) do { } while (0)
 #define test_suspend_state(bit) (0)
-
 #define suspend2_running (0)
-
-#define suspend2_try_resume() do { } while(0)
 #endif /* CONFIG_SUSPEND2 */
+
+#ifdef CONFIG_SUSPEND2
+extern void suspend2_try_resume(void);
+#else
+#define suspend2_try_resume() do { } while(0)
+#endif
 
 #ifdef CONFIG_SOFTWARE_SUSPEND
 extern int software_resume(void);
 #else
-#ifdef CONFIG_SUSPEND2
-extern void suspend2_try_resume(void);
 static inline int software_resume(void)
 {
 	suspend2_try_resume();
 	return 0;
 }
-#else
-#define software_resume() do { } while(0)
-#endif
 #endif
 
 #ifdef CONFIG_PRINTK_NOSAVE
