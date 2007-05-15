@@ -47,7 +47,7 @@ static int try_pm_state_powerdown(void)
 
 	enable_nonboot_cpus();
 
-	if (pm_ops && pm_ops->finish && suspend_powerdown_method > 3)
+	if (pm_ops && pm_ops->finish && suspend_powerdown_method)
 		pm_ops->finish(suspend_powerdown_method);
 
 	device_resume();
