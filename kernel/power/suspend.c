@@ -484,7 +484,7 @@ static int __save_image(void)
 	 * running out when we entered S3).
 	 */
 	if (!suspend2_in_suspend && pm_ops && pm_ops->finish &&
-			suspend_powerdown_method)
+			suspend_powerdown_method > 3)
 		pm_ops->finish(suspend_powerdown_method);
 
 	if (test_action_state(SUSPEND_LATE_CPU_HOTPLUG))
