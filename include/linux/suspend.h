@@ -153,6 +153,7 @@ static inline void check_resume_attempted(void)
 }
 #else
 #define check_resume_attempted() do { } while(0)
+#define resume_attempted (0)
 #endif
 
 #ifdef CONFIG_PRINTK_NOSAVE
