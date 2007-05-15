@@ -284,17 +284,19 @@ static int get_suspend_debug_info(const char *buffer, int count)
  * do_cleanup
  */
 
-static void do_cleanup(void)
+static void do_cleanup(int get_debug_info)
 {
 	int i = 0;
-	char *buffer;;
+	char *buffer = NULL;
 
-	suspend_prepare_status(DONT_CLEAR_BAR, "Cleaning up...");
+	if (get_debug_info)
+		suspend_prepare_status(DONT_CLEAR_BAR, "Cleaning up...");
 	relink_lru_lists();
 
 	free_checksum_pages();
 
-	buffer = (char *) get_zeroed_page(GFP_ATOMIC);
+	if (get_debug_info)
+		buffer = (char *) get_zeroed_page(GFP_ATOMIC);
 
 	if (buffer)
 		i = get_suspend_debug_info(buffer, PAGE_SIZE);
@@ -427,7 +429,7 @@ static int do_power_down(void)
 
 	barrier();
 	mb();
-	do_cleanup();
+	do_cleanup(1);
 	return 0;
 }
 
@@ -561,7 +563,7 @@ static int do_save_image(void)
 {
 	int result = __save_image();
 	if (!suspend2_in_suspend || result)
-		do_cleanup();
+		do_cleanup(1);
 	return result;
 }
 
@@ -593,7 +595,7 @@ static int do_prepare_image(void)
 		return 0;
 
 cleanup:
-	do_cleanup();
+	do_cleanup(0);
 	return 1;
 }
 
@@ -779,7 +781,7 @@ void __suspend2_try_resume(void)
 	    !do_suspend2_step(STEP_RESUME_LOAD_PS1))
 	    do_suspend2_step(STEP_RESUME_DO_RESTORE);
 
-	do_cleanup();
+	do_cleanup(0);
 
 	clear_suspend_state(SUSPEND_IGNORE_LOGLEVEL);
 	clear_suspend_state(SUSPEND_TRYING_TO_RESUME);
@@ -840,7 +842,7 @@ int _suspend2_try_suspend(int have_pmsem)
 		goto out;
 
 	if (test_action_state(SUSPEND_FREEZER_TEST)) {
-		do_cleanup();
+		do_cleanup(0);
 		goto out;
 	}
 
