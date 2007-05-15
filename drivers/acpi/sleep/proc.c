@@ -58,7 +58,7 @@ acpi_system_write_sleep(struct file *file,
 		goto Done;
 	}
 	state = simple_strtoul(str, NULL, 0);
-#ifdef CONFIG_SOFTWARE_SUSPEND
+#ifdef CONFIG_SUSPEND_SHARED
 	if (state == 4) {
 		error = hibernate();
 		goto Done;
