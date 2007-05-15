@@ -120,10 +120,11 @@ static void lzf_compress_exit(struct crypto_tfm *tfm)
 {
 	struct lzf_ctx *ctx = crypto_tfm_ctx(tfm);
 
-	if (ctx->hbuf) {
-		vfree(ctx->hbuf);
-		ctx->hbuf = NULL;
-	}
+	if (!ctx->hbuf)
+		return;
+
+	vfree(ctx->hbuf);
+	ctx->hbuf = NULL;
 }
 
 static int lzf_compress_init(struct crypto_tfm *tfm)
@@ -132,13 +133,12 @@ static int lzf_compress_init(struct crypto_tfm *tfm)
 
 	/* Get LZF ready to go */
 	ctx->hbuf = vmalloc_32((1 << hlog) * sizeof(char *));
-	if (!ctx->hbuf) {
-		printk(KERN_WARNING
-		       "Failed to allocate %ld bytes for lzf workspace\n",
-		       (long) ((1 << hlog) * sizeof(char *)));
-		return -ENOMEM;
-	}
-	return 0;
+	if (ctx->hbuf)
+		return 0;
+
+	printk(KERN_WARNING "Failed to allocate %ld bytes for lzf workspace\n",
+			(long) ((1 << hlog) * sizeof(char *)));
+	return -ENOMEM;
 }
 
 static int lzf_compress(struct crypto_tfm *tfm, const u8 *in_data,
@@ -256,16 +256,15 @@ static int lzf_decompress(struct crypto_tfm *tfm, const u8 *src,
 	u8 const *const in_end = ip + slen;
 	u8 *const out_end = op + *dlen;
 
+	*dlen = PAGE_SIZE;
 	do {
 		unsigned int ctrl = *ip++;
 
 		if (ctrl < (1 << 5)) {	/* literal run */
 			ctrl++;
 
-			if (op + ctrl > out_end) {
-				*dlen = PAGE_SIZE;
+			if (op + ctrl > out_end)
 				return 0;
-			}
 			memcpy(op, ip, ctrl);
 			op += ctrl;
 			ip += ctrl;
@@ -279,19 +278,10 @@ static int lzf_decompress(struct crypto_tfm *tfm, const u8 *src,
 				len += *ip++;
 
 			ref -= *ip++;
+			len += 2;
 
-			if (op + len + 2 > out_end) {
-				*dlen = PAGE_SIZE;
+			if (op + len > out_end || ref < (u8 *) dst)
 				return 0;
-			}
-
-			if (ref < (u8 *) dst) {
-				*dlen = PAGE_SIZE;
-				return 0;
-			}
-
-			*op++ = *ref++;
-			*op++ = *ref++;
 
 			do
 				*op++ = *ref++;

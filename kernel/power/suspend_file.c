@@ -166,14 +166,14 @@ static int size_ignoring_ignored_pages(void)
 {
 	int mappable = 0, i;
 	
-	if (target_is_normal_file()) {
-		for (i = 0; i < (target_inode->i_size >> PAGE_SHIFT) ; i++)
-			if (has_contiguous_blocks(i))
-				mappable++;
-	
-		return mappable;
-	} else
+	if (!target_is_normal_file())
 		return suspend_file_storage_available();
+
+	for (i = 0; i < (target_inode->i_size >> PAGE_SHIFT) ; i++)
+		if (has_contiguous_blocks(i))
+			mappable++;
+	
+	return mappable;
 }
 
 static void __populate_block_list(int min, int max)
@@ -188,58 +188,57 @@ static void __populate_block_list(int min, int max)
 static void populate_block_list(void)
 {
 	int i;
+	int extent_min = -1, extent_max = -1, got_header = 0;
 	
 	if (block_chain.first)
 		suspend_put_extent_chain(&block_chain);
 
-	if (target_is_normal_file()) {
-		int extent_min = -1, extent_max = -1, got_header = 0;
-
-		for (i = 0;
-		     i < (target_inode->i_size >> PAGE_SHIFT);
-		     i++) {
-			sector_t new_sector;
-
-			if (!has_contiguous_blocks(i))
-				continue;
-
-			new_sector = bmap(target_inode,
-				(i * devinfo.blocks_per_page));
-
-			/* 
-			 * Ignore the first block in the file.
-			 * It gets the header.
-			 */
-			if (new_sector == target_firstblock >> devinfo.bmap_shift) {
-				got_header = 1;
-				continue;
-			}
-
-			/* 
-			 * I'd love to be able to fill in holes and resize 
-			 * files, but not yet...
-			 */
-
-			if (new_sector == extent_max + 1)
-				extent_max+= devinfo.blocks_per_page;
-			else {
-				if (extent_min > -1)
-					__populate_block_list(extent_min,
-							extent_max);
-
-				extent_min = new_sector;
-				extent_max = extent_min +
-					devinfo.blocks_per_page - 1;
-			}
-		}
-		if (extent_min > -1)
-			__populate_block_list(extent_min, extent_max);
-	} else {
+	if (!target_is_normal_file()) {
 		if (target_storage_available > 0)
 			__populate_block_list(devinfo.blocks_per_page, 
 				(target_storage_available + 1) *
 			 	devinfo.blocks_per_page - 1);
+		return;
 	}
+
+	for (i = 0; i < (target_inode->i_size >> PAGE_SHIFT); i++) {
+		sector_t new_sector;
+
+		if (!has_contiguous_blocks(i))
+			continue;
+
+		new_sector = bmap(target_inode,
+		(i * devinfo.blocks_per_page));
+
+		/* 
+		 * Ignore the first block in the file.
+		 * It gets the header.
+		 */
+		if (new_sector == target_firstblock >> devinfo.bmap_shift) {
+			got_header = 1;
+			continue;
+		}
+
+		/* 
+		 * I'd love to be able to fill in holes and resize 
+		 * files, but not yet...
+		 */
+
+		if (new_sector == extent_max + 1)
+			extent_max+= devinfo.blocks_per_page;
+		else {
+			if (extent_min > -1)
+				__populate_block_list(extent_min,
+						extent_max);
+
+			extent_min = new_sector;
+			extent_max = extent_min +
+				devinfo.blocks_per_page - 1;
+		}
+	}
+
+	if (extent_min > -1)
+		__populate_block_list(extent_min, extent_max);
 }
 
 static void suspend_file_cleanup(int finishing_cycle)
@@ -308,22 +307,20 @@ static void suspend_file_get_target_info(char *target, int get_size,
 		target_file = NULL;
 		resume_file_dev_t = name_to_dev_t(target);
 		if (!resume_file_dev_t) {
+			struct kstat stat;
+			int error = vfs_stat(target, &stat);
 			printk("Open file %s returned %p and name_to_devt "
-					"failed.\n",
-					target, target_file);
-			if (!resume_file_dev_t) {
-				struct kstat stat;
-				int error = vfs_stat(target, &stat);
-				if (error) {
-					printk("Stating the file also failed."
-						" Nothing more we can do.\n");
-					return;
-				}
+					"failed.\n", target, target_file);
+			if (error)
+				printk("Stating the file also failed."
+					" Nothing more we can do.\n");
+			else
 				resume_file_dev_t = stat.rdev;
-			}
 			return;
 		}
-	     	suspend_file_target_bdev = open_by_devnum(resume_file_dev_t, FMODE_READ);
+
+	     	suspend_file_target_bdev = open_by_devnum(resume_file_dev_t,
+				FMODE_READ);
 		if (IS_ERR(suspend_file_target_bdev)) {
 			printk("Got a dev_num (%lx) but failed to open it.\n",
 					(unsigned long) resume_file_dev_t);
@@ -334,10 +331,8 @@ static void suspend_file_get_target_info(char *target, int get_size,
 	} else
 		target_inode = target_file->f_mapping->host;
 
-	if (S_ISLNK(target_inode->i_mode) ||
-	    S_ISDIR(target_inode->i_mode) ||
-	    S_ISSOCK(target_inode->i_mode) ||
-	    S_ISFIFO(target_inode->i_mode)) {
+	if (S_ISLNK(target_inode->i_mode) || S_ISDIR(target_inode->i_mode) ||
+	    S_ISSOCK(target_inode->i_mode) || S_ISFIFO(target_inode->i_mode)) {
 		printk("File support works with regular files, character "
 				"files and block devices.\n");
 		goto cleanup;
@@ -405,23 +400,19 @@ static int prepare_signature(struct suspend_file_header *current_header,
 
 static int suspend_file_storage_allocated(void)
 {
-	int result;
-
 	if (!target_inode)
 		return 0;
 
-	if (target_is_normal_file()) {
-		result = (int) target_storage_available;
-	} else
-		result = header_pages_allocated + main_pages_requested;
-
-	return result;
+	if (target_is_normal_file())
+		return (int) target_storage_available;
+	else
+		return header_pages_allocated + main_pages_requested;
 }
 
 static int suspend_file_release_storage(void)
 {
-	if ((test_action_state(SUSPEND_KEEP_IMAGE)) &&
-	     test_suspend_state(SUSPEND_NOW_RESUMING))
+	if (test_action_state(SUSPEND_KEEP_IMAGE) &&
+	    test_suspend_state(SUSPEND_NOW_RESUMING))
 		return 0;
 
 	suspend_put_extent_chain(&block_chain);
@@ -467,12 +458,11 @@ static int suspend_file_allocate_header_space(int space_requested)
 
 static int suspend_file_allocate_storage(int space_requested)
 {
-	if (!__suspend_file_allocate_storage(space_requested,
-				header_pages_allocated)) {
-		main_pages_requested = space_requested;
-		return 0;
-	}
+	if (__suspend_file_allocate_storage(space_requested,
+				header_pages_allocated))
+		return -ENOSPC;
 
+	main_pages_requested = space_requested;
 	return -ENOSPC;
 }
 
@@ -892,14 +882,11 @@ static int __test_suspend_file_target(char *target, int resume_time, int quiet)
 
 static void test_suspend_file_target(void)
 {
-	int cant_suspend;
-
 	setting_suspend_file_target = 1;
        	
-	printk("Suspend2: FileAllocator: Testing whether you can suspend:\n");
-	cant_suspend =__test_suspend_file_target(suspend_file_target, 0, 1);
-
-	printk("Suspend2: Suspending %sabled.\n",  cant_suspend ? "dis" : "en");
+	printk("Suspend2: Suspending %sabled.\n",
+			__test_suspend_file_target(suspend_file_target, 0, 1) ?
+			"dis" : "en");
 	
 	setting_suspend_file_target = 0;
 }
@@ -1048,8 +1035,6 @@ static void suspend_file_load_config_info(char *buffer, int size)
 
 static int suspend_file_initialise(int starting_cycle)
 {
-	int result = 0;
-
 	if (starting_cycle) {
 		if (suspendActiveAllocator != &suspend_fileops)
 			return 0;
@@ -1067,10 +1052,10 @@ static int suspend_file_initialise(int starting_cycle)
 	if (starting_cycle && (suspend_file_image_exists() == -1)) {
 		printk("%s is does not have a valid signature for suspending.\n",
 				suspend_file_target);
-		result = 1;
+		return 1;
 	}
 
-	return result;
+	return 0;
 }
 
 static struct suspend_sysfs_data sysfs_params[] = {

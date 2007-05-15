@@ -345,10 +345,9 @@ static struct page *copy_page_from_orig_page(struct page *orig_page)
 				*my_last_high_page = high_page;
 				kunmap(high_page);
 				return page;
-			} else {
-				*my_last_low_page = this;
-				return virt_to_page(this[index].address);
 			}
+			*my_last_low_page = this;
+			return virt_to_page(this[index].address);
 		} else
 			min = index;
 		index = ((max + min) / 2);
@@ -461,8 +460,8 @@ static int worker_rw_loop(void *data)
 					"image.");
 				mutex_lock(&io_mutex);
 				break;
-			} else
-				panic("Read chunk returned (%d)", result);
+			}
+			panic("Read chunk returned (%d)", result);
 		}
 
 		/* 
@@ -1105,6 +1104,7 @@ static int __read_pageset1(void)
 		int resumed_before_default = 0;
 		if (test_suspend_state(SUSPEND_RETRY_RESUME))
 			resumed_before_default = SUSPEND_CONTINUE_REQ;
+
 		suspend_early_boot_message(1, resumed_before_default, NULL);
 		clear_suspend_state(SUSPEND_RETRY_RESUME);
 		if (!(test_suspend_state(SUSPEND_CONTINUE_REQ))) {
@@ -1193,12 +1193,11 @@ static int __read_pageset1(void)
 	 * use for the data to be restored.
 	 */
 
-	if (allocate_dyn_pageflags(&pageset1_map))
-		goto out_invalidate_image;
-	if (allocate_dyn_pageflags(&pageset1_copy_map))
-		goto out_invalidate_image;
-	if (allocate_dyn_pageflags(&io_map))
-		goto out_invalidate_image;
+	if (allocate_dyn_pageflags(&pageset1_map) ||
+	    allocate_dyn_pageflags(&pageset1_copy_map) ||
+	    allocate_dyn_pageflags(&io_map))
+		goto out_reset_console;
+
 	if (load_dyn_pageflags(pageset1_map))
 		goto out_reset_console;
 
