@@ -855,9 +855,14 @@ EXPORT_SYMBOL_GPL(save_avenrun);
 
 void restore_avenrun(void)
 {
+	if (!avenrun_save[0])
+		return;
+
 	avenrun[0] = avenrun_save[0];
 	avenrun[1] = avenrun_save[1];
 	avenrun[2] = avenrun_save[2];
+
+	avenrun_save[0] = 0;
 }
 
 EXPORT_SYMBOL_GPL(restore_avenrun);
