@@ -776,9 +776,10 @@ void __suspend2_try_resume(void)
 	resume_attempted = 1;
 
 	if (do_suspend2_step(STEP_RESUME_CAN_RESUME) &&
-	    !do_suspend2_step(STEP_RESUME_LOAD_PS1) &&
-	    do_suspend2_step(STEP_RESUME_DO_RESTORE))
-		do_cleanup();
+	    !do_suspend2_step(STEP_RESUME_LOAD_PS1))
+	    do_suspend2_step(STEP_RESUME_DO_RESTORE);
+
+	do_cleanup();
 
 	clear_suspend_state(SUSPEND_IGNORE_LOGLEVEL);
 	clear_suspend_state(SUSPEND_TRYING_TO_RESUME);
