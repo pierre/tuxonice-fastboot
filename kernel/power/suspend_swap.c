@@ -253,7 +253,6 @@ static int try_to_parse_resume_device(char *commandline, int quiet)
 static void suspend_swap_noresume_reset(void)
 {
 	memset((char *) &devinfo, 0, sizeof(devinfo));
-	close_bdevs();
 }
 
 static int parse_signature(char *header, int restore)
@@ -765,10 +764,8 @@ static int suspend_swap_read_header_init(void)
 		}
 
 		result = open_bdev(i, thisdevice, 1);
-		if (IS_ERR(result)) {
-			close_bdevs();
+		if (IS_ERR(result))
 			return PTR_ERR(result);
-		}
 	}
 
 	suspend_bio_ops.read_header_init();
@@ -999,8 +996,6 @@ static void suspend_swap_mark_resume_attempted(int mark)
 			virt_to_page(diskpage.ptr));
 	suspend_bio_ops.finish_all_io();
 	free_page(diskpage.address);
-	
-	close_bdevs();
 	return;
 }
 
