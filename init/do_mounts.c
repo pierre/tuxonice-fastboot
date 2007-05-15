@@ -462,11 +462,6 @@ void __init prepare_namespace(void)
 	if (initrd_load())
 		goto out;
 
-#ifdef CONFIG_SUSPEND2
-	if (test_suspend_state(SUSPEND_RESUME_NOT_DONE))
-		software_resume();
-#endif
-	
 	if (is_floppy && rd_doload && rd_load_disk(0))
 		ROOT_DEV = Root_RAM0;
 

@@ -64,7 +64,7 @@ static void __init handle_initrd(void)
 		}
 	}
 
-	if (test_suspend_state(SUSPEND_RESUME_NOT_DONE))
+	if (!resume_attempted)
 		printk(KERN_ERR "Suspend2: No attempt was made to resume from "
 				"any image that might exist.\n");
 	clear_suspend_state(SUSPEND_BOOT_TIME);

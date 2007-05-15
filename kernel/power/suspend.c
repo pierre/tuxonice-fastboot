@@ -773,7 +773,7 @@ out:
 void __suspend2_try_resume(void)
 {
 	set_suspend_state(SUSPEND_TRYING_TO_RESUME);
-	clear_suspend_state(SUSPEND_RESUME_NOT_DONE);
+	resume_attempted = 1;
 
 	if (do_suspend2_step(STEP_RESUME_CAN_RESUME) &&
 	    !do_suspend2_step(STEP_RESUME_LOAD_PS1) &&
@@ -788,7 +788,7 @@ void __suspend2_try_resume(void)
 /* Wrapper for when called from init/do_mounts.c */
 void _suspend2_try_resume(void)
 {
-	clear_suspend_state(SUSPEND_RESUME_NOT_DONE);
+	resume_attempted = 1;
 
 	if (suspend_start_anything(SYSFS_RESUMING))
 		return;

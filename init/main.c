@@ -765,6 +765,8 @@ static int noinline init_post(void)
 				ramdisk_execute_command);
 	}
 
+	check_resume_attempted();
+
 	/*
 	 * We try each of these until one succeeds.
 	 *

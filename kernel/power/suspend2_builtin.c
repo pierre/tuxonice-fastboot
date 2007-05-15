@@ -199,7 +199,6 @@ unsigned long suspend_action = 1 << SUSPEND_PAGESET2_FULL;
 EXPORT_SYMBOL_GPL(suspend_action);
 
 unsigned long suspend_state = ((1 << SUSPEND_BOOT_TIME) |
-		(1 << SUSPEND_RESUME_NOT_DONE) | 
 		(1 << SUSPEND_IGNORE_LOGLEVEL) |
 		(1 << SUSPEND_IO_STOPPED));
 EXPORT_SYMBOL_GPL(suspend_state);

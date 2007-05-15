@@ -45,6 +45,8 @@ static void swsusp_unset_page_forbidden(struct page *);
  * directly to their "original" page frames.
  */
 struct pbe *restore_pblist;
+int resume_attempted;
+EXPORT_SYMBOL_GPL(resume_attempted);
 
 #ifdef CONFIG_SUSPEND2
 #include "pagedir.h"

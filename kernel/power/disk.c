@@ -261,6 +261,8 @@ int software_resume(void)
 {
 	int error;
 
+	resume_attempted = 1;
+
 #ifdef CONFIG_SUSPEND2
 	/* 
 	 * We can't know (until an image header - if any - is loaded), whether

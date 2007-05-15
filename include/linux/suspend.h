@@ -124,20 +124,35 @@ extern int suspend2_running;
 #define suspend2_running (0)
 #endif /* CONFIG_SUSPEND2 */
 
+#ifdef CONFIG_SUSPEND_SHARED
 #ifdef CONFIG_SUSPEND2
 extern void suspend2_try_resume(void);
 #else
 #define suspend2_try_resume() do { } while(0)
 #endif
 
+extern int resume_attempted;
+
 #ifdef CONFIG_SOFTWARE_SUSPEND
 extern int software_resume(void);
 #else
 static inline int software_resume(void)
 {
+	resume_attempted = 1;
 	suspend2_try_resume();
 	return 0;
 }
+#endif
+
+static inline void check_resume_attempted(void)
+{
+	if (resume_attempted)
+		return;
+
+	software_resume();
+}
+#else
+#define check_resume_attempted() do { } while(0)
 #endif
 
 #ifdef CONFIG_PRINTK_NOSAVE
