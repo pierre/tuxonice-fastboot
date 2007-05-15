@@ -87,7 +87,7 @@
 /*! Pageset metadata. */
 struct pagedir pagedir2 = {2}; 
 
-static int had_pmsem = 0;
+static int get_pmsem = 0, got_pmsem;
 static mm_segment_t oldfs;
 static atomic_t actions_running;
 static int block_dump_save;
@@ -343,8 +343,10 @@ static void do_cleanup(int get_debug_info)
 	clear_suspend_state(SUSPEND_TRYING_TO_RESUME);
 	clear_suspend_state(SUSPEND_NOW_RESUMING);
 
-	if (!had_pmsem)
+	if (got_pmsem) {
 		mutex_unlock(&pm_mutex);
+		got_pmsem = 0;
+	}
 }
 
 static int check_still_keeping_image(void)
@@ -389,11 +391,15 @@ static int suspend_init(void)
 
 static int can_suspend(void)
 {
-	if (!had_pmsem && !mutex_trylock(&pm_mutex)) {
-		printk("Suspend2: Failed to obtain pm_mutex.\n");
-		set_result_state(SUSPEND_ABORTED);
-		set_result_state(SUSPEND_PM_SEM);
-		return 0;
+	if (get_pmsem) {
+		if (!mutex_trylock(&pm_mutex)) {
+			printk("Suspend2: Failed to obtain pm_mutex.\n");
+			dump_stack();
+			set_result_state(SUSPEND_ABORTED);
+			set_result_state(SUSPEND_PM_SEM);
+			return 0;
+		}
+		got_pmsem = 1;
 	}
 
 	if (!test_suspend_state(SUSPEND_CAN_SUSPEND))
@@ -406,8 +412,10 @@ static int can_suspend(void)
 			"in lilo.conf or equivalent. (Where /dev/hda1 is your "
 			"swap partition).\n");
 		set_result_state(SUSPEND_ABORTED);
-		if (!had_pmsem)
+		if (!got_pmsem) {
 			mutex_unlock(&pm_mutex);
+			got_pmsem = 0;
+		}
 		return 0;
 	}
 	
@@ -796,7 +804,10 @@ void _suspend2_try_resume(void)
 	if (suspend_start_anything(SYSFS_RESUMING))
 		return;
 
+	/* Unlock will be done in do_cleanup */
 	mutex_lock(&pm_mutex);
+	got_pmsem = 1;
+
 	__suspend2_try_resume();
 
 	/* 
@@ -804,9 +815,6 @@ void _suspend2_try_resume(void)
 	 * flag after trying to resume
 	 */
 	clear_suspend_state(SUSPEND_BOOT_TIME);
-
-	mutex_unlock(&pm_mutex);
-
 	suspend_finish_anything(SYSFS_RESUMING);
 }
 
@@ -827,7 +835,7 @@ int _suspend2_try_suspend(int have_pmsem)
 		sys_power_disk = 1;
 	}
 
-	had_pmsem = have_pmsem;
+	get_pmsem = !have_pmsem;
 
 	if (strlen(poweroff_resume2)) {
 		attempt_to_parse_po_resume_device2();
