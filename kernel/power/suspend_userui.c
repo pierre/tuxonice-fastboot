@@ -45,8 +45,6 @@ static char local_printf_buf[1024];	/* Same as printk - should be safe */
 
 static struct user_helper_data ui_helper_data;
 static struct suspend_module_ops userui_ops;
-static int orig_loglevel;
-static int orig_default_message_loglevel;
 static int orig_kmsg;
 
 static char lastheader[512];
@@ -465,6 +463,17 @@ static int userui_user_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 				return -EINVAL;
 			suspend_powerdown_method = (*data);
 			break;
+		case USERUI_MSG_GET_LOGLEVEL:
+			suspend_send_netlink_message(&ui_helper_data,
+					USERUI_MSG_GET_LOGLEVEL,
+					&suspend_default_console_level,
+					sizeof(suspend_default_console_level));
+			break;
+		case USERUI_MSG_SET_LOGLEVEL:
+			if (nlh->nlmsg_len < NLMSG_LENGTH(sizeof(int)))
+				return -EINVAL;
+			suspend_default_console_level = (*data);
+			break;
 	}
 
 	return 1;
@@ -509,12 +518,8 @@ static void userui_cond_pause(int pause, char *message)
  */
 static void userui_prepare_console(void)
 {
-	orig_loglevel = console_loglevel;
-	orig_default_message_loglevel = default_message_loglevel;
 	orig_kmsg = kmsg_redirect;
 	kmsg_redirect = fg_console + 1;
-	default_message_loglevel = 1;
-	console_loglevel = suspend_default_console_level;
 
 	ui_helper_data.pid = -1;
 
@@ -538,14 +543,10 @@ static void userui_prepare_console(void)
 
 static void userui_cleanup_console(void)
 {
-	suspend_default_console_level = console_loglevel;
-
 	if (ui_helper_data.pid > -1)
 		suspend_netlink_close(&ui_helper_data);
 
-	console_loglevel = orig_loglevel;
 	kmsg_redirect = orig_kmsg;
-	default_message_loglevel = orig_default_message_loglevel;
 }
 
 /*
