@@ -479,7 +479,12 @@ static int __save_image(void)
 
 	temp_result = suspend2_suspend();
 
-	if (pm_ops && pm_ops->finish && suspend_powerdown_method > 3)
+	/* Do pm_ops finish if we've just returned from an
+	 * atomic_restore after powering off (or the battery
+	 * running out when we entered S3).
+	 */
+	if (!suspend2_in_suspend && pm_ops && pm_ops->finish &&
+			suspend_powerdown_method)
 		pm_ops->finish(suspend_powerdown_method);
 
 	if (test_action_state(SUSPEND_LATE_CPU_HOTPLUG))
