@@ -384,10 +384,13 @@ static int suspend_init(void)
 	mark_nosave_pages();
 
 	suspend_prepare_console();
-	if (!test_action_state(SUSPEND_LATE_CPU_HOTPLUG))
-		disable_nonboot_cpus();
+	if (test_action_state(SUSPEND_LATE_CPU_HOTPLUG) ||
+			!disable_nonboot_cpus())
+		return 1;
 
-	return 1;
+	set_result_state(SUSPEND_CPU_HOTPLUG_FAILED);
+	set_result_state(SUSPEND_ABORTED);
+	return 0;
 }
 
 static int can_suspend(void)

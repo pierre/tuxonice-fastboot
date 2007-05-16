@@ -358,7 +358,11 @@ int suspend_atomic_restore(void)
 
 	if (test_action_state(SUSPEND_LATE_CPU_HOTPLUG)) {
 		suspend_prepare_status(DONT_CLEAR_BAR,	"Disable nonboot cpus.");
-		disable_nonboot_cpus();
+		if (disable_nonboot_cpus()) {
+			set_result_state(SUSPEND_CPU_HOTPLUG_FAILED);
+			set_result_state(SUSPEND_ABORTED);
+			goto device_resume;
+		}
 	}
 
 	suspend_prepare_status(DONT_CLEAR_BAR,	"Atomic restore preparation");
