@@ -991,6 +991,17 @@ static __init int suspend_block_io_load(void)
 	return suspend_register_module(&suspend_blockwriter_ops);
 }
 
+#ifdef CONFIG_SUSPEND2_FILE_EXPORTS
+EXPORT_SYMBOL_GPL(suspend_read_fd);
+#endif
+#if defined(CONFIG_SUSPEND2_FILE_EXPORTS) || defined(CONFIG_SUSPEND2_SWAP_EXPORTS)
+EXPORT_SYMBOL_GPL(suspend_writer_posn);
+EXPORT_SYMBOL_GPL(suspend_writer_posn_save);
+EXPORT_SYMBOL_GPL(suspend_writer_buffer);
+EXPORT_SYMBOL_GPL(suspend_writer_buffer_posn);
+EXPORT_SYMBOL_GPL(suspend_header_bytes_used);
+EXPORT_SYMBOL_GPL(suspend_bio_ops);
+#endif
 #ifdef MODULE
 static __exit void suspend_block_io_unload(void)
 {
@@ -1002,14 +1013,6 @@ module_exit(suspend_block_io_unload);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Nigel Cunningham");
 MODULE_DESCRIPTION("Suspend2 block io functions");
-
-EXPORT_SYMBOL_GPL(suspend_writer_posn);
-EXPORT_SYMBOL_GPL(suspend_writer_posn_save);
-EXPORT_SYMBOL_GPL(suspend_bio_ops);
-EXPORT_SYMBOL_GPL(suspend_writer_buffer);
-EXPORT_SYMBOL_GPL(suspend_writer_buffer_posn);
-EXPORT_SYMBOL_GPL(suspend_header_bytes_used);
-EXPORT_SYMBOL_GPL(suspend_read_fd);
 #else
 late_initcall(suspend_block_io_load);
 #endif
