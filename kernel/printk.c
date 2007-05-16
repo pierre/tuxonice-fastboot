@@ -739,12 +739,14 @@ void suspend_console(void)
 	acquire_console_sem();
 	console_suspended = 1;
 }
+EXPORT_SYMBOL(suspend_console);
 
 void resume_console(void)
 {
 	console_suspended = 0;
 	release_console_sem();
 }
+EXPORT_SYMBOL(resume_console);
 #endif /* CONFIG_DISABLE_CONSOLE_SUSPEND */
 
 /**

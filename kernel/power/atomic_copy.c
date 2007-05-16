@@ -13,6 +13,7 @@
 #include <linux/highmem.h>
 #include <linux/cpu.h>
 #include <linux/freezer.h>
+#include <linux/console.h>
 #include "suspend.h"
 #include "storage.h"
 #include "power_off.h"
@@ -349,6 +350,7 @@ int suspend_atomic_restore(void)
 
 	suspend_prepare_status(DONT_CLEAR_BAR,	"Device suspend.");
 
+	suspend_console();
 	if ((error = device_suspend(PMSG_FREEZE))) {
 		printk("Some devices failed to suspend\n");
 		goto device_resume;
@@ -398,6 +400,7 @@ device_power_up:
 		enable_nonboot_cpus();
 device_resume:
 	device_resume();
+	resume_console();
 	free_pbe_list(&restore_pblist, 0);
 #ifdef CONFIG_HIGHMEM
 	free_pbe_list(&restore_highmem_pblist, 1);

@@ -71,6 +71,7 @@
 #include <linux/freezer.h>
 #include <linux/utsrelease.h>
 #include <linux/cpu.h>
+#include <linux/console.h>
 #include <asm/uaccess.h>
 
 #include "modules.h"
@@ -478,6 +479,7 @@ static int __save_image(void)
 	
 	suspend2_in_suspend = 1;
 	
+	suspend_console();
 	if (device_suspend(PMSG_FREEZE)) {
 		set_result_state(SUSPEND_DEVICE_REFUSED);
 		set_result_state(SUSPEND_ABORTED);
@@ -501,6 +503,8 @@ static int __save_image(void)
 		enable_nonboot_cpus();
 
 	device_resume();
+
+	resume_console();
 
 	if (temp_result)
 		return 1;

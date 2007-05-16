@@ -25,6 +25,7 @@
 #include <linux/freezer.h>
 #include <linux/hardirq.h>
 #include <linux/mmzone.h>
+#include <linux/console.h>
 
 #include "pageflags.h"
 #include "modules.h"
@@ -196,6 +197,7 @@ static void get_extra_pd1_allowance(void)
 	
 	suspend_prepare_status(CLEAR_BAR, "Finding allowance for drivers.");
 
+	suspend_console();
 	device_suspend(PMSG_FREEZE);
 	local_irq_disable(); /* irqs might have been re-enabled on us */
 	device_power_down(PMSG_FREEZE);
@@ -205,6 +207,7 @@ static void get_extra_pd1_allowance(void)
 	device_power_up();
 	local_irq_enable();
 	device_resume();
+	resume_console();
 
 	extra_pd1_pages_allowance = max(
 		orig_num_free - final + MIN_EXTRA_PAGES_ALLOWANCE,
