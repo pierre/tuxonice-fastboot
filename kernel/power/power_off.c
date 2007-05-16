@@ -19,17 +19,17 @@
 #include "power_off.h"
 #include "power.h"
 
-unsigned long suspend_powerdown_method = 0; /* 0 - Kernel power off */
+unsigned long suspend2_poweroff_method = 0; /* 0 - Kernel power off */
 
 static int try_pm_state_powerdown(void)
 {
 	int result = 0;
 
-	if (pm_ops && pm_ops->prepare && suspend_powerdown_method &&
-	    pm_ops->prepare(suspend_powerdown_method))
+	if (pm_ops && pm_ops->prepare && suspend2_poweroff_method &&
+	    pm_ops->prepare(suspend2_poweroff_method))
 			return 0;
 
-	if (suspend_powerdown_method > 3)
+	if (suspend2_poweroff_method > 3)
 		kernel_shutdown_prepare(SYSTEM_SUSPEND_DISK);
 	else {
 		if (device_suspend(PMSG_SUSPEND)) {
@@ -42,13 +42,13 @@ static int try_pm_state_powerdown(void)
 
 	mdelay(1000); /* Give time for devices to power down */
 	
-	if (!suspend_enter(suspend_powerdown_method))
+	if (!suspend_enter(suspend2_poweroff_method))
 		result = 1;
 
 	enable_nonboot_cpus();
 
-	if (pm_ops && pm_ops->finish && suspend_powerdown_method)
-		pm_ops->finish(suspend_powerdown_method);
+	if (pm_ops && pm_ops->finish && suspend2_poweroff_method)
+		pm_ops->finish(suspend2_poweroff_method);
 
 	device_resume();
 
@@ -74,7 +74,7 @@ void suspend_power_down(void)
 
 	suspend_prepare_status(DONT_CLEAR_BAR, "Powering down.");
 
-	if (pm_ops && pm_ops->enter && suspend_powerdown_method && try_pm_state_powerdown())
+	if (pm_ops && pm_ops->enter && suspend2_poweroff_method && try_pm_state_powerdown())
 		return;
 
 	kernel_shutdown_prepare(SYSTEM_POWER_OFF);
@@ -88,5 +88,5 @@ void suspend_power_down(void)
 		cpu_relax();
 }
 
-EXPORT_SYMBOL_GPL(suspend_powerdown_method);
+EXPORT_SYMBOL_GPL(suspend2_poweroff_method);
 EXPORT_SYMBOL_GPL(suspend_power_down);

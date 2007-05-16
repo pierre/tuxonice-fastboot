@@ -248,7 +248,7 @@ static int get_suspend_debug_info(const char *buffer, int count)
 			suspend_debug_state,
 			suspend_default_console_level,
 			image_size_limit,
-			suspend_powerdown_method);
+			suspend2_poweroff_method);
 	SNPRINTF("- Overall expected compression percentage: %d.\n",
 			100 - suspend_expected_compression_ratio());
 	len+= suspend_print_module_debug_info(((char *) buffer) + len, 
@@ -496,8 +496,8 @@ static int __save_image(void)
 	 * running out when we entered S3).
 	 */
 	if (!suspend2_in_suspend && pm_ops && pm_ops->finish &&
-			suspend_powerdown_method > 3)
-		pm_ops->finish(suspend_powerdown_method);
+			suspend2_poweroff_method > 3)
+		pm_ops->finish(suspend2_poweroff_method);
 
 	if (test_action_state(SUSPEND_LATE_CPU_HOTPLUG))
 		enable_nonboot_cpus();
@@ -965,7 +965,7 @@ static struct suspend_sysfs_data sysfs_params[] = {
 	  
 #if defined(CONFIG_ACPI)
 	{ SUSPEND2_ATTR("powerdown_method", SYSFS_RW),
-	  SYSFS_UL(&suspend_powerdown_method, 0, 5, 0)
+	  SYSFS_UL(&suspend2_poweroff_method, 0, 5, 0)
 	},
 #endif
 

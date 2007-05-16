@@ -455,13 +455,13 @@ static int userui_user_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 		case USERUI_MSG_GET_POWERDOWN_METHOD:
 			suspend_send_netlink_message(&ui_helper_data,
 					USERUI_MSG_GET_POWERDOWN_METHOD,
-					&suspend_powerdown_method,
-					sizeof(suspend_powerdown_method));
+					&suspend2_poweroff_method,
+					sizeof(suspend2_poweroff_method));
 			break;
 		case USERUI_MSG_SET_POWERDOWN_METHOD:
 			if (nlh->nlmsg_len < NLMSG_LENGTH(sizeof(int)))
 				return -EINVAL;
-			suspend_powerdown_method = (*data);
+			suspend2_poweroff_method = (*data);
 			break;
 		case USERUI_MSG_GET_LOGLEVEL:
 			suspend_send_netlink_message(&ui_helper_data,
