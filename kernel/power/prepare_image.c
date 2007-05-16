@@ -431,7 +431,7 @@ static int size_of_free_region(struct page *page)
  * extents might allocate a new extent page, this routine may well
  * be called more than once.
  */
-static void flag_image_pages(void)
+static void flag_image_pages(int atomic_copy)
 {
 	int num_free = 0;
 	unsigned long loop;
@@ -507,6 +507,9 @@ static void flag_image_pages(void)
 		}
 	}
 
+	if (atomic_copy)
+		return;
+
 	suspend_message(SUSPEND_EAT_MEMORY, SUSPEND_MEDIUM, 0,
 		"Count data pages: Set1 (%d) + Set2 (%d) + Nosave (%d) + "
 		"NumFree (%d) = %d.\n",
@@ -524,7 +527,7 @@ void suspend_recalculate_image_contents(int atomic_copy)
 		/* Need to call this before getting pageset1_size! */
 		suspend_mark_pages_for_pageset2();
 	}
-	flag_image_pages();
+	flag_image_pages(atomic_copy);
 
 	if (!atomic_copy) {
 		storage_available = suspendActiveAllocator->storage_available();
