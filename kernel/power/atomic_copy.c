@@ -351,7 +351,7 @@ int suspend_atomic_restore(void)
 	suspend_prepare_status(DONT_CLEAR_BAR,	"Device suspend.");
 
 	suspend_console();
-	if ((error = device_suspend(PMSG_FREEZE))) {
+	if ((error = device_suspend(PMSG_PRETHAW))) {
 		printk("Some devices failed to suspend\n");
 		goto device_resume;
 	}
