@@ -97,9 +97,10 @@ ResumeConsole:
 				pm_ops->finish(PM_SUSPEND_MAX);
 	}
 
+	suspend_prepare_status(DONT_CLEAR_BAR, "Falling back to alternate power off method.");
 	kernel_power_off();
 	kernel_halt();
-	suspend_prepare_status(DONT_CLEAR_BAR, "Powerdown failed");
+	suspend_prepare_status(DONT_CLEAR_BAR, "Powerdown failed.");
 	while (1)
 		cpu_relax();
 }
