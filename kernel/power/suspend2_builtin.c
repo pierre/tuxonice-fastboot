@@ -111,12 +111,14 @@ EXPORT_SYMBOL_GPL(enable_nonboot_cpus);
 
 #ifdef CONFIG_SUSPEND2_USERUI_EXPORTS
 EXPORT_SYMBOL_GPL(kmsg_redirect);
-EXPORT_SYMBOL_GPL(console_printk);
 #ifndef CONFIG_COMPAT
 EXPORT_SYMBOL_GPL(sys_ioctl);
 #endif
 #endif
 
+#if defined (CONFIG_SUSPEND2_USERUI_EXPORTS) || (CONFIG_SUSPEND2_CORE_EXPORTS)
+EXPORT_SYMBOL_GPL(console_printk);
+#endif
 #ifdef CONFIG_SUSPEND2_SWAP_EXPORTS	/* Suspend swap specific */
 EXPORT_SYMBOL_GPL(sys_swapon);
 EXPORT_SYMBOL_GPL(sys_swapoff);
