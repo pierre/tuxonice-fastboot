@@ -178,4 +178,5 @@ static inline int load_direct(struct page *page)
 	return test_action_state(SUSPEND_NO_DIRECT_LOAD) ? 0 : PagePageset1Copy(page);
 }
 
+extern int pre_resume_freeze(void);
 #endif

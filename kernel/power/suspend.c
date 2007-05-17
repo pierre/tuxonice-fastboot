@@ -756,7 +756,6 @@ int do_suspend2_step(int step)
 		case STEP_RESUME_CAN_RESUME:
 			return do_check_can_resume();
 		case STEP_RESUME_LOAD_PS1:
-			pre_resume_freeze();
 			return do_load_atomic_copy();
 		case STEP_RESUME_DO_RESTORE:
 			/* 

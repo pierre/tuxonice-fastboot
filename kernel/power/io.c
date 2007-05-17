@@ -1186,6 +1186,9 @@ static int __read_pageset1(void)
 
 	set_suspend_state(SUSPEND_NOW_RESUMING);
 
+	if (pre_resume_freeze())
+		goto out_reset_console;
+
 	suspend_cond_pause(1, "About to read original pageset1 locations.");
 
 	/*
