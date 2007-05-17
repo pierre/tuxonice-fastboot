@@ -486,18 +486,17 @@ static int __save_image(void)
 	if (device_suspend(PMSG_FREEZE)) {
 		set_result_state(SUSPEND_DEVICE_REFUSED);
 		set_result_state(SUSPEND_ABORTED);
-		return 1;
+		goto ResumeConsole;
 	}
 	
-	if (test_action_state(SUSPEND_LATE_CPU_HOTPLUG))
-		disable_nonboot_cpus();
+	if (test_action_state(SUSPEND_LATE_CPU_HOTPLUG) &&
+			disable_nonboot_cpus()) {
+		set_result_state(SUSPEND_CPU_HOTPLUG_FAILED);
+		set_result_state(SUSPEND_ABORTED);
+	} else
+		temp_result = suspend2_suspend();
 
-	temp_result = suspend2_suspend();
-
-	/* Do pm_ops finish if we've just returned from an
-	 * atomic_restore after powering off (or the battery
-	 * running out when we entered S3).
-	 */
+	/* We return here at resume time too! */
 	if (!suspend2_in_suspend && pm_ops && pm_ops->finish &&
 			suspend2_poweroff_method > 3)
 		pm_ops->finish(suspend2_poweroff_method);
@@ -507,9 +506,13 @@ static int __save_image(void)
 
 	device_resume();
 
+ResumeConsole:
 	resume_console();
 
-	if (temp_result)
+	if (suspend_activate_storage(1))
+		panic("Failed to reactivate our storage.");
+	
+	if (temp_result || test_result_state(SUSPEND_ABORTED))
 		return 1;
 	
 	/* Resume time? */
@@ -520,9 +523,6 @@ static int __save_image(void)
 
 	/* Nope. Suspending. So, see if we can save the image... */
 
-	if (suspend_activate_storage(1))
-		panic("Failed to reactivate our storage.");
-	
 	suspend_update_status(pagedir2.size,
 			pagedir1.size + pagedir2.size,
 			NULL);
