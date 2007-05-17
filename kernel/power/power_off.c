@@ -56,7 +56,7 @@ static int try_pm_state_powerdown(void)
 }
 
 /*
- * suspend_power_down
+ * suspend2_power_down
  * Functionality   : Powers down or reboots the computer once the image
  *                   has been written to disk.
  * Key Assumptions : Able to reboot/power down via code called or that
@@ -65,7 +65,7 @@ static int try_pm_state_powerdown(void)
  * Called From     : do_suspend2_suspend_2
  */
 
-void suspend_power_down(void)
+void suspend2_power_down(void)
 {
 	if (test_action_state(SUSPEND_REBOOT)) {
 		suspend_prepare_status(DONT_CLEAR_BAR, "Ready to reboot.");
@@ -89,4 +89,4 @@ void suspend_power_down(void)
 }
 
 EXPORT_SYMBOL_GPL(suspend2_poweroff_method);
-EXPORT_SYMBOL_GPL(suspend_power_down);
+EXPORT_SYMBOL_GPL(suspend2_power_down);

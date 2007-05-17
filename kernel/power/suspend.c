@@ -433,7 +433,7 @@ static int do_power_down(void)
 		do_suspend2_step(STEP_RESUME_ALT_IMAGE);
 
 	suspend_cond_pause(1, "About to power down or reboot.");
-	suspend_power_down();
+	suspend2_power_down();
 
 	/* If we return, it's because we suspended to ram */
 	if (read_pageset2(1))

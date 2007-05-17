@@ -386,7 +386,7 @@ static void request_abort_suspend(void)
 			schedule();
 		if (suspendActiveAllocator->mark_resume_attempted)
 			suspendActiveAllocator->mark_resume_attempted(0);
-		suspend_power_down();
+		suspend2_power_down();
 	} else {
 		suspend_prepare_status(CLEAR_BAR, "--- ESCAPE PRESSED :"
 					" ABORTING SUSPEND ---");

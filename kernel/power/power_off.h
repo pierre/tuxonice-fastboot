@@ -9,5 +9,5 @@
  */
 
 int suspend_pm_state_finish(void);
-void suspend_power_down(void);
+void suspend2_power_down(void);
 extern unsigned long suspend2_poweroff_method;
