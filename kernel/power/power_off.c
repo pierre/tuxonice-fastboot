@@ -14,46 +14,13 @@
 #include <linux/pm.h>
 #include <linux/reboot.h>
 #include <linux/cpu.h>
+#include <linux/console.h>
 #include "suspend.h"
 #include "ui.h"
 #include "power_off.h"
 #include "power.h"
 
 unsigned long suspend2_poweroff_method = 0; /* 0 - Kernel power off */
-
-static int try_pm_state_powerdown(void)
-{
-	int result = 0;
-
-	if (pm_ops && pm_ops->prepare && suspend2_poweroff_method &&
-	    pm_ops->prepare(suspend2_poweroff_method))
-			return 0;
-
-	if (suspend2_poweroff_method > 3)
-		kernel_shutdown_prepare(SYSTEM_SUSPEND_DISK);
-	else {
-		if (device_suspend(PMSG_SUSPEND)) {
-			printk(KERN_ERR "Some devices failed to suspend\n");
-			return 0;
-		}
-
-		disable_nonboot_cpus();
-	}
-
-	mdelay(1000); /* Give time for devices to power down */
-	
-	if (!suspend_enter(suspend2_poweroff_method))
-		result = 1;
-
-	enable_nonboot_cpus();
-
-	if (pm_ops && pm_ops->finish && suspend2_poweroff_method)
-		pm_ops->finish(suspend2_poweroff_method);
-
-	device_resume();
-
-	return result;
-}
 
 /*
  * suspend2_power_down
@@ -67,6 +34,8 @@ static int try_pm_state_powerdown(void)
 
 void suspend2_power_down(void)
 {
+	int result = 0;
+
 	if (test_action_state(SUSPEND_REBOOT)) {
 		suspend_prepare_status(DONT_CLEAR_BAR, "Ready to reboot.");
 		kernel_restart(NULL);
@@ -74,15 +43,62 @@ void suspend2_power_down(void)
 
 	suspend_prepare_status(DONT_CLEAR_BAR, "Powering down.");
 
-	if (pm_ops && pm_ops->enter && suspend2_poweroff_method && try_pm_state_powerdown())
-		return;
+	switch (suspend2_poweroff_method) {
+		case 0:
+			break;
+		case 3:
+			suspend_console();
 
-	kernel_shutdown_prepare(SYSTEM_POWER_OFF);
+			if (device_suspend(PMSG_SUSPEND)) {
+				suspend_prepare_status(DONT_CLEAR_BAR, "Device "
+					"suspend failure. Doing poweroff.");
+				goto ResumeConsole;
+			}
 
-	mdelay(1000); /* Give time for devices to power down */
+			if (!pm_ops ||
+			    (pm_ops->prepare && pm_ops->prepare(PM_SUSPEND_MEM)))
+				goto DeviceResume;
 
-	machine_power_off();
-	machine_halt();
+			if (test_action_state(SUSPEND_LATE_CPU_HOTPLUG) &&
+				disable_nonboot_cpus())
+				goto PmOpsFinish;
+	
+			if (!suspend_enter(PM_SUSPEND_MEM))
+				result = 1;
+
+			if (test_action_state(SUSPEND_LATE_CPU_HOTPLUG))
+				enable_nonboot_cpus();
+
+PmOpsFinish:
+			if (pm_ops->finish)
+				pm_ops->finish(PM_SUSPEND_MEM);
+
+DeviceResume:
+			device_resume();
+
+ResumeConsole:
+			resume_console();
+
+			/* If suspended to ram and later woke. */
+			if (result)
+				return;
+			break;
+		case 4:
+		case 5:
+			if (!pm_ops ||
+			    (pm_ops->prepare && pm_ops->prepare(PM_SUSPEND_MAX)))
+				break;
+
+			kernel_shutdown_prepare(SYSTEM_SUSPEND_DISK);
+			suspend_enter(suspend2_poweroff_method);
+
+			/* Failed. Fall back to kernel_power_off etc. */
+			if (pm_ops->finish)
+				pm_ops->finish(PM_SUSPEND_MAX);
+	}
+
+	kernel_power_off();
+	kernel_halt();
 	suspend_prepare_status(DONT_CLEAR_BAR, "Powerdown failed");
 	while (1)
 		cpu_relax();
