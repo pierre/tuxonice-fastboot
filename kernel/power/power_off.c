@@ -22,6 +22,16 @@
 
 unsigned long suspend2_poweroff_method = 0; /* 0 - Kernel power off */
 
+extern struct hibernation_ops *hibernation_ops;
+
+int suspend2_platform_prepare(void)
+{
+	if (suspend2_poweroff_method == 4 && hibernation_ops)
+		return hibernation_ops->prepare();
+
+	return 0;
+}
+
 /*
  * suspend2_power_down
  * Functionality   : Powers down or reboots the computer once the image
@@ -84,6 +94,9 @@ ResumeConsole:
 				return;
 			break;
 		case 4:
+			kernel_shutdown_prepare(SYSTEM_SUSPEND_DISK);
+			hibernation_ops->enter();
+			break;
 		case 5:
 			if (!pm_ops ||
 			    (pm_ops->prepare && pm_ops->prepare(PM_SUSPEND_MAX)))
@@ -103,6 +116,12 @@ ResumeConsole:
 	suspend_prepare_status(DONT_CLEAR_BAR, "Powerdown failed.");
 	while (1)
 		cpu_relax();
+}
+
+void suspend2_platform_finish(void)
+{
+	if (suspend2_poweroff_method == 4 && hibernation_ops)
+		hibernation_ops->finish();
 }
 
 EXPORT_SYMBOL_GPL(suspend2_poweroff_method);

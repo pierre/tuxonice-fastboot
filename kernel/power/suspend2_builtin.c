@@ -30,6 +30,29 @@
 #include "modules.h"
 #include "suspend2_builtin.h"
 
+#ifndef CONFIG_SOFTWARE_SUSPEND
+struct hibernation_ops *hibernation_ops;
+
+/**
+ * hibernation_set_ops - set the global hibernate operations
+ * @ops: the hibernation operations to use in subsequent hibernation transitions
+ */
+
+void hibernation_set_ops(struct hibernation_ops *ops)
+{
+	if (ops && !(ops->prepare && ops->enter && ops->finish)) {
+		WARN_ON(1);
+		return;
+	}
+	mutex_lock(&pm_mutex);
+	hibernation_ops = ops;
+	mutex_unlock(&pm_mutex);
+}
+EXPORT_SYMBOL_GPL(hibernation_set_ops);
+#endif
+
+EXPORT_SYMBOL_GPL(hibernation_ops);
+
 #ifdef CONFIG_SUSPEND2_CORE_EXPORTS
 #ifdef CONFIG_SOFTWARE_SUSPEND
 EXPORT_SYMBOL_GPL(resume_file);

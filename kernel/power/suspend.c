@@ -482,6 +482,12 @@ static int __save_image(void)
 	
 	suspend2_in_suspend = 1;
 	
+	if (suspend2_platform_prepare()) {
+		set_result_state(SUSPEND_PLATFORM_PREP_FAILED);
+		set_result_state(SUSPEND_ABORTED);
+		return 1;
+	}
+
 	suspend_console();
 	if (device_suspend(PMSG_FREEZE)) {
 		set_result_state(SUSPEND_DEVICE_REFUSED);
@@ -497,10 +503,6 @@ static int __save_image(void)
 		temp_result = suspend2_suspend();
 
 	/* We return here at resume time too! */
-	if (!suspend2_in_suspend && pm_ops && pm_ops->finish &&
-			suspend2_poweroff_method > 3)
-		pm_ops->finish(suspend2_poweroff_method);
-
 	if (test_action_state(SUSPEND_LATE_CPU_HOTPLUG))
 		enable_nonboot_cpus();
 
@@ -508,6 +510,8 @@ static int __save_image(void)
 
 ResumeConsole:
 	resume_console();
+
+	suspend2_platform_finish();
 
 	if (suspend_activate_storage(1))
 		panic("Failed to reactivate our storage.");
