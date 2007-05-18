@@ -61,7 +61,7 @@ void suspend2_power_down(void)
 
 			if (device_suspend(PMSG_SUSPEND)) {
 				suspend_prepare_status(DONT_CLEAR_BAR, "Device "
-					"suspend failure. Doing poweroff.");
+					"suspend failure.");
 				goto ResumeConsole;
 			}
 
