@@ -73,10 +73,10 @@ static void ui_nl_set_state(int n)
 		wake_up_interruptible(&userui_wait_for_key);
 }
 
-static void userui_redraw(void)
+static void userui_post_atomic_restore(void)
 {
 	suspend_send_netlink_message(&ui_helper_data,
-			USERUI_MSG_REDRAW, NULL, 0);
+			USERUI_MSG_POST_ATOMIC_RESTORE, NULL, 0);
 }
 
 static int userui_storage_needed(void)
@@ -592,7 +592,7 @@ static struct suspend_module_ops userui_ops = {
 };
 
 static struct ui_ops my_ui_ops = {
-	.redraw				= userui_redraw,
+	.post_atomic_restore		= userui_post_atomic_restore,
 	.update_status			= userui_update_status,
 	.message			= userui_message,
 	.prepare_status			= userui_prepare_status,

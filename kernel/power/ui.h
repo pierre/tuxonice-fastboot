@@ -25,7 +25,7 @@ enum {
 	/* Kernel -> Userspace */
 	USERUI_MSG_MESSAGE = 0x21,
 	USERUI_MSG_PROGRESS = 0x22,
-	USERUI_MSG_REDRAW = 0x25,
+	USERUI_MSG_POST_ATOMIC_RESTORE = 0x25,
 
 	USERUI_MSG_MAX,
 };
@@ -44,7 +44,7 @@ struct ui_ops {
 	void (*abort)(int result_code, const char *fmt, ...);
 	void (*prepare)(void);
 	void (*cleanup)(void);
-	void (*redraw)(void);
+	void (*post_atomic_restore)(void);
 	void (*message)(unsigned long section, unsigned long level,
 		int normally_logged, const char *fmt, ...);
 };
@@ -57,9 +57,9 @@ extern struct ui_ops *s2_current_ui;
 #define suspend_wait_for_keypress(timeout) \
  (s2_current_ui ? (s2_current_ui->wait_for_key) (timeout) : 0)
 
-#define suspend_ui_redraw(void) \
+#define suspend_ui_post_atomic_restore(void) \
 	do { if (s2_current_ui) \
-		(s2_current_ui->redraw)(); \
+		(s2_current_ui->post_atomic_restore)(); \
 	} while(0)
 
 #define suspend_prepare_console(void) \

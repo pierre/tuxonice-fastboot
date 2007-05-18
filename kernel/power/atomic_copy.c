@@ -152,7 +152,7 @@ static void free_pbe_list(struct pbe **list, int highmem)
  * these from the nosave variables to the normal ones.
  * 2) Set the status flags.
  * 3) Resume devices.
- * 4) Get userui to redraw.
+ * 4) Tell userui so it can redraw & restore settings.
  * 5) Reread the page cache.
  **/
 
@@ -174,7 +174,7 @@ void copyback_post(void)
 	if (suspend_activate_storage(1))
 		panic("Failed to reactivate our storage.");
 
-	suspend_ui_redraw();
+	suspend_ui_post_atomic_restore();
 
 	suspend_cond_pause(1, "About to reload secondary pagedir.");
 
