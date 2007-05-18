@@ -107,34 +107,41 @@ void copyback_high(void) { }
  **/
 static void free_pbe_list(struct pbe **list, int highmem)
 {
-	struct pbe *free_pbe = *list;
-	struct page *page = (struct page *) free_pbe;
-
-	do {
+	while(*list) {
 		int i;
+		struct pbe *free_pbe, *next_page = NULL;
+		struct page *page;
 
-		if (highmem)
+		if (highmem) {
+			page = (struct page *) *list;
 			free_pbe = (struct pbe *) kmap(page);
+		} else {
+			page = virt_to_page(*list);
+			free_pbe = *list;
+		}
 
 		for (i = 0; i < PBES_PER_PAGE; i++) {
 			if (!free_pbe)
 				break;
-			__free_page(free_pbe->address);
+			if (highmem)
+				__free_page(free_pbe->address);
+			else
+				free_page((unsigned long) free_pbe->address);
 			free_pbe = free_pbe->next;
 		}
 
 		if (highmem) {
-			struct page *next_page = NULL;
 			if (free_pbe)
-				next_page = (struct page *) free_pbe->next;
+				next_page = free_pbe;
 			kunmap(page);
-			__free_page(page);
-			page = next_page;
+		} else {
+			if (free_pbe)
+				next_page = free_pbe;
 		}
 
-	} while(page && free_pbe);
-
-	*list = NULL;
+		__free_page(page);
+		*list = (struct pbe *) next_page;
+	};
 }
 
 /**
