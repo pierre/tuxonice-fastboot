@@ -217,9 +217,12 @@ EXPORT_SYMBOL_GPL(suspend_compress_bytes_in);
 EXPORT_SYMBOL_GPL(suspend_compress_bytes_out);
 
 #ifdef CONFIG_SUSPEND2_REPLACE_SWSUSP
-unsigned long suspend_action = (1 << SUSPEND_REPLACE_SWSUSP) | (1 << SUSPEND_PAGESET2_FULL);
+unsigned long suspend_action = (1 << SUSPEND_REPLACE_SWSUSP) | \
+			       (1 << SUSPEND_PAGESET2_FULL) | \
+			       (1 << SUSPEND_LATE_CPU_HOTPLUG);
 #else
-unsigned long suspend_action = 1 << SUSPEND_PAGESET2_FULL;
+unsigned long suspend_action = 	(1 << SUSPEND_PAGESET2_FULL) | \
+				(1 << SUSPEND_LATE_CPU_HOTPLUG);
 #endif
 EXPORT_SYMBOL_GPL(suspend_action);
 
