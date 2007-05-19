@@ -19,7 +19,7 @@
 #include <asm/setup.h>
 #include "pageflags.h"
 
-#define SUSPEND_CORE_VERSION "2.2.9.17"
+#define SUSPEND_CORE_VERSION "2.2.10"
 
 /*		 == Action states == 		*/
 
