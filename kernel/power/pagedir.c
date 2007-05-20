@@ -223,7 +223,7 @@ void free_conflicting_pages(void)
 struct page * ___suspend_get_nonconflicting_page(int can_be_highmem)
 {
 	struct page *page;
-	int flags = GFP_ATOMIC | __GFP_NOWARN | __GFP_ZERO;
+	int flags = GFP_ATOMIC | __GFP_NOWARN;
 	if (can_be_highmem)
 		flags |= __GFP_HIGHMEM;
 
