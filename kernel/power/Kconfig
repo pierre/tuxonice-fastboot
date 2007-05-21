@@ -182,9 +182,8 @@ config APM_EMULATION
 
 menuconfig SUSPEND2_CORE
 	tristate "Suspend2"
-	depends on PM
+	depends on PM && (((X86 || PPC64_SWSUSP) && (!SMP || SUSPEND_SMP)) || ((FRV || PPC32) && !SMP))
 	select DYN_PAGEFLAGS
-	select HOTPLUG_CPU if SMP
 	default y
 	---help---
 	  Suspend2 is the 'new and improved' suspend support.
