@@ -24,6 +24,7 @@
 #include "pageflags.h"
 #include "checksum.h"
 #include "suspend2_builtin.h"
+#include "atomic_copy.h"
 
 int extra_pd1_pages_used;
 
@@ -298,39 +299,11 @@ int suspend2_suspend(void)
 
 	suspend2_running = 1; /* For the swsusp code we use :< */
 
-	if (test_action_state(SUSPEND_PM_PREPARE_CONSOLE))
-		pm_prepare_console();
-
-	if ((error = arch_prepare_suspend()))
-		goto err_out;
-
-	local_irq_disable();
-
-	/* At this point, device_suspend() has been called, but *not*
-	 * device_power_down(). We *must* device_power_down() now.
-	 * Otherwise, drivers for some devices (e.g. interrupt controllers)
-	 * become desynchronized with the actual state of the hardware
-	 * at resume time, and evil weirdness ensues.
-	 */
-
-	if ((error = device_power_down(PMSG_FREEZE))) {
-		set_result_state(SUSPEND_DEVICE_REFUSED);
-		set_result_state(SUSPEND_ABORTED);
-		printk(KERN_ERR "Some devices failed to power down, aborting suspend\n");
-		goto enable_irqs;
-	}
-
 	error = suspend2_lowlevel_builtin();
 
 	if (!suspend2_in_suspend)
 		copyback_high();
 
-	device_power_up();
-enable_irqs:
-	local_irq_enable();
-	if (test_action_state(SUSPEND_PM_PREPARE_CONSOLE))
-		pm_restore_console();
-err_out:
 	suspend2_running = 0;
 	return error;
 }
@@ -350,29 +323,10 @@ int suspend_atomic_restore(void)
 
 	suspend2_running = 1;
 
-	suspend_prepare_status(DONT_CLEAR_BAR,	"Prepare console");
+	suspend_prepare_status(DONT_CLEAR_BAR,	"Atomic restore.");
 
-	if (test_action_state(SUSPEND_PM_PREPARE_CONSOLE))
-		pm_prepare_console();
-
-	suspend_prepare_status(DONT_CLEAR_BAR,	"Device suspend.");
-
-	suspend_console();
-	if ((error = device_suspend(PMSG_PRETHAW))) {
-		printk("Some devices failed to suspend\n");
-		goto device_resume;
-	}
-
-	if (test_action_state(SUSPEND_LATE_CPU_HOTPLUG)) {
-		suspend_prepare_status(DONT_CLEAR_BAR,	"Disable nonboot cpus.");
-		if (disable_nonboot_cpus()) {
-			set_result_state(SUSPEND_CPU_HOTPLUG_FAILED);
-			set_result_state(SUSPEND_ABORTED);
-			goto device_resume;
-		}
-	}
-
-	suspend_prepare_status(DONT_CLEAR_BAR,	"Atomic restore preparation");
+	if (suspend2_go_atomic(PMSG_PRETHAW, 0))
+		goto Failed;
 
 	suspend2_nosave_state1 = suspend_action;
 	suspend2_nosave_state2 = suspend_debug_state;
@@ -382,15 +336,6 @@ int suspend_atomic_restore(void)
 		suspend2_nosave_io_speed[loop/2][loop%2] =
 			suspend_io_time[loop/2][loop%2];
 	memcpy(suspend2_nosave_commandline, saved_command_line, COMMAND_LINE_SIZE);
-
-	mb();
-
-	local_irq_disable();
-
-	if (device_power_down(PMSG_FREEZE)) {
-		printk(KERN_ERR "Some devices failed to power down. Very bad.\n");
-		goto device_power_up;
-	}
 
 	/* We'll ignore saved state, but this gets preempt count (etc) right */
 	save_processor_state();
@@ -405,13 +350,7 @@ int suspend_atomic_restore(void)
          */
 	BUG();
 
-device_power_up:
-	device_power_up();
-	if (test_action_state(SUSPEND_LATE_CPU_HOTPLUG))
-		enable_nonboot_cpus();
-device_resume:
-	device_resume();
-	resume_console();
+Failed:
 	free_pbe_list(&restore_pblist, 0);
 #ifdef CONFIG_HIGHMEM
 	free_pbe_list(&restore_highmem_pblist, 1);
@@ -420,4 +359,73 @@ device_resume:
 		pm_restore_console();
 	suspend2_running = 0;
 	return 1;
+}
+
+int suspend2_go_atomic(pm_message_t state, int suspend_time)
+{
+	if (test_action_state(SUSPEND_PM_PREPARE_CONSOLE))
+		pm_prepare_console();
+
+	suspend_console();
+
+	if (device_suspend(state)) {
+		set_result_state(SUSPEND_DEVICE_REFUSED);
+		suspend2_end_atomic(ATOMIC_STEP_RESUME_CONSOLE);
+		goto failed;
+	}
+	
+	if (test_action_state(SUSPEND_LATE_CPU_HOTPLUG)) {
+		suspend_prepare_status(DONT_CLEAR_BAR,	"Disable nonboot cpus.");
+		if (disable_nonboot_cpus()) {
+			set_result_state(SUSPEND_CPU_HOTPLUG_FAILED);
+			suspend2_end_atomic(ATOMIC_STEP_DEVICE_RESUME);
+			goto failed;
+		}
+	}
+
+	if (suspend_time && arch_prepare_suspend()) {
+		set_result_state(SUSPEND_ARCH_PREPARE_FAILED);
+		suspend2_end_atomic(ATOMIC_STEP_CPU_HOTPLUG);
+		goto failed;
+	}
+
+	local_irq_disable();
+
+	/* At this point, device_suspend() has been called, but *not*
+	 * device_power_down(). We *must* device_power_down() now.
+	 * Otherwise, drivers for some devices (e.g. interrupt controllers)
+	 * become desynchronized with the actual state of the hardware
+	 * at resume time, and evil weirdness ensues.
+	 */
+
+	if (device_power_down(PMSG_FREEZE)) {
+		set_result_state(SUSPEND_DEVICE_REFUSED);
+		suspend2_end_atomic(ATOMIC_STEP_IRQS);
+		goto failed;
+	}
+
+	return 0;
+
+failed:
+	set_result_state(SUSPEND_ABORTED);
+	return 1;
+}
+
+void suspend2_end_atomic(int stage)
+{
+	switch (stage) {
+		case ATOMIC_ALL_STEPS:
+			device_power_up();
+		case ATOMIC_STEP_IRQS:
+			local_irq_enable();
+		case ATOMIC_STEP_CPU_HOTPLUG:
+			if (test_action_state(SUSPEND_LATE_CPU_HOTPLUG))
+				enable_nonboot_cpus();
+		case ATOMIC_STEP_DEVICE_RESUME:
+			device_resume();
+		case ATOMIC_STEP_RESUME_CONSOLE:
+			resume_console();
+			if (test_action_state(SUSPEND_PM_PREPARE_CONSOLE))
+				pm_restore_console();
+	}
 }

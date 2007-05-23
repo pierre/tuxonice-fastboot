@@ -84,6 +84,7 @@
 #include "checksum.h"
 #include "cluster.h"
 #include "suspend2_builtin.h"
+#include "atomic_copy.h"
 
 /*! Pageset metadata. */
 struct pagedir pagedir2 = {2}; 
@@ -454,7 +455,7 @@ static int do_power_down(void)
  */
 static int __save_image(void)
 {
-	int temp_result;
+	int temp_result, did_copy = 0;
 
 	suspend_prepare_status(DONT_CLEAR_BAR, "Starting to save the image..");
 
@@ -488,36 +489,27 @@ static int __save_image(void)
 		return 1;
 	}
 
-	suspend_console();
-	if (device_suspend(PMSG_FREEZE)) {
-		set_result_state(SUSPEND_DEVICE_REFUSED);
-		set_result_state(SUSPEND_ABORTED);
-		goto ResumeConsole;
-	}
-	
-	if (test_action_state(SUSPEND_LATE_CPU_HOTPLUG) &&
-			disable_nonboot_cpus()) {
-		set_result_state(SUSPEND_CPU_HOTPLUG_FAILED);
-		set_result_state(SUSPEND_ABORTED);
-	} else
-		temp_result = suspend2_suspend();
+	if (suspend2_go_atomic(PMSG_PRETHAW, 1))
+		goto Failed;
+
+	temp_result = suspend2_suspend();
+	did_copy = 1;
 
 	/* We return here at resume time too! */
-	if (test_action_state(SUSPEND_LATE_CPU_HOTPLUG))
-		enable_nonboot_cpus();
+	suspend2_end_atomic(ATOMIC_ALL_STEPS);
 
-	device_resume();
-
-ResumeConsole:
-	resume_console();
-
+Failed:
 	suspend2_platform_finish();
 
 	if (suspend_activate_storage(1))
 		panic("Failed to reactivate our storage.");
 	
-	if (temp_result || test_result_state(SUSPEND_ABORTED))
-		return 1;
+	if (temp_result || test_result_state(SUSPEND_ABORTED)) {
+		if (did_copy)
+			goto abort_reloading_pagedir_two;
+		else
+			return 1;
+	}
 	
 	/* Resume time? */
 	if (!suspend2_in_suspend) {
