@@ -270,8 +270,7 @@ int __suspend_post_context_save(void)
 			"extra_pages_allowance is currently only %d.\n",
 			pagedir1.size - old_ps1_size,
 			extra_pd1_pages_allowance);
-		set_result_state(SUSPEND_ABORTED);
-		set_result_state(SUSPEND_EXTRA_PAGES_ALLOW_TOO_SMALL);
+		set_abort_result(SUSPEND_EXTRA_PAGES_ALLOW_TOO_SMALL);
 		return -1;
 	}
 
@@ -369,24 +368,24 @@ int suspend2_go_atomic(pm_message_t state, int suspend_time)
 	suspend_console();
 
 	if (device_suspend(state)) {
-		set_result_state(SUSPEND_DEVICE_REFUSED);
+		set_abort_result(SUSPEND_DEVICE_REFUSED);
 		suspend2_end_atomic(ATOMIC_STEP_RESUME_CONSOLE);
-		goto failed;
+		return 1;
 	}
 	
 	if (test_action_state(SUSPEND_LATE_CPU_HOTPLUG)) {
 		suspend_prepare_status(DONT_CLEAR_BAR,	"Disable nonboot cpus.");
 		if (disable_nonboot_cpus()) {
-			set_result_state(SUSPEND_CPU_HOTPLUG_FAILED);
+			set_abort_result(SUSPEND_CPU_HOTPLUG_FAILED);
 			suspend2_end_atomic(ATOMIC_STEP_DEVICE_RESUME);
-			goto failed;
+			return 1;
 		}
 	}
 
 	if (suspend_time && arch_prepare_suspend()) {
-		set_result_state(SUSPEND_ARCH_PREPARE_FAILED);
+		set_abort_result(SUSPEND_ARCH_PREPARE_FAILED);
 		suspend2_end_atomic(ATOMIC_STEP_CPU_HOTPLUG);
-		goto failed;
+		return 1;
 	}
 
 	local_irq_disable();
@@ -399,16 +398,12 @@ int suspend2_go_atomic(pm_message_t state, int suspend_time)
 	 */
 
 	if (device_power_down(PMSG_FREEZE)) {
-		set_result_state(SUSPEND_DEVICE_REFUSED);
+		set_abort_result(SUSPEND_DEVICE_REFUSED);
 		suspend2_end_atomic(ATOMIC_STEP_IRQS);
-		goto failed;
+		return 1;
 	}
 
 	return 0;
-
-failed:
-	set_result_state(SUSPEND_ABORTED);
-	return 1;
 }
 
 void suspend2_end_atomic(int stage)

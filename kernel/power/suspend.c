@@ -389,8 +389,7 @@ static int suspend_init(void)
 			!disable_nonboot_cpus())
 		return 1;
 
-	set_result_state(SUSPEND_CPU_HOTPLUG_FAILED);
-	set_result_state(SUSPEND_ABORTED);
+	set_abort_result(SUSPEND_CPU_HOTPLUG_FAILED);
 	return 0;
 }
 
@@ -400,8 +399,7 @@ static int can_suspend(void)
 		if (!mutex_trylock(&pm_mutex)) {
 			printk("Suspend2: Failed to obtain pm_mutex.\n");
 			dump_stack();
-			set_result_state(SUSPEND_ABORTED);
-			set_result_state(SUSPEND_PM_SEM);
+			set_abort_result(SUSPEND_PM_SEM);
 			return 0;
 		}
 		got_pmsem = 1;
@@ -416,7 +414,7 @@ static int can_suspend(void)
 			"the lines of\n\nresume2=swap:/dev/hda1\n\n"
 			"in lilo.conf or equivalent. (Where /dev/hda1 is your "
 			"swap partition).\n");
-		set_result_state(SUSPEND_ABORTED);
+		set_abort_result(SUSPEND_CANT_SUSPEND);
 		if (!got_pmsem) {
 			mutex_unlock(&pm_mutex);
 			got_pmsem = 0;
@@ -484,8 +482,7 @@ static int __save_image(void)
 	suspend2_in_suspend = 1;
 	
 	if (suspend2_platform_prepare()) {
-		set_result_state(SUSPEND_PLATFORM_PREP_FAILED);
-		set_result_state(SUSPEND_ABORTED);
+		set_abort_result(SUSPEND_PLATFORM_PREP_FAILED);
 		return 1;
 	}
 
@@ -711,8 +708,7 @@ int pre_resume_freeze(void)
 	if (!test_action_state(SUSPEND_LATE_CPU_HOTPLUG)) {
 		suspend_prepare_status(DONT_CLEAR_BAR,	"Disable nonboot cpus.");
 		if (disable_nonboot_cpus()) {
-			set_result_state(SUSPEND_CPU_HOTPLUG_FAILED);
-			set_result_state(SUSPEND_ABORTED);
+			set_abort_result(SUSPEND_CPU_HOTPLUG_FAILED);
 			return 1;
 		}
 	}

@@ -586,10 +586,8 @@ static void update_image(void)
 	else
 		header_space_allocated = param_used;
 
-	if (freeze_processes()) {
-		set_result_state(SUSPEND_FREEZING_FAILED);
-		set_result_state(SUSPEND_ABORTED);
-	}
+	if (freeze_processes())
+		set_abort_result(SUSPEND_FREEZING_FAILED);
 
 	allocate_checksum_pages();
 
@@ -610,10 +608,8 @@ static int attempt_to_freeze(void)
 	suspend_prepare_status(CLEAR_BAR, "Freezing processes & syncing filesystems.");
 	result = freeze_processes();
 
-	if (result) {
-		set_result_state(SUSPEND_ABORTED);
-		set_result_state(SUSPEND_FREEZING_FAILED);
-	}
+	if (result)
+		set_abort_result(SUSPEND_FREEZING_FAILED);
 
 	return result;
 }
@@ -653,8 +649,7 @@ static void eat_memory(void)
 	switch (image_size_limit) {
 		case -1: /* Don't eat any memory */
 			if (amount_wanted > 0) {
-				set_result_state(SUSPEND_ABORTED);
-				set_result_state(SUSPEND_WOULD_EAT_MEMORY);
+				set_abort_result(SUSPEND_WOULD_EAT_MEMORY);
 				return;
 			}
 			break;
@@ -707,10 +702,8 @@ static void eat_memory(void)
 
 		suspend_cond_pause(0, NULL);
 
-		if (freeze_processes()) {
-			set_result_state(SUSPEND_FREEZING_FAILED);
-			set_result_state(SUSPEND_ABORTED);
-		}
+		if (freeze_processes())
+			set_abort_result(SUSPEND_FREEZING_FAILED);
 	}
 	
 	if (did_eat_memory) {
@@ -757,8 +750,7 @@ int suspend_prepare_image(void)
 
 	if (!storage_available) {
 		printk(KERN_ERR "You need some storage available to be able to suspend.\n");
-		set_result_state(SUSPEND_ABORTED);
-		set_result_state(SUSPEND_NOSTORAGE_AVAILABLE);
+		set_abort_result(SUSPEND_NOSTORAGE_AVAILABLE);
 		return 1;
 	}
 

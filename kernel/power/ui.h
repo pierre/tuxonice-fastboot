@@ -76,8 +76,7 @@ extern struct ui_ops *s2_current_ui;
 	do { if (s2_current_ui) \
 		(s2_current_ui->abort)(result, fmt, ##args); \
 	     else { \
-		set_result_state(SUSPEND_ABORTED); \
-		set_result_state(result); \
+		set_abort_result(result); \
 	     } \
 	} while(0)
 

@@ -249,7 +249,7 @@ static int rw_init_modules(int rw, int which)
 		    this_module->type == WRITER_MODULE)
 			continue;
 		if (this_module->rw_init && this_module->rw_init(rw, which)) {
-			set_result_state(SUSPEND_ABORTED);
+			set_abort_result(SUSPEND_FAILED_MODULE_INIT);
 			printk("Setting aborted flag due to module init failure.\n");
 			return 1;
 		}

@@ -158,7 +158,7 @@ void suspend_mark_pages_for_pageset2(void)
 			kmalloc(sizeof(struct attention_list), GFP_ATOMIC);
 		if (!this) {
 			printk("Failed to allocate slab for attention list.\n");
-			set_result_state(SUSPEND_ABORTED);
+			set_abort_result(SUSPEND_UNABLE_TO_PREPARE_IMAGE);
 			goto free_attention_list;
 		}
 		this->next = NULL;

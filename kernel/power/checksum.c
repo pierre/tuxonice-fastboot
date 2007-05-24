@@ -313,7 +313,7 @@ void calculate_check_checksums(int check)
 				printk("\n");
 				suspend_num_resaved++;
 				if (test_action_state(SUSPEND_ABORT_ON_RESAVE_NEEDED))
-					set_result_state(SUSPEND_ABORTED);
+					set_abort_result(SUSPEND_RESAVE_NEEDED);
 			}
 		} else
 			ret = crypto_hash_digest(&desc, sg, 

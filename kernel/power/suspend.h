@@ -77,11 +77,15 @@ enum {
 	SUSPEND_PLATFORM_PREP_FAILED,
 	SUSPEND_CPU_HOTPLUG_FAILED,
 	SUSPEND_ARCH_PREPARE_FAILED,
+	SUSPEND_RESAVE_NEEDED,
+	SUSPEND_CANT_SUSPEND,
 };
 
 extern unsigned long suspend_result;
 
 #define set_result_state(bit) (test_and_set_bit(bit, &suspend_result))
+#define set_abort_result(bit) (	test_and_set_bit(SUSPEND_ABORTED, &suspend_result), \
+				test_and_set_bit(bit, &suspend_result))
 #define clear_result_state(bit) (test_and_clear_bit(bit, &suspend_result))
 #define test_result_state(bit) (test_bit(bit, &suspend_result))
 

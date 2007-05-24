@@ -390,8 +390,7 @@ static void request_abort_suspend(void)
 	} else {
 		suspend_prepare_status(CLEAR_BAR, "--- ESCAPE PRESSED :"
 					" ABORTING SUSPEND ---");
-		set_result_state(SUSPEND_ABORTED);
-		set_result_state(SUSPEND_ABORT_REQUESTED);
+		set_abort_result(SUSPEND_ABORT_REQUESTED);
 	
 		wake_up_interruptible(&userui_wait_for_key);
 	}
