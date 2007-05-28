@@ -834,28 +834,25 @@ static int suspend_bio_read_page(unsigned long *pfn, struct page *buffer_page,
  * with it's index and buffer size.
  */
 
-static int suspend_bio_write_page(unsigned long index, struct page *buffer_page,
+static int suspend_bio_write_page(unsigned long pfn, struct page *buffer_page,
 		unsigned int buf_size)
 {
-	int result;
 	char *buffer_virt = kmap(buffer_page);
+	int result = 0;
 
 	pr_index++;
 
 	while (!mutex_trylock(&suspend_bio_mutex))
 		do_bio_wait();
-	
-	if ((result = suspend_rw_buffer(WRITE, (char *) &index,
-					sizeof(unsigned long))))
-		goto out;
 
-	if ((result = suspend_rw_buffer(WRITE, (char *) &buf_size, sizeof(int))))
-		goto out;
+	if (suspend_rw_buffer(WRITE, (char *) &pfn, sizeof(unsigned long)) ||
+	    suspend_rw_buffer(WRITE, (char *) &buf_size, sizeof(int)) ||
+	    suspend_rw_buffer(WRITE, buffer_virt, buf_size))
+		result = -EIO;
 
-	result = suspend_rw_buffer(WRITE, buffer_virt, buf_size);
+	PR_DEBUG("%d: Index %ld, %d bytes. Result %d.\n", pr_index, pfn,
+			buf_size, result);
 
-	PR_DEBUG("%d: Index %ld, %d bytes.\n", pr_index, index, buf_size);
-out:
 	mutex_unlock(&suspend_bio_mutex);
 	kunmap(buffer_page);
 	return result;
