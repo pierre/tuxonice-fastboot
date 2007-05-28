@@ -758,12 +758,6 @@ static int suspend_rw_buffer(int writing, char *buffer, int buffer_size)
 		char *from = writing ? source_start : dest_start;
 
 		if (bytes_left <= capacity) {
-			if (test_debug_state(SUSPEND_HEADER))
-				printk("Copy %d bytes %d-%d from %p to %p.\n",
-						bytes_left,
-						suspend_header_bytes_used,
-						suspend_header_bytes_used + bytes_left,
-						from, to);
 			memcpy(to, from, bytes_left);
 			suspend_writer_buffer_posn += bytes_left;
 			suspend_header_bytes_used += bytes_left;
@@ -771,12 +765,6 @@ static int suspend_rw_buffer(int writing, char *buffer, int buffer_size)
 		}
 
 		/* Complete this page and start a new one */
-		if (test_debug_state(SUSPEND_HEADER))
-			printk("Copy %d bytes (%d-%d) from %p to %p.\n",
-					capacity,
-					suspend_header_bytes_used,
-					suspend_header_bytes_used + capacity,
-					from, to);
 		memcpy(to, from, capacity);
 		bytes_left -= capacity;
 		suspend_header_bytes_used += capacity;
