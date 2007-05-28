@@ -67,8 +67,8 @@ static int extra_page_forward = 0;
 static volatile unsigned long suspend_readahead_flags[
 	DIV_ROUND_UP(MAX_OUTSTANDING_IO, BITS_PER_LONG)];
 static spinlock_t suspend_readahead_flags_lock = SPIN_LOCK_UNLOCKED;
-static struct page *suspend_readahead_pages[MAX_OUTSTANDING_IO];
-static int readahead_index, readahead_submit_index;
+static struct page *suspend_ra_pages[MAX_OUTSTANDING_IO];
+static int readahead_index, ra_submit_index;
 
 static int current_stream;
 /* 0 = Header, 1 = Pageset1, 2 = Pageset2 */
@@ -241,7 +241,7 @@ static int suspend_prepare_readahead(int index)
 	if(!new_page)
 		return -ENOMEM;
 
-	suspend_readahead_pages[index] = virt_to_page(new_page);
+	suspend_ra_pages[index] = virt_to_page(new_page);
 	return 0;
 }
 
@@ -249,8 +249,8 @@ static int suspend_prepare_readahead(int index)
  * Clean up structures used for readahead */
 static void suspend_cleanup_readahead(int page)
 {
-	__free_page(suspend_readahead_pages[page]);
-	suspend_readahead_pages[page] = 0;
+	__free_page(suspend_ra_pages[page]);
+	suspend_ra_pages[page] = 0;
 	return;
 }
 
@@ -629,7 +629,7 @@ static int suspend_rw_init(int writing, int stream_number)
 
 	current_stream = stream_number;
 
-	readahead_index = readahead_submit_index = -1;
+	readahead_index = ra_submit_index = -1;
 
 	pr_index = 0;
 
@@ -638,7 +638,7 @@ static int suspend_rw_init(int writing, int stream_number)
 
 static void suspend_read_header_init(void)
 {
-	readahead_index = readahead_submit_index = -1;
+	readahead_index = ra_submit_index = -1;
 }
 
 static int suspend_rw_cleanup(int writing)
@@ -654,7 +654,7 @@ static int suspend_rw_cleanup(int writing)
 	suspend_finish_all_io();
 	
 	if (!writing)
-		while (readahead_index != readahead_submit_index) {
+		while (readahead_index != ra_submit_index) {
 			suspend_cleanup_readahead(readahead_index);
 			readahead_index++;
 			if (readahead_index == max_outstanding_io)
@@ -673,14 +673,14 @@ static int suspend_bio_read_page_with_readahead(void)
 
 	if (readahead_index == -1) {
 		last_result = 0;
-		readahead_index = readahead_submit_index = 0;
+		readahead_index = ra_submit_index = 0;
 	}
 
 	/* Start a new readahead? */
 	if (last_result) {
 		/* We failed to submit a read, and have cleaned up
 		 * all the readahead previously submitted */
-		if (readahead_submit_index == readahead_index) {
+		if (ra_submit_index == readahead_index) {
 			abort_suspend(SUSPEND_FAILED_IO, "Failed to submit"
 				" a read and no readahead left.\n");
 			return -EIO;
@@ -689,31 +689,31 @@ static int suspend_bio_read_page_with_readahead(void)
 	}
 	
 	do {
-		if (suspend_prepare_readahead(readahead_submit_index))
+		if (suspend_prepare_readahead(ra_submit_index))
 			break;
 
 		last_result = suspend_bio_rw_page(READ,
-			suspend_readahead_pages[readahead_submit_index], 
-			readahead_submit_index, SUSPEND_ASYNC);
+			suspend_ra_pages[ra_submit_index], 
+			ra_submit_index, SUSPEND_ASYNC);
 		if (last_result) {
 			printk("Begin read chunk for page %d returned %d.\n",
-				readahead_submit_index, last_result);
-			suspend_cleanup_readahead(readahead_submit_index);
+				ra_submit_index, last_result);
+			suspend_cleanup_readahead(ra_submit_index);
 			break;
 		}
 
-		readahead_submit_index++;
+		ra_submit_index++;
 
-		if (readahead_submit_index == max_outstanding_io)
-			readahead_submit_index = 0;
+		if (ra_submit_index == max_outstanding_io)
+			ra_submit_index = 0;
 
-	} while((!last_result) && (readahead_submit_index != readahead_index) &&
+	} while((!last_result) && (ra_submit_index != readahead_index) &&
 			(!suspend_readahead_ready(readahead_index)));
 
 wait:
 	suspend_wait_on_readahead(readahead_index);
 
-	virt = kmap_atomic(suspend_readahead_pages[readahead_index], KM_USER1);
+	virt = kmap_atomic(suspend_ra_pages[readahead_index], KM_USER1);
 	memcpy(suspend_writer_buffer, virt, PAGE_SIZE);
 	kunmap_atomic(virt, KM_USER1);
 
