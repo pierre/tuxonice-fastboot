@@ -406,23 +406,17 @@ static struct io_info *get_io_info_struct(void)
  *
  * Failure? What's that?
  */
-static int suspend_do_io(int writing, struct block_device *bdev, long block0,
+static void suspend_do_io(int writing, struct block_device *bdev, long block0,
 	struct page *page, int readahead_index, int syncio)
 {
-	struct io_info *io_info;
+	struct io_info *io_info = get_io_info_struct();
 	unsigned long buffer_virt = 0;
 	char *to, *from;
-
-	io_info = get_io_info_struct();
 
 	/* Done before submitting to avoid races. */
 	if (syncio)
 		waiting_on = io_info;
 
-	/* Get our local buffer */
-	suspend_message(SUSPEND_WRITER, SUSPEND_HIGH, 1,
-			"Start_IO: [%p]", io_info);
-	
 	/* Copy settings to the io_info struct */
 	io_info->writing = writing;
 	io_info->dev = bdev;
@@ -434,9 +428,6 @@ static int suspend_do_io(int writing, struct block_device *bdev, long block0,
 		while (!(buffer_virt = get_zeroed_page(GFP_ATOMIC | __GFP_NOWARN)))
 			do_bio_wait();
 
-		suspend_message(SUSPEND_WRITER, SUSPEND_HIGH, 0,
-				"[ALLOC BUFFER]->%d",
-				real_nr_free_pages(all_zones_mask));
 		io_info->bio_page = virt_to_page(buffer_virt);
 	} else {
 		unsigned long flags;
@@ -465,9 +456,6 @@ static int suspend_do_io(int writing, struct block_device *bdev, long block0,
 	/* Submit the page */
 	get_page(io_info->bio_page);
 
-	suspend_message(SUSPEND_WRITER, SUSPEND_HIGH, 1,
-		"-> (PRE BRW) %d\n", real_nr_free_pages(all_zones_mask));
-
 	if (syncio)
 	 	submit(io_info);
 	else
@@ -477,8 +465,6 @@ static int suspend_do_io(int writing, struct block_device *bdev, long block0,
 
 	if (syncio)
 		do { do_bio_wait(); } while (waiting_on);
-
-	return 0;
 }
 
 /**
@@ -643,10 +629,12 @@ static int suspend_bio_rw_page(int writing, struct page *page,
 
 	dev_info = &suspend_devinfo[suspend_writer_posn.current_chain];
 
-	return suspend_do_io(writing, dev_info->bdev,
+	suspend_do_io(writing, dev_info->bdev,
 		suspend_writer_posn.current_offset <<
 			dev_info->bmap_shift,
 		page, readahead_index, sync);
+
+	return 0;
 }
 
 /**
