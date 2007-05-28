@@ -545,18 +545,18 @@ static void dump_block_chains(void)
 }
 
 /**
- * forward_extra_blocks: Skip blocks to the start of the next page.
+ * go_next_page: Skip blocks to the start of the next page.
  *
  * Go forward one page, or two if extra_page_forward is set. It only gets
  * set at the start of reading the image header, to skip the first page
  * of the header, which is read without using the extent chains.
  */
-static int forward_extra_blocks(void)
+static int go_next_page(void)
 {
-	int i;
+	int i, max = (suspend_writer_posn.current_chain == -1) ? 1 :
+	  suspend_devinfo[suspend_writer_posn.current_chain].blocks_per_page;
 
-	for (i = 1; i < suspend_devinfo[suspend_writer_posn.current_chain].
-							blocks_per_page; i++)
+	for (i = 0; i < max; i++)
 		suspend_extent_state_next(&suspend_writer_posn);
 
 	if (suspend_extent_state_eof(&suspend_writer_posn)) {
@@ -565,23 +565,9 @@ static int forward_extra_blocks(void)
 		return -ENODATA;
 	}
 
-	return 0;
-}
-
-static int forward_one_page(void)
-{
-	int at_start = (suspend_writer_posn.current_chain == -1);
-
-	/* Have to go forward one to ensure we're on the right chain,
-	 * before we can know how many more blocks to skip.*/
-	suspend_extent_state_next(&suspend_writer_posn);
-
-	if (!at_start && forward_extra_blocks())
-		return -ENODATA;
-
 	if (extra_page_forward) {
 		extra_page_forward = 0;
-		return forward_one_page();
+		return go_next_page();
 	}
 
 	return 0;
@@ -615,7 +601,7 @@ static int suspend_bio_rw_page(int writing, struct page *page,
 	if (test_action_state(SUSPEND_TEST_FILTER_SPEED))
 		return 0;
 		
-	if (forward_one_page()) {
+	if (go_next_page()) {
 		printk("Failed to advance a page in the extent data.\n");
 		return -ENODATA;
 	}
@@ -975,7 +961,7 @@ static void suspend_bio_cleanup(int finishing_cycle)
 struct suspend_bio_ops suspend_bio_ops = {
 	.bdev_page_io = suspend_bdev_page_io,
 	.finish_all_io = suspend_finish_all_io,
-	.forward_one_page = forward_one_page,
+	.forward_one_page = go_next_page,
 	.set_extra_page_forward = set_extra_page_forward,
 	.set_devinfo = suspend_set_devinfo,
 	.read_page = suspend_bio_read_page,
