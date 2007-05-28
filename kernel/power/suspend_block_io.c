@@ -97,7 +97,6 @@ DEFINE_MUTEX(suspend_bio_mutex);
  * Cleanup the bio pointed to by io_info and record as appropriate that the
  * cleanup is done.
  */
-
 static void suspend_bio_cleanup_one(struct io_info *io_info)
 {
 	int readahead_index = io_info->readahead_index;
@@ -143,7 +142,6 @@ static void suspend_bio_cleanup_one(struct io_info *io_info)
  * This routine is designed so that multiple callers can be in here
  * simultaneously.
  */
-
 static void suspend_cleanup_some_completed_io(void)
 {
 	int num_cleaned = 0;
@@ -195,7 +193,6 @@ static void suspend_finish_all_io(void)
  *
  * Returns whether the readahead requested is ready.
  */
-
 static int suspend_readahead_ready(int readahead_index)
 {
 	int index = readahead_index / BITS_PER_LONG;
@@ -247,7 +244,6 @@ static void suspend_cleanup_readahead(int page)
  * the fs/buffer.c version, but we want to mark the page as done in our own
  * structures too.
  */
-
 static int suspend_end_bio(struct bio *bio, unsigned int bytes_done, int err)
 {
 	struct io_info *io_info = bio->bi_private;
@@ -276,7 +272,6 @@ static int suspend_end_bio(struct bio *bio, unsigned int bytes_done, int err)
  *	With a twist, though - we handle block_size != PAGE_SIZE.
  *	Caller has already checked that our page is not fragmented.
  */
-
 static int submit(struct io_info *io_info)
 {
 	struct bio *bio = NULL;
@@ -647,11 +642,21 @@ static int suspend_rw_init(int writing, int stream_number)
 	return 0;
 }
 
+/**
+ * suspend_read_header_init: Prepare to read the image header.
+ *
+ * Reset readahead indices prior to starting to read a section of the image.
+ */
 static void suspend_read_header_init(void)
 {
 	readahead_index = ra_submit_index = -1;
 }
 
+/**
+ * suspend_rw_cleanup: Cleanup after i/o.
+ *
+ * @writing: Whether we were reading or writing.
+ */
 static int suspend_rw_cleanup(int writing)
 {
 	if (writing && suspend_bio_rw_page(WRITE,
@@ -677,6 +682,12 @@ static int suspend_rw_cleanup(int writing)
 	return 0;
 }
 
+/**
+ * suspend_bio_read_page_with_readahead: Read a disk page with readahead.
+ *
+ * Read a page from disk, submitting readahead and cleaning up finished i/o
+ * while we wait for the page we're after.
+ */
 static int suspend_bio_read_page_with_readahead(void)
 {
 	static int last_result;
@@ -745,7 +756,6 @@ wait:
  * @buffer: The start of the buffer to write or fill.
  * @buffer_size: The size of the buffer to write or fill.
  */
-
 static int suspend_rw_buffer(int writing, char *buffer, int buffer_size)
 {
 	int bytes_left = buffer_size;
@@ -798,7 +808,6 @@ static int suspend_rw_buffer(int writing, char *buffer, int buffer_size)
  * Read a (possibly compressed) page from the image, into buffer_page,
  * returning its pfn and the buffer size.
  */
-
 static int suspend_bio_read_page(unsigned long *pfn, struct page *buffer_page,
 		unsigned int *buf_size)
 {
@@ -833,7 +842,6 @@ static int suspend_bio_read_page(unsigned long *pfn, struct page *buffer_page,
  * Write a (possibly compressed) page to the image from the buffer, together
  * with it's index and buffer size.
  */
-
 static int suspend_bio_write_page(unsigned long pfn, struct page *buffer_page,
 		unsigned int buf_size)
 {
@@ -858,12 +866,15 @@ static int suspend_bio_write_page(unsigned long pfn, struct page *buffer_page,
 	return result;
 }
 
-/*
- * suspend_rw_header_chunk
+/**
+ * suspend_rw_header_chunk: Read or write a portion of the image header.
  *
- * Read or write a portion of the header.
+ * @writing: Whether reading or writing.
+ * @owner: The module for which we're writing. Used for confirming that modules
+ * don't use more header space than they asked for.
+ * @buffer: Address of the data to write.
+ * @buffer_size: Size of the data buffer.
  */
-
 static int suspend_rw_header_chunk(int writing,
 		struct suspend_module_ops *owner,
 		char *buffer, int buffer_size)
@@ -883,22 +894,31 @@ static int suspend_rw_header_chunk(int writing,
 	return suspend_rw_buffer(writing, buffer, buffer_size);
 }
 
-/*
- * write_header_chunk_finish
- *
- * Flush any buffered writes in the section of the image.
+/**
+ * write_header_chunk_finish: Flush any buffered header data.
  */
 static int write_header_chunk_finish(void)
 {
+	if (!suspend_writer_buffer_posn)
+		return 0;
+
 	return suspend_bio_rw_page(WRITE, virt_to_page(suspend_writer_buffer),
 		-1) ? -EIO : 0;
 }
 
+/**
+ * suspend_bio_storage_needed: Get the amount of storage needed for my fns.
+ */
 static int suspend_bio_storage_needed(void)
 {
 	return 2 * sizeof(int);
 }
 
+/**
+ * suspend_bio_save_config_info: Save block i/o config to image header.
+ *
+ * @buf: PAGE_SIZE'd buffer into which data should be saved.
+ */
 static int suspend_bio_save_config_info(char *buf)
 {
 	int *ints = (int *) buf;
@@ -907,6 +927,12 @@ static int suspend_bio_save_config_info(char *buf)
 	return 2 * sizeof(int);
 }
 
+/**
+ * suspend_bio_load_config_info: Restore block i/o config.
+ *
+ * @buf: Data to be reloaded.
+ * @size: Size of the buffer saved.
+ */
 static void suspend_bio_load_config_info(char *buf, int size)
 {
 	int *ints = (int *) buf;
@@ -914,6 +940,12 @@ static void suspend_bio_load_config_info(char *buf, int size)
 	submit_batch_size = ints[1];
 }
 
+/**
+ * suspend_bio_initialise: Initialise bio code at start of some action.
+ *
+ * @starting_cycle: Whether starting a suspend cycle, or just reading or
+ * writing a sysfs value.
+ */
 static int suspend_bio_initialise(int starting_cycle)
 {
 	suspend_writer_buffer = (char *) get_zeroed_page(GFP_ATOMIC);
@@ -921,6 +953,11 @@ static int suspend_bio_initialise(int starting_cycle)
 	return suspend_writer_buffer ? 0 : -ENOMEM;
 }
 
+/**
+ * suspend_bio_cleanup: Cleanup after some action.
+ *
+ * @finishing_cycle: Whether completing a cycle.
+ */
 static void suspend_bio_cleanup(int finishing_cycle)
 {
 	if (suspend_writer_buffer) {
@@ -971,6 +1008,11 @@ static struct suspend_module_ops suspend_blockwriter_ops =
 	.num_sysfs_entries	= sizeof(sysfs_params) / sizeof(struct suspend_sysfs_data),
 };
 
+/**
+ * suspend_block_io_load: Load time routine for block i/o module.
+ *
+ * Register block i/o ops and sysfs entries.
+ */
 static __init int suspend_block_io_load(void)
 {
 	return suspend_register_module(&suspend_blockwriter_ops);
