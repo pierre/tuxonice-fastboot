@@ -4,7 +4,7 @@
  * Copyright (C) 2004-2007 Nigel Cunningham (nigel at suspend2 net)
  *
  * Distributed under GPLv2.
- * 
+ *
  * This file contains block io functions for suspend2. These are
  * used by the swapwriter and it is planned that they will also
  * be used by the NFSwriter.
@@ -90,11 +90,12 @@ int suspend_header_bytes_used = 0;
 
 DEFINE_MUTEX(suspend_bio_mutex);
 
-/*
- * __suspend_bio_cleanup_one
- * 
- * Description: Clean up after completing I/O on a page.
- * Arguments:	struct io_info:	Data for I/O to be completed.
+/**
+ * suspend_bio_cleanup_one: Cleanup one bio.
+ * @io_info : Struct io_info to be cleaned up.
+ *
+ * Cleanup the bio pointed to by io_info and record as appropriate that the
+ * cleanup is done.
  */
 static void __suspend_bio_cleanup_one(struct io_info *io_info)
 {
@@ -116,7 +117,7 @@ static void __suspend_bio_cleanup_one(struct io_info *io_info)
 	put_page(io_info->bio_page);
 	if (io_info->writing || io_info->readahead_index == -1)
 		__free_page(io_info->bio_page);
-	
+
 	bio_put(io_info->sys_struct);
 	io_info->sys_struct = NULL;
 }
@@ -148,9 +149,16 @@ static void suspend_bio_cleanup_one(void *data)
 	atomic_dec(&outstanding_io);
 }
 
-/* suspend_cleanup_some_completed_io
+/**
+ * suspend_cleanup_some_completed_io: Cleanup completed Suspend2 i/o.
  *
- * NB: This is designed so that multiple callers can be in here simultaneously.
+ * Cleanup i/o that has been completed. In the end_bio routine (below), we only
+ * move the associated io_info struct from the busy list to the
+ * ready_for_cleanup list. Now (no longer in an interrupt context), we can we
+ * can do the real work.
+ *
+ * This routine is designed so that multiple callers can be in here
+ * simultaneously.
  */
 
 static void suspend_cleanup_some_completed_io(void)
@@ -177,12 +185,11 @@ static void suspend_cleanup_some_completed_io(void)
 	spin_unlock_irqrestore(&ioinfo_ready_lock, flags);
 }
 
-/* do_bio_wait
+/**
+ * do_bio_wait: Wait for some Suspend2 i/o to complete.
  *
- * Actions taken when we want some I/O to get run.
- * 
  * Submit any I/O that's batched up (if we're not already doing
- * that, unplug queues, schedule and clean up whatever we can.
+ * that, schedule and clean up whatever we can.
  */
 static void do_bio_wait(void)
 {
@@ -191,14 +198,11 @@ static void do_bio_wait(void)
 	suspend_cleanup_some_completed_io();
 }
 
-/*
- * suspend_finish_all_io
- *
- * Description:	Finishes all IO and frees all IO info struct pages.
+/**
+ * suspend_finish_all_io: Complete all outstanding i/o.
  */
 static void suspend_finish_all_io(void)
 {
-	/* Wait for all I/O to complete. */
 	while (atomic_read(&outstanding_io))
 		do_bio_wait();
 }
@@ -218,8 +222,8 @@ static void suspend_wait_on_readahead(int readahead_index)
 		do_bio_wait();
 }
 
-/*
- * readahead_done
+/**
+ * suspend_readahead_ready: Is this readahead finished?
  *
  * Returns whether the readahead requested is ready.
  */
@@ -232,8 +236,11 @@ static int suspend_readahead_ready(int readahead_index)
 	return test_bit(bit, &suspend_readahead_flags[index]);
 }
 
-/* suspend_readahead_prepare
- * Set up for doing readahead on an image */
+/**
+ * suspend_wait_on_readahead: Wait on a particular page.
+ *
+ * @readahead_index: Index of the readahead to wait for.
+ */
 static int suspend_prepare_readahead(int index)
 {
 	unsigned long new_page = get_zeroed_page(GFP_ATOMIC | __GFP_NOWARN);
@@ -254,14 +261,17 @@ static void suspend_cleanup_readahead(int page)
 	return;
 }
 
-/*
- * suspend_end_bio
+/**
+ * suspend_end_bio: bio completion function.
  *
- * Description:	Function called by block driver from interrupt context when I/O
- * 		is completed. This is the reason we use spinlocks in
- * 		manipulating the io_info lists. 		
- * 		Nearly the fs/buffer.c version, but we want to mark the page as 
- * 		done in our own structures too.
+ * @bio: bio that has completed.
+ * @bytes_done: Number of bytes written/read.
+ * @err: Error value. Yes, like end_swap_bio_read, we ignore it.
+ *
+ * Function called by block driver from interrupt context when I/O is completed.
+ * This is the reason we use spinlocks in manipulating the io_info lists. Nearly
+ * the fs/buffer.c version, but we want to mark the page as done in our own
+ * structures too.
  */
 
 static int suspend_end_bio(struct bio *bio, unsigned int num, int err)
@@ -323,14 +333,16 @@ static int submit(struct io_info *io_info)
 	spin_lock_irqsave(&ioinfo_busy_lock, flags);
 	list_add_tail(&io_info->list, &ioinfo_busy);
 	spin_unlock_irqrestore(&ioinfo_busy_lock, flags);
-	
+
 	submit_bio(io_info->writing, bio);
 
 	return 0;
 }
 
-/* 
- * submit a batch. The submit function can wait on I/O, so we have
+/**
+ * submit_batched: Submit a batch of bios we've been saving up.
+ *
+ * Submit a batch. The submit function can wait on I/O, so we have
  * simple locking to avoid infinite recursion.
  */
 static int submit_batched(void)
@@ -363,6 +375,11 @@ static int submit_batched(void)
 	return num_submitted;
 }
 
+/**
+ * add_to_batch: Add a page of i/o to our batch for later submission.
+ *
+ * @io_info: Data structure describing a page of I/O to be done.
+ */
 static void add_to_batch(struct io_info *io_info)
 {
 	unsigned long flags;
@@ -378,11 +395,8 @@ static void add_to_batch(struct io_info *io_info)
 		submit_batched();
 }
 
-/*
- * get_io_info_struct
- *
- * Description:	Get an I/O struct.
- * Returns:	Pointer to the struct prepared for use.
+/**
+ * get_io_info_struct: Allocate a struct for recording info on i/o submitted.
  */
 static struct io_info *get_io_info_struct(void)
 {
@@ -399,18 +413,24 @@ static struct io_info *get_io_info_struct(void)
 	return this;
 }
 
-/*
- * suspend_do_io
+/**
+ * suspend_do_io: Prepare to do some i/o on a page and submit or batch it.
  *
- * Description:	Prepare and start a read or write operation.
- * 		Note that we use our own buffer for reading or writing.
- * 		This simplifies doing readahead and asynchronous writing.
- * 		We can begin a read without knowing the location into which
- * 		the data will eventually be placed, and the buffer passed
- * 		for a write can be reused immediately (essential for the
- * 		modules system).
- * 		Failure? What's that?
- * Returns:	The io_info struct created.
+ * @writing: Whether reading or writing.
+ * @bdev: The block device which we're using.
+ * @block0: The first sector we're reading or writing.
+ * @page: The page on which I/O is being done.
+ * @readahead_index: If doing readahead, the index (reset this flag when done).
+ * @syncio: Whether the i/o is being done synchronously.
+ *
+ * Prepare and start a read or write operation.
+ *
+ * Note that we always work with our own page. If writing, we might be given a
+ * compression buffer that will immediately be used to start compressing the
+ * next page. For reading, we do readahead and therefore don't know the final
+ * address where the data needs to go.
+ *
+ * Failure? What's that?
  */
 static int suspend_do_io(int writing, struct block_device *bdev, long block0,
 	struct page *page, int readahead_index, int syncio)
@@ -456,10 +476,11 @@ static int suspend_do_io(int writing, struct block_device *bdev, long block0,
 		io_info->bio_page = page;
 	}
 
-	/* If writing, copy our data. The data is probably in
-	 * lowmem, but we cannot be certain. If there is no
-	 * compression/encryption, we might be passed the
-	 * actual source page's address. */
+	/*
+	 * If writing, copy our data. The data is probably in lowmem, but we cannot be
+	 * certain. If there is no compression, we might be passed the actual source
+	 * page's address.
+	 */
 	if (writing) {
 		to = (char *) buffer_virt;
 		from = kmap_atomic(page, KM_USER1);
@@ -469,7 +490,7 @@ static int suspend_do_io(int writing, struct block_device *bdev, long block0,
 
 	/* Submit the page */
 	get_page(io_info->bio_page);
-	
+
 	suspend_message(SUSPEND_WRITER, SUSPEND_HIGH, 1,
 		"-> (PRE BRW) %d\n", real_nr_free_pages(all_zones_mask));
 
@@ -477,9 +498,9 @@ static int suspend_do_io(int writing, struct block_device *bdev, long block0,
 	 	submit(io_info);
 	else
 		add_to_batch(io_info);
-	
+
 	atomic_inc(&outstanding_io);
-	
+
 	if (syncio)
 		do { do_bio_wait(); } while (waiting_on);
 
@@ -504,20 +525,35 @@ static void suspend_bdev_page_io(int writing, struct block_device *bdev,
 	suspend_do_io(writing, bdev, pos, page, -1, 1);
 }
 
+/**
+ * suspend_bio_memory_needed: Report amount of memory needed for block i/o.
+ *
+ * We want to have at least enough memory so as to have max_outstanding_io
+ * transactions on the fly at once. If we can do more, fine.
+ */
 static int suspend_bio_memory_needed(void)
 {
-	/* We want to have at least enough memory so as to have
-	 * max_outstanding_io transactions on the fly at once. If we 
-	 * can do more, fine. */
 	return (max_outstanding_io * (PAGE_SIZE + sizeof(struct request) +
 				sizeof(struct bio) + sizeof(struct io_info)));
 }
 
+/**
+ * suspend_set_devinfo: Set the bdev info used for i/o.
+ *
+ * @info: Pointer to array of struct suspend_bdev_info - the list of
+ * bdevs and blocks on them in which the image is stored.
+ *
+ * Set the list of bdevs and blocks in which the image will be stored.
+ * Sort of like putting a tape in the cassette player.
+ */
 static void suspend_set_devinfo(struct suspend_bdev_info *info)
 {
 	suspend_devinfo = info;
 }
 
+/**
+ * dump_block_chains: Print the contents of the bdev info array.
+ */
 static void dump_block_chains(void)
 {
 	int i;
@@ -547,6 +583,14 @@ static void dump_block_chains(void)
 				suspend_writer_posn_save[i].extent_num,
 				suspend_writer_posn_save[i].offset);
 }
+
+/**
+ * forward_extra_blocks: Skip blocks to the start of the next page.
+ *
+ * Go forward one page, or two if extra_page_forward is set. It only gets
+ * set at the start of reading the image header, to skip the first page
+ * of the header, which is read without using the extent chains.
+ */
 static int forward_extra_blocks(void)
 {
 	int i;
@@ -583,13 +627,26 @@ static int forward_one_page(void)
 	return 0;
 }
 
-/* Used in reading header, to jump to 2nd page after getting 1st page
- * direct from image header. */
+/**
+ * set_extra_page_forward: Make us skip an extra page on next go_next_page.
+ *
+ * Used in reading header, to jump to 2nd page after getting 1st page
+ * direct from image header.
+ */
 static void set_extra_page_forward(void)
 {
 	extra_page_forward = 1;
 }
 
+/**
+ * suspend_bio_rw_page: Do i/o on the next disk page in the image.
+ *
+ * @writing: Whether reading or writing.
+ * @page: Page to do i/o on.
+ * @readahead_index: -1 or the index in the readahead ring.
+ *
+ * Submit a page for reading or writing, possibly readahead.
+ */
 static int suspend_bio_rw_page(int writing, struct page *page,
 		int readahead_index, int sync)
 {
@@ -618,6 +675,12 @@ static int suspend_bio_rw_page(int writing, struct page *page,
 		page, readahead_index, sync);
 }
 
+/**
+ * suspend_rw_init: Prepare to read or write a stream in the image.
+ *
+ * @writing: Whether reading or writing.
+ * @stream number: Section of the image being processed.
+ */
 static int suspend_rw_init(int writing, int stream_number)
 {
 	suspend_header_bytes_used = 0;
@@ -650,9 +713,9 @@ static int suspend_rw_cleanup(int writing)
 	if (writing && current_stream == 2)
 		suspend_extent_state_save(&suspend_writer_posn,
 				&suspend_writer_posn_save[1]);
-	
+
 	suspend_finish_all_io();
-	
+
 	if (!writing)
 		while (readahead_index != ra_submit_index) {
 			suspend_cleanup_readahead(readahead_index);
@@ -682,18 +745,18 @@ static int suspend_bio_read_page_with_readahead(void)
 		 * all the readahead previously submitted */
 		if (ra_submit_index == readahead_index) {
 			abort_suspend(SUSPEND_FAILED_IO, "Failed to submit"
-				" a read and no readahead left.\n");
+				" a read and no readahead left.");
 			return -EIO;
 		}
 		goto wait;
 	}
-	
+
 	do {
 		if (suspend_prepare_readahead(ra_submit_index))
 			break;
 
 		last_result = suspend_bio_rw_page(READ,
-			suspend_ra_pages[ra_submit_index], 
+			suspend_ra_pages[ra_submit_index],
 			ra_submit_index, SUSPEND_ASYNC);
 		if (last_result) {
 			printk("Begin read chunk for page %d returned %d.\n",
@@ -727,14 +790,17 @@ wait:
 }
 
 /*
+ * suspend_rw_buffer: Combine smaller buffers into PAGE_SIZE I/O.
  *
+ * @writing: Bool - whether writing (or reading).
+ * @buffer: The start of the buffer to write or fill.
+ * @buffer_size: The size of the buffer to write or fill.
  */
 
 static int suspend_rw_buffer(int writing, char *buffer, int buffer_size)
 {
 	int bytes_left = buffer_size;
 
-	/* Read/write a chunk of the header */
 	while (bytes_left) {
 		char *source_start = buffer + buffer_size - bytes_left;
 		char *dest_start = suspend_writer_buffer + suspend_writer_buffer_posn;
@@ -785,13 +851,15 @@ static int suspend_rw_buffer(int writing, char *buffer, int buffer_size)
 	return 0;
 }
 
-/*
- * suspend_bio_read_page
+/**
+ * suspend_bio_read_page - read a page of the image.
  *
- * Read a (possibly compressed and/or encrypted) page from the image,
- * into buffer_page, returning it's index and the buffer size.
+ * @pfn: The pfn where the data belongs.
+ * @buffer_page: The page containing the (possibly compressed) data.
+ * @buf_size: The number of bytes on @buffer_page used.
  *
- * If asynchronous I/O is requested, use readahead.
+ * Read a (possibly compressed) page from the image, into buffer_page,
+ * returning its pfn and the buffer size.
  */
 
 static int suspend_bio_read_page(unsigned long *index, struct page *buffer_page,
@@ -833,11 +901,15 @@ out:
 	return result;
 }
 
-/*
- * suspend_bio_write_page
+/**
+ * suspend_bio_write_page - Write a page of the image.
  *
- * Write a (possibly compressed and/or encrypted) page to the image from
- * the buffer, together with it's index and buffer size.
+ * @pfn: The pfn where the data belongs.
+ * @buffer_page: The page containing the (possibly compressed) data.
+ * @buf_size: The number of bytes on @buffer_page used.
+ *
+ * Write a (possibly compressed) page to the image from the buffer, together
+ * with it's index and buffer size.
  */
 
 static int suspend_bio_write_page(unsigned long index, struct page *buffer_page,
@@ -963,7 +1035,7 @@ static struct suspend_sysfs_data sysfs_params[] = {
 	}
 };
 
-static struct suspend_module_ops suspend_blockwriter_ops = 
+static struct suspend_module_ops suspend_blockwriter_ops =
 {
 	.name					= "Block I/O",
 	.type					= MISC_MODULE,
