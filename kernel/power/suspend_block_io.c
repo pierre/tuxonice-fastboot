@@ -97,43 +97,26 @@ DEFINE_MUTEX(suspend_bio_mutex);
  * Cleanup the bio pointed to by io_info and record as appropriate that the
  * cleanup is done.
  */
-static void __suspend_bio_cleanup_one(struct io_info *io_info)
-{
-	suspend_message(SUSPEND_WRITER, SUSPEND_HIGH, 0,
-		"Cleanup IO: [%p]\n", io_info);
 
-	if (!io_info->writing && io_info->readahead_index == -1) {
-		char *from, *to;
-		/*
-		 * Copy the page we read into the buffer our caller provided.
-		 */
-		to = (char *) kmap(io_info->dest_page);
-		from = (char *) kmap(io_info->bio_page);
+static void suspend_bio_cleanup_one(struct io_info *io_info)
+{
+	int readahead_index = io_info->readahead_index;
+	unsigned long flags;
+
+	if (!io_info->writing && readahead_index == -1) {
+		char *to = (char *) kmap(io_info->dest_page);
+		char *from = (char *) kmap(io_info->bio_page);
 		memcpy(to, from, PAGE_SIZE);
 		kunmap(io_info->dest_page);
 		kunmap(io_info->bio_page);
 	}
 
 	put_page(io_info->bio_page);
-	if (io_info->writing || io_info->readahead_index == -1)
+	if (io_info->writing || readahead_index == -1)
 		__free_page(io_info->bio_page);
 
 	bio_put(io_info->sys_struct);
 	io_info->sys_struct = NULL;
-}
-
-/* __suspend_io_cleanup
- */
-
-static void suspend_bio_cleanup_one(void *data)
-{
-	struct io_info *io_info = (struct io_info *) data;
-	int readahead_index;
-	unsigned long flags;
-
-	readahead_index = io_info->readahead_index;
-	list_del_init(&io_info->list);
-	__suspend_bio_cleanup_one(io_info);
 
 	if (readahead_index > -1) {
 		int index = readahead_index/BITS_PER_LONG;
@@ -175,7 +158,7 @@ static void suspend_cleanup_some_completed_io(void)
 		list_del_init(&first->list);
 
 		spin_unlock_irqrestore(&ioinfo_ready_lock, flags);
-		suspend_bio_cleanup_one((void *) first);
+		suspend_bio_cleanup_one(first);
 		spin_lock_irqsave(&ioinfo_ready_lock, flags);
 
 		num_cleaned++;
