@@ -190,21 +190,6 @@ static void suspend_finish_all_io(void)
 		do_bio_wait();
 }
 
-/*
- * wait_on_readahead
- *
- * Wait until a particular readahead is ready.
- */
-static void suspend_wait_on_readahead(int readahead_index)
-{
-	int index = readahead_index / BITS_PER_LONG;
-	int bit = readahead_index - index * BITS_PER_LONG;
-
-	/* read_ahead_index is the one we want to return */
-	while (!test_bit(bit, &suspend_readahead_flags[index]))
-		do_bio_wait();
-}
-
 /**
  * suspend_readahead_ready: Is this readahead finished?
  *
@@ -224,6 +209,12 @@ static int suspend_readahead_ready(int readahead_index)
  *
  * @readahead_index: Index of the readahead to wait for.
  */
+static void suspend_wait_on_readahead(int readahead_index)
+{
+	while (!suspend_readahead_ready(readahead_index))
+		do_bio_wait();
+}
+
 static int suspend_prepare_readahead(int index)
 {
 	unsigned long new_page = get_zeroed_page(GFP_ATOMIC | __GFP_NOWARN);
