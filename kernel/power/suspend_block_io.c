@@ -594,7 +594,7 @@ static void set_extra_page_forward(void)
  * Submit a page for reading or writing, possibly readahead.
  */
 static int suspend_bio_rw_page(int writing, struct page *page,
-		int readahead_index, int sync)
+		int readahead_index)
 {
 	struct suspend_bdev_info *dev_info;
 
@@ -618,7 +618,7 @@ static int suspend_bio_rw_page(int writing, struct page *page,
 	suspend_do_io(writing, dev_info->bdev,
 		suspend_writer_posn.current_offset <<
 			dev_info->bmap_shift,
-		page, readahead_index, sync);
+		page, readahead_index, 0);
 
 	return 0;
 }
@@ -655,7 +655,7 @@ static void suspend_read_header_init(void)
 static int suspend_rw_cleanup(int writing)
 {
 	if (writing && suspend_bio_rw_page(WRITE,
-			virt_to_page(suspend_writer_buffer), -1, 0))
+			virt_to_page(suspend_writer_buffer), -1))
 		return -EIO;
 
 	if (writing && current_stream == 2)
@@ -705,7 +705,8 @@ static int suspend_bio_read_page_with_readahead(void)
 
 		last_result = suspend_bio_rw_page(READ,
 			suspend_ra_pages[ra_submit_index],
-			ra_submit_index, SUSPEND_ASYNC);
+			ra_submit_index);
+
 		if (last_result) {
 			printk("Begin read chunk for page %d returned %d.\n",
 				ra_submit_index, last_result);
@@ -789,7 +790,7 @@ static int suspend_rw_buffer(int writing, char *buffer, int buffer_size)
 					return -EIO;
 		} else if (suspend_bio_rw_page(WRITE,
 					virt_to_page(suspend_writer_buffer),
-					-1, SUSPEND_ASYNC))
+					-1))
 				return -EIO;
 
 		suspend_writer_buffer_posn = 0;
@@ -920,7 +921,7 @@ static int suspend_rw_header_chunk(int writing,
 static int write_header_chunk_finish(void)
 {
 	return suspend_bio_rw_page(WRITE, virt_to_page(suspend_writer_buffer),
-		-1, 0) ? -EIO : 0;
+		-1) ? -EIO : 0;
 }
 
 static int suspend_bio_storage_needed(void)
