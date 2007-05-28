@@ -1239,8 +1239,8 @@ static __init int suspend_swap_load(void)
 {
 	suspend_swapops.rw_init = suspend_bio_ops.rw_init;
 	suspend_swapops.rw_cleanup = suspend_bio_ops.rw_cleanup;
-	suspend_swapops.read_chunk = suspend_bio_ops.read_chunk;
-	suspend_swapops.write_chunk = suspend_bio_ops.write_chunk;
+	suspend_swapops.read_page = suspend_bio_ops.read_page;
+	suspend_swapops.write_page = suspend_bio_ops.write_page;
 	suspend_swapops.rw_header_chunk = suspend_bio_ops.rw_header_chunk;
 
 	return suspend_register_module(&suspend_swapops);

@@ -779,7 +779,7 @@ static int suspend_rw_buffer(int writing, char *buffer, int buffer_size)
 }
 
 /*
- * suspend_bio_read_chunk
+ * suspend_bio_read_page
  *
  * Read a (possibly compressed and/or encrypted) page from the image,
  * into buffer_page, returning it's index and the buffer size.
@@ -787,7 +787,7 @@ static int suspend_rw_buffer(int writing, char *buffer, int buffer_size)
  * If asynchronous I/O is requested, use readahead.
  */
 
-static int suspend_bio_read_chunk(unsigned long *index, struct page *buffer_page,
+static int suspend_bio_read_page(unsigned long *index, struct page *buffer_page,
 		unsigned int *buf_size, int sync)
 {
 	int result;
@@ -822,18 +822,18 @@ out:
 	kunmap(buffer_page);
 	if (result)
 		abort_suspend(SUSPEND_FAILED_IO,
-			"Returning %d from suspend_bio_read_chunk.\n", result);
+			"Returning %d from suspend_bio_read_page.\n", result);
 	return result;
 }
 
 /*
- * suspend_bio_write_chunk
+ * suspend_bio_write_page
  *
  * Write a (possibly compressed and/or encrypted) page to the image from
  * the buffer, together with it's index and buffer size.
  */
 
-static int suspend_bio_write_chunk(unsigned long index, struct page *buffer_page,
+static int suspend_bio_write_page(unsigned long index, struct page *buffer_page,
 		unsigned int buf_size)
 {
 	int result;
@@ -937,8 +937,8 @@ struct suspend_bio_ops suspend_bio_ops = {
 	.forward_one_page = forward_one_page,
 	.set_extra_page_forward = set_extra_page_forward,
 	.set_devinfo = suspend_set_devinfo,
-	.read_chunk = suspend_bio_read_chunk,
-	.write_chunk = suspend_bio_write_chunk,
+	.read_page = suspend_bio_read_page,
+	.write_page = suspend_bio_write_page,
 	.rw_init = suspend_rw_init,
 	.rw_cleanup = suspend_rw_cleanup,
 	.read_header_init = suspend_read_header_init,

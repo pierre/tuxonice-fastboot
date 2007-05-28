@@ -99,9 +99,9 @@ struct suspend_module_ops {
 	 */
 	int (*rw_init) (int rw, int stream_number);
 	int (*rw_cleanup) (int rw);
-	int (*write_chunk) (unsigned long index, struct page *buffer_page,
+	int (*write_page) (unsigned long index, struct page *buffer_page,
 			unsigned int buf_size);
-	int (*read_chunk) (unsigned long *index, struct page *buffer_page,
+	int (*read_page) (unsigned long *index, struct page *buffer_page,
 			unsigned int *buf_size, int sync);
 
 	/* Reset module if image exists but reading aborted */

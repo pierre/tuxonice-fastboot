@@ -421,7 +421,7 @@ static int worker_rw_loop(void *data)
 
 			mutex_unlock(&io_mutex);
 
-			result = first_filter->write_chunk(write_pfn, page,
+			result = first_filter->write_page(write_pfn, page,
 					PAGE_SIZE);
 		} else {
 			atomic_dec(&io_count);
@@ -440,7 +440,7 @@ static int worker_rw_loop(void *data)
 					schedule();
 			}
 
-			result = first_filter->read_chunk(&write_pfn, buffer,
+			result = first_filter->read_page(&write_pfn, buffer,
 					&buf_size, SUSPEND_ASYNC);
 			if (buf_size != PAGE_SIZE) {
 				abort_suspend(SUSPEND_FAILED_IO,

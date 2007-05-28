@@ -149,7 +149,7 @@ int suspend_compress_rw_init(int rw, int stream_number)
 }
 
 /* 
- * suspend_compress_write_chunk()
+ * suspend_compress_write_page()
  *
  * Compress a page of data, buffering output and passing on filled
  * pages to the next module in the pipeline.
@@ -161,14 +161,14 @@ int suspend_compress_rw_init(int rw, int stream_number)
  * 		modules, -ECHILD if we have a broken pipeline or -EIO if
  * 		zlib errs.
  */
-static int suspend_compress_write_chunk(unsigned long index,
+static int suspend_compress_write_page(unsigned long index,
 		struct page *buffer_page, unsigned int buf_size)
 {
 	int ret, cpu = smp_processor_id();
 	struct cpu_context *ctx = &per_cpu(contexts, cpu);
 	
 	if (!ctx->transform)
-		return next_driver->write_chunk(index, buffer_page, buf_size);
+		return next_driver->write_page(index, buffer_page, buf_size);
 
 	ctx->buffer_start = kmap(buffer_page);
 
@@ -191,18 +191,18 @@ static int suspend_compress_write_chunk(unsigned long index,
 	mutex_unlock(&stats_lock);
 
 	if (ctx->len < buf_size) /* some compression */
-		ret = next_driver->write_chunk(index,
+		ret = next_driver->write_page(index,
 				virt_to_page(ctx->page_buffer),
 				ctx->len);
 	else
-		ret = next_driver->write_chunk(index, buffer_page, buf_size);
+		ret = next_driver->write_page(index, buffer_page, buf_size);
 
 failure:
 	return ret;
 }
 
 /* 
- * suspend_compress_read_chunk()
+ * suspend_compress_read_page()
  * @buffer_page: struct page *. Pointer to a buffer of size PAGE_SIZE.
  * @sync:	int. Whether the previous module (or core) wants its data
  * 		synchronously.
@@ -211,7 +211,7 @@ failure:
  * is filled.
  * Zero if successful. Error condition from me or from downstream on failure.
  */
-static int suspend_compress_read_chunk(unsigned long *index,
+static int suspend_compress_read_page(unsigned long *index,
 		struct page *buffer_page, unsigned int *buf_size, int sync)
 {
 	int ret, cpu = smp_processor_id(); 
@@ -221,7 +221,7 @@ static int suspend_compress_read_chunk(unsigned long *index,
 	struct cpu_context *ctx = &per_cpu(contexts, cpu);
 
 	if (!ctx->transform)
-		return next_driver->read_chunk(index, buffer_page, buf_size,
+		return next_driver->read_page(index, buffer_page, buf_size,
 				sync);
 
 	/* 
@@ -231,7 +231,7 @@ static int suspend_compress_read_chunk(unsigned long *index,
 
 	*buf_size = PAGE_SIZE;
 
-	ret = next_driver->read_chunk(index, buffer_page, &len, SUSPEND_SYNC);
+	ret = next_driver->read_page(index, buffer_page, &len, SUSPEND_SYNC);
 
 	/* Error or uncompressed data */
 	if (ret || len == PAGE_SIZE)
@@ -406,8 +406,8 @@ static struct suspend_module_ops suspend_compression_ops = {
 	
 	.rw_init		= suspend_compress_rw_init,
 
-	.write_chunk		= suspend_compress_write_chunk,
-	.read_chunk		= suspend_compress_read_chunk,
+	.write_page		= suspend_compress_write_page,
+	.read_page		= suspend_compress_read_page,
 
 	.sysfs_data		= sysfs_params,
 	.num_sysfs_entries	= sizeof(sysfs_params) / sizeof(struct suspend_sysfs_data),

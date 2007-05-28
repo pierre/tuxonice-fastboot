@@ -1108,8 +1108,8 @@ static __init int suspend_file_load(void)
 {
 	suspend_fileops.rw_init = suspend_bio_ops.rw_init;
 	suspend_fileops.rw_cleanup = suspend_bio_ops.rw_cleanup;
-	suspend_fileops.read_chunk = suspend_bio_ops.read_chunk;
-	suspend_fileops.write_chunk = suspend_bio_ops.write_chunk;
+	suspend_fileops.read_page = suspend_bio_ops.read_page;
+	suspend_fileops.write_page = suspend_bio_ops.write_page;
 	suspend_fileops.rw_header_chunk = suspend_bio_ops.rw_header_chunk;
 
 	return suspend_register_module(&suspend_fileops);
