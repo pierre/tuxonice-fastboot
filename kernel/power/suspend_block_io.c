@@ -147,12 +147,12 @@ static void suspend_bio_cleanup_one(struct io_info *io_info)
 static void suspend_cleanup_some_completed_io(void)
 {
 	int num_cleaned = 0;
-	struct io_info *first;
 	unsigned long flags;
 
 	spin_lock_irqsave(&ioinfo_ready_lock, flags);
 	while(!list_empty(&ioinfo_ready_for_cleanup)) {
-		first = list_entry(ioinfo_ready_for_cleanup.next,
+		struct io_info *first = list_entry(
+				ioinfo_ready_for_cleanup.next,
 				struct io_info, list);
 
 		list_del_init(&first->list);
