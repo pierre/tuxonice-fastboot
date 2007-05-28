@@ -248,7 +248,7 @@ static void suspend_cleanup_readahead(int page)
  * structures too.
  */
 
-static int suspend_end_bio(struct bio *bio, unsigned int num, int err)
+static int suspend_end_bio(struct bio *bio, unsigned int bytes_done, int err)
 {
 	struct io_info *io_info = bio->bi_private;
 	unsigned long flags;
