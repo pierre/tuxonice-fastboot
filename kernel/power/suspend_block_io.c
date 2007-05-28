@@ -113,17 +113,9 @@ static void __suspend_bio_cleanup_one(struct io_info *io_info)
 		kunmap(io_info->bio_page);
 	}
 
-	if (io_info->writing || io_info->readahead_index == -1) {
-		/* Sanity check */
-		if (page_count(io_info->bio_page) != 2)
-			printk(KERN_EMERG "Cleanup IO: Page count on page %p"
-					" is %d. Not good!\n",
-					io_info->bio_page,
-					page_count(io_info->bio_page));
-		put_page(io_info->bio_page);
+	put_page(io_info->bio_page);
+	if (io_info->writing || io_info->readahead_index == -1)
 		__free_page(io_info->bio_page);
-	} else
-		put_page(io_info->bio_page);
 	
 	bio_put(io_info->sys_struct);
 	io_info->sys_struct = NULL;
