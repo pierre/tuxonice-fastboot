@@ -799,42 +799,27 @@ static int suspend_rw_buffer(int writing, char *buffer, int buffer_size)
  * returning its pfn and the buffer size.
  */
 
-static int suspend_bio_read_page(unsigned long *index, struct page *buffer_page,
+static int suspend_bio_read_page(unsigned long *pfn, struct page *buffer_page,
 		unsigned int *buf_size)
 {
-	int result;
+	int result = 0;
 	char *buffer_virt = kmap(buffer_page);
 
 	pr_index++;
 
 	while (!mutex_trylock(&suspend_bio_mutex))
 		do_bio_wait();
-	
-	if ((result = suspend_rw_buffer(READ, (char *) index,
-			sizeof(unsigned long)))) {
-		abort_suspend(SUSPEND_FAILED_IO,
-				"Read of index returned %d.\n", result);
-		goto out;
-	}
 
-	if ((result = suspend_rw_buffer(READ, (char *) buf_size, sizeof(int)))) {
-		abort_suspend(SUSPEND_FAILED_IO,
-				"Read of buffer size is %d.\n", result);
-		goto out;
-	}
+	if (suspend_rw_buffer(READ, (char *) pfn, sizeof(unsigned long)) ||
+	    suspend_rw_buffer(READ, (char *) buf_size, sizeof(int)) ||
+	    suspend_rw_buffer(READ, buffer_virt, *buf_size)) {
+		abort_suspend(SUSPEND_FAILED_IO, "Read of data failed.");
+		result = 1;
+	} else
+		PR_DEBUG("%d: PFN %ld, %d bytes.\n", pr_index, *pfn, *buf_size);
 
-	result = suspend_rw_buffer(READ, buffer_virt, *buf_size);
-	if (result)
-		abort_suspend(SUSPEND_FAILED_IO,
-				"Read of data returned %d.\n", result);
-
-	PR_DEBUG("%d: Index %ld, %d bytes.\n", pr_index, *index, *buf_size);
-out:
 	mutex_unlock(&suspend_bio_mutex);
 	kunmap(buffer_page);
-	if (result)
-		abort_suspend(SUSPEND_FAILED_IO,
-			"Returning %d from suspend_bio_read_page.\n", result);
 	return result;
 }
 
