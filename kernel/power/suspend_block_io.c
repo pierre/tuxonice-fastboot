@@ -186,13 +186,8 @@ static void suspend_cleanup_some_completed_io(void)
  */
 static void do_bio_wait(void)
 {
-	int num_submitted = 0;
-
-	/* Don't want to wait on I/O we haven't submitted! */
-	num_submitted = submit_batched();
-	
+	submit_batched();
 	io_schedule();
-
 	suspend_cleanup_some_completed_io();
 }
 
