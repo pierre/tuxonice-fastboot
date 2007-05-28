@@ -788,7 +788,7 @@ static int suspend_rw_buffer(int writing, char *buffer, int buffer_size)
  */
 
 static int suspend_bio_read_page(unsigned long *index, struct page *buffer_page,
-		unsigned int *buf_size, int sync)
+		unsigned int *buf_size)
 {
 	int result;
 	char *buffer_virt = kmap(buffer_page);

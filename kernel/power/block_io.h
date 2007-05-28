@@ -34,7 +34,7 @@ struct suspend_bio_ops {
 	void (*set_extra_page_forward) (void);
 	void (*set_devinfo) (struct suspend_bdev_info *info);
 	int (*read_page) (unsigned long *index, struct page *buffer_page,
-			unsigned int *buf_size, int sync);
+			unsigned int *buf_size);
 	int (*write_page) (unsigned long index, struct page *buffer_page,
 			unsigned int buf_size);
 	void (*read_header_init) (void);

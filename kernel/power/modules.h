@@ -102,7 +102,7 @@ struct suspend_module_ops {
 	int (*write_page) (unsigned long index, struct page *buffer_page,
 			unsigned int buf_size);
 	int (*read_page) (unsigned long *index, struct page *buffer_page,
-			unsigned int *buf_size, int sync);
+			unsigned int *buf_size);
 
 	/* Reset module if image exists but reading aborted */
 	void (*noresume_reset) (void);

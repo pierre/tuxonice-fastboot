@@ -441,7 +441,7 @@ static int worker_rw_loop(void *data)
 			}
 
 			result = first_filter->read_page(&write_pfn, buffer,
-					&buf_size, SUSPEND_ASYNC);
+					&buf_size);
 			if (buf_size != PAGE_SIZE) {
 				abort_suspend(SUSPEND_FAILED_IO,
 					"I/O pipeline returned %d bytes instead "

@@ -204,15 +204,13 @@ failure:
 /* 
  * suspend_compress_read_page()
  * @buffer_page: struct page *. Pointer to a buffer of size PAGE_SIZE.
- * @sync:	int. Whether the previous module (or core) wants its data
- * 		synchronously.
  *
  * Retrieve data from later modules and decompress it until the input buffer
  * is filled.
  * Zero if successful. Error condition from me or from downstream on failure.
  */
 static int suspend_compress_read_page(unsigned long *index,
-		struct page *buffer_page, unsigned int *buf_size, int sync)
+		struct page *buffer_page, unsigned int *buf_size)
 {
 	int ret, cpu = smp_processor_id(); 
 	unsigned int len;
@@ -221,8 +219,7 @@ static int suspend_compress_read_page(unsigned long *index,
 	struct cpu_context *ctx = &per_cpu(contexts, cpu);
 
 	if (!ctx->transform)
-		return next_driver->read_page(index, buffer_page, buf_size,
-				sync);
+		return next_driver->read_page(index, buffer_page, buf_size);
 
 	/* 
 	 * All our reads must be synchronous - we can't decompress
@@ -231,7 +228,7 @@ static int suspend_compress_read_page(unsigned long *index,
 
 	*buf_size = PAGE_SIZE;
 
-	ret = next_driver->read_page(index, buffer_page, &len, SUSPEND_SYNC);
+	ret = next_driver->read_page(index, buffer_page, &len);
 
 	/* Error or uncompressed data */
 	if (ret || len == PAGE_SIZE)
