@@ -25,7 +25,7 @@ struct suspend_bdev_info {
  * need these functions duplicated.
  */
 struct suspend_bio_ops {
-	int (*bdev_page_io) (int rw, struct block_device *bdev, long pos,
+	void (*bdev_page_io) (int rw, struct block_device *bdev, long pos,
 			struct page *page);
 	void (*check_io_stats) (void);
 	void (*reset_io_stats) (void);

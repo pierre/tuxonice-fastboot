@@ -486,15 +486,22 @@ static int suspend_do_io(int writing, struct block_device *bdev, long block0,
 	return 0;
 }
 
-/* We used to use bread here, but it doesn't correctly handle
+/**
+ * suspend_bdev_page_io: Simpler interface to do directly i/o on a single page.
+ *
+ * @writing: Whether reading or writing.
+ * @bdev: Block device on which we're operating.
+ * @pos: Sector at which page to read starts.
+ * @page: Page to be read/written.
+ *
+ * We used to use bread here, but it doesn't correctly handle
  * blocksize != PAGE_SIZE. Now we create a submit_info to get the data we
  * want and use our normal routines (synchronously).
  */
-
-static int suspend_bdev_page_io(int writing, struct block_device *bdev,
+static void suspend_bdev_page_io(int writing, struct block_device *bdev,
 		long pos, struct page *page)
 {
-	return suspend_do_io(writing, bdev, pos, page, -1, 1);
+	suspend_do_io(writing, bdev, pos, page, -1, 1);
 }
 
 static int suspend_bio_memory_needed(void)

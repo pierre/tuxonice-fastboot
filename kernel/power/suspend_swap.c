@@ -1090,18 +1090,10 @@ static int suspend_swap_parse_sig_location(char *commandline,
 		return -ENOMEM;
 	}
 
-	temp_result = suspend_bio_ops.bdev_page_io(READ,
-			resume_block_device,
-			resume_firstblock,
-			virt_to_page(diskpage.ptr));
+	suspend_bio_ops.bdev_page_io(READ, resume_block_device,
+			resume_firstblock, virt_to_page(diskpage.ptr));
 
 	suspend_bio_ops.finish_all_io();
-	
-	if (temp_result) {
-		printk(KERN_ERR "Suspend2: SwapAllocator: Failed to submit "
-					"I/O.\n");
-		goto invalid;
-	}
 	
 	signature_found = parse_signature(diskpage.pointer->swh.magic.magic, 0);
 
@@ -1119,7 +1111,6 @@ static int suspend_swap_parse_sig_location(char *commandline,
 		if (!quiet)
 			printk(KERN_ERR "Suspend2: SwapAllocator: No swap "
 				"signature found at specified location.\n");
-invalid:
 	free_page((unsigned long) diskpage.address);
 	return result;
 
