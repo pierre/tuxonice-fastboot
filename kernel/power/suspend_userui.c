@@ -57,12 +57,18 @@ static int progress_granularity = 30;
 
 DECLARE_WAIT_QUEUE_HEAD(userui_wait_for_key);
 
+/**
+ * ui_nl_set_state - Update suspend_action based on a message from userui.
+ *
+ * @n: The bit (1 << bit) to set.
+ */
 static void ui_nl_set_state(int n)
 {
 	/* Only let them change certain settings */
 	static const int suspend_action_mask =
-		(1 << SUSPEND_REBOOT) | (1 << SUSPEND_PAUSE) | (1 << SUSPEND_SLOW) |
-		(1 << SUSPEND_LOGALL) | (1 << SUSPEND_SINGLESTEP) |
+		(1 << SUSPEND_REBOOT) | (1 << SUSPEND_PAUSE) |
+		(1 << SUSPEND_SLOW) | (1 << SUSPEND_LOGALL) |
+		(1 << SUSPEND_SINGLESTEP) |
 		(1 << SUSPEND_PAUSE_NEAR_PAGESET_END);
 
 	suspend_action = (suspend_action & (~suspend_action_mask)) |
@@ -73,17 +79,31 @@ static void ui_nl_set_state(int n)
 		wake_up_interruptible(&userui_wait_for_key);
 }
 
+/**
+ * userui_post_atomic_restore - Tell userui that atomic restore just happened.
+ *
+ * Tell userui that atomic restore just occured, so that it can do things like
+ * redrawing the screen, re-getting settings and so on.
+ */
 static void userui_post_atomic_restore(void)
 {
 	suspend_send_netlink_message(&ui_helper_data,
 			USERUI_MSG_POST_ATOMIC_RESTORE, NULL, 0);
 }
 
+/**
+ * userui_storage_needed - Report how much memory in image header is needed.
+ */
 static int userui_storage_needed(void)
 {
 	return sizeof(ui_helper_data.program) + 1 + sizeof(int);
 }
 
+/**
+ * userui_save_config_info - Fill buffer with config info for image header.
+ *
+ * @buf: Buffer into which to put the config info we want to save.
+ */
 static int userui_save_config_info(char *buf)
 {
 	*((int *) buf) = progress_granularity;
@@ -91,6 +111,12 @@ static int userui_save_config_info(char *buf)
 	return sizeof(ui_helper_data.program) + sizeof(int) + 1;
 }
 
+/**
+ * userui_load_config_info - Restore config info from buffer.
+ *
+ * @buf: Buffer containing header info loaded.
+ * @size: Size of data loaded for this module.
+ */
 static void userui_load_config_info(char *buf, int size)
 {
 	progress_granularity = *((int *) buf);
@@ -107,28 +133,42 @@ static void userui_load_config_info(char *buf, int size)
 	ui_helper_data.program[sizeof(ui_helper_data.program)-1] = '\0';
 }
 
+/**
+ * set_ui_program_set: Record that userui program was changed.
+ *
+ * Side effect routine for when the userui program is set. In an initrd or
+ * ramfs, the user may set a location for the userui program. If this happens,
+ * we don't want to reload the value that was saved in the image header. This
+ * routine allows us to flag that we shouldn't restore the program name from
+ * the image header.
+ */
 static void set_ui_program_set(void)
 {
 	ui_helper_changed = 1;
 }
 
+/**
+ * userui_memory_needed - Tell core how much memory to reserve for us.
+ */
 static int userui_memory_needed(void)
 {
 	/* ball park figure of 128 pages */
 	return (128 * PAGE_SIZE);
 }
 
-/* suspend_update_status
+/**
+ * userui_update_status - Update the progress bar and (if on) in-bar message.
  *
- * Description: Update the progress bar and (if on) in-bar message.
- * Arguments:	UL value, maximum: Current progress percentage (value/max).
- * 		const char *fmt, ...: Message to be displayed in the middle
- * 		of the progress bar.
- * 		Note that a NULL message does not mean that any previous
- * 		message is erased! For that, you need suspend_prepare_status with
- * 		clearbar on.
- * Returns:	Unsigned long: The next value where status needs to be updated.
- * 		This is to reduce unnecessary calls to update_status.
+ * @value: Current progress percentage numerator.
+ * @maximum: Current progress percentage denominator.
+ * @fmt: Message to be displayed in the middle of the progress bar.
+ *
+ * Note that a NULL message does not mean that any previous message is erased!
+ * For that, you need suspend_prepare_status with clearbar on.
+ *
+ * Returns an unsigned long, being the next numerator (as determined by the
+ * maximum and progress granularity) where status needs to be updated.
+ * This is to reduce unnecessary calls to update_status.
  */
 static unsigned long userui_update_status(unsigned long value,
 		unsigned long maximum, const char *fmt, ...)
@@ -191,20 +231,19 @@ static unsigned long userui_update_status(unsigned long value,
 	return next_update;
 }
 
-/* userui_message.
+/**
+ * userui_message - Display a message without necessarily logging it.
  *
- * Description:	This function is intended to do the same job as printk, but
- * 		without normally logging what is printed. The point is to be
- * 		able to get debugging info on screen without filling the logs
- * 		with "1/534. ^M 2/534^M. 3/534^M"
+ * @section: Type of message. Messages can be filtered by type.
+ * @level: Degree of importance of the message. Lower values = higher priority.
+ * @normally_logged: Whether logged even if log_everything is off.
+ * @fmt: Message (and parameters).
  *
- * 		It may be called from an interrupt context - can't sleep!
+ * This function is intended to do the same job as printk, but without normally
+ * logging what is printed. The point is to be able to get debugging info on
+ * screen without filling the logs with "1/534. ^M 2/534^M. 3/534^M"
  *
- * Arguments:	int mask: The debugging section(s) this message belongs to.
- * 		int level: The level of verbosity of this message.
- * 		int restartline: Whether to output a \r or \n with this line
- * 			(\n if we're logging all output).
- * 		const char *fmt, ...: Message to be displayed a la printk.
+ * It may be called from an interrupt context - can't sleep!
  */
 static void userui_message(unsigned long section, unsigned long level,
 		int normally_logged, const char *fmt, ...)
@@ -235,6 +274,9 @@ static void userui_message(unsigned long section, unsigned long level,
 			&msg, sizeof(msg));
 }
 
+/**
+ * wait_for_key_via_userui - Wait for userui to receive a keypress.
+ */
 static void wait_for_key_via_userui(void)
 {
 	DECLARE_WAITQUEUE(wait, current);
@@ -248,6 +290,16 @@ static void wait_for_key_via_userui(void)
 	remove_wait_queue(&userui_wait_for_key, &wait);
 }
 
+/**
+ * userui_wait_for_keypress - Wait for keypress via userui or /dev/console.
+ *
+ * @timeout: Maximum time to wait.
+ *
+ * Wait for a keypress, either from userui or /dev/console if userui isn't
+ * available. The non-userui path is particularly for at boot-time, prior
+ * to userui being started, when we have an important warning to give to
+ * the user.
+ */
 static char userui_wait_for_keypress(int timeout)
 {
 	int fd;
@@ -305,13 +357,14 @@ out:
 	return key;
 }
 
-/* suspend_prepare_status
- * Description:	Prepare the 'nice display', drawing the header and version,
- * 		along with the current action and perhaps also resetting the
- * 		progress bar.
- * Arguments:	
- * 		int clearbar: Whether to reset the progress bar.
- * 		const char *fmt, ...: The action to be displayed.
+/**
+ * userui_prepare_status - Display high level messages.
+ *
+ * @clearbar: Whether to clear the progress bar.
+ * @fmt...: New message for the title.
+ *
+ * Prepare the 'nice display', drawing the header and version, along with the
+ * current action and perhaps also resetting the progress bar.
  */
 static void userui_prepare_status(int clearbar, const char *fmt, ...)
 {
@@ -332,46 +385,49 @@ static void userui_prepare_status(int clearbar, const char *fmt, ...)
 		printk(KERN_EMERG "%s\n", lastheader);
 }
 
-/* abort_suspend
+/**
+ * userui_abort_suspend - Abort a cycle & tell user if they didn't request it.
  *
- * Description: Begin to abort a cycle. If this wasn't at the user's request
- * 		(and we're displaying output), tell the user why and wait for
- * 		them to acknowledge the message.
- * Arguments:	A parameterised string (imagine this is printk) to display,
- *	 	telling the user why we're aborting.
+ * @result_code: Reason why we're aborting (1 << bit).
+ * @fmt: Message to display if telling the user what's going on.
+ *
+ * Abort a cycle. If this wasn't at the user's request (and we're displaying
+ * output), tell the user why and wait for them to acknowledge the message.
  */
-
 static void userui_abort_suspend(int result_code, const char *fmt, ...)
 {
 	va_list args;
 	int printed_len = 0;
 
 	set_result_state(result_code);
-	if (!test_result_state(SUSPEND_ABORTED)) {
-		if (!test_result_state(SUSPEND_ABORT_REQUESTED)) {
-			va_start(args, fmt);
-			printed_len = vsnprintf(local_printf_buf, 
-					sizeof(local_printf_buf), fmt, args);
-			va_end(args);
-			if (ui_helper_data.pid != -1)
-				printed_len = sprintf(local_printf_buf + printed_len,
-					" (Press SPACE to continue)");
-			suspend_prepare_status(CLEAR_BAR, local_printf_buf);
 
-			if (ui_helper_data.pid != -1)
-				suspend_wait_for_keypress(0);
-		}
-		/* Turn on aborting flag */
-		set_result_state(SUSPEND_ABORTED);
-	}
+	if (test_result_state(SUSPEND_ABORTED))
+		return;
+
+	set_result_state(SUSPEND_ABORTED);
+
+	if (test_result_state(SUSPEND_ABORT_REQUESTED))
+		return;
+
+	va_start(args, fmt);
+	printed_len = vsnprintf(local_printf_buf,  sizeof(local_printf_buf),
+			fmt, args);
+	va_end(args);
+	if (ui_helper_data.pid != -1)
+		printed_len = sprintf(local_printf_buf + printed_len,
+					" (Press SPACE to continue)");
+
+	suspend_prepare_status(CLEAR_BAR, local_printf_buf);
+
+	if (ui_helper_data.pid != -1)
+		suspend_wait_for_keypress(0);
 }
 
-/* request_abort_suspend
+/**
+ * request_abort_suspend - Abort suspending or resuming at user request.
  *
- * Description:	Handle the user requesting the cancellation of a suspend by
- * 		pressing escape.
- * Callers:	Invoked from a netlink packet from userspace when the user presses
- * 	 	escape.
+ * Handle the user requesting the cancellation of a suspend or resume by
+ * pressing escape.
  */
 static void request_abort_suspend(void)
 {
@@ -387,15 +443,20 @@ static void request_abort_suspend(void)
 		if (suspendActiveAllocator->mark_resume_attempted)
 			suspendActiveAllocator->mark_resume_attempted(0);
 		suspend2_power_down();
-	} else {
-		suspend_prepare_status(CLEAR_BAR, "--- ESCAPE PRESSED :"
-					" ABORTING SUSPEND ---");
-		set_abort_result(SUSPEND_ABORT_REQUESTED);
-	
-		wake_up_interruptible(&userui_wait_for_key);
 	}
+
+	suspend_prepare_status(CLEAR_BAR, "--- ESCAPE PRESSED :"
+					" ABORTING SUSPEND ---");
+	set_abort_result(SUSPEND_ABORT_REQUESTED);
+	wake_up_interruptible(&userui_wait_for_key);
 }
 
+/**
+ * userui_user_rcv_msg - Receive a netlink message from userui.
+ *
+ * @skb: skb received.
+ * @nlh: Netlink header received.
+ */
 static int userui_user_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 {
 	int type;
@@ -478,15 +539,17 @@ static int userui_user_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 	return 1;
 }
 
-/* userui_cond_pause
+/**
+ * userui_cond_pause - Possibly pause at user request.
+ *
+ * @pause: Whether to pause or just display the message.
+ * @message: Message to display at the start of pausing.
  * 
- * Description:	Potentially pause and wait for the user to tell us to continue.
- * 		We normally only pause when @pause is set.
- * Arguments:	int pause: Whether we normally pause.
- * 		char *message: The message to display. Not parameterised
- * 		 because it's normally a constant.
+ * Potentially pause and wait for the user to tell us to continue. We normally
+ * only pause when @pause is set. While paused, the user can do things like
+ * changing the loglevel, toggling the display of debugging sections and such
+ * like.
  */
-
 static void userui_cond_pause(int pause, char *message)
 {
 	int displayed_message = 0, last_key = 0;
@@ -509,11 +572,11 @@ static void userui_cond_pause(int pause, char *message)
 	schedule();
 }
 
-/* userui_prepare_console
+/**
+ * userui_prepare_console - Prepare the console for use.
  *
- * Description:	Prepare a console for use, save current settings.
- * Returns:	Boolean: Whether an error occured. Errors aren't
- * 		treated as fatal, but a warning is printed.
+ * Prepare a console for use, saving current kmsg settings and attempting to
+ * start userui. Console loglevel changes are handled by userui.
  */
 static void userui_prepare_console(void)
 {
@@ -535,9 +598,10 @@ static void userui_prepare_console(void)
 	return;
 }
 
-/* userui_cleanup_console
+/**
+ * userui_cleanup_console - Cleanup after a cycle.
  *
- * Description: Restore the settings we saved above.
+ * Tell userui to cleanup, and restore kmsg_redirect to its original value.
  */
 
 static void userui_cleanup_console(void)
@@ -602,10 +666,11 @@ static struct ui_ops my_ui_ops = {
 	.wait_for_key			= userui_wait_for_keypress,
 };
 
-/* suspend_console_sysfs_init
- * Description: Boot time initialisation for user interface.
+/**
+ * s2_user_ui_init - Boot time initialisation for user interface.
+ *
+ * Invoked from the core init routine.
  */
-
 static __init int s2_user_ui_init(void)
 {
 	int result;
@@ -632,6 +697,9 @@ static __init int s2_user_ui_init(void)
 }
 
 #ifdef MODULE
+/**
+ * s2_user_ui_ext - Cleanup code for if the core is unloaded.
+ */
 static __exit void s2_user_ui_exit(void)
 {
 	s2_remove_ui_ops(&my_ui_ops);
