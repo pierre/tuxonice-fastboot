@@ -99,16 +99,16 @@
 
    ii) Normal files.
 
-   Suspend2 includes a 'filewriter'. The filewriter can store your image in a
-   simple file. Since Linux has the idea of everything being a file, this is
-   more powerful than it initially sounds. If, for example, you were to set up
-   a network block device file, you could suspend to a network server. This has
-   been tested and works to a point, but nbd itself isn't stateless enough for
-   our purposes.
+   Suspend2 includes a 'file allocator'. The file allocator can store your
+   image in a simple file. Since Linux has the concept of everything being a
+   file, this is more powerful than it initially sounds. If, for example, you
+   were to set up a network block device file, you could suspend to a network
+   server. This has been tested and works to a point, but nbd itself isn't
+   stateless enough for our purposes.
 
-   Take extra care when setting up the filewriter. If you just type commands
-   without thinking and then try to suspend, you could cause irreversible
-   corruption on your filesystems! Make sure you have backups.
+   Take extra care when setting up the file allocator. If you just type
+   commands without thinking and then try to suspend, you could cause
+   irreversible corruption on your filesystems! Make sure you have backups.
 
    Most people will only want to suspend to a local file. To achieve that, do
    something along the lines of:
@@ -119,7 +119,7 @@
    This will create a 512MB file called /suspend-file. To get Suspend2 to use
    it:
 
-   echo /suspend-file > /sys/power/suspend2/filewriter/filewriter_target
+   echo /suspend-file > /sys/power/suspend2/file/target
 
    Then
 
@@ -162,7 +162,7 @@
    can also use a swap file, but usage is a little more complex. Having made
    your swap file, turn it on and do 
 
-   cat /sys/power/suspend2/swapwriter/headerlocations
+   cat /sys/power/suspend2/swap/headerlocations
 
    (this assumes you've already compiled your kernel with Suspend2
    support and booted it). The results of the cat command will tell you
@@ -174,15 +174,15 @@
    If the swapfile changes for any reason (it is moved to a different
    location, it is deleted and recreated, or the filesystem is
    defragmented) then you will have to check
-   /sys/power/suspend2/swapwriter/headerlocations for a new resume_block value.
+   /sys/power/suspend2/swap/headerlocations for a new resume_block value.
 
    Once you've compiled and installed the kernel and adjusted your bootloader
    configuration, you should only need to reboot for the most basic part
    of Suspend2 to be ready.
 
-   If you only compile in the swapwriter, or only compile in the filewriter,
-   you don't need to add the "swap:" part of the resume2= parameters above.
-   resume2=/dev/hda2:0x242d will work just as well.
+   If you only compile in the swap allocator, or only compile in the file
+   allocator, you don't need to add the "swap:" part of the resume2=
+   parameters above. resume2=/dev/hda2:0x242d will work just as well.
 
    d. The hibernate script.
 
@@ -340,11 +340,11 @@
    your attempts at suspending end with a message in dmesg indicating that
    insufficient extra pages were allowed, you need to increase this value.
 
-   - filewriter/target:
+   - file/target:
 
    Read this value to get the current setting. Write to it to point Suspend
-   at a new storage location for the filewriter. See above for details of how
-   to set up the filewriter.
+   at a new storage location for the file allocator. See above for details of
+   how to set up the file allocator.
 
    - freezer_test
 
@@ -446,14 +446,14 @@
    depending upon whether you're at home or work. resume_commandline can be
    set to arbitrary text if you wish to remove sensitive contents.
 
-   - swapwriter/swapfilename:
+   - swap/swapfilename:
 
    This entry is used to specify the swapfile or partition that
    Suspend2 will attempt to swapon/swapoff automatically. Thus, if
    I normally use /dev/hda1 for swap, and want to use /dev/hda2 for specifically
    for my suspend image, I would
   
-   echo /dev/hda2 > /sys/power/suspend2/swapwriter/swapfile
+   echo /dev/hda2 > /sys/power/suspend2/swap/swapfile
 
    /dev/hda2 would then be automatically swapon'd and swapoff'd. Note that the
    swapon and swapoff occur while other processes are frozen (including kswapd)
@@ -464,7 +464,7 @@
    The value of this file is used by headerlocations along with any currently
    activated swapfiles/partitions.
 
-   - swapwriter/headerlocations:
+   - swap/headerlocations:
 
    This option tells you the resume2= options to use for swap devices you
    currently have activated. It is particularly useful when you only want to
@@ -604,16 +604,16 @@
    the image.
 
    The core of Suspend2 knows nothing about how or where pages are stored. We
-   therefore request the active writer (remember you might have compiled in
+   therefore request the active allocator (remember you might have compiled in
    more than one!) to allocate enough storage for our expect image size. If
    this request cannot be fulfilled, we eat more memory and try again. If it
    is fulfiled, we seek to allocate additional storage, just in case our
    expected compression ratio (if any) isn't achieved. This time, however, we
    just continue if we can't allocate enough storage.
 
-   If these calls to our writer change the characteristics of the image such
-   that we haven't allocated enough memory, we also loop. (The writer may well
-   need to allocate space for its storage information).
+   If these calls to our allocator change the characteristics of the image
+   such that we haven't allocated enough memory, we also loop. (The allocator
+   may well need to allocate space for its storage information).
 
    d. Write the first part of the image.
 
@@ -655,18 +655,15 @@
    f. Save the suspend header.
 
    Nearly there! We save our settings and other parameters needed for
-   reloading pageset 1 in a 'suspend header'. We also tell our writer to
+   reloading pageset 1 in a 'suspend header'. We also tell our allocator to
    serialise its data at this stage, so that it can reread the image at resume
-   time. Note that the writer can write this data in any format - in the case
-   of the swapwriter, for example, it splits header pages in 4092 byte blocks,
-   using the last four bytes to link pages of data together. This is completely
-   transparent to the core.
+   time.
 
    g. Set the image header.
 
    Finally, we edit the header at our resume2= location. The signature is
-   changed by the writer to reflect the fact that an image exists, and to point
-   to the start of that data if necessary (swapwriter).
+   changed by the allocator to reflect the fact that an image exists, and to
+   point to the start of that data if necessary (swap allocator).
 
    h. Power down.
 
@@ -704,10 +701,15 @@
    Bernard Blackham
    Nigel Cunningham
 
-   They have been aided in their efforts by a host of hundreds, if not thousands
-   of testers and people who have submitted bug fixes & suggestions. Of special
-   note are the efforts of Michael Frank, who had his computers repetitively
-   suspend and resume for literally tens of thousands of cycles and developed
-   scripts to stress the system and test Suspend2 far beyond the point
-   most of us (Nigel included!) would consider testing. His efforts have
-   contributed as much to Suspend2 as any of the names above.
+   Significant portions of swsusp, the code in the vanilla kernel which
+   Suspend2 enhances, have been worked on by Rafael Wysocki. Thanks should
+   also be expressed to him.
+
+   The above mentioned developers have been aided in their efforts by a host
+   of hundreds, if not thousands of testers and people who have submitted bug
+   fixes & suggestions. Of special note are the efforts of Michael Frank, who
+   had his computers repetitively suspend and resume for literally tens of
+   thousands of cycles and developed scripts to stress the system and test
+   Suspend2 far beyond the point most of us (Nigel included!) would consider
+   testing. His efforts have contributed as much to Suspend2 as any of the
+   names above.
