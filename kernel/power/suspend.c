@@ -481,11 +481,6 @@ static int __save_image(void)
 	
 	suspend2_in_suspend = 1;
 	
-	if (suspend2_platform_prepare()) {
-		set_abort_result(SUSPEND_PLATFORM_PREP_FAILED);
-		return 1;
-	}
-
 	if (suspend2_go_atomic(PMSG_PRETHAW, 1))
 		goto Failed;
 
@@ -493,11 +488,9 @@ static int __save_image(void)
 	did_copy = 1;
 
 	/* We return here at resume time too! */
-	suspend2_end_atomic(ATOMIC_ALL_STEPS);
+	suspend2_end_atomic(ATOMIC_ALL_STEPS, suspend2_in_suspend);
 
 Failed:
-	suspend2_platform_finish();
-
 	if (suspend_activate_storage(1))
 		panic("Failed to reactivate our storage.");
 	

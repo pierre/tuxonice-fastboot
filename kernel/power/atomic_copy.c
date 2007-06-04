@@ -369,22 +369,29 @@ int suspend2_go_atomic(pm_message_t state, int suspend_time)
 
 	if (device_suspend(state)) {
 		set_abort_result(SUSPEND_DEVICE_REFUSED);
-		suspend2_end_atomic(ATOMIC_STEP_RESUME_CONSOLE);
+		suspend2_end_atomic(ATOMIC_STEP_RESUME_CONSOLE, suspend_time);
 		return 1;
 	}
-	
+
+	if (suspend_time && suspend2_platform_prepare()) {
+		set_abort_result(SUSPEND_PLATFORM_PREP_FAILED);
+		suspend2_end_atomic(ATOMIC_STEP_DEVICE_RESUME, suspend_time);
+		return 1;
+	}
+
 	if (test_action_state(SUSPEND_LATE_CPU_HOTPLUG)) {
 		suspend_prepare_status(DONT_CLEAR_BAR,	"Disable nonboot cpus.");
 		if (disable_nonboot_cpus()) {
 			set_abort_result(SUSPEND_CPU_HOTPLUG_FAILED);
-			suspend2_end_atomic(ATOMIC_STEP_DEVICE_RESUME);
+			suspend2_end_atomic(ATOMIC_STEP_DEVICE_RESUME,
+					suspend_time);
 			return 1;
 		}
 	}
 
 	if (suspend_time && arch_prepare_suspend()) {
 		set_abort_result(SUSPEND_ARCH_PREPARE_FAILED);
-		suspend2_end_atomic(ATOMIC_STEP_CPU_HOTPLUG);
+		suspend2_end_atomic(ATOMIC_STEP_CPU_HOTPLUG, suspend_time);
 		return 1;
 	}
 
@@ -399,14 +406,14 @@ int suspend2_go_atomic(pm_message_t state, int suspend_time)
 
 	if (device_power_down(PMSG_FREEZE)) {
 		set_abort_result(SUSPEND_DEVICE_REFUSED);
-		suspend2_end_atomic(ATOMIC_STEP_IRQS);
+		suspend2_end_atomic(ATOMIC_STEP_IRQS, suspend_time);
 		return 1;
 	}
 
 	return 0;
 }
 
-void suspend2_end_atomic(int stage)
+void suspend2_end_atomic(int stage, int suspend_time)
 {
 	switch (stage) {
 		case ATOMIC_ALL_STEPS:
@@ -417,6 +424,8 @@ void suspend2_end_atomic(int stage)
 			if (test_action_state(SUSPEND_LATE_CPU_HOTPLUG))
 				enable_nonboot_cpus();
 		case ATOMIC_STEP_DEVICE_RESUME:
+			if (suspend_time)
+				suspend2_platform_finish();
 			device_resume();
 		case ATOMIC_STEP_RESUME_CONSOLE:
 			resume_console();
