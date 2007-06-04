@@ -40,8 +40,6 @@ endif
 
 obj-$(CONFIG_BITREVERSE) += bitrev.o
 
-obj-$(CONFIG_DYN_PAGEFLAGS) += dyn_pageflags.o
-
 obj-$(CONFIG_CRC_CCITT)	+= crc-ccitt.o
 obj-$(CONFIG_CRC16)	+= crc16.o
 obj-$(CONFIG_CRC_ITU_T)	+= crc-itu-t.o
