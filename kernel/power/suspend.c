@@ -359,6 +359,8 @@ static void do_cleanup(int get_debug_info)
 		enable_nonboot_cpus();
 	suspend_cleanup_console();
 
+	free_attention_list();
+
 	suspend_deactivate_storage(0);
 
 	clear_suspend_state(SUSPEND_IGNORE_LOGLEVEL);

@@ -45,6 +45,178 @@ static int storage_available = 0;
 int extra_pd1_pages_allowance = MIN_EXTRA_PAGES_ALLOWANCE;
 int image_size_limit = 0;
 
+struct attention_list {
+	struct task_struct *task;
+	struct attention_list *next;
+};
+
+static struct attention_list *attention_list = NULL;
+
+#define PAGESET1 0
+#define PAGESET2 1
+
+void free_attention_list(void)
+{
+	struct attention_list *last = NULL;
+
+	while (attention_list) {
+		last = attention_list;
+		attention_list = attention_list->next;
+		kfree(last);
+	}
+}
+
+static int build_attention_list(void)
+{
+	int i, task_count = 0;
+	struct task_struct *p;
+	struct attention_list *next;
+
+	/* 
+	 * Count all userspace process (with task->mm) marked PF_NOFREEZE.
+	 */
+	read_lock(&tasklist_lock);
+	for_each_process(p)
+		if ((p->flags & PF_NOFREEZE) || p == current)
+			task_count++;
+	read_unlock(&tasklist_lock);
+
+	/* 
+	 * Allocate attention list structs.
+	 */
+	for (i = 0; i < task_count; i++) {
+		struct attention_list *this =
+			kmalloc(sizeof(struct attention_list), SUSPEND2_GFP);
+		if (!this) {
+			printk("Failed to allocate slab for attention list.\n");
+			free_attention_list();
+			return 1;
+		}
+		this->next = NULL;
+		if (attention_list)
+			this->next = attention_list;
+		attention_list = this;
+	}
+
+	next = attention_list;
+	read_lock(&tasklist_lock);
+	for_each_process(p)
+		if ((p->flags & PF_NOFREEZE) || p == current) {
+			next->task = p;
+			next = next->next;
+		}
+	read_unlock(&tasklist_lock);
+	return 0;
+}
+
+static void pageset2_full(void)
+{
+	struct zone *zone;
+	unsigned long flags;
+
+	for_each_zone(zone) {
+		spin_lock_irqsave(&zone->lru_lock, flags);
+		if (zone_page_state(zone, NR_INACTIVE)) {
+			struct page *page;
+			list_for_each_entry(page, &zone->inactive_list, lru)
+				SetPagePageset2(page);
+		}
+		if (zone_page_state(zone, NR_ACTIVE)) {
+			struct page *page;
+			list_for_each_entry(page, &zone->active_list, lru)
+				SetPagePageset2(page);
+		}
+		spin_unlock_irqrestore(&zone->lru_lock, flags);
+	}
+}
+
+/*
+ * suspend_mark_task_as_pageset
+ * Functionality   : Marks all the saveable pages belonging to a given process
+ * 		     as belonging to a particular pageset.
+ */
+
+static void suspend_mark_task_as_pageset(struct task_struct *t, int pageset2)
+{
+	struct vm_area_struct *vma;
+	struct mm_struct *mm;
+
+	mm = t->active_mm;
+
+	if (!mm || !mm->mmap) return;
+
+	if (!irqs_disabled())
+		down_read(&mm->mmap_sem);
+	
+	for (vma = mm->mmap; vma; vma = vma->vm_next) {
+		unsigned long posn;
+
+		if (vma->vm_flags & (VM_PFNMAP | VM_IO | VM_RESERVED) ||
+		    !vma->vm_start)
+			continue;
+
+		for (posn = vma->vm_start; posn < vma->vm_end;
+				posn += PAGE_SIZE) {
+			struct page *page = follow_page(vma, posn, 0);
+			if (!page)
+				continue;
+
+			if (pageset2)
+				SetPagePageset2(page);
+			else {
+				ClearPagePageset2(page);
+				SetPagePageset1(page);
+			}
+		}
+	}
+
+	if (!irqs_disabled())
+		up_read(&mm->mmap_sem);
+}
+
+/* mark_pages_for_pageset2
+ *
+ * Description:	Mark unshared pages in processes not needed for suspend as
+ * 		being able to be written out in a separate pagedir.
+ * 		HighMem pages are simply marked as pageset2. They won't be
+ * 		needed during suspend.
+ */
+
+static void suspend_mark_pages_for_pageset2(void)
+{
+	struct task_struct *p;
+	struct attention_list *this = attention_list;
+
+	if (test_action_state(SUSPEND_NO_PAGESET2))
+		return;
+
+	clear_dyn_pageflags(pageset2_map);
+	
+	if (test_action_state(SUSPEND_PAGESET2_FULL))
+		pageset2_full();
+	else {
+		read_lock(&tasklist_lock);
+		for_each_process(p) {
+			if (!p->mm || (p->flags & PF_BORROWED_MM))
+				continue;
+
+			suspend_mark_task_as_pageset(p, PAGESET2);
+		}
+		read_unlock(&tasklist_lock);
+	}
+
+	/* 
+	 * Because the tasks in attention_list are ones related to suspending,
+	 * we know that they won't go away under us.
+	 */
+
+	while (this) {
+		if (!test_result_state(SUSPEND_ABORTED))
+			suspend_mark_task_as_pageset(this->task, PAGESET1);
+		this = this->next;
+	}
+}
+
 /*
  * The atomic copy of pageset1 is stored in pageset2 pages.
  * But if pageset1 is larger (normally only just after boot),
@@ -751,6 +923,12 @@ int suspend_prepare_image(void)
 	if (!storage_available) {
 		printk(KERN_ERR "You need some storage available to be able to suspend.\n");
 		set_abort_result(SUSPEND_NOSTORAGE_AVAILABLE);
+		return 1;
+	}
+
+	if (build_attention_list()) {
+		abort_suspend(SUSPEND_UNABLE_TO_PREPARE_IMAGE,
+				"Unable to successfully prepare the image.\n");
 		return 1;
 	}
 

@@ -40,8 +40,6 @@ extern struct pagedir pagedir1, pagedir2;
 
 extern void suspend_copy_pageset1(void);
 
-extern void suspend_mark_pages_for_pageset2(void);
-
 extern int suspend_get_pageset1_load_addresses(void);
 
 extern unsigned long __suspend_get_nonconflicting_page(void);

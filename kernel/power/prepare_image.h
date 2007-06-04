@@ -15,6 +15,7 @@ extern int real_nr_free_pages(unsigned long zone_idx_mask);
 extern int image_size_limit;
 extern void suspend_free_extra_pagedir_memory(void);
 extern int extra_pd1_pages_allowance;
+extern void free_attention_list(void);
 
 #define MIN_FREE_RAM 100
 #define MIN_EXTRA_PAGES_ALLOWANCE 500
