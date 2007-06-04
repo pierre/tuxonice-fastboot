@@ -248,7 +248,7 @@ int allocate_checksum_pages(void)
 	PRINTK("Need %d checksum pages for %ld pageset2 pages.\n", pages_needed, pagedir2.size);
 	while (pages_allocated < pages_needed) {
 		unsigned long *new_page =
-			(unsigned long *) get_zeroed_page(GFP_ATOMIC);
+			(unsigned long *) get_zeroed_page(SUSPEND2_GFP);
 		if (!new_page)
 			return -ENOMEM;
 		SetPageNosave(virt_to_page(new_page));

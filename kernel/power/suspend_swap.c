@@ -793,7 +793,7 @@ static int suspend_swap_invalidate_image(void)
 	int result = 0;
 	char newsig[11];
 	
-	cur.address = get_zeroed_page(GFP_ATOMIC);
+	cur.address = get_zeroed_page(SUSPEND2_GFP);
 	if (!cur.address) {
 		printk("Unable to allocate a page for restoring the swap signature.\n");
 		return -ENOMEM;
@@ -927,7 +927,7 @@ static int suspend_swap_image_exists(void)
 		return 0;
 	}
 
-	diskpage.address = get_zeroed_page(GFP_ATOMIC);
+	diskpage.address = get_zeroed_page(SUSPEND2_GFP);
 
 	suspend_bio_ops.bdev_page_io(READ, resume_block_device,
 			resume_firstblock,
@@ -975,7 +975,7 @@ static void suspend_swap_mark_resume_attempted(int mark)
 		return;
 	}
 	
-	diskpage.address = get_zeroed_page(GFP_ATOMIC);
+	diskpage.address = get_zeroed_page(SUSPEND2_GFP);
 
 	suspend_bio_ops.bdev_page_io(READ, resume_block_device,
 			resume_firstblock,
@@ -1083,7 +1083,7 @@ static int suspend_swap_parse_sig_location(char *commandline,
 	if (temp_result)
 		return -EINVAL;
 
-	diskpage.address = get_zeroed_page(GFP_ATOMIC);
+	diskpage.address = get_zeroed_page(SUSPEND2_GFP);
 	if (!diskpage.address) {
 		printk(KERN_ERR "Suspend2: SwapAllocator: Failed to allocate "
 					"a diskpage for I/O.\n");

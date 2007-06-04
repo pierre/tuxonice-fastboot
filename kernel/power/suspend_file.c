@@ -685,7 +685,7 @@ static int suspend_file_signature_op(int op)
 	if(suspend_file_target_bdev <= 0)
 		return -1;
 
-	cur = (char *) get_zeroed_page(GFP_ATOMIC);
+	cur = (char *) get_zeroed_page(SUSPEND2_GFP);
 	if (!cur) {
 		printk("Unable to allocate a page for reading the image "
 				"signature.\n");
@@ -819,8 +819,8 @@ static void suspend_file_mark_resume_attempted(int mark)
 
 static void suspend_file_set_resume2(void)
 {
-	char *buffer = (char *) get_zeroed_page(GFP_ATOMIC);
-	char *buffer2 = (char *) get_zeroed_page(GFP_ATOMIC);
+	char *buffer = (char *) get_zeroed_page(SUSPEND2_GFP);
+	char *buffer2 = (char *) get_zeroed_page(SUSPEND2_GFP);
 	unsigned long sector = bmap(target_inode, 0);
 	int offset = 0;
 

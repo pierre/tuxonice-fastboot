@@ -184,4 +184,6 @@ static inline int load_direct(struct page *page)
 }
 
 extern int pre_resume_freeze(void);
+
+#define SUSPEND2_GFP (GFP_KERNEL | __GFP_NOWARN)
 #endif

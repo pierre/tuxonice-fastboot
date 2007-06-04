@@ -96,7 +96,7 @@ void suspend_free_extra_pagedir_memory(void)
 static int suspend_allocate_extra_pagedir_memory(int extra_pages_needed)
 {
 	int j, order, num_to_alloc = extra_pages_needed - extra_pages_allocated;
-	unsigned long flags = GFP_ATOMIC | __GFP_NOWARN;
+	unsigned long flags = SUSPEND2_GFP;
 
 	if (num_to_alloc < 1)
 		return 0;
@@ -114,7 +114,7 @@ static int suspend_allocate_extra_pagedir_memory(int extra_pages_needed)
 			order--;
 
 		extras_entry = (struct extras *) kmalloc(sizeof(struct extras),
-			GFP_ATOMIC);
+			SUSPEND2_GFP);
 
 		if (!extras_entry)
 			return extra_pages_allocated;
@@ -660,7 +660,7 @@ static void eat_memory(void)
 			did_eat_memory = 1;
 			break;
 		default:
-			free_flags = GFP_ATOMIC | __GFP_HIGHMEM;
+			free_flags = GFP_KERNEL | __GFP_HIGHMEM;
 	}
 
 	if (amount_wanted > 0 && !test_result_state(SUSPEND_ABORTED) &&
