@@ -155,7 +155,7 @@ static ssize_t suspend2_attr_store(struct kobject *kobj, struct attribute *attr,
 
 				if (!variable) {
 					sysfs_data->data.string.variable =
-						variable = (char *) get_zeroed_page(SUSPEND2_GFP);
+						variable = (char *) get_zeroed_page(S2_ATOMIC_GFP);
 					assigned_temp_buffer = 1;
 				}
 				strncpy(variable, my_buf, copy_len);

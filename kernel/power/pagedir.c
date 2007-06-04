@@ -60,7 +60,7 @@ void free_conflicting_pages(void)
 struct page * ___suspend_get_nonconflicting_page(int can_be_highmem)
 {
 	struct page *page;
-	int flags = SUSPEND2_GFP;
+	int flags = S2_ATOMIC_GFP;
 	if (can_be_highmem)
 		flags |= __GFP_HIGHMEM;
 
@@ -140,7 +140,7 @@ int suspend_get_pageset1_load_addresses(void)
 	int low_needed = pagedir1.size - get_highmem_size(pagedir1);
 	int high_needed = get_highmem_size(pagedir1);
 	int low_pages_for_highmem = 0;
-	unsigned long flags = SUSPEND2_GFP | __GFP_HIGHMEM;
+	unsigned long flags = GFP_ATOMIC | __GFP_NOWARN | __GFP_HIGHMEM;
 	struct page *page, *high_pbe_page = NULL, *last_high_pbe_page = NULL,
 		    *low_pbe_page;
 	struct pbe **last_low_pbe_ptr = &restore_pblist,

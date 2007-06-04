@@ -94,7 +94,7 @@ static int suspend_compress_crypto_prepare(void)
 			return 1;
 		}
 
-		this->page_buffer = (char *) get_zeroed_page(SUSPEND2_GFP);
+		this->page_buffer = (char *) get_zeroed_page(S2_ATOMIC_GFP);
 	
 		if (!this->page_buffer) {
 			printk(KERN_ERR

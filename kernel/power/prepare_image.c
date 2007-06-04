@@ -86,7 +86,7 @@ static int build_attention_list(void)
 	 */
 	for (i = 0; i < task_count; i++) {
 		struct attention_list *this =
-			kmalloc(sizeof(struct attention_list), SUSPEND2_GFP);
+			kmalloc(sizeof(struct attention_list), S2_WAIT_GFP);
 		if (!this) {
 			printk("Failed to allocate slab for attention list.\n");
 			free_attention_list();
@@ -268,7 +268,7 @@ void suspend_free_extra_pagedir_memory(void)
 static int suspend_allocate_extra_pagedir_memory(int extra_pages_needed)
 {
 	int j, order, num_to_alloc = extra_pages_needed - extra_pages_allocated;
-	unsigned long flags = SUSPEND2_GFP;
+	unsigned long flags = S2_ATOMIC_GFP;
 
 	if (num_to_alloc < 1)
 		return 0;
@@ -286,7 +286,7 @@ static int suspend_allocate_extra_pagedir_memory(int extra_pages_needed)
 			order--;
 
 		extras_entry = (struct extras *) kmalloc(sizeof(struct extras),
-			SUSPEND2_GFP);
+			S2_ATOMIC_GFP);
 
 		if (!extras_entry)
 			return extra_pages_allocated;

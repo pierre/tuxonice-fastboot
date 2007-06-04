@@ -214,7 +214,7 @@ static void suspend_wait_on_readahead(int readahead_index)
 
 static int suspend_prepare_readahead(int index)
 {
-	unsigned long new_page = get_zeroed_page(SUSPEND2_GFP);
+	unsigned long new_page = get_zeroed_page(S2_ATOMIC_GFP);
 
 	if(!new_page)
 		return -ENOMEM;
@@ -420,7 +420,7 @@ static void suspend_do_io(int writing, struct block_device *bdev, long block0,
 	io_info->readahead_index = readahead_index;
 
 	if (io_info->readahead_index == -1) {
-		while (!(buffer_virt = get_zeroed_page(SUSPEND2_GFP)))
+		while (!(buffer_virt = get_zeroed_page(S2_ATOMIC_GFP)))
 			do_bio_wait();
 
 		io_info->bio_page = virt_to_page(buffer_virt);
@@ -948,7 +948,7 @@ static void suspend_bio_load_config_info(char *buf, int size)
  */
 static int suspend_bio_initialise(int starting_cycle)
 {
-	suspend_writer_buffer = (char *) get_zeroed_page(SUSPEND2_GFP);
+	suspend_writer_buffer = (char *) get_zeroed_page(S2_ATOMIC_GFP);
 
 	return suspend_writer_buffer ? 0 : -ENOMEM;
 }

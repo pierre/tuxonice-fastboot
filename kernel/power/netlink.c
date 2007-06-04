@@ -24,7 +24,7 @@ static void suspend_fill_skb_pool(struct user_helper_data *uhd)
 {
 	while (uhd->pool_level < uhd->pool_limit) {
 		struct sk_buff *new_skb =
-			alloc_skb(NLMSG_SPACE(uhd->skb_size), SUSPEND2_GFP);
+			alloc_skb(NLMSG_SPACE(uhd->skb_size), S2_ATOMIC_GFP);
 
 		if (!new_skb)
 			break;
@@ -42,7 +42,7 @@ static void suspend_fill_skb_pool(struct user_helper_data *uhd)
 static struct sk_buff *suspend_get_skb(struct user_helper_data *uhd)
 {
 	struct sk_buff *skb =
-		alloc_skb(NLMSG_SPACE(uhd->skb_size), SUSPEND2_GFP);
+		alloc_skb(NLMSG_SPACE(uhd->skb_size), S2_ATOMIC_GFP);
 
 	if (skb)
 		return skb;
@@ -325,7 +325,7 @@ static int suspend2_launch_userspace_program(char *command, int channel_no)
 		size = strlen(test_read);
 		if (!(size))
 			break;
-		argv[arg] = kmalloc(size + 1, SUSPEND2_GFP);
+		argv[arg] = kmalloc(size + 1, S2_ATOMIC_GFP);
 		strcpy(argv[arg], test_read);
 		orig_posn += size + 1;
 		*test_read = 0;

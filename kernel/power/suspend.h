@@ -185,5 +185,6 @@ static inline int load_direct(struct page *page)
 
 extern int pre_resume_freeze(void);
 
-#define SUSPEND2_GFP (GFP_KERNEL | __GFP_NOWARN)
+#define S2_WAIT_GFP (GFP_KERNEL | __GFP_NOWARN)
+#define S2_ATOMIC_GFP (GFP_ATOMIC | __GFP_NOWARN)
 #endif

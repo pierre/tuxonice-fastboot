@@ -372,7 +372,7 @@ static int worker_rw_loop(void *data)
 	unsigned long orig_pfn, write_pfn;
 	int result, my_io_index = 0;
 	struct suspend_module_ops *first_filter = suspend_get_next_filter(NULL);
-	struct page *buffer = alloc_page(SUSPEND2_GFP);
+	struct page *buffer = alloc_page(S2_ATOMIC_GFP);
 
 	atomic_inc(&worker_thread_count);
 
@@ -769,7 +769,7 @@ static int read_pageset(struct pagedir *pagedir, int overwrittenpagesonly)
 static int write_module_configs(void)
 {
 	struct suspend_module_ops *this_module;
-	char *buffer = (char *) get_zeroed_page(SUSPEND2_GFP);
+	char *buffer = (char *) get_zeroed_page(S2_ATOMIC_GFP);
 	int len, index = 1;
 	struct suspend_module_header suspend_module_header;
 
@@ -837,7 +837,7 @@ static int write_module_configs(void)
 static int read_module_configs(void)
 {
 	struct suspend_module_ops *this_module;
-	char *buffer = (char *) get_zeroed_page(SUSPEND2_GFP);
+	char *buffer = (char *) get_zeroed_page(S2_ATOMIC_GFP);
 	int len, result = 0;
 	struct suspend_module_header suspend_module_header;
 
@@ -977,7 +977,7 @@ int write_image_header(void)
 	}
 
 	/* Get a buffer */
-	header_buffer = (char *) get_zeroed_page(SUSPEND2_GFP);
+	header_buffer = (char *) get_zeroed_page(S2_ATOMIC_GFP);
 	if (!header_buffer) {
 		abort_suspend(SUSPEND_OUT_OF_MEMORY,
 			"Out of memory when trying to get page for header!");
@@ -1076,7 +1076,7 @@ static char *sanity_check(struct suspend_header *sh)
 static int __read_pageset1(void)
 {			
 	int i, result = 0;
-	char *header_buffer = (char *) get_zeroed_page(SUSPEND2_GFP),
+	char *header_buffer = (char *) get_zeroed_page(S2_ATOMIC_GFP),
 	     *sanity_error = NULL;
 	struct suspend_header *suspend_header;
 
@@ -1291,7 +1291,7 @@ int read_pageset1(void)
  */
 static char *get_have_image_data(void)
 {
-	char *output_buffer = (char *) get_zeroed_page(SUSPEND2_GFP);
+	char *output_buffer = (char *) get_zeroed_page(S2_ATOMIC_GFP);
 	struct suspend_header *suspend_header;
 
 	if (!output_buffer) {

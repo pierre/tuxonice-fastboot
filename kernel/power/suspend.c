@@ -318,7 +318,7 @@ static void do_cleanup(int get_debug_info)
 	free_checksum_pages();
 
 	if (get_debug_info)
-		buffer = (char *) get_zeroed_page(SUSPEND2_GFP);
+		buffer = (char *) get_zeroed_page(S2_ATOMIC_GFP);
 
 	if (buffer)
 		i = get_suspend_debug_info(buffer, PAGE_SIZE);

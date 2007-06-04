@@ -24,7 +24,7 @@ static struct extent *suspend_get_extent(void)
 {
 	struct extent *result;
 	
-	if (!(result = kmalloc(sizeof(struct extent), SUSPEND2_GFP)))
+	if (!(result = kmalloc(sizeof(struct extent), S2_ATOMIC_GFP)))
 		return NULL;
 
 	result->minimum = result->maximum = 0;
@@ -171,7 +171,7 @@ int suspend_load_extent_chain(struct extent_chain *chain)
 	}
 
 	for (i = 0; i < chain->num_extents; i++) {
-		this = kmalloc(sizeof(struct extent), SUSPEND2_GFP);
+		this = kmalloc(sizeof(struct extent), S2_ATOMIC_GFP);
 		if (!this) {
 			printk("Failed to allocate a new extent.\n");
 			return -ENOMEM;
