@@ -149,40 +149,9 @@ config PM_STD_PARTITION
 	  suspended image to. It will simply pick the first available swap 
 	  device.
 
-config SUSPEND_SMP
-	bool
-	depends on HOTPLUG_CPU && (X86 || PPC64) && PM
-	default y
-
-config APM_EMULATION
-	tristate "Advanced Power Management Emulation"
-	depends on PM && SYS_SUPPORTS_APM_EMULATION
-	help
-	  APM is a BIOS specification for saving power using several different
-	  techniques. This is mostly useful for battery powered laptops with
-	  APM compliant BIOSes. If you say Y here, the system time will be
-	  reset after a RESUME operation, the /proc/apm device will provide
-	  battery status information, and user-space programs will receive
-	  notification of APM "events" (e.g. battery status change).
-
-	  In order to use APM, you will need supporting software. For location
-	  and more information, read <file:Documentation/pm.txt> and the
-	  Battery Powered Linux mini-HOWTO, available from
-	  <http://www.tldp.org/docs.html#howto>.
-
-	  This driver does not spin down disk drives (see the hdparm(8)
-	  manpage ("man 8 hdparm") for that), and it doesn't turn off
-	  VESA-compliant "green" monitors.
-
-	  Generally, if you don't have a battery in your machine, there isn't
-	  much point in using this driver and you should say N. If you get
-	  random kernel OOPSes or reboots that don't seem to be related to
-	  anything, try disabling/enabling this option (or disabling/enabling
-	  APM in your BIOS).
-
 menuconfig SUSPEND2_CORE
-	tristate "Suspend2"
-	depends on PM && (((X86 || PPC64_SWSUSP) && (!SMP || SUSPEND_SMP)) || ((FRV || PPC32) && !SMP))
+	tristate "Enhanced Hibernation (Suspend2)"
+	depends on SOFTWARE_SUSPEND
 	select DYN_PAGEFLAGS
 	default y
 	---help---
@@ -205,9 +174,8 @@ menuconfig SUSPEND2_CORE
 
 	config SUSPEND2_SWAP
 		tristate "Swap Allocator"
-		depends on SUSPEND2_CORE
+		depends on SUSPEND2_CORE && SWAP
 		default y
-		select SWAP
 		---help---
 		  This option enables support for storing an image in your
 		  swap space.
@@ -308,11 +276,6 @@ menuconfig SUSPEND2_CORE
 		  atomic copy. Should not normally be needed, but here for verification and
 		  diagnostic purposes.
 
-config SUSPEND_SHARED
-	bool
-	depends on SUSPEND2_CORE || SOFTWARE_SUSPEND
-	default y
-
 config SUSPEND2_USERUI_EXPORTS
 	bool
 	depends on SUSPEND2_USERUI=m
@@ -349,3 +312,34 @@ config SUSPEND2
 	bool
 	depends on SUSPEND2_CORE!=n
 	default y
+config SUSPEND_SMP
+	bool
+	depends on HOTPLUG_CPU && (X86 || PPC64) && PM
+	default y
+
+config APM_EMULATION
+	tristate "Advanced Power Management Emulation"
+	depends on PM && SYS_SUPPORTS_APM_EMULATION
+	help
+	  APM is a BIOS specification for saving power using several different
+	  techniques. This is mostly useful for battery powered laptops with
+	  APM compliant BIOSes. If you say Y here, the system time will be
+	  reset after a RESUME operation, the /proc/apm device will provide
+	  battery status information, and user-space programs will receive
+	  notification of APM "events" (e.g. battery status change).
+
+	  In order to use APM, you will need supporting software. For location
+	  and more information, read <file:Documentation/pm.txt> and the
+	  Battery Powered Linux mini-HOWTO, available from
+	  <http://www.tldp.org/docs.html#howto>.
+
+	  This driver does not spin down disk drives (see the hdparm(8)
+	  manpage ("man 8 hdparm") for that), and it doesn't turn off
+	  VESA-compliant "green" monitors.
+
+	  Generally, if you don't have a battery in your machine, there isn't
+	  much point in using this driver and you should say N. If you get
+	  random kernel OOPSes or reboots that don't seem to be related to
+	  anything, try disabling/enabling this option (or disabling/enabling
+	  APM in your BIOS).
+

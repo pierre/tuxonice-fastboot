@@ -19,7 +19,7 @@ struct swsusp_info {
 
 
 
-#ifdef CONFIG_SUSPEND_SHARED
+#ifdef CONFIG_SOFTWARE_SUSPEND
 
 extern char resume_file[256];
 

@@ -50,7 +50,7 @@ struct hibernation_ops {
 	void (*finish)(void);
 };
 
-#if defined(CONFIG_PM) && defined(CONFIG_SUSPEND_SHARED)
+#if defined(CONFIG_PM) && defined(CONFIG_SOFTWARE_SUSPEND)
 /* kernel/power/snapshot.c */
 extern void __register_nosave_region(unsigned long b, unsigned long e, int km);
 static inline void register_nosave_region(unsigned long b, unsigned long e)
@@ -124,7 +124,7 @@ extern int suspend2_running;
 #define suspend2_running (0)
 #endif /* CONFIG_SUSPEND2 */
 
-#ifdef CONFIG_SUSPEND_SHARED
+#ifdef CONFIG_SOFTWARE_SUSPEND
 #ifdef CONFIG_SUSPEND2
 extern void suspend2_try_resume(void);
 #else
@@ -132,17 +132,7 @@ extern void suspend2_try_resume(void);
 #endif
 
 extern int resume_attempted;
-
-#ifdef CONFIG_SOFTWARE_SUSPEND
 extern int software_resume(void);
-#else
-static inline int software_resume(void)
-{
-	resume_attempted = 1;
-	suspend2_try_resume();
-	return 0;
-}
-#endif
 
 static inline void check_resume_attempted(void)
 {

@@ -181,7 +181,7 @@ static struct pm_ops acpi_pm_ops = {
 	.finish = acpi_pm_finish,
 };
 
-#ifdef CONFIG_SUSPEND_SHARED
+#ifdef CONFIG_SOFTWARE_SUSPEND
 static int acpi_hibernation_prepare(void)
 {
 	return acpi_sleep_prepare(ACPI_STATE_S4);
@@ -222,7 +222,7 @@ static struct hibernation_ops acpi_hibernation_ops = {
 	.enter = acpi_hibernation_enter,
 	.finish = acpi_hibernation_finish,
 };
-#endif				/* CONFIG_SUSPEND_SHARED */
+#endif				/* CONFIG_SOFTWARE_SUSPEND */
 
 /*
  * Toshiba fails to preserve interrupts over S1, reinitialization
@@ -267,7 +267,7 @@ int __init acpi_sleep_init(void)
 
 	pm_set_ops(&acpi_pm_ops);
 
-#ifdef CONFIG_SUSPEND_SHARED
+#ifdef CONFIG_SOFTWARE_SUSPEND
 	if (sleep_states[ACPI_STATE_S4])
 		hibernation_set_ops(&acpi_hibernation_ops);
 #else
