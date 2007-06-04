@@ -97,8 +97,14 @@ extern int block_dump;
 
 int do_suspend2_step(int step);
 
-/*
- * Basic clean-up routine.
+/**
+ * suspend_finish_anything - Cleanup after doing anything.
+ *
+ * @suspend_or_resume: Whether finishing a cycle or attempt at resuming.
+ *
+ * This is our basic clean-up routine, matching start_anything below. We
+ * call cleanup routines, drop module references and restore process fs and
+ * cpus allowed masks, together with the global block_dump variable's value.
  */
 void suspend_finish_anything(int suspend_or_resume)
 {
@@ -115,8 +121,14 @@ void suspend_finish_anything(int suspend_or_resume)
 	}
 }
 
-/*
- * Basic set-up routine.
+/**
+ * suspend_start_anything - Basic initialisation for Suspend2.
+ *
+ * @suspend_or_resume: Whether starting a cycle or attempt at resuming.
+ *
+ * Our basic initialisation routine. Take references on modules, use the
+ * kernel segment, recheck resume2= if no active allocator is set, initialise
+ * modules, save and reset block_dump and ensure we're running on CPU0.
  */
 int suspend_start_anything(int suspend_or_resume)
 {
@@ -182,6 +194,12 @@ struct nosave_region {
 	unsigned long end_pfn;
 };
 
+/**
+ * mark_nosave_pages - Set up our Nosave bitmap.
+ *
+ * Build a bitmap of Nosave pages from the list. The bitmap allows faster
+ * use when preparing the image.
+ */
 static void mark_nosave_pages(void)
 {
 	struct nosave_region *region;
@@ -194,7 +212,9 @@ static void mark_nosave_pages(void)
 	}
 }
 
-/*
+/**
+ * allocate_bitmaps: Allocate bitmaps used to record page states.
+ *
  * Allocate & free bitmaps.
  */
 static int allocate_bitmaps(void)
