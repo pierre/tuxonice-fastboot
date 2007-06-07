@@ -1,9 +1,8 @@
+/* Freezer declarations */
 #ifndef LINUX_FREEZER_H
 #define LINUX_FREEZER_H
 
 #include <linux/sched.h>
-
-/* Freezer declarations */
 
 #ifdef CONFIG_PM
 /*
