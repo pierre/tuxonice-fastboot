@@ -39,7 +39,6 @@ ifneq ($(CONFIG_HAVE_DEC_LOCK),y)
 endif
 
 obj-$(CONFIG_BITREVERSE) += bitrev.o
-
 obj-$(CONFIG_CRC_CCITT)	+= crc-ccitt.o
 obj-$(CONFIG_CRC16)	+= crc16.o
 obj-$(CONFIG_CRC_ITU_T)	+= crc-itu-t.o

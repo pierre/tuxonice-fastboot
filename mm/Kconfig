@@ -171,4 +171,3 @@ config NR_QUICK
 
 config DYN_PAGEFLAGS
 	bool
-

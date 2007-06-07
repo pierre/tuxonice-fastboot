@@ -312,6 +312,7 @@ config SUSPEND2
 	bool
 	depends on SUSPEND2_CORE!=n
 	default y
+
 config SUSPEND_SMP
 	bool
 	depends on HOTPLUG_CPU && (X86 || PPC64) && PM
@@ -342,4 +343,3 @@ config APM_EMULATION
 	  random kernel OOPSes or reboots that don't seem to be related to
 	  anything, try disabling/enabling this option (or disabling/enabling
 	  APM in your BIOS).
-
