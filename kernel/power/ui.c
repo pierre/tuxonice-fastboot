@@ -76,8 +76,10 @@ int suspend_default_console_level = 0;
 
 int suspend_early_boot_message(int message_detail, int default_answer, char *warning_reason, ...)
 {
+#if defined(CONFIG_VT) || defined(CONFIG_SERIAL_CONSOLE)
 	unsigned long orig_state = get_suspend_state(), continue_req = 0;
 	unsigned long orig_loglevel = console_loglevel;
+#endif
 	va_list args;
 	int printed_len;
 
@@ -94,11 +96,6 @@ int suspend_early_boot_message(int message_detail, int default_answer, char *war
 		printk("Suspend2: %s\n", local_printf_buf);
 		return default_answer;
 	}
-
-	/* We might be called directly from do_mounts_initrd if the
-	 * user fails to set up their initrd properly. We need to
-	 * enable the keyboard handler by setting the running flag */
-	set_suspend_state(SUSPEND_RUNNING);
 
 #if defined(CONFIG_VT) || defined(CONFIG_SERIAL_CONSOLE)
 	console_loglevel = 7;

@@ -200,7 +200,7 @@ menuconfig SUSPEND2_CORE
 
 	config SUSPEND2_USERUI
 		tristate "Userspace User Interface support"
-		depends on SUSPEND2_CORE && NET
+		depends on SUSPEND2_CORE && NET && (VT || SERIAL_CONSOLE)
 		default y
 		---help---
 		  This option enabled support for a userspace based user interface
