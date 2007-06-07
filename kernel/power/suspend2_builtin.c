@@ -30,33 +30,10 @@
 #include "modules.h"
 #include "suspend2_builtin.h"
 
-#ifndef CONFIG_SOFTWARE_SUSPEND
-struct hibernation_ops *hibernation_ops;
-
-/**
- * hibernation_set_ops - set the global hibernate operations
- * @ops: the hibernation operations to use in subsequent hibernation transitions
- */
-
-void hibernation_set_ops(struct hibernation_ops *ops)
-{
-	if (ops && !(ops->prepare && ops->enter && ops->finish)) {
-		WARN_ON(1);
-		return;
-	}
-	mutex_lock(&pm_mutex);
-	hibernation_ops = ops;
-	mutex_unlock(&pm_mutex);
-}
-EXPORT_SYMBOL_GPL(hibernation_set_ops);
-#endif
-
 EXPORT_SYMBOL_GPL(hibernation_ops);
 
 #ifdef CONFIG_SUSPEND2_CORE_EXPORTS
-#ifdef CONFIG_SOFTWARE_SUSPEND
 EXPORT_SYMBOL_GPL(resume_file);
-#endif
 
 EXPORT_SYMBOL_GPL(max_pfn);
 EXPORT_SYMBOL_GPL(free_dyn_pageflags);
@@ -203,13 +180,6 @@ int suspend2_lowlevel_builtin(void)
 	return error;
 }
 
-#ifndef CONFIG_SOFTWARE_SUSPEND
-int hibernate(void)
-{
-	return suspend2_try_suspend(0);
-}
-#endif
-
 EXPORT_SYMBOL_GPL(suspend2_lowlevel_builtin);
 
 unsigned long suspend_compress_bytes_in, suspend_compress_bytes_out;
@@ -296,25 +266,6 @@ static int __init suspend_retry_resume_setup(char *str)
 	set_suspend_state(SUSPEND_RETRY_RESUME);
 	return 0;
 }
-
-#ifndef CONFIG_SOFTWARE_SUSPEND
-static int __init resume_setup(char *str)
-{
-	if (!*str)
-		return 0;
-	
-	strncpy(resume2_file, str, 255);
-	return 0;
-}
-
-static int __init noresume_setup(char *str)
-{
-	set_suspend_state(SUSPEND_NORESUME_SPECIFIED);
-	return 0;
-}
-__setup("noresume", noresume_setup);
-__setup("resume=", resume_setup);
-#endif
 
 __setup("noresume2", noresume2_setup);
 __setup("resume2=", resume2_setup);

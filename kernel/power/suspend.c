@@ -934,11 +934,9 @@ static struct suspend_sysfs_data sysfs_params[] = {
 	  SYSFS_BIT(&suspend_action, SUSPEND_REBOOT, 0)
 	},
 
-#ifdef CONFIG_SOFTWARE_SUSPEND
 	{ SUSPEND2_ATTR("replace_swsusp", SYSFS_RW),
 	  SYSFS_BIT(&suspend_action, SUSPEND_REPLACE_SWSUSP, 0)
 	},
-#endif
 
 	{ SUSPEND2_ATTR("resume_commandline", SYSFS_RW),
 	  SYSFS_STRING(suspend2_nosave_commandline, COMMAND_LINE_SIZE, 0)
@@ -1021,11 +1019,9 @@ static __init int core_load(void)
 	if (s2_ui_init())
 		return 1;
 
-#ifdef CONFIG_SOFTWARE_SUSPEND
 	/* Overriding resume2= with resume=? */
 	if (test_action_state(SUSPEND_REPLACE_SWSUSP) && resume_file[0])
 		strncpy(resume2_file, resume_file, 256);
-#endif
 
 	return 0;
 }
