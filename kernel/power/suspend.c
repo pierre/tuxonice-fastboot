@@ -402,7 +402,7 @@ static int suspend_init(void)
 
 	if (!test_suspend_state(SUSPEND_CAN_SUSPEND) ||
 	    allocate_bitmaps())
-		return 0;
+		return 1;
 	
 	mark_nosave_pages();
 
