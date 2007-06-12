@@ -802,7 +802,7 @@ static int attempt_to_freeze(void)
 static void eat_memory(void)
 {
 	int amount_wanted = 0;
-	int free_flags = 0, did_eat_memory = 0;
+	int did_eat_memory = 0;
 	
 	/*
 	 * Note that if we have enough storage space and enough free memory, we
@@ -832,7 +832,7 @@ static void eat_memory(void)
 			did_eat_memory = 1;
 			break;
 		default:
-			free_flags = GFP_KERNEL | __GFP_HIGHMEM;
+			break;
 	}
 
 	if (amount_wanted > 0 && !test_result_state(SUSPEND_ABORTED) &&
