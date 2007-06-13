@@ -585,17 +585,15 @@ static void userui_prepare_console(void)
 
 	ui_helper_data.pid = -1;
 
-	if (!userui_ops.enabled)
-		return;
-
-	if (!*ui_helper_data.program) {
-		printk("suspend_userui: program not configured. suspend_userui disabled.\n");
+	if (!userui_ops.enabled) {
+		printk("Suspend2: Userui disabled.\n");
 		return;
 	}
 
-	suspend_netlink_setup(&ui_helper_data);
-
-	return;
+	if (*ui_helper_data.program)
+		suspend_netlink_setup(&ui_helper_data);
+	else
+		printk("Suspend2: Userui program not configured.\n");
 }
 
 /**
