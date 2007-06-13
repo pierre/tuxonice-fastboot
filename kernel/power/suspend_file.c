@@ -14,6 +14,8 @@
  *
  * echo Suspend2 > /path/to/my_file
  *
+ * dd if=/dev/zero bs=1M count=<file_size_desired> >> /path/to/my_file
+ *
  * and
  *
  * echo /path/to/my_file > /sys/power/suspend2/suspend_file/target
