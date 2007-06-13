@@ -259,8 +259,8 @@ static int get_suspend_debug_info(const char *buffer, int count)
 	int len = 0;
 
 	SNPRINTF("Suspend2 debugging info:\n");
-	SNPRINTF("- Suspend core   : %s\n", SUSPEND_CORE_VERSION);
-	SNPRINTF("- Kernel Version : %s\n", UTS_RELEASE);
+	SNPRINTF("- Suspend core   : " SUSPEND_CORE_VERSION "\n");
+	SNPRINTF("- Kernel Version : " UTS_RELEASE "\n");
 	SNPRINTF("- Compiler vers. : %d.%d\n", __GNUC__, __GNUC_MINOR__);
 	SNPRINTF("- Attempt number : %d\n", nr_suspends);
 	SNPRINTF("- Parameters     : %ld %ld %ld %d %d %ld\n",
