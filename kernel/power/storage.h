@@ -49,5 +49,5 @@ extern __init int suspend_usm_init(void);
 extern __exit void suspend_usm_cleanup(void);
 #else
 #define suspend_usm_init() do { } while(0)
-#define suspend_usb_cleanup() do { } while(0)
+#define suspend_usm_cleanup() do { } while(0)
 #endif
