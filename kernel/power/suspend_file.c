@@ -295,7 +295,7 @@ static void suspend_file_get_target_info(char *target, int get_size,
 	if (!target || !strlen(target))
 		return;
 
-	target_file = filp_open(target, O_RDWR, 0);
+	target_file = filp_open(target, O_RDWR|O_LARGEFILE, 0);
 
 	if (IS_ERR(target_file) || !target_file) {
 

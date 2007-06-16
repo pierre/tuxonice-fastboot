@@ -208,7 +208,7 @@ static int try_to_parse_resume_device(char *commandline, int quiet)
 	resume_swap_dev_t = name_to_dev_t(commandline);
 
 	if (!resume_swap_dev_t) {
-		struct file *file = filp_open(commandline, O_RDONLY, 0);
+		struct file *file = filp_open(commandline, O_RDONLY|O_LARGEFILE, 0);
 
 		if (!IS_ERR(file) && file) {
 			vfs_getattr(file->f_vfsmnt, file->f_dentry, &stat);
