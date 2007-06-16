@@ -391,7 +391,8 @@ static int suspend_init(void)
 {
 	suspend_result = 0;
 
-	printk(KERN_INFO "Suspend2: Initiating a software suspend cycle.\n");
+	suspend_print_modules();
+	printk(KERN_INFO "Initiating a hibernation cycle.\n");
 
 	nr_suspends++;
 	
@@ -802,6 +803,9 @@ void __suspend2_try_resume(void)
 	set_suspend_state(SUSPEND_TRYING_TO_RESUME);
 	resume_attempted = 1;
 
+	suspend_print_modules();
+	printk(KERN_INFO "Suspend2: Checking whether there is an image to restore.\n");
+
 	if (do_suspend2_step(STEP_RESUME_CAN_RESUME) &&
 	    !do_suspend2_step(STEP_RESUME_LOAD_PS1))
 	    do_suspend2_step(STEP_RESUME_DO_RESTORE);
@@ -998,8 +1002,6 @@ static __init int core_load(void)
 {
 	int i,
 	    numfiles = sizeof(sysfs_params) / sizeof(struct suspend_sysfs_data);
-
-	printk("Suspend v" SUSPEND_CORE_VERSION "\n");
 
 	if (s2_sysfs_init())
 		return 1;

@@ -159,6 +159,8 @@ extern void suspend_unregister_module(struct suspend_module_ops *module);
 extern int suspend_initialise_modules(int starting_cycle);
 extern void suspend_cleanup_modules(int finishing_cycle);
 
+extern void suspend_print_modules(void);
+
 int suspend_get_modules(void);
 void suspend_put_modules(void);
 #endif

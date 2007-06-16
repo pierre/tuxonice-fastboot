@@ -1077,7 +1077,7 @@ static struct suspend_sysfs_data sysfs_params[] = {
 
 static struct suspend_module_ops suspend_fileops = {
 	.type					= WRITER_MODULE,
-	.name					= "File Allocator",
+	.name					= "file storage",
 	.directory				= "file",
 	.module					= THIS_MODULE,
 	.print_debug_info			= suspend_file_print_debug_stats,

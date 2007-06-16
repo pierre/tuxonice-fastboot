@@ -210,7 +210,6 @@ int suspend_register_module(struct suspend_module_ops *module)
 		}
 	}
 
-	printk("Suspend2 %s support registered.\n", module->name);
 	return 0;
 }
 
@@ -256,7 +255,6 @@ void suspend_unregister_module(struct suspend_module_ops *module)
 	}
 	list_del(&module->module_list);
 	suspend_num_modules--;
-	printk("Suspend2 %s module unloaded.\n", module->name);
 }
 
 /*
@@ -359,6 +357,27 @@ struct suspend_module_ops *suspend_get_next_filter(struct suspend_module_ops *fi
 	}
 
 	return suspendActiveAllocator;
+}
+
+/**
+ * suspend_show_modules: Printk what support is loaded.
+ */
+void suspend_print_modules(void)
+{
+	struct suspend_module_ops *this_module;
+	int prev = 0;
+
+	printk("Suspend2 " SUSPEND_CORE_VERSION ", with support for");
+	
+	list_for_each_entry(this_module, &suspend_modules, module_list) {
+		printk("%s %s%s%s", prev ? "," : "",
+				this_module->enabled ? "" : "[",
+				this_module->name,
+				this_module->enabled ? "" : "]");
+		prev = 1;
+	}
+
+	printk(".\n");
 }
 
 /* suspend_get_modules

@@ -250,7 +250,7 @@ static struct suspend_sysfs_data sysfs_params[] = {
 
 static struct suspend_module_ops usm_ops = {
 	.type				= MISC_MODULE,
-	.name				= "Userspace Storage Manager",
+	.name				= "usm",
 	.directory			= "storage_manager",
 	.module				= THIS_MODULE,
 	.storage_needed			= usm_storage_needed,

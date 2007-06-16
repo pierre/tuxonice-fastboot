@@ -389,7 +389,7 @@ static struct suspend_sysfs_data sysfs_params[] = {
  */
 static struct suspend_module_ops suspend_compression_ops = {
 	.type			= FILTER_MODULE,
-	.name			= "Compressor",
+	.name			= "compression",
 	.directory		= "compression",
 	.module			= THIS_MODULE,
 	.initialise		= suspend_compress_init,

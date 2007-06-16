@@ -341,7 +341,7 @@ static struct suspend_sysfs_data sysfs_params[] = {
  */
 static struct suspend_module_ops suspend_checksum_ops = {
 	.type			= MISC_MODULE,
-	.name			= "Checksumming",
+	.name			= "checksumming",
 	.directory		= "checksum",
 	.module			= THIS_MODULE,
 	.initialise		= suspend_checksum_prepare,

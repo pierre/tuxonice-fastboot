@@ -595,7 +595,7 @@ static struct suspend_sysfs_data sysfs_params[] = {
 
 static struct suspend_module_ops userui_ops = {
 	.type				= MISC_MODULE,
-	.name				= "Userspace UI",
+	.name				= "userui",
 	.shared_directory		= "Basic User Interface",
 	.module				= THIS_MODULE,
 	.storage_needed			= userui_storage_needed,

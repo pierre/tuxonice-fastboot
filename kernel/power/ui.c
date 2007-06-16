@@ -272,7 +272,7 @@ static struct suspend_sysfs_data sysfs_params[] = {
 
 static struct suspend_module_ops userui_ops = {
 	.type				= MISC_MODULE,
-	.name				= "Basic User Interface",
+	.name				= "printk ui",
 	.directory			= "user_interface",
 	.module				= THIS_MODULE,
 	.sysfs_data			= sysfs_params,

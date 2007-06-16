@@ -1197,7 +1197,7 @@ static struct suspend_sysfs_data sysfs_params[] = {
 
 static struct suspend_module_ops suspend_swapops = {
 	.type					= WRITER_MODULE,
-	.name					= "Swap Allocator",
+	.name					= "swap storage",
 	.directory				= "swap",
 	.module					= THIS_MODULE,
 	.memory_needed				= suspend_swap_memory_needed,
