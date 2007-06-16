@@ -94,6 +94,25 @@ int suspend_expected_compression_ratio(void)
 	return ratio;
 }
 
+/* suspend_find_module_given_dir
+ * Functionality :	Return a module (if found), given a pointer
+ * 			to its directory name
+ */
+
+static struct suspend_module_ops *suspend_find_module_given_dir(char *name)
+{
+	struct suspend_module_ops *this_module, *found_module = NULL;
+	
+	list_for_each_entry(this_module, &suspend_modules, module_list) {
+		if (!strcmp(name, this_module->directory)) {
+			found_module = this_module;
+			break;
+		}			
+	}
+
+	return found_module;
+}
+
 /* suspend_find_module_given_name
  * Functionality :	Return a module (if found), given a pointer
  * 			to its name
@@ -190,7 +209,7 @@ int suspend_register_module(struct suspend_module_ops *module)
 		 */
 		if (module->shared_directory) {
 			struct suspend_module_ops *shared =
-				suspend_find_module_given_name(module->shared_directory);
+				suspend_find_module_given_dir(module->shared_directory);
 			if (!shared) {
 				printk("Suspend2: Module %s wants to share %s's directory but %s isn't loaded.\n",
 						module->name,
