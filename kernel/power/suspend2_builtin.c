@@ -86,8 +86,11 @@ EXPORT_SYMBOL_GPL(enable_nonboot_cpus);
 #endif
 #endif
 
+int suspend2_wait = CONFIG_SUSPEND2_DEFAULT_WAIT;
+
 #ifdef CONFIG_SUSPEND2_USERUI_EXPORTS
 EXPORT_SYMBOL_GPL(kmsg_redirect);
+EXPORT_SYMBOL_GPL(suspend2_wait);
 #ifndef CONFIG_COMPAT
 EXPORT_SYMBOL_GPL(sys_ioctl);
 #endif
@@ -232,3 +235,19 @@ EXPORT_SYMBOL_GPL(suspend2_nosave_state3);
 EXPORT_SYMBOL_GPL(suspend2_nosave_io_speed);
 EXPORT_SYMBOL_GPL(suspend2_nosave_commandline);
 #endif
+
+static int __init suspend2_wait_setup(char *str)
+{
+	int value;
+
+	if (sscanf(str, "=%d", &value)) {
+		if (value < -1 || value > 255)
+			printk("Suspend2_wait outside range -1 to 255.\n");
+		else
+			suspend2_wait = value;
+	}
+
+	return 1;
+}
+
+__setup("suspend2_wait", suspend2_wait_setup);

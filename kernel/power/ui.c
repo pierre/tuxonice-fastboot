@@ -44,10 +44,86 @@
 #include "power_off.h"
 
 static char local_printf_buf[1024];	/* Same as printk - should be safe */
+extern int suspend2_wait;
 struct ui_ops *s2_current_ui;
 
 /*! The console log level we default to. */
 int suspend_default_console_level = 0;
+
+/**
+ * suspend_wait_for_keypress - Wait for keypress via userui or /dev/console.
+ *
+ * @timeout: Maximum time to wait.
+ *
+ * Wait for a keypress, either from userui or /dev/console if userui isn't
+ * available. The non-userui path is particularly for at boot-time, prior
+ * to userui being started, when we have an important warning to give to
+ * the user.
+ */
+static char suspend_wait_for_keypress(int timeout)
+{
+	int fd, this_timeout = 255;
+	char key = '\0';
+	struct termios t, t_backup;
+
+	if (s2_current_ui && s2_current_ui->wait_for_key(timeout)) {
+		key = ' ';
+		goto out;
+	}
+	
+	/* We should be guaranteed /dev/console exists after populate_rootfs() in
+	 * init/main.c
+	 */
+	if ((fd = sys_open("/dev/console", O_RDONLY, 0)) < 0) {
+		printk("Couldn't open /dev/console.\n");
+		goto out;
+	}
+
+	if (sys_ioctl(fd, TCGETS, (long)&t) < 0)
+		goto out_close;
+
+	memcpy(&t_backup, &t, sizeof(t));
+
+	t.c_lflag &= ~(ISIG|ICANON|ECHO);
+	t.c_cc[VMIN] = 0;
+
+new_timeout:
+	if (timeout > 0) {
+		this_timeout = timeout < 26 ? timeout : 25;
+		timeout -= this_timeout;
+		this_timeout *= 10;
+	}
+
+	t.c_cc[VTIME] = this_timeout;
+
+	if (sys_ioctl(fd, TCSETS, (long)&t) < 0)
+		goto out_restore;
+
+	while (1) {
+		if (sys_read(fd, &key, 1) <= 0) {
+			if (timeout)
+				goto new_timeout;
+			key = '\0';
+			break;
+		}
+		key = tolower(key);
+		if (test_suspend_state(SUSPEND_SANITY_CHECK_PROMPT)) {
+			if (key == 'c') {
+				set_suspend_state(SUSPEND_CONTINUE_REQ);
+				break;
+			} else if (key == ' ')
+				break;
+		} else
+			break;
+	}
+
+out_restore:
+	sys_ioctl(fd, TCSETS, (long)&t_backup);
+out_close:
+	sys_close(fd);
+out:
+	return key;
+}
 
 /* suspend_early_boot_message()
  * Description:	Handle errors early in the process of booting.
@@ -72,16 +148,24 @@ int suspend_default_console_level = 0;
  */
 
 #define say(message, a...) printk(KERN_EMERG message, ##a)
-#define message_timeout 25 /* message_timeout * 10 must fit in 8 bits */
 
-int suspend_early_boot_message(int message_detail, int default_answer, char *warning_reason, ...)
+void suspend_early_boot_message(int message_detail, int default_answer, char *warning_reason, ...)
 {
 #if defined(CONFIG_VT) || defined(CONFIG_SERIAL_CONSOLE)
 	unsigned long orig_state = get_suspend_state(), continue_req = 0;
 	unsigned long orig_loglevel = console_loglevel;
+	int can_ask = 1;
+#else
+	int can_ask = 0;
 #endif
+
 	va_list args;
 	int printed_len;
+
+	if (!suspend2_wait) {
+		set_suspend_state(SUSPEND_CONTINUE_REQ);
+		can_ask = 0;
+	}
 
 	if (warning_reason) {
 		va_start(args, warning_reason);
@@ -94,7 +178,12 @@ int suspend_early_boot_message(int message_detail, int default_answer, char *war
 
 	if (!test_suspend_state(SUSPEND_BOOT_TIME)) {
 		printk("Suspend2: %s\n", local_printf_buf);
-		return default_answer;
+		return;
+	}
+
+	if (!can_ask) {
+		continue_req = !!default_answer;
+		goto post_ask;
 	}
 
 #if defined(CONFIG_VT) || defined(CONFIG_SERIAL_CONSOLE)
@@ -117,10 +206,11 @@ int suspend_early_boot_message(int message_detail, int default_answer, char *war
 			break;
 		}
 		say("Press SPACE to reboot or C to continue booting with this kernel\n\n");
-		say("Default action if you don't select one in %d seconds is: %s.\n",
-			message_timeout,
-			default_answer == SUSPEND_CONTINUE_REQ ?
-			"continue booting" : "reboot");
+		if (suspend2_wait > 0)
+			say("Default action if you don't select one in %d seconds is: %s.\n",
+				suspend2_wait,
+				default_answer == SUSPEND_CONTINUE_REQ ?
+				"continue booting" : "reboot");
 	} else {
 		say("BIG FAT WARNING!!\n\n");
 		say("You have tried to resume from this image before.\n");
@@ -129,30 +219,31 @@ int suspend_early_boot_message(int message_detail, int default_answer, char *war
 		say("This will be equivalent to entering noresume on the\n");
 		say("kernel command line.\n\n");
 		say("Press SPACE to remove the image or C to continue resuming.\n\n");
-		say("Default action if you don't select one in %d seconds is: %s.\n",
-			message_timeout,
-			!!default_answer ?
-			"continue resuming" : "remove the image");
+		if (suspend2_wait > 0)
+			say("Default action if you don't select one in %d seconds is: %s.\n",
+				suspend2_wait,
+				!!default_answer ?
+				"continue resuming" : "remove the image");
 	}
 	console_loglevel = orig_loglevel;
 	
 	set_suspend_state(SUSPEND_SANITY_CHECK_PROMPT);
 	clear_suspend_state(SUSPEND_CONTINUE_REQ);
 
-	if (suspend_wait_for_keypress(message_timeout) == 0) /* We timed out */
+	if (suspend_wait_for_keypress(suspend2_wait) == 0) /* We timed out */
 		continue_req = !!default_answer;
 	else
 		continue_req = test_suspend_state(SUSPEND_CONTINUE_REQ);
 
+#endif /* CONFIG_VT or CONFIG_SERIAL_CONSOLE */
+
+post_ask:
 	if ((warning_reason) && (!continue_req))
 		machine_restart(NULL);
 	
 	restore_suspend_state(orig_state);
 	if (continue_req)
 		set_suspend_state(SUSPEND_CONTINUE_REQ);
-
-#endif /* CONFIG_VT or CONFIG_SERIAL_CONSOLE */
-	return -EIO;
 }
 #undef say
 

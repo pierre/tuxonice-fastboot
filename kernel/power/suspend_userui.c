@@ -291,73 +291,6 @@ static void wait_for_key_via_userui(void)
 }
 
 /**
- * userui_wait_for_keypress - Wait for keypress via userui or /dev/console.
- *
- * @timeout: Maximum time to wait.
- *
- * Wait for a keypress, either from userui or /dev/console if userui isn't
- * available. The non-userui path is particularly for at boot-time, prior
- * to userui being started, when we have an important warning to give to
- * the user.
- */
-static char userui_wait_for_keypress(int timeout)
-{
-	int fd;
-	char key = '\0';
-	struct termios t, t_backup;
-
-	if (ui_helper_data.pid != -1) {
-		wait_for_key_via_userui();
-		key = ' ';
-		goto out;
-	}
-	
-	/* We should be guaranteed /dev/console exists after populate_rootfs() in
-	 * init/main.c
-	 */
-	if ((fd = sys_open("/dev/console", O_RDONLY, 0)) < 0) {
-		printk("Couldn't open /dev/console.\n");
-		goto out;
-	}
-
-	if (sys_ioctl(fd, TCGETS, (long)&t) < 0)
-		goto out_close;
-
-	memcpy(&t_backup, &t, sizeof(t));
-
-	t.c_lflag &= ~(ISIG|ICANON|ECHO);
-	t.c_cc[VMIN] = 0;
-	if (timeout)
-		t.c_cc[VTIME] = timeout*10;
-
-	if (sys_ioctl(fd, TCSETS, (long)&t) < 0)
-		goto out_restore;
-
-	while (1) {
-		if (sys_read(fd, &key, 1) <= 0) {
-			key = '\0';
-			break;
-		}
-		key = tolower(key);
-		if (test_suspend_state(SUSPEND_SANITY_CHECK_PROMPT)) {
-			if (key == 'c') {
-				set_suspend_state(SUSPEND_CONTINUE_REQ);
-				break;
-			} else if (key == ' ')
-				break;
-		} else
-			break;
-	}
-
-out_restore:
-	sys_ioctl(fd, TCSETS, (long)&t_backup);
-out_close:
-	sys_close(fd);
-out:
-	return key;
-}
-
-/**
  * userui_prepare_status - Display high level messages.
  *
  * @clearbar: Whether to clear the progress bar.
@@ -383,6 +316,27 @@ static void userui_prepare_status(int clearbar, const char *fmt, ...)
 
 	if (ui_helper_data.pid == -1)
 		printk(KERN_EMERG "%s\n", lastheader);
+}
+
+/**
+ * suspend_wait_for_keypress - Wait for keypress via userui.
+ *
+ * @timeout: Maximum time to wait.
+ *
+ * Wait for a keypress from userui.
+ *
+ * FIXME: Implement timeout?
+ */
+static char userui_wait_for_keypress(int timeout)
+{
+	char key = '\0';
+
+	if (ui_helper_data.pid != -1) {
+		wait_for_key_via_userui();
+		key = ' ';
+	}
+	
+	return key;
 }
 
 /**
@@ -420,7 +374,7 @@ static void userui_abort_suspend(int result_code, const char *fmt, ...)
 	suspend_prepare_status(CLEAR_BAR, local_printf_buf);
 
 	if (ui_helper_data.pid != -1)
-		suspend_wait_for_keypress(0);
+		userui_wait_for_keypress(0);
 }
 
 /**
@@ -567,7 +521,7 @@ static void userui_cond_pause(int pause, char *message)
 			   " Single step on." : "");
 			displayed_message = 1;
 		}
-		last_key = suspend_wait_for_keypress(0);
+		last_key = userui_wait_for_keypress(0);
 	}
 	schedule();
 }

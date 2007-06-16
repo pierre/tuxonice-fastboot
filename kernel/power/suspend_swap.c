@@ -948,9 +948,9 @@ static int suspend_swap_image_exists(void)
 		printk("Suspend2: Detected another implementation's signature.\n");
 		return 0;
 	} else if ((signature_found >> 1) != SIGNATURE_VER) {
-		if ((!(test_suspend_state(SUSPEND_NORESUME_SPECIFIED))) &&
+		if (!test_suspend_state(SUSPEND_NORESUME_SPECIFIED)) {
 			suspend_early_boot_message(1, SUSPEND_CONTINUE_REQ,
-			 "Found a different style suspend image signature.")) {
+			  "Found a different style suspend image signature.");
 			set_suspend_state(SUSPEND_NORESUME_SPECIFIED);
 			printk("Suspend2: Dectected another implementation's signature.\n");
 		}

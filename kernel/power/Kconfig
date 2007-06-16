@@ -268,6 +268,22 @@ menuconfig SUSPEND2_CORE
 		  atomic copy. Should not normally be needed, but here for verification and
 		  diagnostic purposes.
 
+	config SUSPEND2_DEFAULT_WAIT
+		int "Default waiting time for emergency boot messages"
+		default "25"
+		range -1 32768
+		depends on SUSPEND2_CORE
+		help
+		  Suspend2 can display warnings very early in the process of resuming,
+		  if (for example) it appears that you have booted a kernel that doesn't
+		  match an image on disk. It can then give you the opportunity to either
+		  continue booting that kernel, or reboot the machine. This option can be
+		  used to control how long to wait in such circumstances. -1 means wait
+		  forever. 0 means don't wait at all (do the default action, which will
+		  generally be to continue booting and remove the image). Values of 1 or
+		  more indicate a number of seconds (up to 255) to wait before doing the
+		  default.
+
 config SUSPEND2_USERUI_EXPORTS
 	bool
 	depends on SUSPEND2_USERUI=m

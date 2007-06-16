@@ -54,9 +54,6 @@ extern struct ui_ops *s2_current_ui;
 #define suspend_update_status(val, max, fmt, args...) \
  (s2_current_ui ? (s2_current_ui->update_status) (val, max, fmt, ##args) : max)
 
-#define suspend_wait_for_keypress(timeout) \
- (s2_current_ui ? (s2_current_ui->wait_for_key) (timeout) : 0)
-
 #define suspend_ui_post_atomic_restore(void) \
 	do { if (s2_current_ui) \
 		(s2_current_ui->post_atomic_restore)(); \

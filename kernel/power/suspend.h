@@ -174,7 +174,7 @@ extern int suspend_io_time[2][2];
 
 #define SECTOR_SIZE 512
 
-extern int suspend_early_boot_message 
+extern void suspend_early_boot_message 
 	(int can_erase_image, int default_answer, char *warning_reason, ...);
 
 static inline int load_direct(struct page *page)

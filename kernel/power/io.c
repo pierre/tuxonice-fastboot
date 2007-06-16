@@ -1141,8 +1141,10 @@ static int __read_pageset1(void)
 	 * NB: This call may also result in a reboot rather than returning.
 	 */
 
-	if ((sanity_error = sanity_check(suspend_header)) &&
-	    suspend_early_boot_message(1, SUSPEND_CONTINUE_REQ, sanity_error)) {
+	sanity_error = sanity_check(suspend_header);
+	if (sanity_error) {
+		suspend_early_boot_message(1, SUSPEND_CONTINUE_REQ,
+				sanity_error);
 		printk("Suspend2: Sanity check failed.\n");
 		goto out_invalidate_image;
 	}
