@@ -12,18 +12,14 @@
 #include "sysfs.h"
 #include "ui.h"
 
-struct list_head suspend_filters, suspendAllocators, suspend_modules;
+LIST_HEAD(suspend_filters);
+LIST_HEAD(suspendAllocators);
+LIST_HEAD(suspend_modules);
+
 struct suspend_module_ops *suspendActiveAllocator;
 int suspend_num_filters;
 int suspendNumAllocators, suspend_num_modules;
-int initialised;
-       
-static inline void suspend_initialise_module_lists(void) {
-	INIT_LIST_HEAD(&suspend_filters);
-	INIT_LIST_HEAD(&suspendAllocators);
-	INIT_LIST_HEAD(&suspend_modules);
-}
-
+ 
 /*
  * suspend_header_storage_for_modules
  *
@@ -152,11 +148,6 @@ int suspend_register_module(struct suspend_module_ops *module)
 {
 	int i;
 	struct kobject *kobj;
-
-	if (!initialised) {
-		suspend_initialise_module_lists();
-		initialised = 1;
-	}
 
 	module->enabled = 1;
 	
