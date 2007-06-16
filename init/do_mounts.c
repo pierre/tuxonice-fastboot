@@ -146,7 +146,7 @@ dev_t name_to_dev_t(char *name)
 #ifdef CONFIG_SYSFS
 	int mkdir_err = sys_mkdir("/sys", 0700);
 	/* 
-	 * When changing resume2 parameter for Software Suspend, sysfs may
+	 * When changing resume parameter for suspend2, sysfs may
 	 * already be mounted. 
 	 */
 	mount_result = sys_mount("sysfs", "/sys", "sysfs", 0, NULL);
