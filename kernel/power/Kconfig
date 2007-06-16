@@ -208,14 +208,6 @@ menuconfig SUSPEND2_CORE
 		  and resuming, and also enables features such as pressing escape to
 		  cancel a cycle or interactive debugging.
 
-	config SUSPEND2_DEFAULT_RESUME2
-		string "Default resume device name"
-		depends on SUSPEND2_CORE
-		---help---
-		  You normally need to add a resume2= parameter to your lilo.conf or
-		  equivalent. With this option properly set, the kernel has a value
-		  to default. No damage will be done if the value is invalid.
-
 	config SUSPEND2_KEEP_IMAGE
 		bool "Allow Keep Image Mode"
 		depends on SUSPEND2_CORE

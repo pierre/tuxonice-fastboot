@@ -205,9 +205,6 @@ EXPORT_SYMBOL_GPL(suspend_state);
 unsigned int nr_suspends;
 EXPORT_SYMBOL_GPL(nr_suspends);
 
-char resume2_file[256] = CONFIG_SUSPEND2_DEFAULT_RESUME2;
-EXPORT_SYMBOL_GPL(resume2_file);
-
 int suspend2_running = 0;
 EXPORT_SYMBOL_GPL(suspend2_running);
 
@@ -235,39 +232,3 @@ EXPORT_SYMBOL_GPL(suspend2_nosave_state3);
 EXPORT_SYMBOL_GPL(suspend2_nosave_io_speed);
 EXPORT_SYMBOL_GPL(suspend2_nosave_commandline);
 #endif
-
-/* --  Commandline Parameter Handling ---
- *
- * Resume setup: obtain the storage device.
- */
-static int __init resume2_setup(char *str)
-{
-	if (!*str)
-		return 0;
-	
-	strncpy(resume2_file, str, 255);
-	return 0;
-}
-
-/*
- * Allow the user to specify that we should ignore any image found and
- * invalidate the image if necesssary. This is equivalent to running
- * the task queue and a sync and then turning off the power. The same
- * precautions should be taken: fsck if you're not journalled.
- */
-static int __init noresume2_setup(char *str)
-{
-	set_suspend_state(SUSPEND_NORESUME_SPECIFIED);
-	return 0;
-}
-
-static int __init suspend_retry_resume_setup(char *str)
-{
-	set_suspend_state(SUSPEND_RETRY_RESUME);
-	return 0;
-}
-
-__setup("noresume2", noresume2_setup);
-__setup("resume2=", resume2_setup);
-__setup("suspend_retry_resume", suspend_retry_resume_setup);
-

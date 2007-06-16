@@ -10,7 +10,6 @@ extern struct suspend2_core_fns *s2_core_fns;
 extern unsigned long suspend_compress_bytes_in, suspend_compress_bytes_out;
 extern unsigned long suspend_action;
 extern unsigned int nr_suspends;
-extern char resume2_file[256];
 extern int suspend2_in_suspend;
 
 extern unsigned long suspend2_nosave_state1 __nosavedata;

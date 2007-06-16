@@ -20,8 +20,8 @@
  *
  * echo /path/to/my_file > /sys/power/suspend2/suspend_file/target
  *
- * then put what they find in /sys/power/suspend2/resume2
- * as their resume2= parameter in lilo.conf (and rerun lilo if using it).
+ * then put what they find in /sys/power/suspend2/resume_from
+ * as their resume= parameter in lilo.conf (and rerun lilo if using it).
  *
  * Having done this, they're ready to suspend and resume.
  *
@@ -270,7 +270,7 @@ static void suspend_file_cleanup(int finishing_cycle)
 /* 
  * reopen_resume_devt
  *
- * Having opened resume2= once, we remember the major and
+ * Having opened resume= once, we remember the major and
  * minor nodes and use them to reopen the bdev for checking
  * whether an image exists (possibly when starting a resume).
  */
@@ -287,7 +287,7 @@ static void reopen_resume_devt(void)
 }
 
 static void suspend_file_get_target_info(char *target, int get_size,
-		int resume2)
+		int resume_param)
 {
 	if (target_file)
 		suspend_file_cleanup(0);
@@ -299,7 +299,7 @@ static void suspend_file_get_target_info(char *target, int get_size,
 
 	if (IS_ERR(target_file) || !target_file) {
 
-		if (!resume2) {
+		if (!resume_param) {
 			printk("Open file %s returned %p.\n",
 					target, target_file);
 			target_file = NULL;
@@ -355,7 +355,7 @@ static void suspend_file_get_target_info(char *target, int get_size,
 	if (get_size)
 		target_storage_available = size_ignoring_ignored_pages();
 
-	if (!resume2)
+	if (!resume_param)
 		target_firstblock = bmap(target_inode, 0) << devinfo.bmap_shift;
 	
 	return;
@@ -619,7 +619,7 @@ static int file_init(void)
  * Ramdisk support based heavily on init/do_mounts_rd.c
  *
  * Description:
- * 1. Attempt to read the device specified with resume2=.
+ * 1. Attempt to read the device specified with resume=.
  * 2. Check the contents of the header for our signature.
  * 3. Warn, ignore, reset and/or continue as appropriate.
  * 4. If continuing, read the suspend_file configuration section
@@ -819,7 +819,7 @@ static void suspend_file_mark_resume_attempted(int mark)
 		UNMARK_RESUME_ATTEMPTED);
 }
 
-static void suspend_file_set_resume2(void)
+static void suspend_file_set_resume_param(void)
 {
 	char *buffer = (char *) get_zeroed_page(S2_ATOMIC_GFP);
 	char *buffer2 = (char *) get_zeroed_page(S2_ATOMIC_GFP);
@@ -840,7 +840,7 @@ static void suspend_file_set_resume2(void)
 		offset += snprintf(buffer + offset, PAGE_SIZE - offset,
 				"%s is not a valid target.", suspend_file_target);
 			
-	sprintf(resume2_file, "file:%s", buffer);
+	sprintf(resume_file, "file:%s", buffer);
 
 	free_page((unsigned long) buffer);
 	free_page((unsigned long) buffer2);
@@ -855,7 +855,7 @@ static int __test_suspend_file_target(char *target, int resume_time, int quiet)
 		if (!quiet)
 			printk("Suspend2: FileAllocator: File signature found.\n");
 		if (!resume_time)
-			suspend_file_set_resume2();
+			suspend_file_set_resume_param();
 		
 		suspend_bio_ops.set_devinfo(&devinfo);
 		suspend_writer_posn.chains = &block_chain;
@@ -896,9 +896,9 @@ static void test_suspend_file_target(void)
 /*
  * Parse Image Location
  *
- * Attempt to parse a resume2= parameter.
- * Swap Writer accepts:
- * resume2=file:DEVNAME[:FIRSTBLOCK]
+ * Attempt to parse a resume= parameter.
+ * File Allocator accepts:
+ * resume=file:DEVNAME[:FIRSTBLOCK]
  *
  * Where:
  * DEVNAME is convertable to a dev_t by name_to_dev_t
@@ -952,10 +952,10 @@ static int suspend_file_parse_sig_location(char *commandline,
 	
 	/* 
 	 * For the suspend_file, you can be able to resume, but not suspend,
-	 * because the resume2= is set correctly, but the suspend_file_target
+	 * because the resume= is set correctly, but the suspend_file_target
 	 * isn't. 
 	 *
-	 * We may have come here as a result of setting resume2 or
+	 * We may have come here as a result of setting resume or
 	 * suspend_file_target. We only test the suspend_file target in the
 	 * former case (it's already done in the later), and we do it before
 	 * setting the block number ourselves. It will overwrite the values

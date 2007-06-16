@@ -127,7 +127,7 @@ void suspend_finish_anything(int suspend_or_resume)
  * @suspend_or_resume: Whether starting a cycle or attempt at resuming.
  *
  * Our basic initialisation routine. Take references on modules, use the
- * kernel segment, recheck resume2= if no active allocator is set, initialise
+ * kernel segment, recheck resume= if no active allocator is set, initialise
  * modules, save and reset block_dump and ensure we're running on CPU0.
  */
 int suspend_start_anything(int suspend_or_resume)
@@ -433,7 +433,7 @@ static int can_suspend(void)
 	if (!test_suspend_state(SUSPEND_CAN_SUSPEND)) {
 		printk("Suspend2: Software suspend is disabled.\n"
 			"This may be because you haven't put something along "
-			"the lines of\n\nresume2=swap:/dev/hda1\n\n"
+			"the lines of\n\nresume=swap:/dev/hda1\n\n"
 			"in lilo.conf or equivalent. (Where /dev/hda1 is your "
 			"swap partition).\n");
 		set_abort_result(SUSPEND_CANT_SUSPEND);
@@ -450,7 +450,7 @@ static int can_suspend(void)
 static int do_power_down(void)
 {
 	/* If switching images fails, do normal powerdown */
-	if (poweroff_resume2[0])
+	if (alt_resume_param[0])
 		do_suspend2_step(STEP_RESUME_ALT_IMAGE);
 
 	suspend_cond_pause(1, "About to power down or reboot.");
@@ -653,9 +653,9 @@ static int do_load_atomic_copy(void)
 		return 1;
 	}
 	
-	if (!resume2_file[0])
+	if (!resume_file[0])
 		printk(KERN_WARNING "Suspend2: "
-			"You need to use a resume2= command line parameter to "
+			"You need to use a resume= command line parameter to "
 			"tell Suspend2 where to look for an image.\n");
 
 	suspend_activate_storage(0);
@@ -673,7 +673,7 @@ static int do_load_atomic_copy(void)
 		else
 			printk(KERN_ALERT "Suspend2: "
 				"Missing or invalid storage location "
-				"(resume2= parameter). Please correct and "
+				"(resume= parameter). Please correct and "
 				"rerun lilo (or equivalent) before "
 				"suspending.\n");
 		suspend_deactivate_storage(0);
@@ -773,7 +773,7 @@ int do_suspend2_step(int step)
 		case STEP_RESUME_ALT_IMAGE:
 			printk("Trying to resume alternate image.\n");
 			suspend2_in_suspend = 0;
-			save_restore_resume2(SAVE, NOQUIET);
+			save_restore_alt_param(SAVE, NOQUIET);
 			prepare_restore_load_alt_image(1);
 			if (!do_check_can_resume()) {
 				printk("Nothing to resume from.\n");
@@ -785,7 +785,7 @@ int do_suspend2_step(int step)
 			}
 out:
 			prepare_restore_load_alt_image(0);
-			save_restore_resume2(RESTORE, NOQUIET);
+			save_restore_alt_param(RESTORE, NOQUIET);
 			break;
 	}
 
@@ -854,11 +854,11 @@ int _suspend2_try_suspend(int have_pmsem)
 
 	get_pmsem = !have_pmsem;
 
-	if (strlen(poweroff_resume2)) {
-		attempt_to_parse_po_resume_device2();
+	if (strlen(alt_resume_param)) {
+		attempt_to_parse_alt_resume_param();
 
-		if (!strlen(poweroff_resume2)) {
-			printk("Poweroff resume2 now invalid. Aborting.\n");
+		if (!strlen(alt_resume_param)) {
+			printk("Alternate resume parameter now invalid. Aborting.\n");
 			goto out;
 		}
 	}
@@ -898,13 +898,13 @@ static struct suspend_sysfs_data sysfs_params[] = {
 	},
 
 	{ SUSPEND2_ATTR("resume2", SYSFS_RW),
-	  SYSFS_STRING(resume2_file, 255, SYSFS_NEEDS_SM_FOR_WRITE),
+	  SYSFS_STRING(resume_file, 255, SYSFS_NEEDS_SM_FOR_WRITE),
 	  .write_side_effect = attempt_to_parse_resume_device2,
 	},
 
-	{ SUSPEND2_ATTR("poweroff_resume2", SYSFS_RW),
-	  SYSFS_STRING(poweroff_resume2, 255, SYSFS_NEEDS_SM_FOR_WRITE),
-	  .write_side_effect = attempt_to_parse_po_resume_device2,
+	{ SUSPEND2_ATTR("alt_resume_param", SYSFS_RW),
+	  SYSFS_STRING(alt_resume_param, 255, SYSFS_NEEDS_SM_FOR_WRITE),
+	  .write_side_effect = attempt_to_parse_alt_resume_param,
 	},
 	{ SUSPEND2_ATTR("debug_info", SYSFS_READONLY),
 	  SYSFS_CUSTOM(get_suspend_debug_info, NULL, 0)
@@ -1018,10 +1018,6 @@ static __init int core_load(void)
 		return 1;
 	if (s2_ui_init())
 		return 1;
-
-	/* Overriding resume2= with resume=? */
-	if (test_action_state(SUSPEND_REPLACE_SWSUSP) && resume_file[0])
-		strncpy(resume2_file, resume_file, 256);
 
 	return 0;
 }

@@ -126,7 +126,7 @@ int suspend_early_boot_message(int message_detail, int default_answer, char *war
 		say("You have tried to resume from this image before.\n");
 		say("If it failed once, it may well fail again.\n");
 		say("Would you like to remove the image and boot normally?\n");
-		say("This will be equivalent to entering noresume2 on the\n");
+		say("This will be equivalent to entering noresume on the\n");
 		say("kernel command line.\n\n");
 		say("Press SPACE to remove the image or C to continue resuming.\n\n");
 		say("Default action if you don't select one in %d seconds is: %s.\n",

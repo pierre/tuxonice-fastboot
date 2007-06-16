@@ -50,7 +50,7 @@ struct suspend_sysfs_data {
 	} data;
 	
 	/* Side effects routines. Used, eg, for reparsing the
-	 * resume2 entry when it changes */
+	 * resume= entry when it changes */
 	void (*read_side_effect) (void);
 	void (*write_side_effect) (void); 
 	struct list_head sysfs_data_list;

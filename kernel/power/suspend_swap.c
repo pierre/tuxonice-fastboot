@@ -684,7 +684,7 @@ static int suspend_swap_write_header_cleanup(void)
  * read_header_init()
  * 
  * Description:
- * 1. Attempt to read the device specified with resume2=.
+ * 1. Attempt to read the device specified with resume=.
  * 2. Check the contents of the swap header for our signature.
  * 3. Warn, ignore, reset and/or continue as appropriate.
  * 4. If continuing, read the suspend_swap configuration section
@@ -1002,9 +1002,9 @@ static void suspend_swap_mark_resume_attempted(int mark)
 /*
  * Parse Image Location
  *
- * Attempt to parse a resume2= parameter.
+ * Attempt to parse a resume= parameter.
  * Swap Writer accepts:
- * resume2=swap:DEVNAME[:FIRSTBLOCK][@BLOCKSIZE]
+ * resume=swap:DEVNAME[:FIRSTBLOCK][@BLOCKSIZE]
  *
  * Where:
  * DEVNAME is convertable to a dev_t by name_to_dev_t
@@ -1025,7 +1025,7 @@ static int suspend_swap_parse_sig_location(char *commandline,
 	if (strncmp(commandline, "swap:", 5)) {
 		/* 
 		 * Failing swap:, we'll take a simple
-		 * resume2=/dev/hda2, but fall through to
+		 * resume=/dev/hda2, but fall through to
 		 * other allocators if /dev/ isn't matched.
 		 */
 		if (strncmp(commandline, "/dev/", 5))
@@ -1139,7 +1139,7 @@ static int header_locations_read_sysfs(const char *page, int count)
 			if (!printedpartitionsmessage) {
 				len += sprintf(output + len, 
 					"For swap partitions, simply use the "
-					"format: resume2=swap:/dev/hda1.\n");
+					"format: resume=swap:/dev/hda1.\n");
 				printedpartitionsmessage = 1;
 			}
 		} else {
@@ -1161,7 +1161,7 @@ static int header_locations_read_sysfs(const char *page, int count)
 			} else {
 				char name_buffer[255];
 				len+= sprintf(output + len, "For swapfile `%s`,"
-					" use resume2=swap:/dev/%s:0x%x.\n",
+					" use resume=swap:/dev/%s:0x%x.\n",
 					path_page,
 					bdevname(si->bdev, name_buffer),
 					zone << (swapf->i_blkbits - 9));

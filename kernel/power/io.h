@@ -41,12 +41,12 @@ extern int read_pageset2(int overwrittenpagesonly);
 
 extern int suspend_attempt_to_parse_resume_device(int quiet);
 extern void attempt_to_parse_resume_device2(void);
-extern void attempt_to_parse_po_resume_device2(void);
+extern void attempt_to_parse_alt_resume_param(void);
 int image_exists_read(const char *page, int count);
 int image_exists_write(const char *buffer, int count);
-extern void save_restore_resume2(int replace, int quiet);
+extern void save_restore_alt_param(int replace, int quiet);
 
-/* Args to save_restore_resume2 */
+/* Args to save_restore_alt_param */
 #define RESTORE 0
 #define SAVE 1
 

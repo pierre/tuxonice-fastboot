@@ -32,7 +32,7 @@
 #include "sysfs.h"
 #include "suspend2_builtin.h"
 
-char poweroff_resume2[256];
+char alt_resume_param[256];
 
 /* Variables shared between threads and updated under the mutex */
 static int io_write, io_finish_at, io_base, io_barmax, io_pageset, io_result;
@@ -47,7 +47,7 @@ static atomic_t io_count;
 
 /* suspend_attempt_to_parse_resume_device
  *
- * Can we suspend, using the current resume2= parameter?
+ * Can we suspend, using the current resume= parameter?
  */
 int suspend_attempt_to_parse_resume_device(int quiet)
 {
@@ -70,9 +70,9 @@ int suspend_attempt_to_parse_resume_device(int quiet)
 		goto cleanup;
 	}
 	
-	if (!resume2_file[0]) {
+	if (!resume_file[0]) {
 		if (!quiet)
-			printk("Suspend2: Resume2 parameter is empty."
+			printk("Suspend2: Resume= parameter is empty."
 				" Suspending will be disabled.\n");
 		goto cleanup;
 	}
@@ -89,7 +89,7 @@ int suspend_attempt_to_parse_resume_device(int quiet)
 			continue;
 
 		result = thisAllocator->parse_sig_location(
-				resume2_file, (suspendNumAllocators == 1),
+				resume_file, (suspendNumAllocators == 1),
 				quiet);
 
 		switch (result) {
@@ -126,44 +126,44 @@ void attempt_to_parse_resume_device2(void)
 	suspend_cleanup_usm();
 }
 
-void save_restore_resume2(int replace, int quiet)
+void save_restore_alt_param(int replace, int quiet)
 {
-	static char resume2_save[255];
+	static char resume_param_save[255];
 	static unsigned long suspend_state_save;
 
 	if (replace) {
 		suspend_state_save = suspend_state;
-		strcpy(resume2_save, resume2_file);
-		strcpy(resume2_file, poweroff_resume2);	
+		strcpy(resume_param_save, resume_file);
+		strcpy(resume_file, alt_resume_param);	
 	} else {
-		strcpy(resume2_file, resume2_save);
+		strcpy(resume_file, resume_param_save);
 		suspend_state = suspend_state_save;
 	}
 	suspend_attempt_to_parse_resume_device(quiet);
 }
 
-void attempt_to_parse_po_resume_device2(void)
+void attempt_to_parse_alt_resume_param(void)
 {
 	int ok = 0;
 
-	/* Temporarily set resume2 to the poweroff value */
-	if (!strlen(poweroff_resume2))
+	/* Temporarily set resume_param to the poweroff value */
+	if (!strlen(alt_resume_param))
 		return;
 
 	printk("=== Trying Poweroff Resume2 ===\n");
-	save_restore_resume2(SAVE, NOQUIET);
+	save_restore_alt_param(SAVE, NOQUIET);
 	if (test_suspend_state(SUSPEND_CAN_RESUME))
 		ok = 1;
 	
 	printk("=== Done ===\n");
-	save_restore_resume2(RESTORE, QUIET);
+	save_restore_alt_param(RESTORE, QUIET);
 	
 	/* If not ok, clear the string */
 	if (ok)
 		return;
 
-	printk("Can't resume from that location; clearing poweroff_resume2.\n");
-	poweroff_resume2[0] = '\0';
+	printk("Can't resume from that location; clearing alt_resume_param.\n");
+	alt_resume_param[0] = '\0';
 }
 
 /* noresume_reset_modules
@@ -1101,12 +1101,7 @@ static int __read_pageset1(void)
 
 	/* Check whether we've resumed before */
 	if (test_suspend_state(SUSPEND_RESUMED_BEFORE)) {
-		int resumed_before_default = 0;
-		if (test_suspend_state(SUSPEND_RETRY_RESUME))
-			resumed_before_default = SUSPEND_CONTINUE_REQ;
-
-		suspend_early_boot_message(1, resumed_before_default, NULL);
-		clear_suspend_state(SUSPEND_RETRY_RESUME);
+		suspend_early_boot_message(1, 0, NULL);
 		if (!(test_suspend_state(SUSPEND_CONTINUE_REQ))) {
 			printk("Suspend2: Tried to resume before: "
 					"Invalidated image.\n");

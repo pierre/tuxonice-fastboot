@@ -164,8 +164,7 @@ extern void __suspend2_try_resume(void);
 extern int __suspend_post_context_save(void);
 
 extern unsigned int nr_suspends;
-extern char resume2_file[256];
-extern char poweroff_resume2[256];
+extern char alt_resume_param[256];
 
 extern void copyback_post(void);
 extern int suspend2_suspend(void);
