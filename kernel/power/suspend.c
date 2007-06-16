@@ -897,7 +897,7 @@ static struct suspend_sysfs_data sysfs_params[] = {
 			  SYSFS_NEEDS_SM_FOR_BOTH)
 	},
 
-	{ SUSPEND2_ATTR("resume2", SYSFS_RW),
+	{ SUSPEND2_ATTR("resume", SYSFS_RW),
 	  SYSFS_STRING(resume_file, 255, SYSFS_NEEDS_SM_FOR_WRITE),
 	  .write_side_effect = attempt_to_parse_resume_device2,
 	},

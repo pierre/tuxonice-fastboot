@@ -433,7 +433,7 @@
     - configuring the module (see below);
 
     ...and routines for writers specific to their work:
-    - Parsing a resume2= location;
+    - Parsing a resume= location;
     - Determining whether an image exists;
     - Marking a resume as having been attempted;
     - Invalidating an image;

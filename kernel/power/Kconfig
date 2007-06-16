@@ -233,8 +233,8 @@ menuconfig SUSPEND2_CORE
 		  to use the vanilla kernel functionality. Note that your initrd/ramfs will
 		  need to do this before trying to resume, too.
 		  With overriding swsusp enabled, Suspend2 will use both the resume= and
-		  noresume commandline options _and_ the resume2= and noresume2 ones (for
-		  compatibility). resume= takes precedence over resume2=. Echoing disk 
+		  noresume commandline options _and_ the resume= and noresume ones (for
+		  compatibility). resume= takes precedence over resume=. Echoing disk 
 		  to /sys/power/state will start a Suspend2 cycle. If resume= doesn't
 		  specify an allocator and both the swap and file allocators are compiled in,
 		  the swap allocator will be used by default.

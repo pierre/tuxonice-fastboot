@@ -123,19 +123,19 @@
 
    Then
 
-   cat /sys/power/suspend2/resume2
+   cat /sys/power/suspend2/resume
 
    Put the results of this into your bootloader's configuration (see also step
    C, below:
 
    ---EXAMPLE-ONLY-DON'T-COPY-AND-PASTE---
-   # cat /sys/power/suspend2/resume2
+   # cat /sys/power/suspend2/resume
    file:/dev/hda2:0x1e001
    
    In this example, we would edit the append= line of our lilo.conf|menu.lst
    so that it included:
 
-   resume2=file:/dev/hda2:0x1e001
+   resume=file:/dev/hda2:0x1e001
    ---EXAMPLE-ONLY-DON'T-COPY-AND-PASTE---
  
    For those who are thinking 'Could I make the file sparse?', the answer is
@@ -149,7 +149,7 @@
    Using Suspend2 also requires that you add an extra parameter to 
    your lilo.conf or equivalent. Here's an example for a swap partition:
 
-   append="resume2=swap:/dev/hda1"
+   append="resume=swap:/dev/hda1"
 
    This would tell Suspend2 that /dev/hda1 is a swap partition you 
    have. Suspend2 will use the swap signature of this partition as a
@@ -168,8 +168,8 @@
    support and booted it). The results of the cat command will tell you
    what you need to put in lilo.conf:
 
-   For swap partitions like /dev/hda1, simply use resume2=/dev/hda1.
-   For swapfile `swapfile`, use resume2=swap:/dev/hda2:0x242d.
+   For swap partitions like /dev/hda1, simply use resume=/dev/hda1.
+   For swapfile `swapfile`, use resume=swap:/dev/hda2:0x242d.
 
    If the swapfile changes for any reason (it is moved to a different
    location, it is deleted and recreated, or the filesystem is
@@ -181,8 +181,8 @@
    of Suspend2 to be ready.
 
    If you only compile in the swap allocator, or only compile in the file
-   allocator, you don't need to add the "swap:" part of the resume2=
-   parameters above. resume2=/dev/hda2:0x242d will work just as well.
+   allocator, you don't need to add the "swap:" part of the resume=
+   parameters above. resume=/dev/hda2:0x242d will work just as well.
 
    d. The hibernate script.
 
@@ -249,7 +249,7 @@
    very end of writing the image. Then it will need to reload a small (
    usually 4-50MBs, depending upon the image characteristics) portion first.
 
-   If you run into problems with resuming, adding the "noresume2" option to
+   If you run into problems with resuming, adding the "noresume" option to
    the kernel command line will let you skip the resume step and recover your
    system.
 
@@ -355,7 +355,7 @@
    - image_exists:
 
    Can be used in a script to determine whether a valid image exists at the
-   location currently pointed to by resume2=. Returns up to three lines.
+   location currently pointed to by resume=. Returns up to three lines.
    The first is whether an image exists (-1 for unsure, otherwise 0 or 1).
    If an image eixsts, additional lines will return the machine and version.
    Echoing anything to this entry removes any current image.
@@ -466,7 +466,7 @@
 
    - swap/headerlocations:
 
-   This option tells you the resume2= options to use for swap devices you
+   This option tells you the resume= options to use for swap devices you
    currently have activated. It is particularly useful when you only want to
    use a swap file to store your image. See above for further details.
 
@@ -661,7 +661,7 @@
 
    g. Set the image header.
 
-   Finally, we edit the header at our resume2= location. The signature is
+   Finally, we edit the header at our resume= location. The signature is
    changed by the allocator to reflect the fact that an image exists, and to
    point to the start of that data if necessary (swap allocator).
 
