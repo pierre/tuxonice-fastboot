@@ -57,12 +57,11 @@
 
    Suspend2 patches are available from http://suspend2.net.
 
-   ii) Compression and encryption support.
+   ii) Compression support.
 
-   Compression and encryption support are implemented via the
-   cryptoapi. You will therefore want to select any Cryptoapi transforms that
-   you want to use on your image from the Cryptoapi menu while configuring
-   your kernel.
+   Compression support is implemented via the cryptoapi. You will therefore want
+   to select any Cryptoapi transforms that you want to use on your image from
+   the Cryptoapi menu while configuring your kernel.
 
    You can also tell Suspend to write it's image to an encrypted and/or
    compressed filesystem/swap partition. In that case, you don't need to do
@@ -318,17 +317,6 @@
    - */enabled
 
    These option can be used to temporarily disable various parts of suspend.
-
-   - encryption/*
-
-   The iv, key, save_key_and_iv, mode and algorithm values allow you to
-   select a cryptoapi encryption algoritm, set the iv and key and whether
-   they are saved in the image header. Saving the iv and key in the image
-   header is of course less secure than having them on some external device,
-   such as a USB key. If you want to use a USB key, you'll need to write
-   some scripting in your initrd/ramfs to retrieve the key & iv from your
-   USB key and put them into the entries again prior to doing the echo to
-   do_resume.
 
    - extra_pages_allowance
 
