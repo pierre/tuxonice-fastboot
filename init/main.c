@@ -55,7 +55,6 @@
 #include <linux/pid_namespace.h>
 #include <linux/device.h>
 #include <linux/kthread.h>
-#include <linux/suspend.h>
 
 #include <asm/io.h>
 #include <asm/bugs.h>
@@ -818,9 +817,7 @@ static int __init kernel_init(void * unused)
 
 	/*
 	 * check if there is an early userspace init.  If yes, let it do all
-	 * the work. For suspend2, we assume that it will do the right thing
-	 * with regard to trying to resume at the right place. When that
-	 * happens, the BOOT_TIME flag will be cleared.
+	 * the work
 	 */
 
 	if (!ramdisk_execute_command)
