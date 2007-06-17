@@ -255,24 +255,5 @@ void kernel_map_pages(struct page *page, int numpages, int enable)
 EXPORT_SYMBOL(kernel_map_pages);
 #endif
 
-int page_is_mapped(struct page *page)
-{
-	pte_t *kpte; 
-	unsigned long address;
-	struct page *kpte_page;
-
-	if(PageHighMem(page))
-		return 0;
-
-	address = (unsigned long)page_address(page);
-
-	kpte = lookup_address(address);
-	if (!kpte)
-		return -EINVAL;
-	kpte_page = virt_to_page(kpte);
-
-	return (pte_val(*kpte) & (__PAGE_KERNEL_EXEC | __PAGE_KERNEL)) ? 1:0;
-}
 EXPORT_SYMBOL(change_page_attr);
 EXPORT_SYMBOL(global_flush_tlb);
-EXPORT_SYMBOL(page_is_mapped);

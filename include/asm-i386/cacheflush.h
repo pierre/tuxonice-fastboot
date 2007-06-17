@@ -36,6 +36,4 @@ void kernel_map_pages(struct page *page, int numpages, int enable);
 void mark_rodata_ro(void);
 #endif
 
-extern int page_is_mapped(struct page *page);
-
 #endif /* _I386_CACHEFLUSH_H */

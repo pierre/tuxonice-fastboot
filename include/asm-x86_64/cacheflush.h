@@ -32,9 +32,4 @@ int change_page_attr_addr(unsigned long addr, int numpages, pgprot_t prot);
 void mark_rodata_ro(void);
 #endif
 
-static inline int page_is_mapped(struct page *page)
-{
-	return 1;
-}
-
 #endif /* _X8664_CACHEFLUSH_H */
