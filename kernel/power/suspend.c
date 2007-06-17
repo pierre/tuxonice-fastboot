@@ -893,7 +893,8 @@ out:
  */
 static struct suspend_sysfs_data sysfs_params[] = {
 	{ SUSPEND2_ATTR("extra_pages_allowance", SYSFS_RW),
-	  SYSFS_INT(&extra_pd1_pages_allowance, 0, INT_MAX, 0)
+	  SYSFS_INT(&extra_pd1_pages_allowance, MIN_EXTRA_PAGES_ALLOWANCE,
+			  INT_MAX, 0)
 	},
 
 	{ SUSPEND2_ATTR("image_exists", SYSFS_RW),
