@@ -321,6 +321,7 @@ fastcall void __kprobes do_page_fault(struct pt_regs *regs,
 	 * unmap afterwards.
 	 */
 
+#ifdef CONFIG_DEBUG_PAGEALLOC
 	if (unlikely(suspend2_running && !suspend2_faulted)) {
 		struct page *page = NULL;
 		suspend2_faulted = 1;
@@ -328,6 +329,7 @@ fastcall void __kprobes do_page_fault(struct pt_regs *regs,
 		kernel_map_pages(page, 1, 1);
 		return;
 	}
+#endif
 
 	/*
 	 * We fault-in kernel-space virtual memory on-demand. The
