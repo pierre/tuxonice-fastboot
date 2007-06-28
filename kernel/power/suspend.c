@@ -1053,12 +1053,6 @@ static struct suspend_sysfs_data sysfs_params[] = {
 	  SYSFS_BIT(&suspend_action, SUSPEND_LATE_CPU_HOTPLUG, 0)
 	},
 
-#if defined(CONFIG_ACPI)
-	{ SUSPEND2_ATTR("powerdown_method", SYSFS_RW),
-	  SYSFS_UL(&suspend2_poweroff_method, 0, 5, 0)
-	},
-#endif
-
 #ifdef CONFIG_SUSPEND2_KEEP_IMAGE
 	{ SUSPEND2_ATTR("keep_image", SYSFS_RW),
 	  SYSFS_BIT(&suspend_action, SUSPEND_KEEP_IMAGE, 0)
@@ -1095,6 +1089,8 @@ static __init int core_load(void)
 		return 1;
 	if (s2_ui_init())
 		return 1;
+	if (s2_poweroff_init())
+		return 1;
 
 	return 0;
 }
@@ -1105,6 +1101,7 @@ static __exit void core_unload(void)
 	int i,
 	    numfiles = sizeof(sysfs_params) / sizeof(struct suspend_sysfs_data);
 
+	s2_poweroff_exit();
 	s2_ui_exit();
 	s2_checksum_exit();
 	s2_cluster_exit();

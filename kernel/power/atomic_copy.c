@@ -183,6 +183,14 @@ void copyback_post(void)
 		panic("Unable to successfully reread the page cache.");
 
 	clear_suspend_state(SUSPEND_PAGESET2_NOT_LOADED);
+
+	/*
+	 * If the user wants to sleep again after resuming from full-off,
+	 * it's most likely to be in order to suspend to ram, so we'll
+	 * do this check after loading pageset2, to give them the fastest
+	 * wakeup when they are ready to use the computer again.
+	 */
+	suspend2_check_resleep();
 }
 
 /**

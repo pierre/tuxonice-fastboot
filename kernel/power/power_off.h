@@ -13,3 +13,6 @@ void suspend2_power_down(void);
 extern unsigned long suspend2_poweroff_method;
 extern int suspend2_platform_prepare(void);
 extern void suspend2_platform_finish(void);
+int s2_poweroff_init(void);
+void s2_poweroff_exit(void);
+void suspend2_check_resleep(void);
