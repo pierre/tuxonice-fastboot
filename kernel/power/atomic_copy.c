@@ -365,17 +365,17 @@ int suspend2_go_atomic(pm_message_t state, int suspend_time)
 	if (test_action_state(SUSPEND_PM_PREPARE_CONSOLE))
 		pm_prepare_console();
 
+	if (suspend_time && suspend2_platform_prepare()) {
+		set_abort_result(SUSPEND_PLATFORM_PREP_FAILED);
+		suspend2_end_atomic(ATOMIC_STEP_RESTORE_CONSOLE, suspend_time);
+		return 1;
+	}
+
 	suspend_console();
 
 	if (device_suspend(state)) {
 		set_abort_result(SUSPEND_DEVICE_REFUSED);
 		suspend2_end_atomic(ATOMIC_STEP_RESUME_CONSOLE, suspend_time);
-		return 1;
-	}
-
-	if (suspend_time && suspend2_platform_prepare()) {
-		set_abort_result(SUSPEND_PLATFORM_PREP_FAILED);
-		suspend2_end_atomic(ATOMIC_STEP_DEVICE_RESUME, suspend_time);
 		return 1;
 	}
 
@@ -404,7 +404,7 @@ int suspend2_go_atomic(pm_message_t state, int suspend_time)
 	 * at resume time, and evil weirdness ensues.
 	 */
 
-	if (device_power_down(PMSG_FREEZE)) {
+	if (device_power_down(state)) {
 		set_abort_result(SUSPEND_DEVICE_REFUSED);
 		suspend2_end_atomic(ATOMIC_STEP_IRQS, suspend_time);
 		return 1;
@@ -424,11 +424,11 @@ void suspend2_end_atomic(int stage, int suspend_time)
 			if (test_action_state(SUSPEND_LATE_CPU_HOTPLUG))
 				enable_nonboot_cpus();
 		case ATOMIC_STEP_DEVICE_RESUME:
-			if (suspend_time)
-				suspend2_platform_finish();
+			suspend2_platform_finish();
 			device_resume();
 		case ATOMIC_STEP_RESUME_CONSOLE:
 			resume_console();
+		case ATOMIC_STEP_RESTORE_CONSOLE:
 			if (test_action_state(SUSPEND_PM_PREPARE_CONSOLE))
 				pm_restore_console();
 	}

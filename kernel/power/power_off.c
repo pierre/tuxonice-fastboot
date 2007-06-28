@@ -26,10 +26,8 @@ extern struct hibernation_ops *hibernation_ops;
 
 int suspend2_platform_prepare(void)
 {
-	if (suspend2_poweroff_method == 4 && hibernation_ops)
-		return hibernation_ops->prepare();
-
-	return 0;
+	return (suspend2_poweroff_method == 4 && hibernation_ops) ?
+		hibernation_ops->prepare() : 0;
 }
 
 /*
@@ -57,6 +55,12 @@ void suspend2_power_down(void)
 		case 0:
 			break;
 		case 3:
+			if (!pm_ops ||
+			    (pm_ops->prepare && pm_ops->prepare(PM_SUSPEND_MEM))) {
+				printk("No pm_ops or prepare failed.\n");
+				break;
+			}
+
 			suspend_console();
 
 			if (device_suspend(PMSG_SUSPEND)) {
@@ -65,29 +69,26 @@ void suspend2_power_down(void)
 				goto ResumeConsole;
 			}
 
-			if (!pm_ops ||
-			    (pm_ops->prepare && pm_ops->prepare(PM_SUSPEND_MEM)))
-				goto DeviceResume;
-
 			if (test_action_state(SUSPEND_LATE_CPU_HOTPLUG) &&
 				disable_nonboot_cpus())
-				goto PmOpsFinish;
+				goto DeviceResume;
 	
-			if (!suspend_enter(PM_SUSPEND_MEM))
+			if (!suspend_enter(PM_SUSPEND_MEM)) {
+				printk("Failed to enter suspend to ram state.\n");
 				result = 1;
+			}
 
 			if (test_action_state(SUSPEND_LATE_CPU_HOTPLUG))
 				enable_nonboot_cpus();
-
-PmOpsFinish:
-			if (pm_ops->finish)
-				pm_ops->finish(PM_SUSPEND_MEM);
 
 DeviceResume:
 			device_resume();
 
 ResumeConsole:
 			resume_console();
+
+			if (pm_ops->finish)
+				pm_ops->finish(PM_SUSPEND_MEM);
 
 			/* If suspended to ram and later woke. */
 			if (result)
@@ -98,19 +99,13 @@ ResumeConsole:
 			hibernation_ops->enter();
 			break;
 		case 5:
-			if (!pm_ops ||
-			    (pm_ops->prepare && pm_ops->prepare(PM_SUSPEND_MAX)))
-				break;
-
-			kernel_shutdown_prepare(SYSTEM_SUSPEND_DISK);
-			suspend_enter(suspend2_poweroff_method);
-
-			/* Failed. Fall back to kernel_power_off etc. */
-			if (pm_ops->finish)
-				pm_ops->finish(PM_SUSPEND_MAX);
+			/* Historic entry only now */
+			break;
 	}
 
-	suspend_prepare_status(DONT_CLEAR_BAR, "Falling back to alternate power off method.");
+	if (suspend2_poweroff_method)
+		suspend_prepare_status(DONT_CLEAR_BAR,
+				"Falling back to alternate power off method.");
 	kernel_power_off();
 	kernel_halt();
 	suspend_prepare_status(DONT_CLEAR_BAR, "Powerdown failed.");

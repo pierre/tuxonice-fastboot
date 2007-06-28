@@ -563,7 +563,7 @@ static int __save_image(void)
 
 	suspend2_in_suspend = 1;
 
-	if (suspend2_go_atomic(PMSG_PRETHAW, 1))
+	if (suspend2_go_atomic(PMSG_FREEZE, 1))
 		goto Failed;
 
 	temp_result = suspend2_suspend();
