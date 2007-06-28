@@ -5,7 +5,7 @@
  *
  * Suspend2 provides support for saving and restoring an image of
  * system memory to an arbitrary storage device, either on the local computer,
- * or across some network. The support is entirely OS based, so Suspend2 
+ * or across some network. The support is entirely OS based, so Suspend2
  * works without requiring BIOS, APM or ACPI support. The vast majority of the
  * code is also architecture independant, so it should be very easy to port
  * the code to new architectures. Suspend includes support for SMP, 4G HighMem
@@ -17,7 +17,7 @@
  * provide arbitrary combinations of functionality). The user interface is also
  * modular, so that arbitrarily simple or complex interfaces can be used to
  * provide anything from debugging information through to eye candy.
- * 
+ *
  * \section Copyright
  *
  * Suspend2 is released under the GPLv2.
@@ -28,9 +28,9 @@
  * Copyright (C) 2002-2007 Nigel Cunningham (nigel at suspend2 net)<BR>
  *
  * \section Credits
- * 
+ *
  * Nigel would like to thank the following people for their work:
- * 
+ *
  * Bernard Blackham <bernard@blackham.com.au><BR>
  * Web page & Wiki administration, some coding. A person without whom
  * Suspend would not be where it is.
@@ -55,7 +55,7 @@
  *
  * <B>Cyclades.com.</B> Nigel's employers from Dec 2004 until May 2006, who
  * allowed him to work on Suspend and PM related issues on company time.
- * 
+ *
  * <B>LinuxFund.org.</B> Sponsored Nigel's work on Suspend for four months Oct 2003
  * to Jan 2004.
  *
@@ -87,7 +87,7 @@
 #include "atomic_copy.h"
 
 /*! Pageset metadata. */
-struct pagedir pagedir2 = {2}; 
+struct pagedir pagedir2 = {2};
 
 static int get_pmsem = 0, got_pmsem;
 static mm_segment_t oldfs;
@@ -146,7 +146,7 @@ int suspend_start_anything(int suspend_or_resume)
 	set_fs(KERNEL_DS);
 
 	if (!suspendActiveAllocator) {
-		/* Be quiet if we're not trying to suspend or resume */ 
+		/* Be quiet if we're not trying to suspend or resume */
 		if (suspend_or_resume)
 			printk("No storage allocator is currently active. "
 					"Rechecking whether we can use one.\n");
@@ -215,7 +215,8 @@ static void mark_nosave_pages(void)
 /**
  * allocate_bitmaps: Allocate bitmaps used to record page states.
  *
- * Allocate & free bitmaps.
+ * Allocate the bitmaps we use to record the various Suspend2 related
+ * page states.
  */
 static int allocate_bitmaps(void)
 {
@@ -231,6 +232,12 @@ static int allocate_bitmaps(void)
 	return 0;
 }
 
+/**
+ * free_bitmaps: Free the bitmaps used to record page states.
+ *
+ * Free the bitmaps allocated above. It is not an error to call
+ * free_dyn_pageflags on a bitmap that isn't currentyl allocated.
+ */
 static void free_bitmaps(void)
 {
 	free_dyn_pageflags(&pageset1_map);
@@ -242,15 +249,28 @@ static void free_bitmaps(void)
 	free_dyn_pageflags(&page_resave_map);
 }
 
-static int io_MB_per_second(int read_write)
+/**
+ * io_MB_per_second: Return the number of MB/s read or written.
+ *
+ * @write: Whether to return the speed at which we wrote.
+ *
+ * Calculate the number of megabytes per second that were read or written.
+ */
+static int io_MB_per_second(int write)
 {
-	return (suspend_io_time[read_write][1]) ?
-		MB((unsigned long) suspend_io_time[read_write][0]) * HZ /
-		suspend_io_time[read_write][1] : 0;
+	return (suspend_io_time[write][1]) ?
+		MB((unsigned long) suspend_io_time[write][0]) * HZ /
+		suspend_io_time[write][1] : 0;
 }
 
-/* get_debug_info
- * Functionality:	Store debug info in a buffer.
+/**
+ * get_debug_info: Fill a buffer with debugging information.
+ *
+ * @buffer: The buffer to be filled.
+ * @count: The size of the buffer, in bytes.
+ *
+ * Fill a (usually PAGE_SIZEd) buffer with the debugging info that we will
+ * either printk or return via sysfs.
  */
 #define SNPRINTF(a...) 	len += snprintf_used(((char *)buffer) + len, \
 		count - len - 1, ## a)
@@ -272,7 +292,7 @@ static int get_suspend_debug_info(const char *buffer, int count)
 			suspend2_poweroff_method);
 	SNPRINTF("- Overall expected compression percentage: %d.\n",
 			100 - suspend_expected_compression_ratio());
-	len+= suspend_print_module_debug_info(((char *) buffer) + len, 
+	len+= suspend_print_module_debug_info(((char *) buffer) + len,
 			count - len - 1);
 	if (suspend_io_time[0][1]) {
 		if ((io_MB_per_second(0) < 5) || (io_MB_per_second(1) < 5)) {
@@ -302,10 +322,14 @@ static int get_suspend_debug_info(const char *buffer, int count)
 	return len;
 }
 
-/*
- * do_cleanup
+/**
+ * do_cleanup: Cleanup after attempting to suspend or resume.
+ *
+ * @get_debug_info: Whether to allocate and return debugging info.
+ *
+ * Cleanup after attempting to suspend or resume, possibly getting
+ * debugging info as we do so.
  */
-
 static void do_cleanup(int get_debug_info)
 {
 	int i = 0;
@@ -324,7 +348,7 @@ static void do_cleanup(int get_debug_info)
 		i = get_suspend_debug_info(buffer, PAGE_SIZE);
 
 	suspend_free_extra_pagedir_memory();
-	
+
 	pagedir1.size = pagedir2.size = 0;
 	set_highmem_size(pagedir1, 0);
 	set_highmem_size(pagedir2, 0);
@@ -373,6 +397,18 @@ static void do_cleanup(int get_debug_info)
 	}
 }
 
+/**
+ * check_still_keeping_image: We kept an image; check whether to reuse it.
+ *
+ * We enter this routine when we have kept an image. If the user has said they
+ * want to still keep it, all we need to do is powerdown. If powering down
+ * means suspending to ram and the power doesn't run out, we'll return 1.
+ * If we do power off properly or the battery runs out, we'll resume via the
+ * normal paths.
+ *
+ * If the user has said they want to remove the previously kept image, we
+ * remove it, and return 0. We'll then store a new image.
+ */
 static int check_still_keeping_image(void)
 {
 	if (test_action_state(SUSPEND_KEEP_IMAGE)) {
@@ -387,6 +423,12 @@ static int check_still_keeping_image(void)
 	return 0;
 }
 
+/**
+ * suspend_init: Prepare to suspend to disk.
+ *
+ * Initialise variables & data structures, in preparation for
+ * suspending to disk.
+ */
 static int suspend_init(void)
 {
 	suspend_result = 0;
@@ -395,16 +437,16 @@ static int suspend_init(void)
 	printk(KERN_INFO "Initiating a hibernation cycle.\n");
 
 	nr_suspends++;
-	
+
 	save_avenrun();
 
-	suspend_io_time[0][0] = suspend_io_time[0][1] = 
+	suspend_io_time[0][0] = suspend_io_time[0][1] =
 		suspend_io_time[1][0] =	suspend_io_time[1][1] = 0;
 
 	if (!test_suspend_state(SUSPEND_CAN_SUSPEND) ||
 	    allocate_bitmaps())
 		return 1;
-	
+
 	mark_nosave_pages();
 
 	suspend_prepare_console();
@@ -416,7 +458,14 @@ static int suspend_init(void)
 	return 0;
 }
 
-static int can_suspend(void)
+/**
+ * can_hibernate: Perform basic 'Can we hibernate?' tests.
+ *
+ * Perform basic tests that must pass if we're going to be able to hibernate:
+ * Can we get the pm_mutex? Is resume= valid (we need to know where to write
+ * the image header).
+ */
+static int can_hibernate(void)
 {
 	if (get_pmsem) {
 		if (!mutex_trylock(&pm_mutex)) {
@@ -444,11 +493,18 @@ static int can_suspend(void)
 		}
 		return 0;
 	}
-	
+
 	return 1;
 }
 
-static int do_power_down(void)
+/**
+ * do_post_image_write: Having written an image, figure out what to do next.
+ *
+ * After writing an image, we might load an alternate image or power down.
+ * Powering down might involve suspending to ram, in which case we also
+ * need to handle reloading pageset2.
+ */
+static int do_post_image_write(void)
 {
 	/* If switching images fails, do normal powerdown */
 	if (alt_resume_param[0])
@@ -467,12 +523,15 @@ static int do_power_down(void)
 	return 0;
 }
 
-/*
- * __save_image
- * Functionality    : High level routine which performs the steps necessary
- *                    to save the image after preparatory steps have been taken.
- * Key Assumptions  : Processes frozen, sufficient memory available, drivers
- *                    suspended.
+/**
+ * __save_image: Do the hard work of saving the image.
+ *
+ * High level routine for getting the image saved. The key assumptions made
+ * are that processes have been frozen and sufficient memory is available.
+ *
+ * We also exit through here at resume time, coming back from suspend2_suspend
+ * after the atomic restore. This is the reason for the suspend2_in_suspend
+ * test.
  */
 static int __save_image(void)
 {
@@ -489,7 +548,7 @@ static int __save_image(void)
 	calculate_check_checksums(0);
 
 	temp_result = write_pageset(&pagedir2);
-	
+
 	if (temp_result == -1 || test_result_state(SUSPEND_ABORTED))
 		return 1;
 
@@ -501,9 +560,9 @@ static int __save_image(void)
 	suspend_deactivate_storage(1);
 
 	suspend_prepare_status(DONT_CLEAR_BAR, "Doing atomic copy.");
-	
+
 	suspend2_in_suspend = 1;
-	
+
 	if (suspend2_go_atomic(PMSG_PRETHAW, 1))
 		goto Failed;
 
@@ -516,14 +575,14 @@ static int __save_image(void)
 Failed:
 	if (suspend_activate_storage(1))
 		panic("Failed to reactivate our storage.");
-	
+
 	if (temp_result || test_result_state(SUSPEND_ABORTED)) {
 		if (did_copy)
 			goto abort_reloading_pagedir_two;
 		else
 			return 1;
 	}
-	
+
 	/* Resume time? */
 	if (!suspend2_in_suspend) {
 		copyback_post();
@@ -535,7 +594,7 @@ Failed:
 	suspend_update_status(pagedir2.size,
 			pagedir1.size + pagedir2.size,
 			NULL);
-	
+
 	if (test_result_state(SUSPEND_ABORTED))
 		goto abort_reloading_pagedir_two;
 
@@ -577,10 +636,11 @@ abort_reloading_pagedir_two:
 	return 1;
 }
 
-/* 
- * do_save_image
+/**
+ * do_save_image: Save the image and handle the result.
  *
- * Save the prepared image.
+ * Save the prepared image. If we fail or we're in the path returning
+ * from the atomic restore, cleanup.
  */
 
 static int do_save_image(void)
@@ -592,7 +652,8 @@ static int do_save_image(void)
 }
 
 
-/* do_prepare_image
+/**
+ * do_prepare_image: Try to prepare an image.
  *
  * Seek to initialise and prepare an image to be saved. On failure,
  * cleanup.
@@ -604,12 +665,12 @@ static int do_prepare_image(void)
 		return 1;
 
 	/*
-	 * If kept image and still keeping image and suspending to RAM, we will 
+	 * If kept image and still keeping image and suspending to RAM, we will
 	 * return 1 after suspending and resuming (provided the power doesn't
-	 * run out.
+	 * run out. In that case, we skip directly to cleaning up and exiting.
 	 */
 
-	if (!can_suspend() ||
+	if (!can_hibernate() ||
 	    (test_result_state(SUSPEND_KEPT_IMAGE) &&
 	     check_still_keeping_image()))
 		goto cleanup;
@@ -623,6 +684,13 @@ cleanup:
 	return 1;
 }
 
+/**
+ * do_check_can_resume: Find out whether an image has been stored.
+ *
+ * Read whether an image exists. We use the same routine as the
+ * image_exists sysfs entry, and just look to see whether the
+ * first character in the resulting buffer is a '1'.
+ */
 static int do_check_can_resume(void)
 {
 	char *buf = (char *) get_zeroed_page(GFP_KERNEL);
@@ -641,8 +709,15 @@ static int do_check_can_resume(void)
 	return result;
 }
 
-/*
- * We check if we have an image and if so we try to resume.
+/**
+ * do_load_atomic_copy: Load the first part of an image, if it exists.
+ *
+ * Check whether we have an image. If one exists, do sanity checking
+ * (possibly invalidating the image or even rebooting if the user
+ * requests that) before loading it into memory in preparation for the
+ * atomic restore.
+ *
+ * If and only if we have an image loaded and ready to restore, we return 1.
  */
 static int do_load_atomic_copy(void)
 {
@@ -653,7 +728,7 @@ static int do_load_atomic_copy(void)
 			" of long. Please report this!\n");
 		return 1;
 	}
-	
+
 	if (!resume_file[0])
 		printk(KERN_WARNING "Suspend2: "
 			"You need to use a resume= command line parameter to "
@@ -663,8 +738,8 @@ static int do_load_atomic_copy(void)
 
 	if (!(test_suspend_state(SUSPEND_RESUME_DEVICE_OK)) &&
 		!suspend_attempt_to_parse_resume_device(0)) {
-		/* 
-		 * Without a usable storage device we can do nothing - 
+		/*
+		 * Without a usable storage device we can do nothing -
 		 * even if noresume is given
 		 */
 
@@ -689,13 +764,18 @@ static int do_load_atomic_copy(void)
 	}
 
 	suspend_deactivate_storage(0);
-	
+
 	if (read_image_result)
 		return 1;
 
 	return 0;
 }
 
+/**
+ * prepare_restore_load_alt_image: Save & restore alt image variables.
+ *
+ * Save and restore the pageset1 maps, when loading an alternate image.
+ */
 static void prepare_restore_load_alt_image(int prepare)
 {
 	static dyn_pageflags_t pageset1_map_save, pageset1_copy_map_save;
@@ -719,6 +799,12 @@ static void prepare_restore_load_alt_image(int prepare)
 	}
 }
 
+/**
+ * pre_resume_freeze: Freeze the system, before doing an atomic restore.
+ *
+ * Hot unplug cpus (if we didn't do it early) and freeze processes, in
+ * preparation for doing an atomic restore.
+ */
 int pre_resume_freeze(void)
 {
 	if (!test_action_state(SUSPEND_LATE_CPU_HOTPLUG)) {
@@ -739,13 +825,6 @@ int pre_resume_freeze(void)
 	return 0;
 }
 
-void post_resume_thaw(void)
-{
-	thaw_processes();
-	if (!test_action_state(SUSPEND_LATE_CPU_HOTPLUG))
-		enable_nonboot_cpus();
-}
-
 int do_suspend2_step(int step)
 {
 	int result;
@@ -756,21 +835,18 @@ int do_suspend2_step(int step)
 		case STEP_SUSPEND_SAVE_IMAGE:
 			return do_save_image();
 		case STEP_SUSPEND_POWERDOWN:
-			return do_power_down();
+			return do_post_image_write();
 		case STEP_RESUME_CAN_RESUME:
 			return do_check_can_resume();
 		case STEP_RESUME_LOAD_PS1:
 			return do_load_atomic_copy();
 		case STEP_RESUME_DO_RESTORE:
-			/* 
+			/*
 			 * If we succeed, this doesn't return.
 			 * Instead, we return from do_save_image() in the
 			 * suspended kernel.
 			 */
-			result = suspend_atomic_restore();
-			if (result)
-				post_resume_thaw();
-			return result;
+			return suspend_atomic_restore();
 		case STEP_RESUME_ALT_IMAGE:
 			printk("Trying to resume alternate image.\n");
 			suspend2_in_suspend = 0;
@@ -831,7 +907,7 @@ void _suspend2_try_resume(void)
 
 	__suspend2_try_resume();
 
-	/* 
+	/*
 	 * For initramfs, we have to clear the boot time
 	 * flag after trying to resume
 	 */
@@ -841,7 +917,7 @@ void _suspend2_try_resume(void)
 
 /*
  * _suspend2_try_suspend
- * Functionality   : 
+ * Functionality   :
  * Called From     : drivers/acpi/sleep/main.c
  *                   kernel/reboot.c
  */
@@ -914,11 +990,11 @@ static struct suspend_sysfs_data sysfs_params[] = {
 	{ SUSPEND2_ATTR("debug_info", SYSFS_READONLY),
 	  SYSFS_CUSTOM(get_suspend_debug_info, NULL, 0)
 	},
-	
+
 	{ SUSPEND2_ATTR("ignore_rootfs", SYSFS_RW),
 	  SYSFS_BIT(&suspend_action, SUSPEND_IGNORE_ROOTFS, 0)
 	},
-	
+
 	{ SUSPEND2_ATTR("image_size_limit", SYSFS_RW),
 	  SYSFS_INT(&image_size_limit, -2, INT_MAX, 0)
 	},
@@ -926,7 +1002,7 @@ static struct suspend_sysfs_data sysfs_params[] = {
 	{ SUSPEND2_ATTR("last_result", SYSFS_RW),
 	  SYSFS_UL(&suspend_result, 0, 0, 0)
 	},
-	
+
 	{ SUSPEND2_ATTR("no_multithreaded_io", SYSFS_RW),
 	  SYSFS_BIT(&suspend_action, SUSPEND_NO_MULTITHREADED_IO, 0)
 	},
@@ -974,11 +1050,11 @@ static struct suspend_sysfs_data sysfs_params[] = {
 	{ SUSPEND2_ATTR("no_pageset2", SYSFS_RW),
 	  SYSFS_BIT(&suspend_action, SUSPEND_NO_PAGESET2, 0)
 	},
-	  
+
 	{ SUSPEND2_ATTR("late_cpu_hotplug", SYSFS_RW),
 	  SYSFS_BIT(&suspend_action, SUSPEND_LATE_CPU_HOTPLUG, 0)
 	},
-	  
+
 #if defined(CONFIG_ACPI)
 	{ SUSPEND2_ATTR("powerdown_method", SYSFS_RW),
 	  SYSFS_UL(&suspend2_poweroff_method, 0, 5, 0)
@@ -998,7 +1074,7 @@ struct suspend2_core_fns my_fns = {
 	.try_suspend = _suspend2_try_suspend,
 	.try_resume = _suspend2_try_resume,
 };
- 
+
 static __init int core_load(void)
 {
 	int i,
