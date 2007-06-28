@@ -219,8 +219,12 @@ int suspend_register_module(struct suspend_module_ops *module)
 				return -ENODEV;
 			}
 			kobj = shared->dir_kobj;
-		} else
-			kobj = make_suspend2_sysdir(module->directory);
+		} else {
+			if (!strncmp(module->directory, "[ROOT]", 6))
+				kobj = &suspend2_subsys.kobj;
+			else
+				kobj = make_suspend2_sysdir(module->directory);
+		}
 		module->dir_kobj = kobj;
 		for (i=0; i < module->num_sysfs_entries; i++) {
 			int result = suspend_register_sysfs_file(kobj, &module->sysfs_data[i]);
@@ -245,7 +249,8 @@ void suspend_unregister_module(struct suspend_module_ops *module)
 		for (i=0; i < module->num_sysfs_entries; i++)
 			suspend_unregister_sysfs_file(module->dir_kobj, &module->sysfs_data[i]);
 
-	if (!module->shared_directory && module->directory)
+	if (!module->shared_directory && module->directory &&
+			strncmp(module->directory, "[ROOT]", 6))
 		remove_suspend2_sysdir(module->dir_kobj);
 
 	switch (module->type) {
