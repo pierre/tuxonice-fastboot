@@ -827,8 +827,6 @@ int pre_resume_freeze(void)
 
 int do_suspend2_step(int step)
 {
-	int result;
-
 	switch (step) {
 		case STEP_SUSPEND_PREPARE_IMAGE:
 			return do_prepare_image();
