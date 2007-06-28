@@ -191,6 +191,7 @@ int suspend_register_module(struct suspend_module_ops *module)
 			break;
 
 		case MISC_MODULE:
+		case MISC_HIDDEN_MODULE:
 			break;
 
 		default:
@@ -270,6 +271,7 @@ void suspend_unregister_module(struct suspend_module_ops *module)
 			break;
 		
 		case MISC_MODULE:
+		case MISC_HIDDEN_MODULE:
 			break;
 
 		default:
@@ -302,6 +304,7 @@ void suspend_move_module_tail(struct suspend_module_ops *module)
 			break;
 		
 		case MISC_MODULE:
+		case MISC_HIDDEN_MODULE:
 			break;
 		default:
 			printk("Hmmm. Module '%s' has an invalid type."
@@ -394,6 +397,8 @@ void suspend_print_modules(void)
 	printk("Suspend2 " SUSPEND_CORE_VERSION ", with support for");
 	
 	list_for_each_entry(this_module, &suspend_modules, module_list) {
+		if (this_module->type == MISC_HIDDEN_MODULE)
+			continue;
 		printk("%s %s%s%s", prev ? "," : "",
 				this_module->enabled ? "" : "[",
 				this_module->name,

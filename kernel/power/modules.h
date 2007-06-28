@@ -30,7 +30,8 @@ struct suspend_module_header {
 enum {
 	FILTER_MODULE,
 	WRITER_MODULE,
-	MISC_MODULE /* Block writer, eg. */
+	MISC_MODULE, /* Block writer, eg. */
+	MISC_HIDDEN_MODULE,
 };
 
 enum {

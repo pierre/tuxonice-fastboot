@@ -994,7 +994,7 @@ static struct suspend_sysfs_data sysfs_params[] = {
 static struct suspend_module_ops suspend_blockwriter_ops =
 {
 	.name					= "lowlevel i/o",
-	.type					= MISC_MODULE,
+	.type					= MISC_HIDDEN_MODULE,
 	.directory				= "block_io",
 	.module					= THIS_MODULE,
 	.memory_needed				= suspend_bio_memory_needed,

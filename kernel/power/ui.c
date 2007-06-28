@@ -271,7 +271,7 @@ static struct suspend_sysfs_data sysfs_params[] = {
 };
 
 static struct suspend_module_ops userui_ops = {
-	.type				= MISC_MODULE,
+	.type				= MISC_HIDDEN_MODULE,
 	.name				= "printk ui",
 	.directory			= "user_interface",
 	.module				= THIS_MODULE,
