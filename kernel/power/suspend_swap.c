@@ -76,7 +76,6 @@ struct bdev_opened
 {
 	dev_t device;
 	struct block_device *bdev;
-	int claimed;
 };
 
 /* 
@@ -91,10 +90,7 @@ static void close_bdev(int i)
 {
 	struct bdev_opened *this = bdev_info_list[i];
 
-	if (this->claimed)
-		bd_release(this->bdev);
-
-	/* Release our reference. */
+	bd_release(this->bdev);
 	blkdev_put(this->bdev);
 
 	/* Free our info. */
@@ -119,13 +115,13 @@ static struct block_device *open_bdev(int index, dev_t device, int display_errs)
 	struct bdev_opened *this;
 	struct block_device *bdev;
 
-	if (bdev_info_list[index] && (bdev_info_list[index]->device == device)){
-		bdev = bdev_info_list[index]->bdev;
-		return bdev;
-	}
+	if (bdev_info_list[index]) {
+		if (bdev_info_list[index]->device == device)
+			return bdev_info_list[index]->bdev;
 	
-	if (bdev_info_list[index] && bdev_info_list[index]->device != device)
 		close_bdev(index);
+		bdev_info_list[index] = NULL;
+	}
 
 	bdev = open_by_devnum(device, FMODE_READ);
 
@@ -143,6 +139,7 @@ static struct block_device *open_bdev(int index, dev_t device, int display_errs)
 	if (!this) {
 		printk(KERN_WARNING "Suspend2: Failed to allocate memory for "
 				"opening a bdev.");
+		close_bdev(index);
 		return ERR_PTR(-ENOMEM);
 	}
 
