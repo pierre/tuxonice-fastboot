@@ -64,7 +64,6 @@ static int main_pages_allocated, main_pages_requested;
 /* User Specified Parameters. */
 
 static unsigned long resume_firstblock;
-static int resume_blocksize;
 static dev_t resume_swap_dev_t;
 static struct block_device *resume_block_device;
 
@@ -1015,7 +1014,7 @@ static void suspend_swap_mark_resume_attempted(int mark)
 static int suspend_swap_parse_sig_location(char *commandline,
 		int only_allocator, int quiet)
 {
-	char *thischar, *devstart, *colon = NULL, *at_symbol = NULL;
+	char *thischar, *devstart, *colon = NULL;
 	union p_diskpage diskpage;
 	int signature_found, result = -EINVAL, temp_result;
 
@@ -1041,14 +1040,9 @@ static int suspend_swap_parse_sig_location(char *commandline,
 		thischar++;
 	}
 
-	while ((*thischar != '@') && ((thischar - commandline) < 250) && (*thischar))
+	while ((thischar - commandline) < 250 && *thischar)
 		thischar++;
 
-	if (*thischar == '@') {
-		at_symbol = thischar;
-		*at_symbol = 0;
-	}
-	
 	if (colon)
 		resume_firstblock = (int) simple_strtoul(colon + 1, NULL, 0);
 	else
@@ -1057,25 +1051,10 @@ static int suspend_swap_parse_sig_location(char *commandline,
 	clear_suspend_state(SUSPEND_CAN_SUSPEND);
 	clear_suspend_state(SUSPEND_CAN_RESUME);
 	
-	/* Legacy */
-	if (at_symbol) {
-		resume_blocksize = (int) simple_strtoul(at_symbol + 1, NULL, 0);
-		if (resume_blocksize & (SECTOR_SIZE - 1)) {
-			if (!quiet)
-				printk("SwapAllocator: Blocksizes are multiples"
-						"of %d!\n", SECTOR_SIZE);
-			return -EINVAL;
-		}
-		resume_firstblock = resume_firstblock *
-			(resume_blocksize / SECTOR_SIZE);
-	}
-	
 	temp_result = try_to_parse_resume_device(devstart, quiet);
 
 	if (colon)
 		*colon = ':';
-	if (at_symbol)
-		*at_symbol = '@';
 
 	if (temp_result)
 		return -EINVAL;
