@@ -174,7 +174,15 @@ static void suspend_cleanup_some_completed_io(void)
  */
 static void do_bio_wait(void)
 {
+	struct backing_dev_info *bdi;
+
 	submit_batched();
+
+	if (waiting_on) {
+		bdi = waiting_on->dev->bd_inode->i_mapping->backing_dev_info;
+		blk_run_backing_dev(bdi, waiting_on->bio_page);
+	}
+
 	io_schedule();
 	suspend_cleanup_some_completed_io();
 }
