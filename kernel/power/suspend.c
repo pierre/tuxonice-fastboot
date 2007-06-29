@@ -754,10 +754,8 @@ static int do_load_atomic_copy(void)
 
 	read_image_result = read_pageset1(); /* non fatal error ignored */
 
-	if (test_suspend_state(SUSPEND_NORESUME_SPECIFIED)) {
-		printk(KERN_WARNING "Suspend2: Resuming disabled as requested.\n");
+	if (test_suspend_state(SUSPEND_NORESUME_SPECIFIED))
 		clear_suspend_state(SUSPEND_NORESUME_SPECIFIED);
-	}
 
 	suspend_deactivate_storage(0);
 
