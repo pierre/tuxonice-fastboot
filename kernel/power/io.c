@@ -167,7 +167,7 @@ void attempt_to_parse_alt_resume_param(void)
  *
  * Description:	When we read the start of an image, modules (and especially the
  * 		active allocator) might need to reset data structures if we
- * 		decide to invalidate the image rather than resuming from it.
+ * 		decide to remove the image rather than resuming from it.
  */
 
 static void noresume_reset_modules(void)
@@ -235,7 +235,7 @@ static int rw_init_modules(int rw, int which)
 		abort_suspend(SUSPEND_FAILED_MODULE_INIT,
 				"Failed to initialise the allocator."); 
 		if (!rw)
-			suspendActiveAllocator->invalidate_image();
+			suspendActiveAllocator->remove_image();
 		return 1;
 	}
 
@@ -735,7 +735,7 @@ static int read_pageset(struct pagedir *pagedir, int overwrittenpagesonly)
 	start_time = jiffies;
 
 	if (rw_init_modules(0, pagedir->id)) {
-		suspendActiveAllocator->invalidate_image();
+		suspendActiveAllocator->remove_image();
 		result = 1;
 	} else
 		result = do_rw_loop(0, finish_at, pageflags, base, barmax,
@@ -879,7 +879,7 @@ static int read_module_configs(void)
 					"registered.\n",
 					suspend_module_header.name);
 				if (!(test_suspend_state(SUSPEND_CONTINUE_REQ))) {
-					suspendActiveAllocator->invalidate_image();
+					suspendActiveAllocator->remove_image();
 					free_page((unsigned long) buffer);
 					return -EINVAL;
 				}
@@ -1092,8 +1092,8 @@ static int __read_pageset1(void)
 
 	/* Check for noresume command line option */
 	if (test_suspend_state(SUSPEND_NORESUME_SPECIFIED)) {
-		printk("Suspend2: Noresume: Invalidated image.\n");
-		goto out_invalidate_image;
+		printk("Suspend2: Noresume on command line. Removed image.\n");
+		goto out_remove_image;
 	}
 
 	/* Check whether we've resumed before */
@@ -1102,7 +1102,7 @@ static int __read_pageset1(void)
 		if (!(test_suspend_state(SUSPEND_CONTINUE_REQ))) {
 			printk("Suspend2: Tried to resume before: "
 					"Invalidated image.\n");
-			goto out_invalidate_image;
+			goto out_remove_image;
 		}
 	}
 
@@ -1122,14 +1122,14 @@ static int __read_pageset1(void)
 	if ((result = suspendActiveAllocator->read_header_init())) {
 		printk("Suspend2: Failed to initialise, reading the image "
 				"header.\n");
-		goto out_invalidate_image;
+		goto out_remove_image;
 	}
 	
 	/* Read suspend header */
 	if ((result = suspendActiveAllocator->rw_header_chunk(READ, NULL,
 			header_buffer, sizeof(struct suspend_header))) < 0) {
 		printk("Suspend2: Failed to read the image signature.\n");
-		goto out_invalidate_image;
+		goto out_remove_image;
 	}
 	
 	suspend_header = (struct suspend_header *) header_buffer;
@@ -1143,7 +1143,7 @@ static int __read_pageset1(void)
 		suspend_early_boot_message(1, SUSPEND_CONTINUE_REQ,
 				sanity_error);
 		printk("Suspend2: Sanity check failed.\n");
-		goto out_invalidate_image;
+		goto out_remove_image;
 	}
 
 	/*
@@ -1173,7 +1173,7 @@ static int __read_pageset1(void)
 		printk("Suspend2: Failed to read Suspend module "
 				"configurations.\n");
 		clear_action_state(SUSPEND_KEEP_IMAGE);
-		goto out_invalidate_image;
+		goto out_remove_image;
 	}
 
 	suspend_prepare_console();
@@ -1240,13 +1240,13 @@ out:
 out_reset_console:
 	suspend_cleanup_console();
 
-out_invalidate_image:
+out_remove_image:
 	free_dyn_pageflags(&pageset1_map);
 	free_dyn_pageflags(&pageset1_copy_map);
 	free_dyn_pageflags(&io_map);
 	result = -EINVAL;
 	if (!test_action_state(SUSPEND_KEEP_IMAGE))
-		suspendActiveAllocator->invalidate_image();
+		suspendActiveAllocator->remove_image();
 	suspendActiveAllocator->read_header_cleanup();
 	noresume_reset_modules();
 	goto out;
@@ -1385,7 +1385,7 @@ int image_exists_write(const char *buffer, int count)
 		return count;
 
 	if (suspendActiveAllocator && suspendActiveAllocator->image_exists())
-		suspendActiveAllocator->invalidate_image();
+		suspendActiveAllocator->remove_image();
 
 	suspend_deactivate_storage(0);
 

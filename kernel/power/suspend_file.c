@@ -778,20 +778,13 @@ static int suspend_file_storage_needed(void)
 }
 
 /* 
- * suspend_file_invalidate_image
+ * suspend_file_remove_image
  * 
  */
-static int suspend_file_invalidate_image(void)
+static int suspend_file_remove_image(void)
 {
-	int result;
-
 	suspend_file_release_storage();
-
-	result = suspend_file_signature_op(INVALIDATE);
-	if (result == 1 && !nr_suspends)
-		printk(KERN_WARNING "Suspend2: Image invalidated.\n");
-
-	return result;
+	return suspend_file_signature_op(INVALIDATE);
 }
 
 /*
@@ -1098,7 +1091,7 @@ static struct suspend_module_ops suspend_fileops = {
 	.write_header_cleanup	= suspend_file_write_header_cleanup,
 	.read_header_init	= suspend_file_read_header_init,
 	.read_header_cleanup	= suspend_file_read_header_cleanup,
-	.invalidate_image	= suspend_file_invalidate_image,
+	.remove_image		= suspend_file_remove_image,
 	.parse_sig_location	= suspend_file_parse_sig_location,
 
 	.sysfs_data		= sysfs_params,

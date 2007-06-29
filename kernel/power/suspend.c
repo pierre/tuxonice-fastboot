@@ -363,7 +363,7 @@ static void do_cleanup(int get_debug_info)
 	} else
 #endif
 		if (suspendActiveAllocator)
-			suspendActiveAllocator->invalidate_image();
+			suspendActiveAllocator->remove_image();
 
 	free_bitmaps();
 
@@ -414,7 +414,7 @@ static int check_still_keeping_image(void)
 	}
 
 	printk("Invalidating previous image.\n");
-	suspendActiveAllocator->invalidate_image();
+	suspendActiveAllocator->remove_image();
 
 	return 0;
 }

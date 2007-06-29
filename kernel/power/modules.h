@@ -128,7 +128,7 @@ struct suspend_module_ops {
 	void (*mark_resume_attempted) (int);
 
 	/* Destroy image if one exists */
-	int (*invalidate_image) (void);
+	int (*remove_image) (void);
 	
 	/* Sysfs Data */
 	struct suspend_sysfs_data *sysfs_data;

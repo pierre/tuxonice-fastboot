@@ -68,7 +68,6 @@ static dev_t resume_swap_dev_t;
 static struct block_device *resume_block_device;
 
 struct sysinfo swapinfo;
-static int suspend_swap_invalidate_image(void);
 
 /* Block devices open. */
 struct bdev_opened
@@ -780,10 +779,10 @@ static int suspend_swap_read_header_cleanup(void)
 	return 0;
 }
 
-/* suspend_swap_invalidate_image
+/* suspend_swap_remove_image
  * 
  */
-static int suspend_swap_invalidate_image(void)
+static int suspend_swap_remove_image(void)
 {
 	union p_diskpage cur;
 	int result = 0;
@@ -826,9 +825,6 @@ static int suspend_swap_invalidate_image(void)
 	suspend_bio_ops.bdev_page_io(WRITE, resume_block_device,
 			resume_firstblock,
 			virt_to_page(cur.pointer));
-
-	if (!nr_suspends)
-		printk(KERN_WARNING "Suspend2: Image invalidated.\n");
 out:
 	suspend_bio_ops.finish_all_io();
 	free_page(cur.address);
@@ -1192,7 +1188,7 @@ static struct suspend_module_ops suspend_swapops = {
 	.write_header_cleanup	= suspend_swap_write_header_cleanup,
 	.read_header_init	= suspend_swap_read_header_init,
 	.read_header_cleanup	= suspend_swap_read_header_cleanup,
-	.invalidate_image	= suspend_swap_invalidate_image,
+	.remove_image		= suspend_swap_remove_image,
 	.parse_sig_location	= suspend_swap_parse_sig_location,
 
 	.sysfs_data		= sysfs_params,
