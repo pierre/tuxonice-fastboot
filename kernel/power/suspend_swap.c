@@ -1084,7 +1084,7 @@ static int suspend_swap_parse_sig_location(char *commandline,
 	} else
 		if (!quiet)
 			printk(KERN_ERR "Suspend2: SwapAllocator: No swap "
-				"signature found at specified location.\n");
+				"signature found at %s.\n", devstart);
 	free_page((unsigned long) diskpage.address);
 	return result;
 
