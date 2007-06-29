@@ -563,7 +563,8 @@ static int go_next_page(void)
 		suspend_extent_state_next(&suspend_writer_posn);
 
 	if (suspend_extent_state_eof(&suspend_writer_posn)) {
-		printk("Extent state eof.\n");
+		printk("Extent state eof. "
+			"Expected compression ratio too optimistic?\n");
 		dump_block_chains();
 		return -ENODATA;
 	}
