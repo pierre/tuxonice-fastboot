@@ -1095,8 +1095,6 @@ static int suspend_swap_parse_sig_location(char *commandline,
 	signature_found = parse_signature(diskpage.pointer->swh.magic.magic, 0);
 
 	if (signature_found != -1) {
-		if (!quiet)
-			printk("Suspend2: SwapAllocator: Signature found.\n");
 		result = 0;
 
 		suspend_bio_ops.set_devinfo(devinfo);

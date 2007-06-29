@@ -145,13 +145,9 @@ int suspend_start_anything(int suspend_or_resume)
 	oldfs = get_fs();
 	set_fs(KERNEL_DS);
 
-	if (!suspendActiveAllocator) {
-		/* Be quiet if we're not trying to suspend or resume */
-		if (suspend_or_resume)
-			printk("No storage allocator is currently active. "
-					"Rechecking whether we can use one.\n");
+	/* Be quiet if we're not trying to suspend or resume */
+	if (!suspendActiveAllocator)
 		suspend_attempt_to_parse_resume_device(!suspend_or_resume);
-	}
 
 	set_suspend_state(SUSPEND_RUNNING);
 
@@ -878,7 +874,6 @@ void __suspend2_try_resume(void)
 	resume_attempted = 1;
 
 	suspend_print_modules();
-	printk(KERN_INFO "Suspend2: Checking whether there is an image to restore.\n");
 
 	if (do_suspend2_step(STEP_RESUME_CAN_RESUME) &&
 	    !do_suspend2_step(STEP_RESUME_LOAD_PS1))

@@ -379,7 +379,6 @@ int suspend_netlink_setup(struct user_helper_data *uhd)
 		return 1;
 	}
 
-	printk("Userui successfully started.\n");
 	return 0;
 }
 

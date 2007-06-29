@@ -104,9 +104,6 @@ int suspend_attempt_to_parse_resume_device(int quiet)
 
 				set_suspend_state(SUSPEND_RESUME_DEVICE_OK);
 				set_suspend_state(SUSPEND_CAN_RESUME);
-				if (!quiet)
-					printk("Suspend2: Resuming enabled.\n");
-
 				returning = 1;
 				goto cleanup;
 		}

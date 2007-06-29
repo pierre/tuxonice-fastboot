@@ -150,9 +150,7 @@ static void open_file(char *format, char *arg, struct file **var, int mode,
 			printk("Failed to open %s file '%s' (%p).\n",
 				desc, buf, *var);
 			*var = 0;
-		} else
-			printk("Opened %s file '%s' (%p).\n",
-				desc, buf, *var);
+		}
 	}
 }
 
