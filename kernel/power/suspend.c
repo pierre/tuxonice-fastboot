@@ -819,6 +819,13 @@ int pre_resume_freeze(void)
 	return 0;
 }
 
+/**
+ * do_suspend2_step: Perform a step in suspending or resuming.
+ *
+ * Perform a step in suspending or resuming an image. This abstraction
+ * is in preparation for implementing cluster support, and perhaps replacing
+ * uswsusp too (haven't looked whether that's possible yet).
+ */
 int do_suspend2_step(int step)
 {
 	switch (step) {
@@ -863,8 +870,11 @@ out:
 
 /* -- Functions for kickstarting a suspend or resume --- */
 
-/*
- * Check if we have an image and if so try to resume.
+/**
+ * __suspend2_try_resume: Try to do the steps in resuming.
+ *
+ * Check if we have an image and if so try to resume. Clear the status
+ * flags too.
  */
 void __suspend2_try_resume(void)
 {
@@ -884,7 +894,12 @@ void __suspend2_try_resume(void)
 	clear_suspend_state(SUSPEND_NOW_RESUMING);
 }
 
-/* Wrapper for when called from init/do_mounts.c */
+/**
+ * _suspend2_try_resume: Wrapper calling __suspend2_try_resume from do_mounts.
+ *
+ * Wrapper for when __suspend2_try_resume is called from init/do_mounts.c,
+ * rather than from echo > /sys/power/suspend2/do_resume.
+ */
 void _suspend2_try_resume(void)
 {
 	resume_attempted = 1;
@@ -906,11 +921,20 @@ void _suspend2_try_resume(void)
 	suspend_finish_anything(SYSFS_RESUMING);
 }
 
-/*
- * _suspend2_try_suspend
- * Functionality   :
- * Called From     : drivers/acpi/sleep/main.c
- *                   kernel/reboot.c
+/**
+ * _suspend2_try_suspend: Try to start a hibernation cycle.
+ *
+ * have_pmsem: Whther the pm_sem is already taken.
+ *
+ * Start a hibernation cycle, coming in from either
+ * echo > /sys/power/suspend2/do_suspend
+ *
+ * or
+ *
+ * echo disk > /sys/power/state
+ *
+ * In the later case, we come in without pm_sem taken; in the
+ * former, it has been taken.
  */
 int _suspend2_try_suspend(int have_pmsem)
 {
@@ -1060,6 +1084,13 @@ struct suspend2_core_fns my_fns = {
 	.try_resume = _suspend2_try_resume,
 };
 
+/**
+ * core_load: Initialisation of Suspend2 core.
+ *
+ * Initialise the core, beginning with sysfs. Checksum and so on are part of
+ * the core, but have their own initialisation routines because they either
+ * aren't compiled in all the time or have their own subdirectories.
+ */
 static __init int core_load(void)
 {
 	int i,
@@ -1089,6 +1120,9 @@ static __init int core_load(void)
 }
 
 #ifdef MODULE
+/**
+ * core_unload: Prepare to unload the core code.
+ */
 static __exit void core_unload(void)
 {
 	int i,
