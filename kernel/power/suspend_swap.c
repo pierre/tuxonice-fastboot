@@ -174,20 +174,20 @@ static struct block_device *open_bdev(int index, dev_t device, int display_errs)
 	return bdev;
 }
 
-/* Must be silent - might be called from cat /sys/power/suspend2/debug_info
- * Returns 0 if was off, -EBUSY if was on, error value otherwise.
+/**
+ * enable_swapfile: Swapon the user specified swapfile prior to suspending.
+ *
+ * Activate the given swapfile if it wasn't already enabled. Remember whether
+ * we really did swapon it for swapoffing later.
  */
-static int enable_swapfile(void)
+static void enable_swapfile(void)
 {
 	int activateswapresult = -EINVAL;
-
-	if (suspend_swapon_status)
-		return 0;
 
 	if (swapfilename[0]) {
 		/* Attempt to swap on with maximum priority */
 		activateswapresult = sys_swapon(swapfilename, 0xFFFF);
-		if ((activateswapresult) && (activateswapresult != -EBUSY))
+		if (activateswapresult && activateswapresult != -EBUSY)
 			printk("Suspend2: The swapfile/partition specified by "
 				"/sys/power/suspend2/suspend_swap/swapfile "
 				"(%s) could not be turned on (error %d). "
@@ -196,28 +196,30 @@ static int enable_swapfile(void)
 		if (!activateswapresult)
 			suspend_swapon_status = 1;
 	}
-	return activateswapresult;
 }
 
-/* Returns 0 if was on, -EINVAL if was off, error value otherwise */
-static int disable_swapfile(void)
+/**
+ * disable_swapfile: Swapoff any file swaponed at the start of the cycle.
+ *
+ * If we did successfully swapon a file at the start of the cycle, swapoff
+ * it now (finishing up).
+ */
+static void disable_swapfile(void)
 {
-	int result = -EINVAL;
-	
 	if (!suspend_swapon_status)
-		return 0;
+		return;
 
-	if (swapfilename[0]) {
-		result = sys_swapoff(swapfilename);
-		if (result == -EINVAL)
-	 		return 0;	/* Wasn't on */
-		if (!result)
-			suspend_swapon_status = 0;
-	}
-
-	return result;
+	sys_swapoff(swapfilename);
+	suspend_swapon_status = 0;
 }
 
+/**
+ * try_to_parse_resume_device: Try to parse resume=
+ *
+ * Any "swap:" has been stripped away and we just have the path to deal with.
+ * We attempt to do name_to_dev_t, open and stat the file. Having opened the
+ * file, get the struct block_device * to match.
+ */
 static int try_to_parse_resume_device(char *commandline, int quiet)
 {
 	struct kstat stat;
