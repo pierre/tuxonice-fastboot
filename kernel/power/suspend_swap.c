@@ -1201,7 +1201,7 @@ static struct suspend_module_ops suspend_swapops = {
 	.initialise				= suspend_swap_initialise,
 	.cleanup				= suspend_swap_cleanup,
 
-	.noresume_reset	= suspend_swap_noresume_reset,
+	.noresume_reset		= suspend_swap_noresume_reset,
 	.storage_available 	= suspend_swap_storage_available,
 	.storage_allocated	= suspend_swap_storage_allocated,
 	.release_storage	= suspend_swap_release_storage,
