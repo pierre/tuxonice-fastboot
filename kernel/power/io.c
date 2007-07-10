@@ -1160,7 +1160,7 @@ static int __read_pageset1(void)
 	suspend_result = suspend_header->param0;
 	suspend_action = suspend_header->param1;
 	suspend_debug_state = suspend_header->param2;
-	console_loglevel = suspend_header->param3;
+	suspend_default_console_level = suspend_header->param3;
 	clear_suspend_state(SUSPEND_IGNORE_LOGLEVEL);
 	pagedir2.size = suspend_header->pageset_2_size;
 	for (i = 0; i < 4; i++)

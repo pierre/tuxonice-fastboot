@@ -163,7 +163,7 @@ void copyback_post(void)
 
 	suspend_action = suspend2_nosave_state1;
 	suspend_debug_state = suspend2_nosave_state2;
-	console_loglevel = suspend2_nosave_state3;
+	suspend_default_console_level = suspend2_nosave_state3;
 
 	for (loop = 0; loop < 4; loop++)
 		suspend_io_time[loop/2][loop%2] =
@@ -337,7 +337,7 @@ int suspend_atomic_restore(void)
 
 	suspend2_nosave_state1 = suspend_action;
 	suspend2_nosave_state2 = suspend_debug_state;
-	suspend2_nosave_state3 = console_loglevel;
+	suspend2_nosave_state3 = suspend_default_console_level;
 	
 	for (loop = 0; loop < 4; loop++)
 		suspend2_nosave_io_speed[loop/2][loop%2] =
