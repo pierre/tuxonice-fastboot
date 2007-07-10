@@ -84,30 +84,54 @@ struct bdev_opened
  */
 static struct bdev_opened *bdev_info_list[MAX_SWAPFILES + 2];
        
+/**
+ * close_bdev: Close a swap bdev.
+ *
+ * int: The swap entry number to close.
+ */
 static void close_bdev(int i)
 {
 	struct bdev_opened *this = bdev_info_list[i];
 
+	if (!this)
+		return;
+
 	bd_release(this->bdev);
 	blkdev_put(this->bdev);
-
-	/* Free our info. */
 	kfree(this);
-
 	bdev_info_list[i] = NULL;
 }
 
+/**
+ * close_bdevs: Close all bdevs we opened.
+ *
+ * Close all bdevs that we opened and reset the related vars.
+ */
 static void close_bdevs(void)
 {
 	int i;
 
 	for (i = 0; i < MAX_SWAPFILES; i++)
-		if (bdev_info_list[i])
-			close_bdev(i);
+		close_bdev(i);
 
 	resume_block_device = header_block_device = NULL;
 }
 
+/**
+ * open_bdev: Open a bdev at resume time.
+ *
+ * index: The swap index. May be MAX_SWAPFILES for the resume_dev_t
+ * (the user can have resume= pointing at a swap partition/file that isn't
+ * swapon'd when they suspend. MAX_SWAPFILES+1 for the first page of the
+ * header. It will be from a swap partition that was enabled when we suspended,
+ * but we don't know it's real index until we read that first page.
+ * dev_t: The device major/minor.
+ * display_errs: Whether to try to do this quietly.
+ *
+ * We stored a dev_t in the image header. Open the matching device without
+ * requiring /dev/<whatever> in most cases and record the details needed
+ * to close it later and avoid duplicating work.
+ */
 static struct block_device *open_bdev(int index, dev_t device, int display_errs)
 {
 	struct bdev_opened *this;
@@ -118,7 +142,6 @@ static struct block_device *open_bdev(int index, dev_t device, int display_errs)
 			return bdev_info_list[index]->bdev;
 	
 		close_bdev(index);
-		bdev_info_list[index] = NULL;
 	}
 
 	bdev = open_by_devnum(device, FMODE_READ);
