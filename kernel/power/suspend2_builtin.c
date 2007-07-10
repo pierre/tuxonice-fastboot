@@ -33,8 +33,6 @@
 EXPORT_SYMBOL_GPL(hibernation_ops);
 
 #ifdef CONFIG_SUSPEND2_CORE_EXPORTS
-EXPORT_SYMBOL_GPL(resume_file);
-
 EXPORT_SYMBOL_GPL(max_pfn);
 EXPORT_SYMBOL_GPL(free_dyn_pageflags);
 EXPORT_SYMBOL_GPL(clear_dynpageflag);
@@ -113,6 +111,7 @@ EXPORT_SYMBOL_GPL(get_swap_info_struct);
 /* Suspend_file specific */
 extern char * __initdata root_device_name;
 
+EXPORT_SYMBOL_GPL(resume_file);
 EXPORT_SYMBOL_GPL(ROOT_DEV);
 EXPORT_SYMBOL_GPL(root_device_name);
 EXPORT_SYMBOL_GPL(sys_unlink);
