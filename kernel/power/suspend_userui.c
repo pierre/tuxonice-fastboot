@@ -488,6 +488,8 @@ static int userui_user_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 				return -EINVAL;
 			suspend_default_console_level = (*data);
 			break;
+		case USERUI_MSG_PRINTK:
+			printk((char *) data);
 	}
 
 	return 1;
