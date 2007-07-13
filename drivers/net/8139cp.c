@@ -107,11 +107,6 @@ MODULE_PARM_DESC (multicast_filter_limit, "8139cp: maximum number of filtered mu
 
 #define PFX			DRV_NAME ": "
 
-#ifndef TRUE
-#define FALSE 0
-#define TRUE (!FALSE)
-#endif
-
 #define CP_DEF_MSG_ENABLE	(NETIF_MSG_DRV		| \
 				 NETIF_MSG_PROBE 	| \
 				 NETIF_MSG_LINK)
@@ -661,7 +656,7 @@ static irqreturn_t cp_interrupt (int irq, void *dev_instance)
 	if (status & (TxOK | TxErr | TxEmpty | SWInt))
 		cp_tx(cp);
 	if (status & LinkChg)
-		mii_check_media(&cp->mii_if, netif_msg_link(cp), FALSE);
+		mii_check_media(&cp->mii_if, netif_msg_link(cp), false);
 
 	spin_unlock(&cp->lock);
 
@@ -1188,7 +1183,7 @@ static int cp_open (struct net_device *dev)
 		goto err_out_hw;
 
 	netif_carrier_off(dev);
-	mii_check_media(&cp->mii_if, netif_msg_link(cp), TRUE);
+	mii_check_media(&cp->mii_if, netif_msg_link(cp), true);
 	netif_start_queue(dev);
 
 	return 0;
@@ -1804,7 +1799,6 @@ static int cp_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 	void __iomem *regs;
 	resource_size_t pciaddr;
 	unsigned int addr_len, i, pci_using_dac;
-	u8 pci_rev;
 
 #ifndef MODULE
 	static int version_printed;
@@ -1812,13 +1806,11 @@ static int cp_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 		printk("%s", version);
 #endif
 
-	pci_read_config_byte(pdev, PCI_REVISION_ID, &pci_rev);
-
 	if (pdev->vendor == PCI_VENDOR_ID_REALTEK &&
-	    pdev->device == PCI_DEVICE_ID_REALTEK_8139 && pci_rev < 0x20) {
+	    pdev->device == PCI_DEVICE_ID_REALTEK_8139 && pdev->revision < 0x20) {
 		dev_err(&pdev->dev,
 			   "This (id %04x:%04x rev %02x) is not an 8139C+ compatible chip\n",
-		           pdev->vendor, pdev->device, pci_rev);
+		           pdev->vendor, pdev->device, pdev->revision);
 		dev_err(&pdev->dev, "Try the \"8139too\" driver instead.\n");
 		return -ENODEV;
 	}
@@ -2050,7 +2042,7 @@ static int cp_resume (struct pci_dev *pdev)
 
 	spin_lock_irqsave (&cp->lock, flags);
 
-	mii_check_media(&cp->mii_if, netif_msg_link(cp), FALSE);
+	mii_check_media(&cp->mii_if, netif_msg_link(cp), false);
 
 	spin_unlock_irqrestore (&cp->lock, flags);
 

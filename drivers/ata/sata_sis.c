@@ -133,7 +133,7 @@ static const struct ata_port_info sis_port_info = {
 	.flags		= ATA_FLAG_SATA | ATA_FLAG_NO_LEGACY,
 	.pio_mask	= 0x1f,
 	.mwdma_mask	= 0x7,
-	.udma_mask	= 0x7f,
+	.udma_mask	= ATA_UDMA6,
 	.port_ops	= &sis_ops,
 };
 
@@ -334,7 +334,7 @@ static int sis_init_one (struct pci_dev *pdev, const struct pci_device_id *ent)
 		break;
 	}
 
-	rc = ata_pci_prepare_native_host(pdev, ppi, &host);
+	rc = ata_pci_prepare_sff_host(pdev, ppi, &host);
 	if (rc)
 		return rc;
 

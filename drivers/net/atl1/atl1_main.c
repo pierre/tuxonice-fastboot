@@ -118,10 +118,6 @@ static int __devinit atl1_sw_init(struct atl1_adapter *adapter)
 {
 	struct atl1_hw *hw = &adapter->hw;
 	struct net_device *netdev = adapter->netdev;
-	struct pci_dev *pdev = adapter->pdev;
-
-	/* PCI config space info */
-	pci_read_config_byte(pdev, PCI_REVISION_ID, &hw->revision_id);
 
 	hw->max_frame_size = netdev->mtu + ENET_HEADER_SIZE + ETHERNET_FCS_SIZE;
 	hw->min_frame_size = MINIMUM_ETHERNET_FRAME_SIZE;
@@ -634,14 +630,13 @@ static void atl1_intr_tx(struct atl1_adapter *adapter)
 	struct atl1_buffer *buffer_info;
 	u16 sw_tpd_next_to_clean;
 	u16 cmb_tpd_next_to_clean;
-	u8 update = 0;
 
 	sw_tpd_next_to_clean = atomic_read(&tpd_ring->next_to_clean);
 	cmb_tpd_next_to_clean = le16_to_cpu(adapter->cmb.cmb->tpd_cons_idx);
 
 	while (cmb_tpd_next_to_clean != sw_tpd_next_to_clean) {
 		struct tx_packet_desc *tpd;
-		update = 1;
+
 		tpd = ATL1_TPD_DESC(tpd_ring, sw_tpd_next_to_clean);
 		buffer_info = &tpd_ring->buffer_info[sw_tpd_next_to_clean];
 		if (buffer_info->dma) {
