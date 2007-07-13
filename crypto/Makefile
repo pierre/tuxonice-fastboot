@@ -51,3 +51,9 @@ obj-$(CONFIG_CRYPTO_CRC32C) += crc32c.o
 obj-$(CONFIG_CRYPTO_LZF) += lzf.o
 
 obj-$(CONFIG_CRYPTO_TEST) += tcrypt.o
+
+#
+# generic algorithms and the async_tx api
+#
+obj-$(CONFIG_XOR_BLOCKS) += xor.o
+obj-$(CONFIG_ASYNC_CORE) += async_tx/
