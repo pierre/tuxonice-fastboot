@@ -24,8 +24,8 @@
 
 #include "power.h"
 
-#include "suspend.h"
-#include "suspend2_builtin.h"
+#include "tuxonice.h"
+#include "tuxonice_builtin.h"
 
 static int noresume = 0;
 char resume_file[256] = CONFIG_PM_STD_PARTITION;

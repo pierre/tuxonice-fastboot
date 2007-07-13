@@ -4,8 +4,8 @@
 
 #include <linux/suspend.h>
 #include <linux/utsname.h>
-#include "suspend.h"
-#include "suspend2_builtin.h"
+#include "tuxonice.h"
+#include "tuxonice_builtin.h"
 
 struct swsusp_info {
 	struct new_utsname	uts;

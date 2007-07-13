@@ -33,7 +33,7 @@
 #include <asm/io.h>
 
 #include "power.h"
-#include "suspend2_builtin.h"
+#include "tuxonice_builtin.h"
 
 static int swsusp_page_is_free(struct page *);
 static void swsusp_set_page_forbidden(struct page *);
@@ -49,7 +49,7 @@ int resume_attempted;
 EXPORT_SYMBOL_GPL(resume_attempted);
 
 #ifdef CONFIG_SUSPEND2
-#include "pagedir.h"
+#include "tuxonice_pagedir.h"
 int suspend_post_context_save(void);
 #endif
 
