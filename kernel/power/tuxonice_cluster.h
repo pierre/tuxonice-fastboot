@@ -7,7 +7,7 @@
  * This file is released under the GPLv2.
  */
 
-#ifdef CONFIG_SUSPEND2_CLUSTER
+#ifdef CONFIG_TOI_CLUSTER
 extern int s2_cluster_init(void);
 extern void s2_cluster_exit(void);
 #else

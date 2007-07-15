@@ -963,6 +963,6 @@ int suspend_prepare_image(void)
 	return result;
 }
 
-#ifdef CONFIG_SUSPEND2_EXPORTS
+#ifdef CONFIG_TOI_EXPORTS
 EXPORT_SYMBOL_GPL(real_nr_free_pages);
 #endif

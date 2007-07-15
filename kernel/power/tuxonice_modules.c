@@ -446,7 +446,7 @@ void suspend_put_modules(void)
 		module_put(this_module->module);
 }
 
-#ifdef CONFIG_SUSPEND2_EXPORTS
+#ifdef CONFIG_TOI_EXPORTS
 EXPORT_SYMBOL_GPL(suspend_register_module);
 EXPORT_SYMBOL_GPL(suspend_unregister_module);
 EXPORT_SYMBOL_GPL(suspend_get_next_filter);

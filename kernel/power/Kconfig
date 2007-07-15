@@ -149,7 +149,7 @@ config PM_STD_PARTITION
 	  suspended image to. It will simply pick the first available swap 
 	  device.
 
-menuconfig SUSPEND2_CORE
+menuconfig TOI_CORE
 	tristate "Enhanced Hibernation (Suspend2)"
 	depends on SOFTWARE_SUSPEND
 	select DYN_PAGEFLAGS
@@ -161,31 +161,31 @@ menuconfig SUSPEND2_CORE
 	  for FAQs, HOWTOs and other documentation.
 
 	comment "Image Storage (you need at least one allocator)"
-		depends on SUSPEND2_CORE
+		depends on TOI_CORE
 	
-	config SUSPEND2_FILE
+	config TOI_FILE
 		tristate "File Allocator"
-		depends on SUSPEND2_CORE
+		depends on TOI_CORE
 		default y
 		---help---
 		  This option enables support for storing an image in a
 		  simple file. This should be possible, but we're still
 		  testing it.
 
-	config SUSPEND2_SWAP
+	config TOI_SWAP
 		tristate "Swap Allocator"
-		depends on SUSPEND2_CORE && SWAP
+		depends on TOI_CORE && SWAP
 		default y
 		---help---
 		  This option enables support for storing an image in your
 		  swap space.
 
 	comment "General Options"
-		depends on SUSPEND2_CORE
+		depends on TOI_CORE
 
-	config SUSPEND2_CRYPTO
+	config TOI_CRYPTO
 		tristate "Compression support"
-		depends on SUSPEND2_CORE && CRYPTO
+		depends on TOI_CORE && CRYPTO
 		default y
 		---help---
 		  This option adds support for using cryptoapi compression
@@ -196,11 +196,11 @@ menuconfig SUSPEND2_CORE
 		  You probably want this, so say Y here.
 
 	comment "No compression support available without Cryptoapi support."
-		depends on SUSPEND2_CORE && !CRYPTO
+		depends on TOI_CORE && !CRYPTO
 
-	config SUSPEND2_USERUI
+	config TOI_USERUI
 		tristate "Userspace User Interface support"
-		depends on SUSPEND2_CORE && NET && (VT || SERIAL_CONSOLE)
+		depends on TOI_CORE && NET && (VT || SERIAL_CONSOLE)
 		default y
 		---help---
 		  This option enabled support for a userspace based user interface
@@ -208,9 +208,9 @@ menuconfig SUSPEND2_CORE
 		  and resuming, and also enables features such as pressing escape to
 		  cancel a cycle or interactive debugging.
 
-	config SUSPEND2_KEEP_IMAGE
+	config TOI_KEEP_IMAGE
 		bool "Allow Keep Image Mode"
-		depends on SUSPEND2_CORE
+		depends on TOI_CORE
 		---help---
 		  This option allows you to keep and image and reuse it. It is intended
 		  __ONLY__ for use with systems where all filesystems are mounted read-
@@ -223,10 +223,10 @@ menuconfig SUSPEND2_CORE
 		  bit. Keep image mode is a little less user friendly on purpose - it
 		  should not be used without thought!
 
-	config SUSPEND2_REPLACE_SWSUSP
+	config TOI_REPLACE_SWSUSP
 		bool "Replace swsusp by default"
 		default y
-		depends on SUSPEND2_CORE
+		depends on TOI_CORE
 		---help---
 		  Suspend2 can replace swsusp. This option makes that the default state,
 		  requiring you to echo 0 > /sys/power/suspend2/replace_swsusp if you want
@@ -239,17 +239,17 @@ menuconfig SUSPEND2_CORE
 		  specify an allocator and both the swap and file allocators are compiled in,
 		  the swap allocator will be used by default.
 
-	config SUSPEND2_CLUSTER
+	config TOI_CLUSTER
 		tristate "Cluster support"
 		default n
-		depends on SUSPEND2_CORE && NET && BROKEN
+		depends on TOI_CORE && NET && BROKEN
 		---help---
 		  Support for linking multiple machines in a cluster so that they suspend
 		  and resume together.
 
-	config SUSPEND2_DEFAULT_CLUSTER_MASTER
+	config TOI_DEFAULT_CLUSTER_MASTER
 		string "Default cluster master address/port"
-		depends on SUSPEND2_CLUSTER
+		depends on TOI_CLUSTER
 		---help---
 		  If this machine will be the master, simply enter a port on which to
 		  listen for slaves.
@@ -257,9 +257,9 @@ menuconfig SUSPEND2_CORE
 		  which the master listens with a colon separating them.
 		  If no value is set here, cluster support will be disabled by default.
 
-	config SUSPEND2_CHECKSUM
+	config TOI_CHECKSUM
 		bool "Checksum pageset2"
-		depends on SUSPEND2_CORE
+		depends on TOI_CORE
 		select CRYPTO
 		select CRYPTO_ALGAPI
 		select CRYPTO_MD5
@@ -268,11 +268,11 @@ menuconfig SUSPEND2_CORE
 		  atomic copy. Should not normally be needed, but here for verification and
 		  diagnostic purposes.
 
-	config SUSPEND2_DEFAULT_WAIT
+	config TOI_DEFAULT_WAIT
 		int "Default waiting time for emergency boot messages"
 		default "25"
 		range -1 32768
-		depends on SUSPEND2_CORE
+		depends on TOI_CORE
 		help
 		  Suspend2 can display warnings very early in the process of resuming,
 		  if (for example) it appears that you have booted a kernel that doesn't
@@ -284,41 +284,41 @@ menuconfig SUSPEND2_CORE
 		  more indicate a number of seconds (up to 255) to wait before doing the
 		  default.
 
-config SUSPEND2_USERUI_EXPORTS
+config TOI_USERUI_EXPORTS
 	bool
-	depends on SUSPEND2_USERUI=m
+	depends on TOI_USERUI=m
 	default y
 
-config SUSPEND2_SWAP_EXPORTS
+config TOI_SWAP_EXPORTS
 	bool
-	depends on SUSPEND2_SWAP=m
+	depends on TOI_SWAP=m
 	default y
 
-config SUSPEND2_FILE_EXPORTS
+config TOI_FILE_EXPORTS
 	bool
-	depends on SUSPEND2_FILE=m
+	depends on TOI_FILE=m
 	default y
 
-config SUSPEND2_CRYPTO_EXPORTS
+config TOI_CRYPTO_EXPORTS
 	bool
-	depends on SUSPEND2_CRYPTO=m
+	depends on TOI_CRYPTO=m
 	default y
 
-config SUSPEND2_CORE_EXPORTS
+config TOI_CORE_EXPORTS
 	bool
-	depends on SUSPEND2_CORE=m
+	depends on TOI_CORE=m
 	default y
 
-config SUSPEND2_EXPORTS
+config TOI_EXPORTS
 	bool
-	depends on SUSPEND2_SWAP_EXPORTS || SUSPEND2_FILE_EXPORTS || \
-		SUSPEND2_CRYPTO_EXPORTS || SUSPEND2_CLUSTER=m || \
-		SUSPEND2_USERUI_EXPORTS
+	depends on TOI_SWAP_EXPORTS || TOI_FILE_EXPORTS || \
+		TOI_CRYPTO_EXPORTS || TOI_CLUSTER=m || \
+		TOI_USERUI_EXPORTS
 	default y
 
-config SUSPEND2
+config TOI
 	bool
-	depends on SUSPEND2_CORE!=n
+	depends on TOI_CORE!=n
 	default y
 
 config SUSPEND_SMP

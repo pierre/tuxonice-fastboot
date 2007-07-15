@@ -1027,10 +1027,10 @@ static __init int suspend_block_io_load(void)
 	return suspend_register_module(&suspend_blockwriter_ops);
 }
 
-#ifdef CONFIG_SUSPEND2_FILE_EXPORTS
+#ifdef CONFIG_TOI_FILE_EXPORTS
 EXPORT_SYMBOL_GPL(suspend_read_fd);
 #endif
-#if defined(CONFIG_SUSPEND2_FILE_EXPORTS) || defined(CONFIG_SUSPEND2_SWAP_EXPORTS)
+#if defined(CONFIG_TOI_FILE_EXPORTS) || defined(CONFIG_TOI_SWAP_EXPORTS)
 EXPORT_SYMBOL_GPL(suspend_writer_posn);
 EXPORT_SYMBOL_GPL(suspend_writer_posn_save);
 EXPORT_SYMBOL_GPL(suspend_writer_buffer);

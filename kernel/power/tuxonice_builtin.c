@@ -32,7 +32,7 @@
 
 EXPORT_SYMBOL_GPL(hibernation_ops);
 
-#ifdef CONFIG_SUSPEND2_CORE_EXPORTS
+#ifdef CONFIG_TOI_CORE_EXPORTS
 EXPORT_SYMBOL_GPL(max_pfn);
 EXPORT_SYMBOL_GPL(free_dyn_pageflags);
 EXPORT_SYMBOL_GPL(clear_dynpageflag);
@@ -84,9 +84,9 @@ EXPORT_SYMBOL_GPL(enable_nonboot_cpus);
 #endif
 #endif
 
-int suspend2_wait = CONFIG_SUSPEND2_DEFAULT_WAIT;
+int suspend2_wait = CONFIG_TOI_DEFAULT_WAIT;
 
-#ifdef CONFIG_SUSPEND2_USERUI_EXPORTS
+#ifdef CONFIG_TOI_USERUI_EXPORTS
 EXPORT_SYMBOL_GPL(kmsg_redirect);
 EXPORT_SYMBOL_GPL(suspend2_wait);
 #ifndef CONFIG_COMPAT
@@ -94,10 +94,10 @@ EXPORT_SYMBOL_GPL(sys_ioctl);
 #endif
 #endif
 
-#if defined(CONFIG_SUSPEND2_USERUI_EXPORTS) || defined(CONFIG_SUSPEND2_CORE_EXPORTS)
+#if defined(CONFIG_TOI_USERUI_EXPORTS) || defined(CONFIG_TOI_CORE_EXPORTS)
 EXPORT_SYMBOL_GPL(console_printk);
 #endif
-#ifdef CONFIG_SUSPEND2_SWAP_EXPORTS	/* Suspend swap specific */
+#ifdef CONFIG_TOI_SWAP_EXPORTS	/* Suspend swap specific */
 EXPORT_SYMBOL_GPL(sys_swapon);
 EXPORT_SYMBOL_GPL(sys_swapoff);
 EXPORT_SYMBOL_GPL(si_swapinfo);
@@ -107,7 +107,7 @@ EXPORT_SYMBOL_GPL(swap_free);
 EXPORT_SYMBOL_GPL(get_swap_info_struct);
 #endif
 
-#ifdef CONFIG_SUSPEND2_FILE_EXPORTS
+#ifdef CONFIG_TOI_FILE_EXPORTS
 /* Suspend_file specific */
 extern char * __initdata root_device_name;
 
@@ -119,12 +119,12 @@ EXPORT_SYMBOL_GPL(sys_mknod);
 #endif
 
 /* Swap or file */
-#if defined(CONFIG_SUSPEND2_FILE_EXPORTS) || defined(CONFIG_SUSPEND2_SWAP_EXPORTS)
+#if defined(CONFIG_TOI_FILE_EXPORTS) || defined(CONFIG_TOI_SWAP_EXPORTS)
 EXPORT_SYMBOL_GPL(bio_set_pages_dirty);
 EXPORT_SYMBOL_GPL(name_to_dev_t);
 #endif
 
-#if defined(CONFIG_SUSPEND2_EXPORTS) || defined(CONFIG_SUSPEND2_CORE_EXPORTS)
+#if defined(CONFIG_TOI_EXPORTS) || defined(CONFIG_TOI_CORE_EXPORTS)
 EXPORT_SYMBOL_GPL(snprintf_used);
 #endif
 struct suspend2_core_fns *s2_core_fns;
@@ -188,7 +188,7 @@ unsigned long suspend_compress_bytes_in, suspend_compress_bytes_out;
 EXPORT_SYMBOL_GPL(suspend_compress_bytes_in);
 EXPORT_SYMBOL_GPL(suspend_compress_bytes_out);
 
-#ifdef CONFIG_SUSPEND2_REPLACE_SWSUSP
+#ifdef CONFIG_TOI_REPLACE_SWSUSP
 unsigned long suspend_action = (1 << SUSPEND_REPLACE_SWSUSP) | \
 			       (1 << SUSPEND_PAGESET2_FULL) | \
 			       (1 << SUSPEND_LATE_CPU_HOTPLUG);
@@ -221,7 +221,7 @@ __nosavedata char suspend2_nosave_commandline[COMMAND_LINE_SIZE];
 
 __nosavedata struct pbe *restore_highmem_pblist;
 
-#ifdef CONFIG_SUSPEND2_CORE_EXPORTS
+#ifdef CONFIG_TOI_CORE_EXPORTS
 #ifdef CONFIG_HIGHMEM
 EXPORT_SYMBOL_GPL(nr_free_highpages);
 EXPORT_SYMBOL_GPL(saveable_highmem_page);

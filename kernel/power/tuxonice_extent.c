@@ -293,7 +293,7 @@ void suspend_extent_state_restore(struct extent_iterate_state *state,
 		state->current_extent = state->current_extent->next;
 }
 
-#ifdef CONFIG_SUSPEND2_EXPORTS
+#ifdef CONFIG_TOI_EXPORTS
 EXPORT_SYMBOL_GPL(suspend_add_to_extent_chain);
 EXPORT_SYMBOL_GPL(suspend_put_extent_chain);
 EXPORT_SYMBOL_GPL(suspend_load_extent_chain);

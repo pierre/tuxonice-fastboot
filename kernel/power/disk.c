@@ -154,7 +154,7 @@ int hibernate(void)
 {
 	int error;
 
-#ifdef CONFIG_SUSPEND2
+#ifdef CONFIG_TOI
 	if (test_action_state(SUSPEND_REPLACE_SWSUSP))
 		return suspend2_try_suspend(1);
 #endif
@@ -263,7 +263,7 @@ int software_resume(void)
 
 	resume_attempted = 1;
 
-#ifdef CONFIG_SUSPEND2
+#ifdef CONFIG_TOI
 	/* 
 	 * We can't know (until an image header - if any - is loaded), whether
 	 * we did override swsusp. We therefore ensure that both are tried.

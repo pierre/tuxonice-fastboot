@@ -106,7 +106,7 @@ enum {
 	SUSPEND_IO_STOPPED,
 };
 
-#ifdef CONFIG_SUSPEND2
+#ifdef CONFIG_TOI
 
 /* Used in init dir files */
 extern unsigned long suspend_state;
@@ -115,17 +115,17 @@ extern unsigned long suspend_state;
 #define test_suspend_state(bit) (test_bit(bit, &suspend_state))
 extern int suspend2_running;
 
-#else /* !CONFIG_SUSPEND2 */
+#else /* !CONFIG_TOI */
 
 #define suspend_state		(0)
 #define set_suspend_state(bit) do { } while(0)
 #define clear_suspend_state(bit) do { } while (0)
 #define test_suspend_state(bit) (0)
 #define suspend2_running (0)
-#endif /* CONFIG_SUSPEND2 */
+#endif /* CONFIG_TOI */
 
 #ifdef CONFIG_SOFTWARE_SUSPEND
-#ifdef CONFIG_SUSPEND2
+#ifdef CONFIG_TOI
 extern void suspend2_try_resume(void);
 #else
 #define suspend2_try_resume() do { } while(0)

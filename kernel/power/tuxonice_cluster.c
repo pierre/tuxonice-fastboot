@@ -17,7 +17,7 @@
 #include "tuxonice_sysfs.h"
 #include "tuxonice_io.h"
 
-static char suspend_cluster_master[63] = CONFIG_SUSPEND2_DEFAULT_CLUSTER_MASTER;
+static char suspend_cluster_master[63] = CONFIG_TOI_DEFAULT_CLUSTER_MASTER;
 
 static struct suspend_module_ops suspend_cluster_ops;
 

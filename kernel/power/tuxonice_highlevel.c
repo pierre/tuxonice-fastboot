@@ -353,7 +353,7 @@ static void do_cleanup(int get_debug_info)
 
 	thaw_processes();
 
-#ifdef CONFIG_SUSPEND2_KEEP_IMAGE
+#ifdef CONFIG_TOI_KEEP_IMAGE
 	if (test_action_state(SUSPEND_KEEP_IMAGE) &&
 	    !test_result_state(SUSPEND_ABORTED)) {
 		suspend_message(SUSPEND_ANY_SECTION, SUSPEND_LOW, 1,
@@ -1070,7 +1070,7 @@ static struct suspend_sysfs_data sysfs_params[] = {
 	  SYSFS_BIT(&suspend_action, SUSPEND_LATE_CPU_HOTPLUG, 0)
 	},
 
-#ifdef CONFIG_SUSPEND2_KEEP_IMAGE
+#ifdef CONFIG_TOI_KEEP_IMAGE
 	{ SUSPEND2_ATTR("keep_image", SYSFS_RW),
 	  SYSFS_BIT(&suspend_action, SUSPEND_KEEP_IMAGE, 0)
 	},
@@ -1149,6 +1149,6 @@ module_exit(core_unload);
 late_initcall(core_load);
 #endif
 
-#ifdef CONFIG_SUSPEND2_EXPORTS
+#ifdef CONFIG_TOI_EXPORTS
 EXPORT_SYMBOL_GPL(pagedir2);
 #endif

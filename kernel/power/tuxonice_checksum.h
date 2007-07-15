@@ -11,7 +11,7 @@
  * made to pageset 2 while we're saving it.
  */
 
-#if defined(CONFIG_SUSPEND2_CHECKSUM)
+#if defined(CONFIG_TOI_CHECKSUM)
 extern int s2_checksum_init(void);
 extern void s2_checksum_exit(void);
 void calculate_check_checksums(int check);

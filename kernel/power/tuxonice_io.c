@@ -1394,7 +1394,7 @@ int image_exists_write(const char *buffer, int count)
 	return count;
 }
 
-#ifdef CONFIG_SUSPEND2_EXPORTS
+#ifdef CONFIG_TOI_EXPORTS
 EXPORT_SYMBOL_GPL(suspend_attempt_to_parse_resume_device);
 EXPORT_SYMBOL_GPL(attempt_to_parse_resume_device2);
 #endif

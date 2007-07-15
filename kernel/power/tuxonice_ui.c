@@ -314,7 +314,7 @@ void s2_ui_exit(void)
 	suspend_unregister_module(&userui_ops);
 }
 
-#ifdef CONFIG_SUSPEND2_EXPORTS
+#ifdef CONFIG_TOI_EXPORTS
 EXPORT_SYMBOL_GPL(s2_current_ui);
 EXPORT_SYMBOL_GPL(suspend_early_boot_message);
 EXPORT_SYMBOL_GPL(s2_register_ui_ops);

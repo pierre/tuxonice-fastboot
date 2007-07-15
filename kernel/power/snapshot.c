@@ -48,7 +48,7 @@ struct pbe *restore_pblist;
 int resume_attempted;
 EXPORT_SYMBOL_GPL(resume_attempted);
 
-#ifdef CONFIG_SUSPEND2
+#ifdef CONFIG_TOI
 #include "tuxonice_pagedir.h"
 int suspend_post_context_save(void);
 #endif
@@ -94,7 +94,7 @@ static void *get_image_page(gfp_t gfp_mask, int safe_needed)
 
 unsigned long get_safe_page(gfp_t gfp_mask)
 {
-#ifdef CONFIG_SUSPEND2
+#ifdef CONFIG_TOI
 	if (suspend2_running)
 		return suspend_get_nonconflicting_page();
 #endif
@@ -1214,7 +1214,7 @@ asmlinkage int swsusp_save(void)
 {
 	unsigned int nr_pages, nr_highmem;
 
-#ifdef CONFIG_SUSPEND2
+#ifdef CONFIG_TOI
 	if (suspend2_running)
 		return suspend_post_context_save();
 #endif
