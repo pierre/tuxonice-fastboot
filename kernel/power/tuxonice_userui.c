@@ -634,7 +634,7 @@ static __init int s2_user_ui_init(void)
 	ui_helper_data.pid = -1;
 	ui_helper_data.skb_size = sizeof(struct userui_msg_params);
 	ui_helper_data.pool_limit = 6;
-	ui_helper_data.netlink_id = NETLINK_SUSPEND2_USERUI;
+	ui_helper_data.netlink_id = NETLINK_TOI_USERUI;
 	ui_helper_data.name = "userspace ui";
 	ui_helper_data.rcv_msg = userui_user_rcv_msg;
 	ui_helper_data.interface_version = 7;

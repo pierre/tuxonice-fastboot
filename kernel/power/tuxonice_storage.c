@@ -272,7 +272,7 @@ int s2_usm_init(void)
 	usm_helper_data.pid = -1;
 	usm_helper_data.skb_size = 0;
 	usm_helper_data.pool_limit = 6;
-	usm_helper_data.netlink_id = NETLINK_SUSPEND2_USM;
+	usm_helper_data.netlink_id = NETLINK_TOI_USM;
 	usm_helper_data.name = "userspace storage manager";
 	usm_helper_data.rcv_msg = usm_user_rcv_msg;
 	usm_helper_data.interface_version = 1;

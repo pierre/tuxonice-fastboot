@@ -24,8 +24,8 @@
 /* leave room for NETLINK_DM (DM Events) */
 #define NETLINK_SCSITRANSPORT	18	/* SCSI Transports */
 #define NETLINK_ECRYPTFS	19
-#define NETLINK_SUSPEND2_USERUI	20	/* For suspend2's userui */
-#define NETLINK_SUSPEND2_USM	21	/* For suspend2's userspace storage manager */
+#define NETLINK_TOI_USERUI	20	/* For TuxOnIce's userui */
+#define NETLINK_TOI_USM		21	/* For TuxOnIce's userspace storage manager */
 
 #define MAX_LINKS 32		
 
