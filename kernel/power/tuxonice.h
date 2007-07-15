@@ -19,7 +19,7 @@
 #include <asm/setup.h>
 #include "tuxonice_pageflags.h"
 
-#define SUSPEND_CORE_VERSION "2.2.10.2"
+#define TOI_CORE_VERSION "2.2.10.2"
 
 /*		 == Action states == 		*/
 

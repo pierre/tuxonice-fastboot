@@ -275,7 +275,7 @@ static int get_suspend_debug_info(const char *buffer, int count)
 	int len = 0;
 
 	SNPRINTF("Suspend2 debugging info:\n");
-	SNPRINTF("- Suspend core   : " SUSPEND_CORE_VERSION "\n");
+	SNPRINTF("- Suspend core   : " TOI_CORE_VERSION "\n");
 	SNPRINTF("- Kernel Version : " UTS_RELEASE "\n");
 	SNPRINTF("- Compiler vers. : %d.%d\n", __GNUC__, __GNUC_MINOR__);
 	SNPRINTF("- Attempt number : %d\n", nr_suspends);
@@ -1039,7 +1039,7 @@ static struct suspend_sysfs_data sysfs_params[] = {
 	},
 
 	{ SUSPEND2_ATTR("version", SYSFS_READONLY),
-	  SYSFS_STRING(SUSPEND_CORE_VERSION, 0, 0)
+	  SYSFS_STRING(TOI_CORE_VERSION, 0, 0)
 	},
 
 	{ SUSPEND2_ATTR("no_load_direct", SYSFS_RW),
