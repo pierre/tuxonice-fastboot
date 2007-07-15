@@ -59,9 +59,9 @@ int suspend_attempt_to_parse_resume_device(int quiet)
 		return 0;
 
 	suspendActiveAllocator = NULL;
-	clear_suspend_state(SUSPEND_RESUME_DEVICE_OK);
-	clear_suspend_state(SUSPEND_CAN_RESUME);
-	clear_result_state(SUSPEND_ABORTED);
+	clear_suspend_state(TOI_RESUME_DEVICE_OK);
+	clear_suspend_state(TOI_CAN_RESUME);
+	clear_result_state(TOI_ABORTED);
 
 	if (!suspendNumAllocators) {
 		if (!quiet)
@@ -102,8 +102,8 @@ int suspend_attempt_to_parse_resume_device(int quiet)
 				/* For this allocator and valid. */
 				suspendActiveAllocator = thisAllocator;
 
-				set_suspend_state(SUSPEND_RESUME_DEVICE_OK);
-				set_suspend_state(SUSPEND_CAN_RESUME);
+				set_suspend_state(TOI_RESUME_DEVICE_OK);
+				set_suspend_state(TOI_CAN_RESUME);
 				returning = 1;
 				goto cleanup;
 		}
@@ -149,7 +149,7 @@ void attempt_to_parse_alt_resume_param(void)
 
 	printk("=== Trying Poweroff Resume2 ===\n");
 	save_restore_alt_param(SAVE, NOQUIET);
-	if (test_suspend_state(SUSPEND_CAN_RESUME))
+	if (test_suspend_state(TOI_CAN_RESUME))
 		ok = 1;
 	
 	printk("=== Done ===\n");
@@ -223,7 +223,7 @@ static int rw_init_modules(int rw, int which)
 		if (!this_module->enabled)
 			continue;
 		if (this_module->rw_init && this_module->rw_init(rw, which)) {
-			abort_suspend(SUSPEND_FAILED_MODULE_INIT,
+			abort_suspend(TOI_FAILED_MODULE_INIT,
 				"Failed to initialise the %s filter.",
 				this_module->name);
 			return 1;
@@ -232,7 +232,7 @@ static int rw_init_modules(int rw, int which)
 
 	/* Initialise allocator */
 	if (suspendActiveAllocator->rw_init(rw, which)) {
-		abort_suspend(SUSPEND_FAILED_MODULE_INIT,
+		abort_suspend(TOI_FAILED_MODULE_INIT,
 				"Failed to initialise the allocator."); 
 		if (!rw)
 			suspendActiveAllocator->remove_image();
@@ -246,7 +246,7 @@ static int rw_init_modules(int rw, int which)
 		    this_module->type == WRITER_MODULE)
 			continue;
 		if (this_module->rw_init && this_module->rw_init(rw, which)) {
-			set_abort_result(SUSPEND_FAILED_MODULE_INIT);
+			set_abort_result(TOI_FAILED_MODULE_INIT);
 			printk("Setting aborted flag due to module init failure.\n");
 			return 1;
 		}
@@ -353,7 +353,7 @@ static struct page *copy_page_from_orig_page(struct page *orig_page)
 	if (is_high)
 		kunmap(high_page);
 
-	abort_suspend(SUSPEND_FAILED_IO, "Failed to get destination page for"
+	abort_suspend(TOI_FAILED_IO, "Failed to get destination page for"
 		" orig page %p. This[min].orig_address=%p.\n", orig_page,
 		this[index].orig_address);
 	return NULL;
@@ -429,10 +429,10 @@ static int worker_rw_loop(void *data)
 			 * resetting the resume_attempted flag (from ui.c) will
 			 * clear the bdev flags, making this thread oops.
 			 */
-			if (unlikely(test_suspend_state(SUSPEND_STOP_RESUME))) {
+			if (unlikely(test_suspend_state(TOI_STOP_RESUME))) {
 				atomic_dec(&worker_thread_count);
 				if (!atomic_read(&worker_thread_count))
-					set_suspend_state(SUSPEND_IO_STOPPED);
+					set_suspend_state(TOI_IO_STOPPED);
 				while (1)
 					schedule();
 			}
@@ -440,7 +440,7 @@ static int worker_rw_loop(void *data)
 			result = first_filter->read_page(&write_pfn, buffer,
 					&buf_size);
 			if (buf_size != PAGE_SIZE) {
-				abort_suspend(SUSPEND_FAILED_IO,
+				abort_suspend(TOI_FAILED_IO,
 					"I/O pipeline returned %d bytes instead "
 					"of %d.\n", buf_size, PAGE_SIZE);
 				mutex_lock(&io_mutex);
@@ -452,7 +452,7 @@ static int worker_rw_loop(void *data)
 			io_result = result;
 			if (io_write) {
 				printk("Write chunk returned %d.\n", result);
-				abort_suspend(SUSPEND_FAILED_IO,
+				abort_suspend(TOI_FAILED_IO,
 					"Failed to write a chunk of the "
 					"image.");
 				mutex_lock(&io_mutex);
@@ -525,7 +525,7 @@ static int worker_rw_loop(void *data)
 		mutex_lock(&io_mutex);
 
 	} while(atomic_read(&io_count) >= atomic_read(&worker_thread_count) &&
-		!(io_write && test_result_state(SUSPEND_ABORTED)));
+		!(io_write && test_result_state(TOI_ABORTED)));
 
 	atomic_dec(&worker_thread_count);
 	mutex_unlock(&io_mutex);
@@ -608,17 +608,17 @@ static int do_rw_loop(int write, int finish_at, dyn_pageflags_t *pageflags,
 	pfn = max_pfn + 1;
 	other_pfn = pfn;
 
-	clear_suspend_state(SUSPEND_IO_STOPPED);
+	clear_suspend_state(TOI_IO_STOPPED);
 
-	if (!test_action_state(SUSPEND_NO_MULTITHREADED_IO))
+	if (!test_action_state(TOI_NO_MULTITHREADED_IO))
 		start_other_threads();
 	worker_rw_loop(NULL);
 
 	while (atomic_read(&worker_thread_count))
 		schedule();
 
-	set_suspend_state(SUSPEND_IO_STOPPED);
-	if (unlikely(test_suspend_state(SUSPEND_STOP_RESUME))) {
+	set_suspend_state(TOI_IO_STOPPED);
+	if (unlikely(test_suspend_state(TOI_STOP_RESUME))) {
 		while (1)
 			schedule();
 	}
@@ -630,7 +630,7 @@ static int do_rw_loop(int write, int finish_at, dyn_pageflags_t *pageflags,
 				MB(io_base + io_finish_at), MB(io_barmax));
 	}
 
-	if (io_write && test_result_state(SUSPEND_ABORTED))
+	if (io_write && test_result_state(TOI_ABORTED))
 		io_result = 1;
 	else /* All I/O done? */
 		BUG_ON(get_next_bit_on(io_map, max_pfn + 1) != max_pfn + 1);
@@ -663,8 +663,8 @@ int write_pageset(struct pagedir *pagedir)
 		suspend_prepare_status(DONT_CLEAR_BAR,
 				"Writing kernel & process data...");
 		base = pagedir2.size;
-		if (test_action_state(SUSPEND_TEST_FILTER_SPEED) ||
-		    test_action_state(SUSPEND_TEST_BIO))
+		if (test_action_state(TOI_TEST_FILTER_SPEED) ||
+		    test_action_state(TOI_TEST_BIO))
 			pageflags = &pageset1_map;
 		else
 			pageflags = &pageset1_copy_map;
@@ -676,7 +676,7 @@ int write_pageset(struct pagedir *pagedir)
 	start_time = jiffies;
 
 	if (rw_init_modules(1, pagedir->id)) {
-		abort_suspend(SUSPEND_FAILED_MODULE_INIT,
+		abort_suspend(TOI_FAILED_MODULE_INIT,
 				"Failed to initialise modules for writing.");
 		error = 1;
 	}
@@ -686,14 +686,14 @@ int write_pageset(struct pagedir *pagedir)
 				pagedir->id);
 
 	if (rw_cleanup_modules(WRITE) && !error) {
-		abort_suspend(SUSPEND_FAILED_MODULE_CLEANUP,
+		abort_suspend(TOI_FAILED_MODULE_CLEANUP,
 				"Failed to cleanup after writing.");
 		error = 1;
 	}
 
 	end_time = jiffies;
 	
-	if ((end_time - start_time) && (!test_result_state(SUSPEND_ABORTED))) {
+	if ((end_time - start_time) && (!test_result_state(TOI_ABORTED))) {
 		suspend_io_time[0][0] += finish_at,
 		suspend_io_time[0][1] += (end_time - start_time);
 	}
@@ -742,7 +742,7 @@ static int read_pageset(struct pagedir *pagedir, int overwrittenpagesonly)
 				pagedir->id);
 
 	if (rw_cleanup_modules(READ) && !result) {
-		abort_suspend(SUSPEND_FAILED_MODULE_CLEANUP,
+		abort_suspend(TOI_FAILED_MODULE_CLEANUP,
 				"Failed to cleanup after reading.");
 		result = 1;
 	}
@@ -750,7 +750,7 @@ static int read_pageset(struct pagedir *pagedir, int overwrittenpagesonly)
 	/* Statistics */
 	end_time=jiffies;
 
-	if ((end_time - start_time) && (!test_result_state(SUSPEND_ABORTED))) {
+	if ((end_time - start_time) && (!test_result_state(TOI_ABORTED))) {
 		suspend_io_time[1][0] += finish_at,
 		suspend_io_time[1][1] += (end_time - start_time);
 	}
@@ -873,12 +873,12 @@ static int read_module_configs(void)
 			 * allocator must be loaded!
 			 */
 			if (suspend_module_header.enabled) {
-				suspend_early_boot_message(1, SUSPEND_CONTINUE_REQ,
+				suspend_early_boot_message(1, TOI_CONTINUE_REQ,
 					"It looks like we need module %s for "
 					"reading the image but it hasn't been "
 					"registered.\n",
 					suspend_module_header.name);
-				if (!(test_suspend_state(SUSPEND_CONTINUE_REQ))) {
+				if (!(test_suspend_state(TOI_CONTINUE_REQ))) {
 					suspendActiveAllocator->remove_image();
 					free_page((unsigned long) buffer);
 					return -EINVAL;
@@ -967,7 +967,7 @@ int write_image_header(void)
 
 	/* Now prepare to write the header */
 	if ((ret = suspendActiveAllocator->write_header_init())) {
-		abort_suspend(SUSPEND_FAILED_MODULE_INIT,
+		abort_suspend(TOI_FAILED_MODULE_INIT,
 				"Active allocator's write_header_init"
 				" function failed.");
 		goto write_image_header_abort;
@@ -976,7 +976,7 @@ int write_image_header(void)
 	/* Get a buffer */
 	header_buffer = (char *) get_zeroed_page(S2_ATOMIC_GFP);
 	if (!header_buffer) {
-		abort_suspend(SUSPEND_OUT_OF_MEMORY,
+		abort_suspend(TOI_OUT_OF_MEMORY,
 			"Out of memory when trying to get page for header!");
 		goto write_image_header_abort;
 	}
@@ -990,7 +990,7 @@ int write_image_header(void)
 
 	/* Write module configurations */
 	if ((ret = write_module_configs())) {
-		abort_suspend(SUSPEND_FAILED_IO,
+		abort_suspend(TOI_FAILED_IO,
 				"Failed to write module configs.");
 		goto write_image_header_abort;
 	}
@@ -999,15 +999,15 @@ int write_image_header(void)
 
 	/* Flush data and let allocator cleanup */
 	if (suspendActiveAllocator->write_header_cleanup()) {
-		abort_suspend(SUSPEND_FAILED_IO,
+		abort_suspend(TOI_FAILED_IO,
 				"Failed to cleanup writing header.");
 		goto write_image_header_abort_no_cleanup;
 	}
 
-	if (test_result_state(SUSPEND_ABORTED))
+	if (test_result_state(TOI_ABORTED))
 		goto write_image_header_abort_no_cleanup;
 
-	suspend_message(SUSPEND_IO, SUSPEND_VERBOSE, 1, "|\n");
+	suspend_message(TOI_IO, TOI_VERBOSE, 1, "|\n");
 	suspend_update_status(total, total, NULL);
 
 	return 0;
@@ -1050,7 +1050,7 @@ static char *sanity_check(struct suspend_header *sh)
 	if (sh->page_size != PAGE_SIZE)
 		return "Incorrect PAGE_SIZE.";
 
-	if (!test_action_state(SUSPEND_IGNORE_ROOTFS)) {
+	if (!test_action_state(TOI_IGNORE_ROOTFS)) {
 		const struct super_block *sb;
 		list_for_each_entry(sb, &super_blocks, s_list) {
 			if ((!(sb->s_flags & MS_RDONLY)) &&
@@ -1091,22 +1091,22 @@ static int __read_pageset1(void)
 	}
 
 	/* Check for noresume command line option */
-	if (test_suspend_state(SUSPEND_NORESUME_SPECIFIED)) {
+	if (test_suspend_state(TOI_NORESUME_SPECIFIED)) {
 		printk("Suspend2: Noresume on command line. Removed image.\n");
 		goto out_remove_image;
 	}
 
 	/* Check whether we've resumed before */
-	if (test_suspend_state(SUSPEND_RESUMED_BEFORE)) {
+	if (test_suspend_state(TOI_RESUMED_BEFORE)) {
 		suspend_early_boot_message(1, 0, NULL);
-		if (!(test_suspend_state(SUSPEND_CONTINUE_REQ))) {
+		if (!(test_suspend_state(TOI_CONTINUE_REQ))) {
 			printk("Suspend2: Tried to resume before: "
 					"Invalidated image.\n");
 			goto out_remove_image;
 		}
 	}
 
-	clear_suspend_state(SUSPEND_CONTINUE_REQ);
+	clear_suspend_state(TOI_CONTINUE_REQ);
 
 	/* 
 	 * Prepare the active allocator for reading the image header. The
@@ -1140,7 +1140,7 @@ static int __read_pageset1(void)
 
 	sanity_error = sanity_check(suspend_header);
 	if (sanity_error) {
-		suspend_early_boot_message(1, SUSPEND_CONTINUE_REQ,
+		suspend_early_boot_message(1, TOI_CONTINUE_REQ,
 				sanity_error);
 		printk("Suspend2: Sanity check failed.\n");
 		goto out_remove_image;
@@ -1161,7 +1161,7 @@ static int __read_pageset1(void)
 	suspend_action = suspend_header->param1;
 	suspend_debug_state = suspend_header->param2;
 	suspend_default_console_level = suspend_header->param3;
-	clear_suspend_state(SUSPEND_IGNORE_LOGLEVEL);
+	clear_suspend_state(TOI_IGNORE_LOGLEVEL);
 	pagedir2.size = suspend_header->pageset_2_size;
 	for (i = 0; i < 4; i++)
 		suspend_io_time[i/2][i%2] =
@@ -1172,13 +1172,13 @@ static int __read_pageset1(void)
 		pagedir1.size = pagedir2.size = 0;
 		printk("Suspend2: Failed to read Suspend module "
 				"configurations.\n");
-		clear_action_state(SUSPEND_KEEP_IMAGE);
+		clear_action_state(TOI_KEEP_IMAGE);
 		goto out_remove_image;
 	}
 
 	suspend_prepare_console();
 
-	set_suspend_state(SUSPEND_NOW_RESUMING);
+	set_suspend_state(TOI_NOW_RESUMING);
 
 	if (pre_resume_freeze())
 		goto out_reset_console;
@@ -1229,7 +1229,7 @@ static int __read_pageset1(void)
 	suspend_cond_pause(1, "About to restore original kernel.");
 	result = 0;
 
-	if (!test_action_state(SUSPEND_KEEP_IMAGE) &&
+	if (!test_action_state(TOI_KEEP_IMAGE) &&
 	    suspendActiveAllocator->mark_resume_attempted)
 		suspendActiveAllocator->mark_resume_attempted(1);
 
@@ -1245,7 +1245,7 @@ out_remove_image:
 	free_dyn_pageflags(&pageset1_copy_map);
 	free_dyn_pageflags(&io_map);
 	result = -EINVAL;
-	if (!test_action_state(SUSPEND_KEEP_IMAGE))
+	if (!test_action_state(TOI_KEEP_IMAGE))
 		suspendActiveAllocator->remove_image();
 	suspendActiveAllocator->read_header_cleanup();
 	noresume_reset_modules();
@@ -1270,10 +1270,10 @@ int read_pageset1(void)
 		case -EINVAL:	/* non fatal error */
 			break;
 		default:
-			if (test_result_state(SUSPEND_ABORTED))
+			if (test_result_state(TOI_ABORTED))
 				break;
 
-			abort_suspend(SUSPEND_IMAGE_ERROR,
+			abort_suspend(TOI_IMAGE_ERROR,
 					"Suspend2: Error %d resuming\n",
 					error);
 	}
@@ -1309,7 +1309,7 @@ static char *get_have_image_data(void)
 			suspend_header->uts.version);
 
 	/* Check whether we've resumed before */
-	if (test_suspend_state(SUSPEND_RESUMED_BEFORE))
+	if (test_suspend_state(TOI_RESUMED_BEFORE))
 		strcat(output_buffer, "Resumed before.\n");
 
 out:
@@ -1357,7 +1357,7 @@ int image_exists_read(const char *page, int count)
 	if (suspend_activate_storage(0))
 		return count;
 
-	if (!test_suspend_state(SUSPEND_RESUME_DEVICE_OK))
+	if (!test_suspend_state(TOI_RESUME_DEVICE_OK))
 		suspend_attempt_to_parse_resume_device(0);
 
 	if (!suspendActiveAllocator) {
@@ -1389,7 +1389,7 @@ int image_exists_write(const char *buffer, int count)
 
 	suspend_deactivate_storage(0);
 
-	clear_result_state(SUSPEND_KEPT_IMAGE);
+	clear_result_state(TOI_KEPT_IMAGE);
 
 	return count;
 }

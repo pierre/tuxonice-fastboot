@@ -155,7 +155,7 @@ int hibernate(void)
 	int error;
 
 #ifdef CONFIG_TOI
-	if (test_action_state(SUSPEND_REPLACE_SWSUSP))
+	if (test_action_state(TOI_REPLACE_SWSUSP))
 		return suspend2_try_suspend(1);
 #endif
 
@@ -268,7 +268,7 @@ int software_resume(void)
 	 * We can't know (until an image header - if any - is loaded), whether
 	 * we did override swsusp. We therefore ensure that both are tried.
 	 */
-	if (test_action_state(SUSPEND_REPLACE_SWSUSP))
+	if (test_action_state(TOI_REPLACE_SWSUSP))
 		printk("Replacing swsusp.\n");
 		suspend2_try_resume();
 #endif
@@ -561,7 +561,7 @@ static int __init resume_offset_setup(char *str)
 static int __init noresume_setup(char *str)
 {
 	noresume = 1;
-	set_suspend_state(SUSPEND_NORESUME_SPECIFIED);
+	set_suspend_state(TOI_NORESUME_SPECIFIED);
 	return 1;
 }
 

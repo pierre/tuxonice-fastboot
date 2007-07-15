@@ -265,8 +265,8 @@ void suspend_unregister_module(struct suspend_module_ops *module)
 			suspendNumAllocators--;
 			if (suspendActiveAllocator == module) {
 				suspendActiveAllocator = NULL;
-				clear_suspend_state(SUSPEND_CAN_RESUME);
-				clear_suspend_state(SUSPEND_CAN_SUSPEND);
+				clear_suspend_state(TOI_CAN_RESUME);
+				clear_suspend_state(TOI_CAN_HIBERNATE);
 			}
 			break;
 		
@@ -331,7 +331,7 @@ int suspend_initialise_modules(int starting_cycle)
 		if (!this_module->enabled)
 			continue;
 		if (this_module->initialise) {
-			suspend_message(SUSPEND_MEMORY, SUSPEND_MEDIUM, 1,
+			suspend_message(TOI_MEMORY, TOI_MEDIUM, 1,
 				"Initialising module %s.\n",
 				this_module->name);
 			if ((result = this_module->initialise(starting_cycle))) {
@@ -358,7 +358,7 @@ void suspend_cleanup_modules(int finishing_cycle)
 		if (!this_module->enabled)
 			continue;
 		if (this_module->cleanup) {
-			suspend_message(SUSPEND_MEMORY, SUSPEND_MEDIUM, 1,
+			suspend_message(TOI_MEMORY, TOI_MEDIUM, 1,
 				"Cleaning up module %s.\n",
 				this_module->name);
 			this_module->cleanup(finishing_cycle);

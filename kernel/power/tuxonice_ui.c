@@ -107,9 +107,9 @@ new_timeout:
 			break;
 		}
 		key = tolower(key);
-		if (test_suspend_state(SUSPEND_SANITY_CHECK_PROMPT)) {
+		if (test_suspend_state(TOI_SANITY_CHECK_PROMPT)) {
 			if (key == 'c') {
-				set_suspend_state(SUSPEND_CONTINUE_REQ);
+				set_suspend_state(TOI_CONTINUE_REQ);
 				break;
 			} else if (key == ' ')
 				break;
@@ -163,7 +163,7 @@ void suspend_early_boot_message(int message_detail, int default_answer, char *wa
 	int printed_len;
 
 	if (!suspend2_wait) {
-		set_suspend_state(SUSPEND_CONTINUE_REQ);
+		set_suspend_state(TOI_CONTINUE_REQ);
 		can_ask = 0;
 	}
 
@@ -176,7 +176,7 @@ void suspend_early_boot_message(int message_detail, int default_answer, char *wa
 		va_end(args);
 	}
 
-	if (!test_suspend_state(SUSPEND_BOOT_TIME)) {
+	if (!test_suspend_state(TOI_BOOT_TIME)) {
 		printk("Suspend2: %s\n", local_printf_buf);
 		return;
 	}
@@ -209,7 +209,7 @@ void suspend_early_boot_message(int message_detail, int default_answer, char *wa
 		if (suspend2_wait > 0)
 			say("Default action if you don't select one in %d seconds is: %s.\n",
 				suspend2_wait,
-				default_answer == SUSPEND_CONTINUE_REQ ?
+				default_answer == TOI_CONTINUE_REQ ?
 				"continue booting" : "reboot");
 	} else {
 		say("BIG FAT WARNING!!\n\n");
@@ -227,13 +227,13 @@ void suspend_early_boot_message(int message_detail, int default_answer, char *wa
 	}
 	console_loglevel = orig_loglevel;
 	
-	set_suspend_state(SUSPEND_SANITY_CHECK_PROMPT);
-	clear_suspend_state(SUSPEND_CONTINUE_REQ);
+	set_suspend_state(TOI_SANITY_CHECK_PROMPT);
+	clear_suspend_state(TOI_CONTINUE_REQ);
 
 	if (suspend_wait_for_keypress(suspend2_wait) == 0) /* We timed out */
 		continue_req = !!default_answer;
 	else
-		continue_req = test_suspend_state(SUSPEND_CONTINUE_REQ);
+		continue_req = test_suspend_state(TOI_CONTINUE_REQ);
 
 #endif /* CONFIG_VT or CONFIG_SERIAL_CONSOLE */
 
@@ -243,7 +243,7 @@ post_ask:
 	
 	restore_suspend_state(orig_state);
 	if (continue_req)
-		set_suspend_state(SUSPEND_CONTINUE_REQ);
+		set_suspend_state(TOI_CONTINUE_REQ);
 }
 #undef say
 
@@ -262,11 +262,11 @@ static struct suspend_sysfs_data sysfs_params[] = {
 	},
 
 	{ SUSPEND2_ATTR("log_everything", SYSFS_RW),
-	  SYSFS_BIT(&suspend_action, SUSPEND_LOGALL, 0)
+	  SYSFS_BIT(&suspend_action, TOI_LOGALL, 0)
 	},
 #endif
 	{ SUSPEND2_ATTR("pm_prepare_console", SYSFS_RW),
-	  SYSFS_BIT(&suspend_action, SUSPEND_PM_PREPARE_CONSOLE, 0)
+	  SYSFS_BIT(&suspend_action, TOI_PM_PREPARE_CONSOLE, 0)
 	}
 };
 

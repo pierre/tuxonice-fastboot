@@ -66,16 +66,16 @@ static void ui_nl_set_state(int n)
 {
 	/* Only let them change certain settings */
 	static const int suspend_action_mask =
-		(1 << SUSPEND_REBOOT) | (1 << SUSPEND_PAUSE) |
-		(1 << SUSPEND_SLOW) | (1 << SUSPEND_LOGALL) |
-		(1 << SUSPEND_SINGLESTEP) |
-		(1 << SUSPEND_PAUSE_NEAR_PAGESET_END);
+		(1 << TOI_REBOOT) | (1 << TOI_PAUSE) |
+		(1 << TOI_SLOW) | (1 << TOI_LOGALL) |
+		(1 << TOI_SINGLESTEP) |
+		(1 << TOI_PAUSE_NEAR_PAGESET_END);
 
 	suspend_action = (suspend_action & (~suspend_action_mask)) |
 		(n & suspend_action_mask);
 
-	if (!test_action_state(SUSPEND_PAUSE) &&
-			!test_action_state(SUSPEND_SINGLESTEP))
+	if (!test_action_state(TOI_PAUSE) &&
+			!test_action_state(TOI_SINGLESTEP))
 		wake_up_interruptible(&userui_wait_for_key);
 }
 
@@ -267,7 +267,7 @@ static void userui_message(unsigned long section, unsigned long level,
 		msg.text[sizeof(msg.text)-1] = '\0';
 	}
 
-	if (test_action_state(SUSPEND_LOGALL))
+	if (test_action_state(TOI_LOGALL))
 		printk("%s\n", msg.text);
 
 	suspend_send_netlink_message(&ui_helper_data, USERUI_MSG_MESSAGE,
@@ -312,7 +312,7 @@ static void userui_prepare_status(int clearbar, const char *fmt, ...)
 	if (clearbar)
 		suspend_update_status(0, 1, NULL);
 
-	suspend_message(0, SUSPEND_STATUS, 1, lastheader, NULL);
+	suspend_message(0, TOI_STATUS, 1, lastheader, NULL);
 
 	if (ui_helper_data.pid == -1)
 		printk(KERN_EMERG "%s\n", lastheader);
@@ -355,12 +355,12 @@ static void userui_abort_suspend(int result_code, const char *fmt, ...)
 
 	set_result_state(result_code);
 
-	if (test_result_state(SUSPEND_ABORTED))
+	if (test_result_state(TOI_ABORTED))
 		return;
 
-	set_result_state(SUSPEND_ABORTED);
+	set_result_state(TOI_ABORTED);
 
-	if (test_result_state(SUSPEND_ABORT_REQUESTED))
+	if (test_result_state(TOI_ABORT_REQUESTED))
 		return;
 
 	va_start(args, fmt);
@@ -385,14 +385,14 @@ static void userui_abort_suspend(int result_code, const char *fmt, ...)
  */
 static void request_abort_suspend(void)
 {
-	if (test_result_state(SUSPEND_ABORT_REQUESTED))
+	if (test_result_state(TOI_ABORT_REQUESTED))
 		return;
 
-	if (test_suspend_state(SUSPEND_NOW_RESUMING)) {
+	if (test_suspend_state(TOI_NOW_RESUMING)) {
 		suspend_prepare_status(CLEAR_BAR, "Escape pressed. "
 					"Powering down again.");
-		set_suspend_state(SUSPEND_STOP_RESUME);
-		while (!test_suspend_state(SUSPEND_IO_STOPPED))
+		set_suspend_state(TOI_STOP_RESUME);
+		while (!test_suspend_state(TOI_IO_STOPPED))
 			schedule();
 		if (suspendActiveAllocator->mark_resume_attempted)
 			suspendActiveAllocator->mark_resume_attempted(0);
@@ -401,7 +401,7 @@ static void request_abort_suspend(void)
 
 	suspend_prepare_status(CLEAR_BAR, "--- ESCAPE PRESSED :"
 					" ABORTING SUSPEND ---");
-	set_abort_result(SUSPEND_ABORT_REQUESTED);
+	set_abort_result(TOI_ABORT_REQUESTED);
 	wake_up_interruptible(&userui_wait_for_key);
 }
 
@@ -512,14 +512,14 @@ static void userui_cond_pause(int pause, char *message)
 	
 	while (last_key != 32 &&
 		ui_helper_data.pid != -1 &&
-		(!test_result_state(SUSPEND_ABORTED)) &&
-		((test_action_state(SUSPEND_PAUSE) && pause) || 
-		 (test_action_state(SUSPEND_SINGLESTEP)))) {
+		(!test_result_state(TOI_ABORTED)) &&
+		((test_action_state(TOI_PAUSE) && pause) || 
+		 (test_action_state(TOI_SINGLESTEP)))) {
 		if (!displayed_message) {
 			suspend_prepare_status(DONT_CLEAR_BAR, 
 			   "%s Press SPACE to continue.%s",
 			   message ? message : "",
-			   (test_action_state(SUSPEND_SINGLESTEP)) ? 
+			   (test_action_state(TOI_SINGLESTEP)) ? 
 			   " Single step on." : "");
 			displayed_message = 1;
 		}
@@ -573,11 +573,11 @@ static void userui_cleanup_console(void)
 static struct suspend_sysfs_data sysfs_params[] = {
 #if defined(CONFIG_NET) && defined(CONFIG_SYSFS)
 	{ SUSPEND2_ATTR("enable_escape", SYSFS_RW),
-	  SYSFS_BIT(&suspend_action, SUSPEND_CAN_CANCEL, 0)
+	  SYSFS_BIT(&suspend_action, TOI_CAN_CANCEL, 0)
 	},
 
 	{ SUSPEND2_ATTR("pause_between_steps", SYSFS_RW),
-	  SYSFS_BIT(&suspend_action, SUSPEND_PAUSE, 0)
+	  SYSFS_BIT(&suspend_action, TOI_PAUSE, 0)
 	},
 
 	{ SUSPEND2_ATTR("enabled", SYSFS_RW),

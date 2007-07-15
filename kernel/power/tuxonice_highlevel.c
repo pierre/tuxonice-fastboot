@@ -113,7 +113,6 @@ void suspend_finish_anything(int suspend_or_resume)
 
 	suspend_cleanup_modules(suspend_or_resume);
 	suspend_put_modules();
-	clear_suspend_state(SUSPEND_RUNNING);
 	set_fs(oldfs);
 	if (suspend_or_resume) {
 		block_dump = block_dump_save;
@@ -148,8 +147,6 @@ int suspend_start_anything(int suspend_or_resume)
 	/* Be quiet if we're not trying to suspend or resume */
 	if (!suspendActiveAllocator)
 		suspend_attempt_to_parse_resume_device(!suspend_or_resume);
-
-	set_suspend_state(SUSPEND_RUNNING);
 
 	if (suspend_get_modules()) {
 		printk("Suspend2: Get modules failed!\n");
@@ -354,12 +351,12 @@ static void do_cleanup(int get_debug_info)
 	thaw_processes();
 
 #ifdef CONFIG_TOI_KEEP_IMAGE
-	if (test_action_state(SUSPEND_KEEP_IMAGE) &&
-	    !test_result_state(SUSPEND_ABORTED)) {
-		suspend_message(SUSPEND_ANY_SECTION, SUSPEND_LOW, 1,
+	if (test_action_state(TOI_KEEP_IMAGE) &&
+	    !test_result_state(TOI_ABORTED)) {
+		suspend_message(TOI_ANY_SECTION, TOI_LOW, 1,
 			"Suspend2: Not invalidating the image due "
 			"to Keep Image being enabled.\n");
-		set_result_state(SUSPEND_KEPT_IMAGE);
+		set_result_state(TOI_KEPT_IMAGE);
 	} else
 #endif
 		if (suspendActiveAllocator)
@@ -375,7 +372,7 @@ static void do_cleanup(int get_debug_info)
 		free_page((unsigned long) buffer);
 	}
 
-	if (!test_action_state(SUSPEND_LATE_CPU_HOTPLUG))
+	if (!test_action_state(TOI_LATE_CPU_HOTPLUG))
 		enable_nonboot_cpus();
 	suspend_cleanup_console();
 
@@ -383,9 +380,9 @@ static void do_cleanup(int get_debug_info)
 
 	suspend_deactivate_storage(0);
 
-	clear_suspend_state(SUSPEND_IGNORE_LOGLEVEL);
-	clear_suspend_state(SUSPEND_TRYING_TO_RESUME);
-	clear_suspend_state(SUSPEND_NOW_RESUMING);
+	clear_suspend_state(TOI_IGNORE_LOGLEVEL);
+	clear_suspend_state(TOI_TRYING_TO_RESUME);
+	clear_suspend_state(TOI_NOW_RESUMING);
 
 	if (got_pmsem) {
 		mutex_unlock(&pm_mutex);
@@ -407,9 +404,9 @@ static void do_cleanup(int get_debug_info)
  */
 static int check_still_keeping_image(void)
 {
-	if (test_action_state(SUSPEND_KEEP_IMAGE)) {
+	if (test_action_state(TOI_KEEP_IMAGE)) {
 		printk("Image already stored: powering down immediately.");
-		do_suspend2_step(STEP_SUSPEND_POWERDOWN);
+		do_suspend2_step(STEP_HIBERNATE_POWERDOWN);
 		return 1;	/* Just in case we're using S3 */
 	}
 
@@ -439,18 +436,18 @@ static int suspend_init(void)
 	suspend_io_time[0][0] = suspend_io_time[0][1] =
 		suspend_io_time[1][0] =	suspend_io_time[1][1] = 0;
 
-	if (!test_suspend_state(SUSPEND_CAN_SUSPEND) ||
+	if (!test_suspend_state(TOI_CAN_HIBERNATE) ||
 	    allocate_bitmaps())
 		return 1;
 
 	mark_nosave_pages();
 
 	suspend_prepare_console();
-	if (test_action_state(SUSPEND_LATE_CPU_HOTPLUG) ||
+	if (test_action_state(TOI_LATE_CPU_HOTPLUG) ||
 			!disable_nonboot_cpus())
 		return 1;
 
-	set_abort_result(SUSPEND_CPU_HOTPLUG_FAILED);
+	set_abort_result(TOI_CPU_HOTPLUG_FAILED);
 	return 0;
 }
 
@@ -467,22 +464,22 @@ static int can_hibernate(void)
 		if (!mutex_trylock(&pm_mutex)) {
 			printk("Suspend2: Failed to obtain pm_mutex.\n");
 			dump_stack();
-			set_abort_result(SUSPEND_PM_SEM);
+			set_abort_result(TOI_PM_SEM);
 			return 0;
 		}
 		got_pmsem = 1;
 	}
 
-	if (!test_suspend_state(SUSPEND_CAN_SUSPEND))
+	if (!test_suspend_state(TOI_CAN_HIBERNATE))
 		suspend_attempt_to_parse_resume_device(0);
 
-	if (!test_suspend_state(SUSPEND_CAN_SUSPEND)) {
+	if (!test_suspend_state(TOI_CAN_HIBERNATE)) {
 		printk("Suspend2: Software suspend is disabled.\n"
 			"This may be because you haven't put something along "
 			"the lines of\n\nresume=swap:/dev/hda1\n\n"
 			"in lilo.conf or equivalent. (Where /dev/hda1 is your "
 			"swap partition).\n");
-		set_abort_result(SUSPEND_CANT_SUSPEND);
+		set_abort_result(TOI_CANT_SUSPEND);
 		if (!got_pmsem) {
 			mutex_unlock(&pm_mutex);
 			got_pmsem = 0;
@@ -535,7 +532,7 @@ static int __save_image(void)
 
 	suspend_prepare_status(DONT_CLEAR_BAR, "Starting to save the image..");
 
-	suspend_message(SUSPEND_ANY_SECTION, SUSPEND_LOW, 1,
+	suspend_message(TOI_ANY_SECTION, TOI_LOW, 1,
 		" - Final values: %d and %d.\n",
 		pagedir1.size, pagedir2.size);
 
@@ -545,12 +542,12 @@ static int __save_image(void)
 
 	temp_result = write_pageset(&pagedir2);
 
-	if (temp_result == -1 || test_result_state(SUSPEND_ABORTED))
+	if (temp_result == -1 || test_result_state(TOI_ABORTED))
 		return 1;
 
 	suspend_cond_pause(1, "About to copy pageset 1.");
 
-	if (test_result_state(SUSPEND_ABORTED))
+	if (test_result_state(TOI_ABORTED))
 		return 1;
 
 	suspend_deactivate_storage(1);
@@ -572,7 +569,7 @@ Failed:
 	if (suspend_activate_storage(1))
 		panic("Failed to reactivate our storage.");
 
-	if (temp_result || test_result_state(SUSPEND_ABORTED)) {
+	if (temp_result || test_result_state(TOI_ABORTED)) {
 		if (did_copy)
 			goto abort_reloading_pagedir_two;
 		else
@@ -591,34 +588,34 @@ Failed:
 			pagedir1.size + pagedir2.size,
 			NULL);
 
-	if (test_result_state(SUSPEND_ABORTED))
+	if (test_result_state(TOI_ABORTED))
 		goto abort_reloading_pagedir_two;
 
 	suspend_cond_pause(1, "About to write pageset1.");
 
-	suspend_message(SUSPEND_ANY_SECTION, SUSPEND_LOW, 1,
+	suspend_message(TOI_ANY_SECTION, TOI_LOW, 1,
 			"-- Writing pageset1\n");
 
 	temp_result = write_pageset(&pagedir1);
 
 	/* We didn't overwrite any memory, so no reread needs to be done. */
-	if (test_action_state(SUSPEND_TEST_FILTER_SPEED))
+	if (test_action_state(TOI_TEST_FILTER_SPEED))
 		return 1;
 
-	if (temp_result == 1 || test_result_state(SUSPEND_ABORTED))
+	if (temp_result == 1 || test_result_state(TOI_ABORTED))
 		goto abort_reloading_pagedir_two;
 
 	suspend_cond_pause(1, "About to write header.");
 
-	if (test_result_state(SUSPEND_ABORTED))
+	if (test_result_state(TOI_ABORTED))
 		goto abort_reloading_pagedir_two;
 
 	temp_result = write_image_header();
 
-	if (test_action_state(SUSPEND_TEST_BIO))
+	if (test_action_state(TOI_TEST_BIO))
 		return 1;
 
-	if (!temp_result && !test_result_state(SUSPEND_ABORTED))
+	if (!temp_result && !test_result_state(TOI_ABORTED))
 		return 0;
 
 abort_reloading_pagedir_two:
@@ -667,12 +664,12 @@ static int do_prepare_image(void)
 	 */
 
 	if (!can_hibernate() ||
-	    (test_result_state(SUSPEND_KEPT_IMAGE) &&
+	    (test_result_state(TOI_KEPT_IMAGE) &&
 	     check_still_keeping_image()))
 		goto cleanup;
 
 	if (suspend_init() && !suspend_prepare_image() &&
-			!test_result_state(SUSPEND_ABORTED))
+			!test_result_state(TOI_ABORTED))
 		return 0;
 
 cleanup:
@@ -732,7 +729,7 @@ static int do_load_atomic_copy(void)
 
 	suspend_activate_storage(0);
 
-	if (!(test_suspend_state(SUSPEND_RESUME_DEVICE_OK)) &&
+	if (!(test_suspend_state(TOI_RESUME_DEVICE_OK)) &&
 		!suspend_attempt_to_parse_resume_device(0)) {
 		/*
 		 * Without a usable storage device we can do nothing -
@@ -754,8 +751,8 @@ static int do_load_atomic_copy(void)
 
 	read_image_result = read_pageset1(); /* non fatal error ignored */
 
-	if (test_suspend_state(SUSPEND_NORESUME_SPECIFIED))
-		clear_suspend_state(SUSPEND_NORESUME_SPECIFIED);
+	if (test_suspend_state(TOI_NORESUME_SPECIFIED))
+		clear_suspend_state(TOI_NORESUME_SPECIFIED);
 
 	suspend_deactivate_storage(0);
 
@@ -779,7 +776,7 @@ static void prepare_restore_load_alt_image(int prepare)
 		pageset1_map = NULL;
 		pageset1_copy_map_save = pageset1_copy_map;
 		pageset1_copy_map = NULL;
-		set_suspend_state(SUSPEND_LOADING_ALT_IMAGE);
+		set_suspend_state(TOI_LOADING_ALT_IMAGE);
 		suspend_reset_alt_image_pageset2_pfn();
 	} else {
 		if (pageset1_map)
@@ -788,8 +785,8 @@ static void prepare_restore_load_alt_image(int prepare)
 		if (pageset1_copy_map)
 			free_dyn_pageflags(&pageset1_copy_map);
 		pageset1_copy_map = pageset1_copy_map_save;
-		clear_suspend_state(SUSPEND_NOW_RESUMING);
-		clear_suspend_state(SUSPEND_LOADING_ALT_IMAGE);
+		clear_suspend_state(TOI_NOW_RESUMING);
+		clear_suspend_state(TOI_LOADING_ALT_IMAGE);
 	}
 }
 
@@ -801,10 +798,10 @@ static void prepare_restore_load_alt_image(int prepare)
  */
 int pre_resume_freeze(void)
 {
-	if (!test_action_state(SUSPEND_LATE_CPU_HOTPLUG)) {
+	if (!test_action_state(TOI_LATE_CPU_HOTPLUG)) {
 		suspend_prepare_status(DONT_CLEAR_BAR,	"Disable nonboot cpus.");
 		if (disable_nonboot_cpus()) {
-			set_abort_result(SUSPEND_CPU_HOTPLUG_FAILED);
+			set_abort_result(TOI_CPU_HOTPLUG_FAILED);
 			return 1;
 		}
 	}
@@ -829,11 +826,11 @@ int pre_resume_freeze(void)
 int do_suspend2_step(int step)
 {
 	switch (step) {
-		case STEP_SUSPEND_PREPARE_IMAGE:
+		case STEP_HIBERNATE_PREPARE_IMAGE:
 			return do_prepare_image();
-		case STEP_SUSPEND_SAVE_IMAGE:
+		case STEP_HIBERNATE_SAVE_IMAGE:
 			return do_save_image();
-		case STEP_SUSPEND_POWERDOWN:
+		case STEP_HIBERNATE_POWERDOWN:
 			return do_post_image_write();
 		case STEP_RESUME_CAN_RESUME:
 			return do_check_can_resume();
@@ -878,7 +875,7 @@ out:
  */
 void __suspend2_try_resume(void)
 {
-	set_suspend_state(SUSPEND_TRYING_TO_RESUME);
+	set_suspend_state(TOI_TRYING_TO_RESUME);
 	resume_attempted = 1;
 
 	suspend_print_modules();
@@ -889,9 +886,9 @@ void __suspend2_try_resume(void)
 
 	do_cleanup(0);
 
-	clear_suspend_state(SUSPEND_IGNORE_LOGLEVEL);
-	clear_suspend_state(SUSPEND_TRYING_TO_RESUME);
-	clear_suspend_state(SUSPEND_NOW_RESUMING);
+	clear_suspend_state(TOI_IGNORE_LOGLEVEL);
+	clear_suspend_state(TOI_TRYING_TO_RESUME);
+	clear_suspend_state(TOI_NOW_RESUMING);
 }
 
 /**
@@ -917,7 +914,7 @@ void _suspend2_try_resume(void)
 	 * For initramfs, we have to clear the boot time
 	 * flag after trying to resume
 	 */
-	clear_suspend_state(SUSPEND_BOOT_TIME);
+	clear_suspend_state(TOI_BOOT_TIME);
 	suspend_finish_anything(SYSFS_RESUMING);
 }
 
@@ -958,20 +955,20 @@ int _suspend2_try_suspend(int have_pmsem)
 		}
 	}
 
-	if ((result = do_suspend2_step(STEP_SUSPEND_PREPARE_IMAGE)))
+	if ((result = do_suspend2_step(STEP_HIBERNATE_PREPARE_IMAGE)))
 		goto out;
 
-	if (test_action_state(SUSPEND_FREEZER_TEST)) {
+	if (test_action_state(TOI_FREEZER_TEST)) {
 		do_cleanup(0);
 		goto out;
 	}
 
-	if ((result = do_suspend2_step(STEP_SUSPEND_SAVE_IMAGE)))
+	if ((result = do_suspend2_step(STEP_HIBERNATE_SAVE_IMAGE)))
 		goto out;
 
 	/* This code runs at resume time too! */
 	if (suspend2_in_suspend)
-		result = do_suspend2_step(STEP_SUSPEND_POWERDOWN);
+		result = do_suspend2_step(STEP_HIBERNATE_POWERDOWN);
 out:
 	if (sys_power_disk)
 		suspend_finish_anything(SYSFS_SUSPENDING);
@@ -1007,7 +1004,7 @@ static struct suspend_sysfs_data sysfs_params[] = {
 	},
 
 	{ SUSPEND2_ATTR("ignore_rootfs", SYSFS_RW),
-	  SYSFS_BIT(&suspend_action, SUSPEND_IGNORE_ROOTFS, 0)
+	  SYSFS_BIT(&suspend_action, TOI_IGNORE_ROOTFS, 0)
 	},
 
 	{ SUSPEND2_ATTR("image_size_limit", SYSFS_RW),
@@ -1019,19 +1016,19 @@ static struct suspend_sysfs_data sysfs_params[] = {
 	},
 
 	{ SUSPEND2_ATTR("no_multithreaded_io", SYSFS_RW),
-	  SYSFS_BIT(&suspend_action, SUSPEND_NO_MULTITHREADED_IO, 0)
+	  SYSFS_BIT(&suspend_action, TOI_NO_MULTITHREADED_IO, 0)
 	},
 
 	{ SUSPEND2_ATTR("full_pageset2", SYSFS_RW),
-	  SYSFS_BIT(&suspend_action, SUSPEND_PAGESET2_FULL, 0)
+	  SYSFS_BIT(&suspend_action, TOI_PAGESET2_FULL, 0)
 	},
 
 	{ SUSPEND2_ATTR("reboot", SYSFS_RW),
-	  SYSFS_BIT(&suspend_action, SUSPEND_REBOOT, 0)
+	  SYSFS_BIT(&suspend_action, TOI_REBOOT, 0)
 	},
 
 	{ SUSPEND2_ATTR("replace_swsusp", SYSFS_RW),
-	  SYSFS_BIT(&suspend_action, SUSPEND_REPLACE_SWSUSP, 0)
+	  SYSFS_BIT(&suspend_action, TOI_REPLACE_SWSUSP, 0)
 	},
 
 	{ SUSPEND2_ATTR("resume_commandline", SYSFS_RW),
@@ -1043,36 +1040,36 @@ static struct suspend_sysfs_data sysfs_params[] = {
 	},
 
 	{ SUSPEND2_ATTR("no_load_direct", SYSFS_RW),
-	  SYSFS_BIT(&suspend_action, SUSPEND_NO_DIRECT_LOAD, 0)
+	  SYSFS_BIT(&suspend_action, TOI_NO_DIRECT_LOAD, 0)
 	},
 
 	{ SUSPEND2_ATTR("freezer_test", SYSFS_RW),
-	  SYSFS_BIT(&suspend_action, SUSPEND_FREEZER_TEST, 0)
+	  SYSFS_BIT(&suspend_action, TOI_FREEZER_TEST, 0)
 	},
 
 	{ SUSPEND2_ATTR("test_bio", SYSFS_RW),
-	  SYSFS_BIT(&suspend_action, SUSPEND_TEST_BIO, 0)
+	  SYSFS_BIT(&suspend_action, TOI_TEST_BIO, 0)
 	},
 
 	{ SUSPEND2_ATTR("test_filter_speed", SYSFS_RW),
-	  SYSFS_BIT(&suspend_action, SUSPEND_TEST_FILTER_SPEED, 0)
+	  SYSFS_BIT(&suspend_action, TOI_TEST_FILTER_SPEED, 0)
 	},
 
 	{ SUSPEND2_ATTR("slow", SYSFS_RW),
-	  SYSFS_BIT(&suspend_action, SUSPEND_SLOW, 0)
+	  SYSFS_BIT(&suspend_action, TOI_SLOW, 0)
 	},
 
 	{ SUSPEND2_ATTR("no_pageset2", SYSFS_RW),
-	  SYSFS_BIT(&suspend_action, SUSPEND_NO_PAGESET2, 0)
+	  SYSFS_BIT(&suspend_action, TOI_NO_PAGESET2, 0)
 	},
 
 	{ SUSPEND2_ATTR("late_cpu_hotplug", SYSFS_RW),
-	  SYSFS_BIT(&suspend_action, SUSPEND_LATE_CPU_HOTPLUG, 0)
+	  SYSFS_BIT(&suspend_action, TOI_LATE_CPU_HOTPLUG, 0)
 	},
 
 #ifdef CONFIG_TOI_KEEP_IMAGE
 	{ SUSPEND2_ATTR("keep_image", SYSFS_RW),
-	  SYSFS_BIT(&suspend_action, SUSPEND_KEEP_IMAGE, 0)
+	  SYSFS_BIT(&suspend_action, TOI_KEEP_IMAGE, 0)
 	},
 #endif
 };

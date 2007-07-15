@@ -148,7 +148,7 @@ static struct block_device *open_bdev(int index, dev_t device, int display_errs)
 
 	if (IS_ERR(bdev) || !bdev) {
 		if (display_errs)
-			suspend_early_boot_message(1,SUSPEND_CONTINUE_REQ,  
+			suspend_early_boot_message(1,TOI_CONTINUE_REQ,  
 				"Failed to get access to block device "
 				"\"%x\" (error %d).\n Maybe you need "
 				"to run mknod and/or lvmsetup in an "
@@ -243,8 +243,8 @@ static int try_to_parse_resume_device(char *commandline, int quiet)
 		if (quiet)
 			return 1;
 
-		if (test_suspend_state(SUSPEND_TRYING_TO_RESUME))
-			suspend_early_boot_message(1, SUSPEND_CONTINUE_REQ,
+		if (test_suspend_state(TOI_TRYING_TO_RESUME))
+			suspend_early_boot_message(1, TOI_CONTINUE_REQ,
 			  "Failed to translate \"%s\" into a device id.\n",
 			  commandline);
 		else
@@ -256,7 +256,7 @@ static int try_to_parse_resume_device(char *commandline, int quiet)
 	resume_block_device = open_bdev(MAX_SWAPFILES, resume_swap_dev_t, 0);
 	if (IS_ERR(resume_block_device)) {
 		if (!quiet)
-			suspend_early_boot_message(1, SUSPEND_CONTINUE_REQ,
+			suspend_early_boot_message(1, TOI_CONTINUE_REQ,
 				"Failed to get access to \"%s\", where"
 				" the swap header should be found.",
 				commandline);
@@ -310,9 +310,9 @@ static int parse_signature(char *header, int restore)
 		 * We are now using the highest bit of the char to indicate
 		 * whether we have attempted to resume from this image before.
 		 */
-		clear_suspend_state(SUSPEND_RESUMED_BEFORE);
+		clear_suspend_state(TOI_RESUMED_BEFORE);
 		if (((int) *headerblocksize_ptr) & 0x80)
-			set_suspend_state(SUSPEND_RESUMED_BEFORE);
+			set_suspend_state(TOI_RESUMED_BEFORE);
 		headerblock = (unsigned long) *headerblock_ptr;
 	}
 
@@ -419,7 +419,7 @@ static void get_main_pool_phys_params(void)
 			extent_max++;
 		else {
 			if (extent_min > -1) {
-				if (test_action_state(SUSPEND_TEST_BIO))
+				if (test_action_state(TOI_TEST_BIO))
 					printk("Adding extent chain %d %d-%d.\n",
 						swapfilenum,
 						extent_min <<
@@ -437,7 +437,7 @@ static void get_main_pool_phys_params(void)
 	}
 
 	if (extent_min > -1) {
-		if (test_action_state(SUSPEND_TEST_BIO))
+		if (test_action_state(TOI_TEST_BIO))
 			printk("Adding extent chain %d %d-%d.\n",
 				last_chain,
 				extent_min <<
@@ -491,8 +491,8 @@ static int suspend_swap_release_storage(void)
 {
 	int i = 0;
 
-	if (test_action_state(SUSPEND_KEEP_IMAGE) &&
-	    test_suspend_state(SUSPEND_NOW_RESUMING))
+	if (test_action_state(TOI_KEEP_IMAGE) &&
+	    test_suspend_state(TOI_NOW_RESUMING))
 		return 0;
 
 	header_pages_allocated = 0;
@@ -965,10 +965,10 @@ static int suspend_swap_image_exists(void)
 		printk("Suspend2: Detected another implementation's signature.\n");
 		return 0;
 	} else if ((signature_found >> 1) != SIGNATURE_VER) {
-		if (!test_suspend_state(SUSPEND_NORESUME_SPECIFIED)) {
-			suspend_early_boot_message(1, SUSPEND_CONTINUE_REQ,
+		if (!test_suspend_state(TOI_NORESUME_SPECIFIED)) {
+			suspend_early_boot_message(1, TOI_CONTINUE_REQ,
 			  "Found a different style suspend image signature.");
-			set_suspend_state(SUSPEND_NORESUME_SPECIFIED);
+			set_suspend_state(TOI_NORESUME_SPECIFIED);
 			printk("Suspend2: Dectected another implementation's signature.\n");
 		}
 	}
@@ -1069,8 +1069,8 @@ static int suspend_swap_parse_sig_location(char *commandline,
 	else
 		resume_firstblock = 0;
 
-	clear_suspend_state(SUSPEND_CAN_SUSPEND);
-	clear_suspend_state(SUSPEND_CAN_RESUME);
+	clear_suspend_state(TOI_CAN_HIBERNATE);
+	clear_suspend_state(TOI_CAN_RESUME);
 	
 	temp_result = try_to_parse_resume_device(devstart, quiet);
 
@@ -1100,8 +1100,8 @@ static int suspend_swap_parse_sig_location(char *commandline,
 		suspend_bio_ops.set_devinfo(devinfo);
 		suspend_writer_posn.chains = &block_chain[0];
 		suspend_writer_posn.num_chains = MAX_SWAPFILES;
-		set_suspend_state(SUSPEND_CAN_SUSPEND);
-		set_suspend_state(SUSPEND_CAN_RESUME);
+		set_suspend_state(TOI_CAN_HIBERNATE);
+		set_suspend_state(TOI_CAN_RESUME);
 	} else
 		if (!quiet)
 			printk(KERN_ERR "Suspend2: SwapAllocator: No swap "

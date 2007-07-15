@@ -187,12 +187,12 @@ static void suspend_mark_pages_for_pageset2(void)
 	struct task_struct *p;
 	struct attention_list *this = attention_list;
 
-	if (test_action_state(SUSPEND_NO_PAGESET2))
+	if (test_action_state(TOI_NO_PAGESET2))
 		return;
 
 	clear_dyn_pageflags(pageset2_map);
 	
-	if (test_action_state(SUSPEND_PAGESET2_FULL))
+	if (test_action_state(TOI_PAGESET2_FULL))
 		pageset2_full();
 	else {
 		read_lock(&tasklist_lock);
@@ -211,7 +211,7 @@ static void suspend_mark_pages_for_pageset2(void)
 	 */
 
 	while (this) {
-		if (!test_result_state(SUSPEND_ABORTED))
+		if (!test_result_state(TOI_ABORTED))
 			suspend_mark_task_as_pageset(this->task, PAGESET1);
 		this = this->next;
 	}
@@ -474,7 +474,7 @@ static int amount_needed(int use_image_size_limit)
 
 static int image_not_ready(int use_image_size_limit)
 {
-	suspend_message(SUSPEND_EAT_MEMORY, SUSPEND_LOW, 1,
+	suspend_message(TOI_EAT_MEMORY, TOI_LOW, 1,
 		"Amount still needed (%d) > 0:%d. Header: %d < %d: %d,"
 		" Storage allocd: %d < %d: %d.\n",
 			amount_needed(use_image_size_limit),
@@ -529,7 +529,7 @@ static void display_stats(int always, int sub_extra_pd1_allow)
 	if (always)
 		printk(buffer);
 	else
-		suspend_message(SUSPEND_EAT_MEMORY, SUSPEND_MEDIUM, 1, buffer);
+		suspend_message(TOI_EAT_MEMORY, TOI_MEDIUM, 1, buffer);
 }
 
 /* generate_free_page_map
@@ -682,7 +682,7 @@ static void flag_image_pages(int atomic_copy)
 	if (atomic_copy)
 		return;
 
-	suspend_message(SUSPEND_EAT_MEMORY, SUSPEND_MEDIUM, 0,
+	suspend_message(TOI_EAT_MEMORY, TOI_MEDIUM, 0,
 		"Count data pages: Set1 (%d) + Set2 (%d) + Nosave (%d) + "
 		"NumFree (%d) = %d.\n",
 		pagedir1.size, pagedir2.size, num_nosave, num_free,
@@ -723,7 +723,7 @@ static void update_image(void)
 	if (wanted > extra_pages_allocated) {
 		got = suspend_allocate_extra_pagedir_memory(wanted);
 		if (wanted < got) {
-			suspend_message(SUSPEND_EAT_MEMORY, SUSPEND_LOW, 1,
+			suspend_message(TOI_EAT_MEMORY, TOI_LOW, 1,
 				"Want %d extra pages for pageset1, got %d.\n",
 				wanted, got);
 			return;
@@ -753,13 +753,13 @@ static void update_image(void)
 	result = suspendActiveAllocator->allocate_header_space(param_used);
 
 	if (result)
-		suspend_message(SUSPEND_EAT_MEMORY, SUSPEND_LOW, 1,
+		suspend_message(TOI_EAT_MEMORY, TOI_LOW, 1,
 			"Still need to get more storage space for header.\n");
 	else
 		header_space_allocated = param_used;
 
 	if (freeze_processes())
-		set_abort_result(SUSPEND_FREEZING_FAILED);
+		set_abort_result(TOI_FREEZING_FAILED);
 
 	allocate_checksum_pages();
 
@@ -781,7 +781,7 @@ static int attempt_to_freeze(void)
 	result = freeze_processes();
 
 	if (result)
-		set_abort_result(SUSPEND_FREEZING_FAILED);
+		set_abort_result(TOI_FREEZING_FAILED);
 
 	return result;
 }
@@ -821,7 +821,7 @@ static void eat_memory(void)
 	switch (image_size_limit) {
 		case -1: /* Don't eat any memory */
 			if (amount_wanted > 0) {
-				set_abort_result(SUSPEND_WOULD_EAT_MEMORY);
+				set_abort_result(TOI_WOULD_EAT_MEMORY);
 				return;
 			}
 			break;
@@ -835,7 +835,7 @@ static void eat_memory(void)
 			break;
 	}
 
-	if (amount_wanted > 0 && !test_result_state(SUSPEND_ABORTED) &&
+	if (amount_wanted > 0 && !test_result_state(TOI_ABORTED) &&
 			image_size_limit != -1) {
 		struct zone *zone;
 		int zone_idx;
@@ -875,7 +875,7 @@ static void eat_memory(void)
 		suspend_cond_pause(0, NULL);
 
 		if (freeze_processes())
-			set_abort_result(SUSPEND_FREEZING_FAILED);
+			set_abort_result(TOI_FREEZING_FAILED);
 	}
 	
 	if (did_eat_memory) {
@@ -922,12 +922,12 @@ int suspend_prepare_image(void)
 
 	if (!storage_available) {
 		printk(KERN_ERR "You need some storage available to be able to suspend.\n");
-		set_abort_result(SUSPEND_NOSTORAGE_AVAILABLE);
+		set_abort_result(TOI_NOSTORAGE_AVAILABLE);
 		return 1;
 	}
 
 	if (build_attention_list()) {
-		abort_suspend(SUSPEND_UNABLE_TO_PREPARE_IMAGE,
+		abort_suspend(TOI_UNABLE_TO_PREPARE_IMAGE,
 				"Unable to successfully prepare the image.\n");
 		return 1;
 	}
@@ -937,7 +937,7 @@ int suspend_prepare_image(void)
 	
 		eat_memory();
 
-		if (test_result_state(SUSPEND_ABORTED))
+		if (test_result_state(TOI_ABORTED))
 			break;
 
 		update_image();
@@ -945,14 +945,14 @@ int suspend_prepare_image(void)
 		tries++;
 
 	} while (image_not_ready(1) && tries <= MAX_TRIES &&
-			!test_result_state(SUSPEND_ABORTED));
+			!test_result_state(TOI_ABORTED));
 
 	result = image_not_ready(0);
 
-	if (!test_result_state(SUSPEND_ABORTED)) {
+	if (!test_result_state(TOI_ABORTED)) {
 		if (result) {
 			display_stats(1, 0);
-			abort_suspend(SUSPEND_UNABLE_TO_PREPARE_IMAGE,
+			abort_suspend(TOI_UNABLE_TO_PREPARE_IMAGE,
 				"Unable to successfully prepare the image.\n");
 		} else {
 			unlink_lru_lists();

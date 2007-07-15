@@ -67,7 +67,7 @@ static void __init handle_initrd(void)
 	if (!resume_attempted)
 		printk(KERN_ERR "Suspend2: No attempt was made to resume from "
 				"any image that might exist.\n");
-	clear_suspend_state(SUSPEND_BOOT_TIME);
+	clear_suspend_state(TOI_BOOT_TIME);
 
 	/* move initrd to rootfs' /old */
 	sys_fchdir(old_fd);

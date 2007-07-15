@@ -602,7 +602,7 @@ static int suspend_bio_rw_page(int writing, struct page *page,
 {
 	struct suspend_bdev_info *dev_info;
 
-	if (test_action_state(SUSPEND_TEST_FILTER_SPEED))
+	if (test_action_state(TOI_TEST_FILTER_SPEED))
 		return 0;
 		
 	if (go_next_page()) {
@@ -712,7 +712,7 @@ static int suspend_bio_read_page_with_readahead(void)
 		/* We failed to submit a read, and have cleaned up
 		 * all the readahead previously submitted */
 		if (ra_submit_index == readahead_index) {
-			abort_suspend(SUSPEND_FAILED_IO, "Failed to submit"
+			abort_suspend(TOI_FAILED_IO, "Failed to submit"
 				" a read and no readahead left.");
 			return -EIO;
 		}
@@ -789,7 +789,7 @@ static int suspend_rw_buffer(int writing, char *buffer, int buffer_size)
 		suspend_header_bytes_used += capacity;
 
 		if (!writing) {
-			if (test_suspend_state(SUSPEND_TRY_RESUME_RD))
+			if (test_suspend_state(TOI_TRY_RESUME_RD))
 				sys_read(suspend_read_fd,
 					suspend_writer_buffer, BLOCK_SIZE);
 			else
@@ -831,7 +831,7 @@ static int suspend_bio_read_page(unsigned long *pfn, struct page *buffer_page,
 	if (suspend_rw_buffer(READ, (char *) pfn, sizeof(unsigned long)) ||
 	    suspend_rw_buffer(READ, (char *) buf_size, sizeof(int)) ||
 	    suspend_rw_buffer(READ, buffer_virt, *buf_size)) {
-		abort_suspend(SUSPEND_FAILED_IO, "Read of data failed.");
+		abort_suspend(TOI_FAILED_IO, "Read of data failed.");
 		result = 1;
 	} else
 		PR_DEBUG("%d: PFN %ld, %d bytes.\n", pr_index, *pfn, *buf_size);

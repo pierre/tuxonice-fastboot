@@ -50,7 +50,7 @@ static void __suspend2_power_down(int method)
 {
 	int result = 0;
 
-	if (test_action_state(SUSPEND_REBOOT)) {
+	if (test_action_state(TOI_REBOOT)) {
 		suspend_prepare_status(DONT_CLEAR_BAR, "Ready to reboot.");
 		kernel_restart(NULL);
 	}
@@ -75,7 +75,7 @@ static void __suspend2_power_down(int method)
 				goto ResumeConsole;
 			}
 
-			if (test_action_state(SUSPEND_LATE_CPU_HOTPLUG) &&
+			if (test_action_state(TOI_LATE_CPU_HOTPLUG) &&
 				disable_nonboot_cpus())
 				goto DeviceResume;
 	
@@ -84,7 +84,7 @@ static void __suspend2_power_down(int method)
 				result = 1;
 			}
 
-			if (test_action_state(SUSPEND_LATE_CPU_HOTPLUG))
+			if (test_action_state(TOI_LATE_CPU_HOTPLUG))
 				enable_nonboot_cpus();
 
 DeviceResume:

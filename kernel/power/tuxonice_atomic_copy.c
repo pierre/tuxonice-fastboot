@@ -169,8 +169,7 @@ void copyback_post(void)
 		suspend_io_time[loop/2][loop%2] =
 			suspend2_nosave_io_speed[loop/2][loop%2];
 
-	set_suspend_state(SUSPEND_NOW_RESUMING);
-	set_suspend_state(SUSPEND_PAGESET2_NOT_LOADED);
+	set_suspend_state(TOI_NOW_RESUMING);
 
 	if (suspend_activate_storage(1))
 		panic("Failed to reactivate our storage.");
@@ -181,8 +180,6 @@ void copyback_post(void)
 
 	if (read_pageset2(0))
 		panic("Unable to successfully reread the page cache.");
-
-	clear_suspend_state(SUSPEND_PAGESET2_NOT_LOADED);
 
 	/*
 	 * If the user wants to sleep again after resuming from full-off,
@@ -278,12 +275,12 @@ int __suspend_post_context_save(void)
 			"extra_pages_allowance is currently only %d.\n",
 			pagedir1.size - old_ps1_size,
 			extra_pd1_pages_allowance);
-		set_abort_result(SUSPEND_EXTRA_PAGES_ALLOW_TOO_SMALL);
+		set_abort_result(TOI_EXTRA_PAGES_ALLOW_TOO_SMALL);
 		return -1;
 	}
 
-	if (!test_action_state(SUSPEND_TEST_FILTER_SPEED) &&
-	    !test_action_state(SUSPEND_TEST_BIO))
+	if (!test_action_state(TOI_TEST_FILTER_SPEED) &&
+	    !test_action_state(TOI_TEST_BIO))
 		suspend_copy_pageset1();
 
 	return 0;
@@ -362,7 +359,7 @@ Failed:
 #ifdef CONFIG_HIGHMEM
 	free_pbe_list(&restore_highmem_pblist, 1);
 #endif
-	if (test_action_state(SUSPEND_PM_PREPARE_CONSOLE))
+	if (test_action_state(TOI_PM_PREPARE_CONSOLE))
 		pm_restore_console();
 	suspend2_running = 0;
 	return 1;
@@ -370,11 +367,11 @@ Failed:
 
 int suspend2_go_atomic(pm_message_t state, int suspend_time)
 {
-	if (test_action_state(SUSPEND_PM_PREPARE_CONSOLE))
+	if (test_action_state(TOI_PM_PREPARE_CONSOLE))
 		pm_prepare_console();
 
 	if (suspend_time && suspend2_platform_prepare()) {
-		set_abort_result(SUSPEND_PLATFORM_PREP_FAILED);
+		set_abort_result(TOI_PLATFORM_PREP_FAILED);
 		suspend2_end_atomic(ATOMIC_STEP_RESTORE_CONSOLE, suspend_time);
 		return 1;
 	}
@@ -382,15 +379,15 @@ int suspend2_go_atomic(pm_message_t state, int suspend_time)
 	suspend_console();
 
 	if (device_suspend(state)) {
-		set_abort_result(SUSPEND_DEVICE_REFUSED);
+		set_abort_result(TOI_DEVICE_REFUSED);
 		suspend2_end_atomic(ATOMIC_STEP_RESUME_CONSOLE, suspend_time);
 		return 1;
 	}
 
-	if (test_action_state(SUSPEND_LATE_CPU_HOTPLUG)) {
+	if (test_action_state(TOI_LATE_CPU_HOTPLUG)) {
 		suspend_prepare_status(DONT_CLEAR_BAR,	"Disable nonboot cpus.");
 		if (disable_nonboot_cpus()) {
-			set_abort_result(SUSPEND_CPU_HOTPLUG_FAILED);
+			set_abort_result(TOI_CPU_HOTPLUG_FAILED);
 			suspend2_end_atomic(ATOMIC_STEP_DEVICE_RESUME,
 					suspend_time);
 			return 1;
@@ -398,7 +395,7 @@ int suspend2_go_atomic(pm_message_t state, int suspend_time)
 	}
 
 	if (suspend_time && arch_prepare_suspend()) {
-		set_abort_result(SUSPEND_ARCH_PREPARE_FAILED);
+		set_abort_result(TOI_ARCH_PREPARE_FAILED);
 		suspend2_end_atomic(ATOMIC_STEP_CPU_HOTPLUG, suspend_time);
 		return 1;
 	}
@@ -413,7 +410,7 @@ int suspend2_go_atomic(pm_message_t state, int suspend_time)
 	 */
 
 	if (device_power_down(state)) {
-		set_abort_result(SUSPEND_DEVICE_REFUSED);
+		set_abort_result(TOI_DEVICE_REFUSED);
 		suspend2_end_atomic(ATOMIC_STEP_IRQS, suspend_time);
 		return 1;
 	}
@@ -429,7 +426,7 @@ void suspend2_end_atomic(int stage, int suspend_time)
 		case ATOMIC_STEP_IRQS:
 			local_irq_enable();
 		case ATOMIC_STEP_CPU_HOTPLUG:
-			if (test_action_state(SUSPEND_LATE_CPU_HOTPLUG))
+			if (test_action_state(TOI_LATE_CPU_HOTPLUG))
 				enable_nonboot_cpus();
 		case ATOMIC_STEP_DEVICE_RESUME:
 			suspend2_platform_finish();
@@ -437,7 +434,7 @@ void suspend2_end_atomic(int stage, int suspend_time)
 		case ATOMIC_STEP_RESUME_CONSOLE:
 			resume_console();
 		case ATOMIC_STEP_RESTORE_CONSOLE:
-			if (test_action_state(SUSPEND_PM_PREPARE_CONSOLE))
+			if (test_action_state(TOI_PM_PREPARE_CONSOLE))
 				pm_restore_console();
 	}
 }

@@ -312,8 +312,8 @@ void calculate_check_checksums(int check)
 				print_tasks_using_page(pfn_to_page(pfn));
 				printk("\n");
 				suspend_num_resaved++;
-				if (test_action_state(SUSPEND_ABORT_ON_RESAVE_NEEDED))
-					set_abort_result(SUSPEND_RESAVE_NEEDED);
+				if (test_action_state(TOI_ABORT_ON_RESAVE_NEEDED))
+					set_abort_result(TOI_RESAVE_NEEDED);
 			}
 		} else
 			ret = crypto_hash_digest(&desc, sg, 
@@ -332,7 +332,7 @@ static struct suspend_sysfs_data sysfs_params[] = {
 	},
 
 	{ SUSPEND2_ATTR("abort_if_resave_needed", SYSFS_RW),
-	  SYSFS_BIT(&suspend_action, SUSPEND_ABORT_ON_RESAVE_NEEDED, 0)
+	  SYSFS_BIT(&suspend_action, TOI_ABORT_ON_RESAVE_NEEDED, 0)
 	}
 };
 

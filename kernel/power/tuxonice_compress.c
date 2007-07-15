@@ -241,10 +241,10 @@ static int suspend_compress_read_page(unsigned long *index,
 			ctx->page_buffer,
 			len, buffer_start, &outlen);
 	if (ret)
-		abort_suspend(SUSPEND_FAILED_IO,
+		abort_suspend(TOI_FAILED_IO,
 			"Compress_read returned %d.\n", ret);
 	else if (outlen != PAGE_SIZE) {
-		abort_suspend(SUSPEND_FAILED_IO,
+		abort_suspend(TOI_FAILED_IO,
 			"Decompression yielded %d bytes instead of %ld.\n",
 			outlen, PAGE_SIZE);
 		ret = -EIO;

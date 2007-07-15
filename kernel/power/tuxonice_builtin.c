@@ -189,18 +189,18 @@ EXPORT_SYMBOL_GPL(suspend_compress_bytes_in);
 EXPORT_SYMBOL_GPL(suspend_compress_bytes_out);
 
 #ifdef CONFIG_TOI_REPLACE_SWSUSP
-unsigned long suspend_action = (1 << SUSPEND_REPLACE_SWSUSP) | \
-			       (1 << SUSPEND_PAGESET2_FULL) | \
-			       (1 << SUSPEND_LATE_CPU_HOTPLUG);
+unsigned long suspend_action = (1 << TOI_REPLACE_SWSUSP) | \
+			       (1 << TOI_PAGESET2_FULL) | \
+			       (1 << TOI_LATE_CPU_HOTPLUG);
 #else
-unsigned long suspend_action = 	(1 << SUSPEND_PAGESET2_FULL) | \
-				(1 << SUSPEND_LATE_CPU_HOTPLUG);
+unsigned long suspend_action = 	(1 << TOI_PAGESET2_FULL) | \
+				(1 << TOI_LATE_CPU_HOTPLUG);
 #endif
 EXPORT_SYMBOL_GPL(suspend_action);
 
-unsigned long suspend_state = ((1 << SUSPEND_BOOT_TIME) |
-		(1 << SUSPEND_IGNORE_LOGLEVEL) |
-		(1 << SUSPEND_IO_STOPPED));
+unsigned long suspend_state = ((1 << TOI_BOOT_TIME) |
+		(1 << TOI_IGNORE_LOGLEVEL) |
+		(1 << TOI_IO_STOPPED));
 EXPORT_SYMBOL_GPL(suspend_state);
 
 /* The number of suspends we have started (some may have been cancelled) */

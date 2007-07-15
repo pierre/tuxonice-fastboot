@@ -180,7 +180,7 @@ static int size_ignoring_ignored_pages(void)
 
 static void __populate_block_list(int min, int max)
 {
-	if (test_action_state(SUSPEND_TEST_BIO))
+	if (test_action_state(TOI_TEST_BIO))
 		printk("Adding extent %d-%d.\n", min << devinfo.bmap_shift,
 		        ((max + 1) << devinfo.bmap_shift) - 1);
 
@@ -381,9 +381,9 @@ static int parse_signature(struct suspend_file_header *header)
 		return -1;
 
 	if (header->resumed_before)
-		set_suspend_state(SUSPEND_RESUMED_BEFORE);
+		set_suspend_state(TOI_RESUMED_BEFORE);
 	else
-		clear_suspend_state(SUSPEND_RESUMED_BEFORE);
+		clear_suspend_state(TOI_RESUMED_BEFORE);
 
 	target_header_start = header->first_header_block;
 	return 1;
@@ -413,8 +413,8 @@ static int suspend_file_storage_allocated(void)
 
 static int suspend_file_release_storage(void)
 {
-	if (test_action_state(SUSPEND_KEEP_IMAGE) &&
-	    test_suspend_state(SUSPEND_NOW_RESUMING))
+	if (test_action_state(TOI_KEEP_IMAGE) &&
+	    test_suspend_state(TOI_NOW_RESUMING))
 		return 0;
 
 	suspend_put_extent_chain(&block_chain);
@@ -485,7 +485,7 @@ static int __suspend_file_allocate_storage(int main_space_requested,
 
 	populate_block_list();
 
-	suspend_message(SUSPEND_WRITER, SUSPEND_MEDIUM, 0,
+	suspend_message(TOI_WRITER, TOI_MEDIUM, 0,
 		"Finished with block_chain.size == %d.\n",
 		block_chain.size);
 
@@ -637,7 +637,7 @@ static int suspend_file_read_header_init(void)
 	int result;
 	struct block_device *tmp;
 
-	if (test_suspend_state(SUSPEND_TRY_RESUME_RD))
+	if (test_suspend_state(TOI_TRY_RESUME_RD))
 		result = rd_init();
 	else
 		result = file_init();
@@ -855,11 +855,11 @@ static int __test_suspend_file_target(char *target, int resume_time, int quiet)
 		suspend_writer_posn.num_chains = 1;
 
 		if (!resume_time)
-			set_suspend_state(SUSPEND_CAN_SUSPEND);
+			set_suspend_state(TOI_CAN_HIBERNATE);
 		return 0;
 	}
 
-	clear_suspend_state(SUSPEND_CAN_SUSPEND);
+	clear_suspend_state(TOI_CAN_HIBERNATE);
 
 	if (quiet)
 		return 1;
@@ -990,7 +990,7 @@ static int suspend_file_parse_sig_location(char *commandline,
 
 out:
 	if (result)
-		clear_suspend_state(SUSPEND_CAN_SUSPEND);
+		clear_suspend_state(TOI_CAN_HIBERNATE);
 
 	if (!quiet)
 		printk("Resuming %sabled.\n",  result ? "dis" : "en");
