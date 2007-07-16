@@ -567,7 +567,7 @@ static void userui_cleanup_console(void)
 }
 
 /*
- * User interface specific /sys/power/suspend2 entries.
+ * User interface specific /sys/power/tuxonice entries.
  */
 
 static struct toi_sysfs_data sysfs_params[] = {

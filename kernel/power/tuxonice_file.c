@@ -18,9 +18,9 @@
  *
  * and
  *
- * echo /path/to/my_file > /sys/power/suspend2/file/target
+ * echo /path/to/my_file > /sys/power/tuxonice/file/target
  *
- * then put what they find in /sys/power/suspend2/resume
+ * then put what they find in /sys/power/tuxonice/resume
  * as their resume= parameter in lilo.conf (and rerun lilo if using it).
  *
  * Having done this, they're ready to hibernate and resume.

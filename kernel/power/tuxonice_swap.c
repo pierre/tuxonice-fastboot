@@ -189,7 +189,7 @@ static void enable_swapfile(void)
 		activateswapresult = sys_swapon(swapfilename, 0xFFFF);
 		if (activateswapresult && activateswapresult != -EBUSY)
 			printk("TuxOnIce: The swapfile/partition specified by "
-				"/sys/power/suspend2/toi_swap/swapfile "
+				"/sys/power/tuxonice/swap/swapfile "
 				"(%s) could not be turned on (error %d). "
 				"Attempting to continue.\n",
 				swapfilename, activateswapresult);
