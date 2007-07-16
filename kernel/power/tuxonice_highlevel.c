@@ -272,7 +272,7 @@ static int get_toi_debug_info(const char *buffer, int count)
 	int len = 0;
 
 	SNPRINTF("TuxOnIce debugging info:\n");
-	SNPRINTF("- TuxOnIce core   : " TOI_CORE_VERSION "\n");
+	SNPRINTF("- TuxOnIce core  : " TOI_CORE_VERSION "\n");
 	SNPRINTF("- Kernel Version : " UTS_RELEASE "\n");
 	SNPRINTF("- Compiler vers. : %d.%d\n", __GNUC__, __GNUC_MINOR__);
 	SNPRINTF("- Attempt number : %d\n", nr_hibernates);
