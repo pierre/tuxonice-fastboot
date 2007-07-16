@@ -312,10 +312,10 @@ static void userui_prepare_status(int clearbar, const char *fmt, ...)
 	if (clearbar)
 		toi_update_status(0, 1, NULL);
 
-	toi_message(0, TOI_STATUS, 1, lastheader, NULL);
-
 	if (ui_helper_data.pid == -1)
 		printk(KERN_EMERG "%s\n", lastheader);
+	else
+		toi_message(0, TOI_STATUS, 1, lastheader, NULL);
 }
 
 /**

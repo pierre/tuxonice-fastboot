@@ -505,7 +505,9 @@ static int worker_rw_loop(void *data)
 				MB(io_base+my_io_index+1), MB(io_barmax));
 
 		if ((my_io_index + 1) == io_pc) {
-			printk("%d%%...", 20 * io_pc_step);
+			printk("%s%d%%...",
+					io_pc_step == 1 ? KERN_EMERG : "",
+					20 * io_pc_step);
 			io_pc_step++;
 			io_pc = io_finish_at * io_pc_step / 5;
 		}
