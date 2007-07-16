@@ -8,7 +8,7 @@
  *
  * This file is released under the GPLv2.
  *
- * Routines for Suspend2's user interface.
+ * Routines for TuxOnIce's user interface.
  *
  * The user interface code talks to a userspace program via a
  * netlink socket.
@@ -44,14 +44,14 @@
 #include "tuxonice_power_off.h"
 
 static char local_printf_buf[1024];	/* Same as printk - should be safe */
-extern int suspend2_wait;
-struct ui_ops *s2_current_ui;
+extern int toi_wait;
+struct ui_ops *toi_current_ui;
 
 /*! The console log level we default to. */
-int suspend_default_console_level = 0;
+int toi_default_console_level = 0;
 
 /**
- * suspend_wait_for_keypress - Wait for keypress via userui or /dev/console.
+ * toi_wait_for_keypress - Wait for keypress via userui or /dev/console.
  *
  * @timeout: Maximum time to wait.
  *
@@ -60,13 +60,13 @@ int suspend_default_console_level = 0;
  * to userui being started, when we have an important warning to give to
  * the user.
  */
-static char suspend_wait_for_keypress(int timeout)
+static char toi_wait_for_keypress(int timeout)
 {
 	int fd, this_timeout = 255;
 	char key = '\0';
 	struct termios t, t_backup;
 
-	if (s2_current_ui && s2_current_ui->wait_for_key(timeout)) {
+	if (toi_current_ui && toi_current_ui->wait_for_key(timeout)) {
 		key = ' ';
 		goto out;
 	}
@@ -125,7 +125,7 @@ out:
 	return key;
 }
 
-/* suspend_early_boot_message()
+/* toi_early_boot_message()
  * Description:	Handle errors early in the process of booting.
  * 		The user may press C to continue booting, perhaps
  * 		invalidating the image,  or space to reboot. 
@@ -136,7 +136,7 @@ out:
  * 		locked. If we want to get events from the serial console,
  * 		we need to temporarily unlock the kernel.
  *
- * 		suspend_early_boot_message may also be called post-boot.
+ * 		toi_early_boot_message may also be called post-boot.
  * 		In this case, it simply printks the message and returns.
  *
  * Arguments:	int	Whether we are able to erase the image.
@@ -149,7 +149,7 @@ out:
 
 #define say(message, a...) printk(KERN_EMERG message, ##a)
 
-void suspend_early_boot_message(int message_detail, int default_answer, char *warning_reason, ...)
+void toi_early_boot_message(int message_detail, int default_answer, char *warning_reason, ...)
 {
 #if defined(CONFIG_VT) || defined(CONFIG_SERIAL_CONSOLE)
 	unsigned long orig_state = get_toi_state(), continue_req = 0;
@@ -162,7 +162,7 @@ void suspend_early_boot_message(int message_detail, int default_answer, char *wa
 	va_list args;
 	int printed_len;
 
-	if (!suspend2_wait) {
+	if (!toi_wait) {
 		set_toi_state(TOI_CONTINUE_REQ);
 		can_ask = 0;
 	}
@@ -177,7 +177,7 @@ void suspend_early_boot_message(int message_detail, int default_answer, char *wa
 	}
 
 	if (!test_toi_state(TOI_BOOT_TIME)) {
-		printk("Suspend2: %s\n", local_printf_buf);
+		printk("TuxOnIce: %s\n", local_printf_buf);
 		return;
 	}
 
@@ -189,26 +189,26 @@ void suspend_early_boot_message(int message_detail, int default_answer, char *wa
 #if defined(CONFIG_VT) || defined(CONFIG_SERIAL_CONSOLE)
 	console_loglevel = 7;
 
-	say("=== Suspend2 ===\n\n");
+	say("=== TuxOnIce ===\n\n");
 	if (warning_reason) {
 		say("BIG FAT WARNING!! %s\n\n", local_printf_buf);
 		switch (message_detail) {
 		 case 0:
 			say("If you continue booting, note that any image WILL NOT BE REMOVED.\n");
-			say("Suspend is unable to do so because the appropriate modules aren't\n");
+			say("TuxOnIce is unable to do so because the appropriate modules aren't\n");
 			say("loaded. You should manually remove the image to avoid any\n");
 			say("possibility of corrupting your filesystem(s) later.\n");
 			break;
 		 case 1:
-			say("If you want to use the current suspend image, reboot and try\n");
-			say("again with the same kernel that you suspended from. If you want\n");
+			say("If you want to use the current TuxOnIce image, reboot and try\n");
+			say("again with the same kernel that you hibernated from. If you want\n");
 			say("to forget that image, continue and the image will be erased.\n");
 			break;
 		}
 		say("Press SPACE to reboot or C to continue booting with this kernel\n\n");
-		if (suspend2_wait > 0)
+		if (toi_wait > 0)
 			say("Default action if you don't select one in %d seconds is: %s.\n",
-				suspend2_wait,
+				toi_wait,
 				default_answer == TOI_CONTINUE_REQ ?
 				"continue booting" : "reboot");
 	} else {
@@ -219,9 +219,9 @@ void suspend_early_boot_message(int message_detail, int default_answer, char *wa
 		say("This will be equivalent to entering noresume on the\n");
 		say("kernel command line.\n\n");
 		say("Press SPACE to remove the image or C to continue resuming.\n\n");
-		if (suspend2_wait > 0)
+		if (toi_wait > 0)
 			say("Default action if you don't select one in %d seconds is: %s.\n",
-				suspend2_wait,
+				toi_wait,
 				!!default_answer ?
 				"continue resuming" : "remove the image");
 	}
@@ -230,7 +230,7 @@ void suspend_early_boot_message(int message_detail, int default_answer, char *wa
 	set_toi_state(TOI_SANITY_CHECK_PROMPT);
 	clear_toi_state(TOI_CONTINUE_REQ);
 
-	if (suspend_wait_for_keypress(suspend2_wait) == 0) /* We timed out */
+	if (toi_wait_for_keypress(toi_wait) == 0) /* We timed out */
 		continue_req = !!default_answer;
 	else
 		continue_req = test_toi_state(TOI_CONTINUE_REQ);
@@ -251,73 +251,73 @@ post_ask:
  * User interface specific /sys/power/suspend2 entries.
  */
 
-static struct suspend_sysfs_data sysfs_params[] = {
+static struct toi_sysfs_data sysfs_params[] = {
 #if defined(CONFIG_NET) && defined(CONFIG_SYSFS)
-	{ SUSPEND2_ATTR("default_console_level", SYSFS_RW),
-	  SYSFS_INT(&suspend_default_console_level, 0, 7, 0)
+	{ TOI_ATTR("default_console_level", SYSFS_RW),
+	  SYSFS_INT(&toi_default_console_level, 0, 7, 0)
 	},
 
-	{ SUSPEND2_ATTR("debug_sections", SYSFS_RW),
-	  SYSFS_UL(&suspend_debug_state, 0, 1 << 30, 0)
+	{ TOI_ATTR("debug_sections", SYSFS_RW),
+	  SYSFS_UL(&toi_debug_state, 0, 1 << 30, 0)
 	},
 
-	{ SUSPEND2_ATTR("log_everything", SYSFS_RW),
-	  SYSFS_BIT(&suspend_action, TOI_LOGALL, 0)
+	{ TOI_ATTR("log_everything", SYSFS_RW),
+	  SYSFS_BIT(&toi_action, TOI_LOGALL, 0)
 	},
 #endif
-	{ SUSPEND2_ATTR("pm_prepare_console", SYSFS_RW),
-	  SYSFS_BIT(&suspend_action, TOI_PM_PREPARE_CONSOLE, 0)
+	{ TOI_ATTR("pm_prepare_console", SYSFS_RW),
+	  SYSFS_BIT(&toi_action, TOI_PM_PREPARE_CONSOLE, 0)
 	}
 };
 
-static struct suspend_module_ops userui_ops = {
+static struct toi_module_ops userui_ops = {
 	.type				= MISC_HIDDEN_MODULE,
 	.name				= "printk ui",
 	.directory			= "user_interface",
 	.module				= THIS_MODULE,
 	.sysfs_data			= sysfs_params,
-	.num_sysfs_entries		= sizeof(sysfs_params) / sizeof(struct suspend_sysfs_data),
+	.num_sysfs_entries		= sizeof(sysfs_params) / sizeof(struct toi_sysfs_data),
 };
 
-int s2_register_ui_ops(struct ui_ops *this_ui)
+int toi_register_ui_ops(struct ui_ops *this_ui)
 {
-	if (s2_current_ui) {
-		printk("Only one Suspend2 user interface module can be loaded"
+	if (toi_current_ui) {
+		printk("Only one TuxOnIce user interface module can be loaded"
 			" at a time.");
 		return -EBUSY;
 	}
 
-	s2_current_ui = this_ui;
+	toi_current_ui = this_ui;
 
 	return 0;
 }
 
-void s2_remove_ui_ops(struct ui_ops *this_ui)
+void toi_remove_ui_ops(struct ui_ops *this_ui)
 {
-	if (s2_current_ui != this_ui)
+	if (toi_current_ui != this_ui)
 		return;
 
-	s2_current_ui = NULL;
+	toi_current_ui = NULL;
 }
 
-/* suspend_console_sysfs_init
+/* toi_console_sysfs_init
  * Description: Boot time initialisation for user interface.
  */
 
-int s2_ui_init(void)
+int toi_ui_init(void)
 {
-	return suspend_register_module(&userui_ops);
+	return toi_register_module(&userui_ops);
 }
 
-void s2_ui_exit(void)
+void toi_ui_exit(void)
 {
-	suspend_unregister_module(&userui_ops);
+	toi_unregister_module(&userui_ops);
 }
 
 #ifdef CONFIG_TOI_EXPORTS
-EXPORT_SYMBOL_GPL(s2_current_ui);
-EXPORT_SYMBOL_GPL(suspend_early_boot_message);
-EXPORT_SYMBOL_GPL(s2_register_ui_ops);
-EXPORT_SYMBOL_GPL(s2_remove_ui_ops);
-EXPORT_SYMBOL_GPL(suspend_default_console_level);
+EXPORT_SYMBOL_GPL(toi_current_ui);
+EXPORT_SYMBOL_GPL(toi_early_boot_message);
+EXPORT_SYMBOL_GPL(toi_register_ui_ops);
+EXPORT_SYMBOL_GPL(toi_remove_ui_ops);
+EXPORT_SYMBOL_GPL(toi_default_console_level);
 #endif

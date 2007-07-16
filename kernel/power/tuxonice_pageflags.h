@@ -5,7 +5,7 @@
  *
  * This file is released under the GPLv2.
  *
- * Suspend2 needs a few pageflags while working that aren't otherwise
+ * TuxOnIce needs a few pageflags while working that aren't otherwise
  * used. To save the struct page pageflags, we dynamically allocate
  * a bitmap and use that. These are the only non order-0 allocations
  * we do.
@@ -56,4 +56,4 @@ extern dyn_pageflags_t free_map;
 
 extern void save_dyn_pageflags(dyn_pageflags_t pagemap);
 extern int load_dyn_pageflags(dyn_pageflags_t pagemap);
-extern int suspend_pageflags_space_needed(void);
+extern int toi_pageflags_space_needed(void);

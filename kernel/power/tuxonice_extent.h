@@ -6,7 +6,7 @@
  * This file is released under the GPLv2.
  *
  * It contains declarations related to extents. Extents are
- * suspend's method of storing some of the metadata for the image.
+ * TuxOnIce's method of storing some of the metadata for the image.
  * See tuxonice_extent.c for more info.
  *
  */
@@ -41,10 +41,10 @@ struct extent_iterate_saved_state {
 	unsigned long offset;
 };
 
-#define suspend_extent_state_eof(state) ((state)->num_chains == (state)->current_chain)
+#define toi_extent_state_eof(state) ((state)->num_chains == (state)->current_chain)
 
 /* Simplify iterating through all the values in an extent chain */
-#define suspend_extent_for_each(extent_chain, extentpointer, value) \
+#define toi_extent_for_each(extent_chain, extentpointer, value) \
 if ((extent_chain)->first) \
 	for ((extentpointer) = (extent_chain)->first, (value) = \
 			(extentpointer)->minimum; \
@@ -55,12 +55,12 @@ if ((extent_chain)->first) \
 		 ((extentpointer) ? (extentpointer)->minimum : 0)) : \
 			(value)++))
 
-void suspend_put_extent_chain(struct extent_chain *chain);
-int suspend_add_to_extent_chain(struct extent_chain *chain, 
+void toi_put_extent_chain(struct extent_chain *chain);
+int toi_add_to_extent_chain(struct extent_chain *chain, 
 		unsigned long minimum, unsigned long maximum);
-int suspend_serialise_extent_chain(struct suspend_module_ops *owner,
+int toi_serialise_extent_chain(struct toi_module_ops *owner,
 		struct extent_chain *chain);
-int suspend_load_extent_chain(struct extent_chain *chain);
+int toi_load_extent_chain(struct extent_chain *chain);
 
 /* swap_entry_to_extent_val & extent_val_to_swap_entry: 
  * We are putting offset in the low bits so consecutive swap entries
@@ -68,10 +68,10 @@ int suspend_load_extent_chain(struct extent_chain *chain);
 #define swap_entry_to_extent_val(swp_entry) (swp_entry.val)
 #define extent_val_to_swap_entry(val) (swp_entry_t) { (val) }
 
-void suspend_extent_state_save(struct extent_iterate_state *state,
+void toi_extent_state_save(struct extent_iterate_state *state,
 		struct extent_iterate_saved_state *saved_state);
-void suspend_extent_state_restore(struct extent_iterate_state *state,
+void toi_extent_state_restore(struct extent_iterate_state *state,
 		struct extent_iterate_saved_state *saved_state);
-void suspend_extent_state_goto_start(struct extent_iterate_state *state);
-unsigned long suspend_extent_state_next(struct extent_iterate_state *state);
+void toi_extent_state_goto_start(struct extent_iterate_state *state);
+unsigned long toi_extent_state_next(struct extent_iterate_state *state);
 #endif

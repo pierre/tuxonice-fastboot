@@ -6,7 +6,7 @@
  *
  * This file is released under the GPLv2.
  *
- * Routines for Suspend2's user interface.
+ * Routines for TuxOnIce's user interface.
  *
  * The user interface code talks to a userspace program via a
  * netlink socket.
@@ -44,7 +44,7 @@
 static char local_printf_buf[1024];	/* Same as printk - should be safe */
 
 static struct user_helper_data ui_helper_data;
-static struct suspend_module_ops userui_ops;
+static struct toi_module_ops userui_ops;
 static int orig_kmsg;
 
 static char lastheader[512];
@@ -58,21 +58,21 @@ static int progress_granularity = 30;
 DECLARE_WAIT_QUEUE_HEAD(userui_wait_for_key);
 
 /**
- * ui_nl_set_state - Update suspend_action based on a message from userui.
+ * ui_nl_set_state - Update toi_action based on a message from userui.
  *
  * @n: The bit (1 << bit) to set.
  */
 static void ui_nl_set_state(int n)
 {
 	/* Only let them change certain settings */
-	static const int suspend_action_mask =
+	static const int toi_action_mask =
 		(1 << TOI_REBOOT) | (1 << TOI_PAUSE) |
 		(1 << TOI_SLOW) | (1 << TOI_LOGALL) |
 		(1 << TOI_SINGLESTEP) |
 		(1 << TOI_PAUSE_NEAR_PAGESET_END);
 
-	suspend_action = (suspend_action & (~suspend_action_mask)) |
-		(n & suspend_action_mask);
+	toi_action = (toi_action & (~toi_action_mask)) |
+		(n & toi_action_mask);
 
 	if (!test_action_state(TOI_PAUSE) &&
 			!test_action_state(TOI_SINGLESTEP))
@@ -87,7 +87,7 @@ static void ui_nl_set_state(int n)
  */
 static void userui_post_atomic_restore(void)
 {
-	suspend_send_netlink_message(&ui_helper_data,
+	toi_send_netlink_message(&ui_helper_data,
 			USERUI_MSG_POST_ATOMIC_RESTORE, NULL, 0);
 }
 
@@ -164,7 +164,7 @@ static int userui_memory_needed(void)
  * @fmt: Message to be displayed in the middle of the progress bar.
  *
  * Note that a NULL message does not mean that any previous message is erased!
- * For that, you need suspend_prepare_status with clearbar on.
+ * For that, you need toi_prepare_status with clearbar on.
  *
  * Returns an unsigned long, being the next numerator (as determined by the
  * maximum and progress granularity) where status needs to be updated.
@@ -224,7 +224,7 @@ static unsigned long userui_update_status(unsigned long value,
 		msg.text[sizeof(msg.text)-1] = '\0';
 	}
 
-	suspend_send_netlink_message(&ui_helper_data, USERUI_MSG_PROGRESS,
+	toi_send_netlink_message(&ui_helper_data, USERUI_MSG_PROGRESS,
 			&msg, sizeof(msg));
 	last_step = this_step;
 
@@ -270,7 +270,7 @@ static void userui_message(unsigned long section, unsigned long level,
 	if (test_action_state(TOI_LOGALL))
 		printk("%s\n", msg.text);
 
-	suspend_send_netlink_message(&ui_helper_data, USERUI_MSG_MESSAGE,
+	toi_send_netlink_message(&ui_helper_data, USERUI_MSG_MESSAGE,
 			&msg, sizeof(msg));
 }
 
@@ -310,16 +310,16 @@ static void userui_prepare_status(int clearbar, const char *fmt, ...)
 	}
 
 	if (clearbar)
-		suspend_update_status(0, 1, NULL);
+		toi_update_status(0, 1, NULL);
 
-	suspend_message(0, TOI_STATUS, 1, lastheader, NULL);
+	toi_message(0, TOI_STATUS, 1, lastheader, NULL);
 
 	if (ui_helper_data.pid == -1)
 		printk(KERN_EMERG "%s\n", lastheader);
 }
 
 /**
- * suspend_wait_for_keypress - Wait for keypress via userui.
+ * toi_wait_for_keypress - Wait for keypress via userui.
  *
  * @timeout: Maximum time to wait.
  *
@@ -340,7 +340,7 @@ static char userui_wait_for_keypress(int timeout)
 }
 
 /**
- * userui_abort_suspend - Abort a cycle & tell user if they didn't request it.
+ * userui_abort_hibernate - Abort a cycle & tell user if they didn't request it.
  *
  * @result_code: Reason why we're aborting (1 << bit).
  * @fmt: Message to display if telling the user what's going on.
@@ -348,7 +348,7 @@ static char userui_wait_for_keypress(int timeout)
  * Abort a cycle. If this wasn't at the user's request (and we're displaying
  * output), tell the user why and wait for them to acknowledge the message.
  */
-static void userui_abort_suspend(int result_code, const char *fmt, ...)
+static void userui_abort_hibernate(int result_code, const char *fmt, ...)
 {
 	va_list args;
 	int printed_len = 0;
@@ -371,36 +371,36 @@ static void userui_abort_suspend(int result_code, const char *fmt, ...)
 		printed_len = sprintf(local_printf_buf + printed_len,
 					" (Press SPACE to continue)");
 
-	suspend_prepare_status(CLEAR_BAR, local_printf_buf);
+	toi_prepare_status(CLEAR_BAR, local_printf_buf);
 
 	if (ui_helper_data.pid != -1)
 		userui_wait_for_keypress(0);
 }
 
 /**
- * request_abort_suspend - Abort suspending or resuming at user request.
+ * request_abort_hibernate - Abort hibernating or resuming at user request.
  *
- * Handle the user requesting the cancellation of a suspend or resume by
+ * Handle the user requesting the cancellation of a hibernation or resume by
  * pressing escape.
  */
-static void request_abort_suspend(void)
+static void request_abort_hibernate(void)
 {
 	if (test_result_state(TOI_ABORT_REQUESTED))
 		return;
 
 	if (test_toi_state(TOI_NOW_RESUMING)) {
-		suspend_prepare_status(CLEAR_BAR, "Escape pressed. "
+		toi_prepare_status(CLEAR_BAR, "Escape pressed. "
 					"Powering down again.");
 		set_toi_state(TOI_STOP_RESUME);
 		while (!test_toi_state(TOI_IO_STOPPED))
 			schedule();
-		if (suspendActiveAllocator->mark_resume_attempted)
-			suspendActiveAllocator->mark_resume_attempted(0);
-		suspend2_power_down();
+		if (toiActiveAllocator->mark_resume_attempted)
+			toiActiveAllocator->mark_resume_attempted(0);
+		toi_power_down();
 	}
 
-	suspend_prepare_status(CLEAR_BAR, "--- ESCAPE PRESSED :"
-					" ABORTING SUSPEND ---");
+	toi_prepare_status(CLEAR_BAR, "--- ESCAPE PRESSED :"
+					" ABORTING HIBERNATION ---");
 	set_abort_result(TOI_ABORT_REQUESTED);
 	wake_up_interruptible(&userui_wait_for_key);
 }
@@ -440,18 +440,18 @@ static int userui_user_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 
 	switch (type) {
 		case USERUI_MSG_ABORT:
-			request_abort_suspend();
+			request_abort_hibernate();
 			break;
 		case USERUI_MSG_GET_STATE:
-			suspend_send_netlink_message(&ui_helper_data, 
-					USERUI_MSG_GET_STATE, &suspend_action,
-					sizeof(suspend_action));
+			toi_send_netlink_message(&ui_helper_data, 
+					USERUI_MSG_GET_STATE, &toi_action,
+					sizeof(toi_action));
 			break;
 		case USERUI_MSG_GET_DEBUG_STATE:
-			suspend_send_netlink_message(&ui_helper_data,
+			toi_send_netlink_message(&ui_helper_data,
 					USERUI_MSG_GET_DEBUG_STATE,
-					&suspend_debug_state,
-					sizeof(suspend_debug_state));
+					&toi_debug_state,
+					sizeof(toi_debug_state));
 			break;
 		case USERUI_MSG_SET_STATE:
 			if (nlh->nlmsg_len < NLMSG_LENGTH(sizeof(int)))
@@ -461,32 +461,32 @@ static int userui_user_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 		case USERUI_MSG_SET_DEBUG_STATE:
 			if (nlh->nlmsg_len < NLMSG_LENGTH(sizeof(int)))
 				return -EINVAL;
-			suspend_debug_state = (*data);
+			toi_debug_state = (*data);
 			break;
 		case USERUI_MSG_SPACE:
 			wake_up_interruptible(&userui_wait_for_key);
 			break;
 		case USERUI_MSG_GET_POWERDOWN_METHOD:
-			suspend_send_netlink_message(&ui_helper_data,
+			toi_send_netlink_message(&ui_helper_data,
 					USERUI_MSG_GET_POWERDOWN_METHOD,
-					&suspend2_poweroff_method,
-					sizeof(suspend2_poweroff_method));
+					&toi_poweroff_method,
+					sizeof(toi_poweroff_method));
 			break;
 		case USERUI_MSG_SET_POWERDOWN_METHOD:
 			if (nlh->nlmsg_len < NLMSG_LENGTH(sizeof(int)))
 				return -EINVAL;
-			suspend2_poweroff_method = (*data);
+			toi_poweroff_method = (*data);
 			break;
 		case USERUI_MSG_GET_LOGLEVEL:
-			suspend_send_netlink_message(&ui_helper_data,
+			toi_send_netlink_message(&ui_helper_data,
 					USERUI_MSG_GET_LOGLEVEL,
-					&suspend_default_console_level,
-					sizeof(suspend_default_console_level));
+					&toi_default_console_level,
+					sizeof(toi_default_console_level));
 			break;
 		case USERUI_MSG_SET_LOGLEVEL:
 			if (nlh->nlmsg_len < NLMSG_LENGTH(sizeof(int)))
 				return -EINVAL;
-			suspend_default_console_level = (*data);
+			toi_default_console_level = (*data);
 			break;
 		case USERUI_MSG_PRINTK:
 			printk((char *) data);
@@ -516,7 +516,7 @@ static void userui_cond_pause(int pause, char *message)
 		((test_action_state(TOI_PAUSE) && pause) || 
 		 (test_action_state(TOI_SINGLESTEP)))) {
 		if (!displayed_message) {
-			suspend_prepare_status(DONT_CLEAR_BAR, 
+			toi_prepare_status(DONT_CLEAR_BAR, 
 			   "%s Press SPACE to continue.%s",
 			   message ? message : "",
 			   (test_action_state(TOI_SINGLESTEP)) ? 
@@ -542,14 +542,14 @@ static void userui_prepare_console(void)
 	ui_helper_data.pid = -1;
 
 	if (!userui_ops.enabled) {
-		printk("Suspend2: Userui disabled.\n");
+		printk("TuxOnIce: Userui disabled.\n");
 		return;
 	}
 
 	if (*ui_helper_data.program)
-		suspend_netlink_setup(&ui_helper_data);
+		toi_netlink_setup(&ui_helper_data);
 	else
-		printk("Suspend2: Userui program not configured.\n");
+		printk("TuxOnIce: Userui program not configured.\n");
 }
 
 /**
@@ -561,7 +561,7 @@ static void userui_prepare_console(void)
 static void userui_cleanup_console(void)
 {
 	if (ui_helper_data.pid > -1)
-		suspend_netlink_close(&ui_helper_data);
+		toi_netlink_close(&ui_helper_data);
 
 	kmsg_redirect = orig_kmsg;
 }
@@ -570,32 +570,32 @@ static void userui_cleanup_console(void)
  * User interface specific /sys/power/suspend2 entries.
  */
 
-static struct suspend_sysfs_data sysfs_params[] = {
+static struct toi_sysfs_data sysfs_params[] = {
 #if defined(CONFIG_NET) && defined(CONFIG_SYSFS)
-	{ SUSPEND2_ATTR("enable_escape", SYSFS_RW),
-	  SYSFS_BIT(&suspend_action, TOI_CAN_CANCEL, 0)
+	{ TOI_ATTR("enable_escape", SYSFS_RW),
+	  SYSFS_BIT(&toi_action, TOI_CAN_CANCEL, 0)
 	},
 
-	{ SUSPEND2_ATTR("pause_between_steps", SYSFS_RW),
-	  SYSFS_BIT(&suspend_action, TOI_PAUSE, 0)
+	{ TOI_ATTR("pause_between_steps", SYSFS_RW),
+	  SYSFS_BIT(&toi_action, TOI_PAUSE, 0)
 	},
 
-	{ SUSPEND2_ATTR("enabled", SYSFS_RW),
+	{ TOI_ATTR("enabled", SYSFS_RW),
 	  SYSFS_INT(&userui_ops.enabled, 0, 1, 0)
 	},
 
-	{ SUSPEND2_ATTR("progress_granularity", SYSFS_RW),
+	{ TOI_ATTR("progress_granularity", SYSFS_RW),
 	  SYSFS_INT(&progress_granularity, 1, 2048, 0)
 	},
 
-	{ SUSPEND2_ATTR("program", SYSFS_RW),
+	{ TOI_ATTR("program", SYSFS_RW),
 	  SYSFS_STRING(ui_helper_data.program, 255, 0),
 	  .write_side_effect = set_ui_program_set,
 	},
 #endif
 };
 
-static struct suspend_module_ops userui_ops = {
+static struct toi_module_ops userui_ops = {
 	.type				= MISC_MODULE,
 	.name				= "userui",
 	.shared_directory		= "user_interface",
@@ -605,7 +605,7 @@ static struct suspend_module_ops userui_ops = {
 	.load_config_info		= userui_load_config_info,
 	.memory_needed			= userui_memory_needed,
 	.sysfs_data			= sysfs_params,
-	.num_sysfs_entries		= sizeof(sysfs_params) / sizeof(struct suspend_sysfs_data),
+	.num_sysfs_entries		= sizeof(sysfs_params) / sizeof(struct toi_sysfs_data),
 };
 
 static struct ui_ops my_ui_ops = {
@@ -613,7 +613,7 @@ static struct ui_ops my_ui_ops = {
 	.update_status			= userui_update_status,
 	.message			= userui_message,
 	.prepare_status			= userui_prepare_status,
-	.abort				= userui_abort_suspend,
+	.abort				= userui_abort_hibernate,
 	.cond_pause			= userui_cond_pause,
 	.prepare			= userui_prepare_console,
 	.cleanup			= userui_cleanup_console,
@@ -621,11 +621,11 @@ static struct ui_ops my_ui_ops = {
 };
 
 /**
- * s2_user_ui_init - Boot time initialisation for user interface.
+ * toi_user_ui_init - Boot time initialisation for user interface.
  *
  * Invoked from the core init routine.
  */
-static __init int s2_user_ui_init(void)
+static __init int toi_user_ui_init(void)
 {
 	int result;
 
@@ -641,30 +641,30 @@ static __init int s2_user_ui_init(void)
 	ui_helper_data.must_init = 0;
 	ui_helper_data.not_ready = userui_cleanup_console;
 	init_completion(&ui_helper_data.wait_for_process);
-	result = suspend_register_module(&userui_ops);
+	result = toi_register_module(&userui_ops);
 	if (!result)
-		result = s2_register_ui_ops(&my_ui_ops);
+		result = toi_register_ui_ops(&my_ui_ops);
 	if (result)
-		suspend_unregister_module(&userui_ops);
+		toi_unregister_module(&userui_ops);
 
 	return result;
 }
 
 #ifdef MODULE
 /**
- * s2_user_ui_ext - Cleanup code for if the core is unloaded.
+ * toi_user_ui_ext - Cleanup code for if the core is unloaded.
  */
-static __exit void s2_user_ui_exit(void)
+static __exit void toi_user_ui_exit(void)
 {
-	s2_remove_ui_ops(&my_ui_ops);
-	suspend_unregister_module(&userui_ops);
+	toi_remove_ui_ops(&my_ui_ops);
+	toi_unregister_module(&userui_ops);
 }
 
-module_init(s2_user_ui_init);
-module_exit(s2_user_ui_exit);
+module_init(toi_user_ui_init);
+module_exit(toi_user_ui_exit);
 MODULE_AUTHOR("Nigel Cunningham");
-MODULE_DESCRIPTION("Suspend2 Userui Support");
+MODULE_DESCRIPTION("TuxOnIce Userui Support");
 MODULE_LICENSE("GPL");
 #else
-late_initcall(s2_user_ui_init);
+late_initcall(toi_user_ui_init);
 #endif

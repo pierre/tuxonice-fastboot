@@ -156,7 +156,7 @@ int hibernate(void)
 
 #ifdef CONFIG_TOI
 	if (test_action_state(TOI_REPLACE_SWSUSP))
-		return suspend2_try_suspend(1);
+		return toi_try_hibernate(1);
 #endif
 
 	/* The snapshot device should not be opened while we're running */
@@ -270,7 +270,7 @@ int software_resume(void)
 	 */
 	if (test_action_state(TOI_REPLACE_SWSUSP))
 		printk("Replacing swsusp.\n");
-		suspend2_try_resume();
+		toi_try_resume();
 #endif
 
 	mutex_lock(&pm_mutex);

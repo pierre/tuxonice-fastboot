@@ -24,7 +24,7 @@
 #include "tuxonice_extent.h"
 #include "tuxonice_block_io.h"
 
-static struct suspend_module_ops suspend_swapops;
+static struct toi_module_ops toi_swapops;
 
 #define SIGNATURE_VER 6
 
@@ -41,7 +41,7 @@ union p_diskpage {
 };
 
 /* Devices used for swap */
-static struct suspend_bdev_info devinfo[MAX_SWAPFILES];
+static struct toi_bdev_info devinfo[MAX_SWAPFILES];
 
 /* Extent chains for swap & blocks */
 struct extent_chain swapextents;
@@ -53,7 +53,7 @@ static unsigned long headerblock;
 
 /* For swapfile automatically swapon/off'd. */
 static char swapfilename[32] = "";
-static int suspend_swapon_status;
+static int toi_swapon_status;
 
 /* Header Page Information */
 static int header_pages_allocated;
@@ -78,7 +78,7 @@ struct bdev_opened
 
 /* 
  * Entry MAX_SWAPFILES is the resume block device, which may
- * not be a swap device enabled when we suspend.
+ * not be a swap device enabled when we hibernate.
  * Entry MAX_SWAPFILES + 1 is the header block device, which
  * is needed before we find out which slot it occupies.
  */
@@ -122,8 +122,8 @@ static void close_bdevs(void)
  *
  * index: The swap index. May be MAX_SWAPFILES for the resume_dev_t
  * (the user can have resume= pointing at a swap partition/file that isn't
- * swapon'd when they suspend. MAX_SWAPFILES+1 for the first page of the
- * header. It will be from a swap partition that was enabled when we suspended,
+ * swapon'd when they hibernate. MAX_SWAPFILES+1 for the first page of the
+ * header. It will be from a swap partition that was enabled when we hibernated,
  * but we don't know it's real index until we read that first page.
  * dev_t: The device major/minor.
  * display_errs: Whether to try to do this quietly.
@@ -148,7 +148,7 @@ static struct block_device *open_bdev(int index, dev_t device, int display_errs)
 
 	if (IS_ERR(bdev) || !bdev) {
 		if (display_errs)
-			suspend_early_boot_message(1,TOI_CONTINUE_REQ,  
+			toi_early_boot_message(1,TOI_CONTINUE_REQ,  
 				"Failed to get access to block device "
 				"\"%x\" (error %d).\n Maybe you need "
 				"to run mknod and/or lvmsetup in an "
@@ -158,7 +158,7 @@ static struct block_device *open_bdev(int index, dev_t device, int display_errs)
 
 	this = kmalloc(sizeof(struct bdev_opened), GFP_KERNEL);
 	if (!this) {
-		printk(KERN_WARNING "Suspend2: Failed to allocate memory for "
+		printk(KERN_WARNING "TuxOnIce: Failed to allocate memory for "
 				"opening a bdev.");
 		close_bdev(index);
 		return ERR_PTR(-ENOMEM);
@@ -175,7 +175,7 @@ static struct block_device *open_bdev(int index, dev_t device, int display_errs)
 }
 
 /**
- * enable_swapfile: Swapon the user specified swapfile prior to suspending.
+ * enable_swapfile: Swapon the user specified swapfile prior to hibernating.
  *
  * Activate the given swapfile if it wasn't already enabled. Remember whether
  * we really did swapon it for swapoffing later.
@@ -188,13 +188,13 @@ static void enable_swapfile(void)
 		/* Attempt to swap on with maximum priority */
 		activateswapresult = sys_swapon(swapfilename, 0xFFFF);
 		if (activateswapresult && activateswapresult != -EBUSY)
-			printk("Suspend2: The swapfile/partition specified by "
-				"/sys/power/suspend2/suspend_swap/swapfile "
+			printk("TuxOnIce: The swapfile/partition specified by "
+				"/sys/power/suspend2/toi_swap/swapfile "
 				"(%s) could not be turned on (error %d). "
 				"Attempting to continue.\n",
 				swapfilename, activateswapresult);
 		if (!activateswapresult)
-			suspend_swapon_status = 1;
+			toi_swapon_status = 1;
 	}
 }
 
@@ -206,11 +206,11 @@ static void enable_swapfile(void)
  */
 static void disable_swapfile(void)
 {
-	if (!suspend_swapon_status)
+	if (!toi_swapon_status)
 		return;
 
 	sys_swapoff(swapfilename);
-	suspend_swapon_status = 0;
+	toi_swapon_status = 0;
 }
 
 /**
@@ -244,11 +244,11 @@ static int try_to_parse_resume_device(char *commandline, int quiet)
 			return 1;
 
 		if (test_toi_state(TOI_TRYING_TO_RESUME))
-			suspend_early_boot_message(1, TOI_CONTINUE_REQ,
+			toi_early_boot_message(1, TOI_CONTINUE_REQ,
 			  "Failed to translate \"%s\" into a device id.\n",
 			  commandline);
 		else
-			printk("Suspend2: Can't translate \"%s\" into a device "
+			printk("TuxOnIce: Can't translate \"%s\" into a device "
 					"id yet.\n", commandline);
 		return 1;
 	}
@@ -256,7 +256,7 @@ static int try_to_parse_resume_device(char *commandline, int quiet)
 	resume_block_device = open_bdev(MAX_SWAPFILES, resume_swap_dev_t, 0);
 	if (IS_ERR(resume_block_device)) {
 		if (!quiet)
-			suspend_early_boot_message(1, TOI_CONTINUE_REQ,
+			toi_early_boot_message(1, TOI_CONTINUE_REQ,
 				"Failed to get access to \"%s\", where"
 				" the swap header should be found.",
 				commandline);
@@ -270,7 +270,7 @@ static int try_to_parse_resume_device(char *commandline, int quiet)
  * If we have read part of the image, we might have filled  memory with
  * data that should be zeroed out.
  */
-static void suspend_swap_noresume_reset(void)
+static void toi_swap_noresume_reset(void)
 {
 	memset((char *) &devinfo, 0, sizeof(devinfo));
 }
@@ -297,7 +297,7 @@ static int parse_signature(char *header, int restore)
 		type = 13;
 	
 	/* 
-	 * Put bdev of suspend header in last byte of swap header
+	 * Put bdev of hibernate header in last byte of swap header
 	 * (unsigned short)
 	 */
 	if (type > 11) {
@@ -346,7 +346,7 @@ static int prepare_signature(dev_t bdev, unsigned long block,
 	 * safely put the data elsewhere. */
 
 	if (BITS_PER_LONG == 64 && ffs(block) > 31) {
-		suspend_prepare_status(DONT_CLEAR_BAR,
+		toi_prepare_status(DONT_CLEAR_BAR,
 			"Header sector requires 33+ bits. "
 			"Would not be able to resume.");
 		return 1;
@@ -362,24 +362,24 @@ static int prepare_signature(dev_t bdev, unsigned long block,
 	return 0;
 }
 
-static int __suspend_swap_allocate_storage(int main_storage_requested,
+static int __toi_swap_allocate_storage(int main_storage_requested,
 		int header_storage);
 
-static int suspend_swap_allocate_header_space(int space_requested)
+static int toi_swap_allocate_header_space(int space_requested)
 {
 	int i;
 
-	if (!swapextents.size && __suspend_swap_allocate_storage(
+	if (!swapextents.size && __toi_swap_allocate_storage(
 				main_pages_requested, space_requested)) {
 		printk("Failed to allocate space for the header.\n");
 		return -ENOSPC;
 	}
 
-	suspend_extent_state_goto_start(&suspend_writer_posn);
-	suspend_bio_ops.forward_one_page(); /* To first page */
+	toi_extent_state_goto_start(&toi_writer_posn);
+	toi_bio_ops.forward_one_page(); /* To first page */
 	
 	for (i = 0; i < space_requested; i++) {
-		if (suspend_bio_ops.forward_one_page()) {
+		if (toi_bio_ops.forward_one_page()) {
 			printk("Out of space while seeking to allocate "
 					"header pages,\n");
 			header_pages_allocated = i;
@@ -392,8 +392,8 @@ static int suspend_swap_allocate_header_space(int space_requested)
 
 	/* The end of header pages will be the start of pageset 2;
 	 * we are now sitting on the first pageset2 page. */
-	suspend_extent_state_save(&suspend_writer_posn,
-			&suspend_writer_posn_save[2]);
+	toi_extent_state_save(&toi_writer_posn,
+			&toi_writer_posn_save[2]);
 	return 0;
 }
 
@@ -405,9 +405,9 @@ static void get_main_pool_phys_params(void)
 
 	for (i = 0; i < MAX_SWAPFILES; i++)
 		if (block_chain[i].first)
-			suspend_put_extent_chain(&block_chain[i]);
+			toi_put_extent_chain(&block_chain[i]);
 
-	suspend_extent_for_each(&swapextents, extentpointer, address) {
+	toi_extent_for_each(&swapextents, extentpointer, address) {
 		swp_entry_t swap_address = extent_val_to_swap_entry(address);
 		pgoff_t offset = swp_offset(swap_address);
 		unsigned swapfilenum = swp_type(swap_address);
@@ -427,7 +427,7 @@ static void get_main_pool_phys_params(void)
 						extent_max <<
 						 devinfo[last_chain].bmap_shift);
 						
-				suspend_add_to_extent_chain(
+				toi_add_to_extent_chain(
 					&block_chain[last_chain],
 					extent_min, extent_max);
 			}
@@ -444,27 +444,27 @@ static void get_main_pool_phys_params(void)
 					devinfo[last_chain].bmap_shift,
 				extent_max <<
 					devinfo[last_chain].bmap_shift);
-		suspend_add_to_extent_chain(
+		toi_add_to_extent_chain(
 			&block_chain[last_chain],
 			extent_min, extent_max);
 	}
 
-	suspend_swap_allocate_header_space(header_pages_allocated);
+	toi_swap_allocate_header_space(header_pages_allocated);
 }
 
-static int suspend_swap_storage_allocated(void)
+static int toi_swap_storage_allocated(void)
 {
 	return main_pages_requested + header_pages_allocated;
 }
 
-static int suspend_swap_storage_available(void)
+static int toi_swap_storage_available(void)
 {
 	si_swapinfo(&swapinfo);
 	return (((int) swapinfo.freeswap + main_pages_allocated) * PAGE_SIZE /
 		(PAGE_SIZE + sizeof(unsigned long) + sizeof(int)));
 }
 
-static int suspend_swap_initialise(int starting_cycle)
+static int toi_swap_initialise(int starting_cycle)
 {
 	if (!starting_cycle)
 		return 0;
@@ -479,7 +479,7 @@ static int suspend_swap_initialise(int starting_cycle)
 	return 0;
 }
 
-static void suspend_swap_cleanup(int ending_cycle)
+static void toi_swap_cleanup(int ending_cycle)
 {
 	if (ending_cycle)
 		disable_swapfile();
@@ -487,7 +487,7 @@ static void suspend_swap_cleanup(int ending_cycle)
 	close_bdevs();
 }
 
-static int suspend_swap_release_storage(void)
+static int toi_swap_release_storage(void)
 {
 	int i = 0;
 
@@ -502,23 +502,23 @@ static int suspend_swap_release_storage(void)
 		/* Free swap entries */
 		struct extent *extentpointer;
 		unsigned long extentvalue;
-		suspend_extent_for_each(&swapextents, extentpointer, 
+		toi_extent_for_each(&swapextents, extentpointer, 
 				extentvalue)
 			swap_free(extent_val_to_swap_entry(extentvalue));
 
-		suspend_put_extent_chain(&swapextents);
+		toi_put_extent_chain(&swapextents);
 
 		for (i = 0; i < MAX_SWAPFILES; i++)
 			if (block_chain[i].first)
-				suspend_put_extent_chain(&block_chain[i]);
+				toi_put_extent_chain(&block_chain[i]);
 	}
 
 	return 0;
 }
 
-static int suspend_swap_allocate_storage(int space_requested)
+static int toi_swap_allocate_storage(int space_requested)
 {
-	if (!__suspend_swap_allocate_storage(space_requested,
+	if (!__toi_swap_allocate_storage(space_requested,
 				header_pages_allocated)) {
 		main_pages_requested = space_requested;
 		return 0;
@@ -540,7 +540,7 @@ static void free_swap_range(unsigned long min, unsigned long max)
  * could make this very inefficient, so we track extents allocated on
  * a per-swapfiles basis.
  */
-static int __suspend_swap_allocate_storage(int main_space_requested,
+static int __toi_swap_allocate_storage(int main_space_requested,
 		int header_space_requested)
 {
 	int i, result = 0, first[MAX_SWAPFILES], pages_to_get, extra_pages, gotten = 0;
@@ -589,7 +589,7 @@ static int __suspend_swap_allocate_storage(int main_space_requested,
 			continue;
 		}
 
-		if (suspend_add_to_extent_chain(&swapextents,
+		if (toi_add_to_extent_chain(&swapextents,
 					extent_min[swapfilenum],
 					extent_max[swapfilenum])) {
 			free_swap_range(extent_min[swapfilenum],
@@ -606,7 +606,7 @@ static int __suspend_swap_allocate_storage(int main_space_requested,
 	}
 
 	for (i = 0; i < MAX_SWAPFILES; i++)
-		if (!first[i] && suspend_add_to_extent_chain(&swapextents,
+		if (!first[i] && toi_add_to_extent_chain(&swapextents,
 					extent_min[i], extent_max[i])) {
 			free_swap_range(extent_min[i], extent_max[i]);
 			gotten -= (extent_max[i] - extent_min[i]);
@@ -620,14 +620,14 @@ static int __suspend_swap_allocate_storage(int main_space_requested,
 	return result;
 }
 
-static int suspend_swap_write_header_init(void)
+static int toi_swap_write_header_init(void)
 {
 	int i, result;
 	struct swap_info_struct *si;
 
-	suspend_extent_state_goto_start(&suspend_writer_posn);
+	toi_extent_state_goto_start(&toi_writer_posn);
 
-	suspend_writer_buffer_posn = suspend_header_bytes_used = 0;
+	toi_writer_buffer_posn = toi_header_bytes_used = 0;
 
 	/* Info needed to bootstrap goes at the start of the header.
 	 * First we save the positions and devinfo, including the number
@@ -647,53 +647,53 @@ static int suspend_swap_write_header_init(void)
 			devinfo[i].dev_t = (dev_t) 0;
 	}
 
-	if ((result = suspend_bio_ops.rw_header_chunk(WRITE,
-			&suspend_swapops,
-			(char *) &suspend_writer_posn_save, 
-			sizeof(suspend_writer_posn_save))))
+	if ((result = toi_bio_ops.rw_header_chunk(WRITE,
+			&toi_swapops,
+			(char *) &toi_writer_posn_save, 
+			sizeof(toi_writer_posn_save))))
 		return result;
 
-	if ((result = suspend_bio_ops.rw_header_chunk(WRITE,
-			&suspend_swapops,
+	if ((result = toi_bio_ops.rw_header_chunk(WRITE,
+			&toi_swapops,
 			(char *) &devinfo, sizeof(devinfo))))
 		return result;
 
 	for (i=0; i < MAX_SWAPFILES; i++)
-		suspend_serialise_extent_chain(&suspend_swapops, &block_chain[i]);
+		toi_serialise_extent_chain(&toi_swapops, &block_chain[i]);
 
 	return 0;
 }
 
-static int suspend_swap_write_header_cleanup(void)
+static int toi_swap_write_header_cleanup(void)
 {
 	int result;
 	struct swap_info_struct *si;
 
 	/* Write any unsaved data */
-	if (suspend_writer_buffer_posn)
-		suspend_bio_ops.write_header_chunk_finish();
+	if (toi_writer_buffer_posn)
+		toi_bio_ops.write_header_chunk_finish();
 
-	suspend_bio_ops.finish_all_io();
+	toi_bio_ops.finish_all_io();
 
-	suspend_extent_state_goto_start(&suspend_writer_posn);
-	suspend_bio_ops.forward_one_page();
+	toi_extent_state_goto_start(&toi_writer_posn);
+	toi_bio_ops.forward_one_page();
 
 	/* Adjust swap header */
-	suspend_bio_ops.bdev_page_io(READ, resume_block_device,
+	toi_bio_ops.bdev_page_io(READ, resume_block_device,
 			resume_firstblock,
-			virt_to_page(suspend_writer_buffer));
+			virt_to_page(toi_writer_buffer));
 
-	si = get_swap_info_struct(suspend_writer_posn.current_chain);
+	si = get_swap_info_struct(toi_writer_posn.current_chain);
 	result = prepare_signature(si->bdev->bd_dev,
-			suspend_writer_posn.current_offset,
-		((union swap_header *) suspend_writer_buffer)->magic.magic);
+			toi_writer_posn.current_offset,
+		((union swap_header *) toi_writer_buffer)->magic.magic);
 		
 	if (!result)
-		suspend_bio_ops.bdev_page_io(WRITE, resume_block_device,
+		toi_bio_ops.bdev_page_io(WRITE, resume_block_device,
 			resume_firstblock,
-			virt_to_page(suspend_writer_buffer));
+			virt_to_page(toi_writer_buffer));
 
-	suspend_bio_ops.finish_all_io();
+	toi_bio_ops.finish_all_io();
 
 	return result;
 }
@@ -707,7 +707,7 @@ static int suspend_swap_write_header_cleanup(void)
  * 1. Attempt to read the device specified with resume=.
  * 2. Check the contents of the swap header for our signature.
  * 3. Warn, ignore, reset and/or continue as appropriate.
- * 4. If continuing, read the suspend_swap configuration section
+ * 4. If continuing, read the toi_swap configuration section
  *    of the header and set up block device info so we can read
  *    the rest of the header & image.
  *
@@ -717,11 +717,11 @@ static int suspend_swap_write_header_cleanup(void)
  * normally.
  */
 
-static int suspend_swap_read_header_init(void)
+static int toi_swap_read_header_init(void)
 {
 	int i, result = 0;
 
-	suspend_header_bytes_used = 0;
+	toi_header_bytes_used = 0;
 
 	if (!header_dev_t) {
 		printk("read_header_init called when we haven't "
@@ -742,22 +742,22 @@ static int suspend_swap_read_header_init(void)
 		header_block_device = resume_block_device;
 
 	/* 
-	 * Read suspend_swap configuration.
+	 * Read toi_swap configuration.
 	 * Headerblock size taken into account already.
 	 */
-	suspend_bio_ops.bdev_page_io(READ, header_block_device,
+	toi_bio_ops.bdev_page_io(READ, header_block_device,
 			headerblock << 3,
-			virt_to_page((unsigned long) suspend_writer_buffer));
+			virt_to_page((unsigned long) toi_writer_buffer));
 
-	memcpy(&suspend_writer_posn_save, suspend_writer_buffer, 3 * sizeof(struct extent_iterate_saved_state));
+	memcpy(&toi_writer_posn_save, toi_writer_buffer, 3 * sizeof(struct extent_iterate_saved_state));
 
-	suspend_writer_buffer_posn = 3 * sizeof(struct extent_iterate_saved_state);
-	suspend_header_bytes_used += 3 * sizeof(struct extent_iterate_saved_state);
+	toi_writer_buffer_posn = 3 * sizeof(struct extent_iterate_saved_state);
+	toi_header_bytes_used += 3 * sizeof(struct extent_iterate_saved_state);
 
-	memcpy(&devinfo, suspend_writer_buffer + suspend_writer_buffer_posn, sizeof(devinfo));
+	memcpy(&devinfo, toi_writer_buffer + toi_writer_buffer_posn, sizeof(devinfo));
 
-	suspend_writer_buffer_posn += sizeof(devinfo);
-	suspend_header_bytes_used += sizeof(devinfo);
+	toi_writer_buffer_posn += sizeof(devinfo);
+	toi_header_bytes_used += sizeof(devinfo);
 
 	/* Restore device info */
 	for (i = 0; i < MAX_SWAPFILES; i++) {
@@ -788,54 +788,54 @@ static int suspend_swap_read_header_init(void)
 			return PTR_ERR(result);
 	}
 
-	suspend_bio_ops.read_header_init();
-	suspend_extent_state_goto_start(&suspend_writer_posn);
-	suspend_bio_ops.set_extra_page_forward();
+	toi_bio_ops.read_header_init();
+	toi_extent_state_goto_start(&toi_writer_posn);
+	toi_bio_ops.set_extra_page_forward();
 
 	for (i = 0; i < MAX_SWAPFILES && !result; i++)
-		result = suspend_load_extent_chain(&block_chain[i]);
+		result = toi_load_extent_chain(&block_chain[i]);
 
 	return result;
 }
 
-static int suspend_swap_read_header_cleanup(void)
+static int toi_swap_read_header_cleanup(void)
 {
-	suspend_bio_ops.rw_cleanup(READ);
+	toi_bio_ops.rw_cleanup(READ);
 	return 0;
 }
 
-/* suspend_swap_remove_image
+/* toi_swap_remove_image
  * 
  */
-static int suspend_swap_remove_image(void)
+static int toi_swap_remove_image(void)
 {
 	union p_diskpage cur;
 	int result = 0;
 	char newsig[11];
 	
-	cur.address = get_zeroed_page(S2_ATOMIC_GFP);
+	cur.address = get_zeroed_page(TOI_ATOMIC_GFP);
 	if (!cur.address) {
 		printk("Unable to allocate a page for restoring the swap signature.\n");
 		return -ENOMEM;
 	}
 
 	/*
-	 * If nr_suspends == 0, we must be booting, so no swap pages
+	 * If nr_hibernates == 0, we must be booting, so no swap pages
 	 * will be recorded as used yet.
 	 */
 
-	if (nr_suspends > 0)
-		suspend_swap_release_storage();
+	if (nr_hibernates > 0)
+		toi_swap_release_storage();
 
 	/* 
 	 * We don't do a sanity check here: we want to restore the swap 
-	 * whatever version of kernel made the suspend image.
+	 * whatever version of kernel made the hibernate image.
 	 * 
 	 * We need to write swap, but swap may not be enabled so
 	 * we write the device directly
 	 */
 	
-	suspend_bio_ops.bdev_page_io(READ, resume_block_device,
+	toi_bio_ops.bdev_page_io(READ, resume_block_device,
 			resume_firstblock,
 			virt_to_page(cur.pointer));
 
@@ -847,11 +847,11 @@ static int suspend_swap_remove_image(void)
 	strncpy(newsig, cur.pointer->swh.magic.magic, 10);
 	newsig[10] = 0;
 
-	suspend_bio_ops.bdev_page_io(WRITE, resume_block_device,
+	toi_bio_ops.bdev_page_io(WRITE, resume_block_device,
 			resume_firstblock,
 			virt_to_page(cur.pointer));
 out:
-	suspend_bio_ops.finish_all_io();
+	toi_bio_ops.finish_all_io();
 	free_page(cur.address);
 	return 0;
 }
@@ -862,10 +862,10 @@ out:
  * Description:
  * Returns the number of bytes of RAM needed for this
  * code to do its work. (Used when calculating whether
- * we have enough memory to be able to suspend & resume).
+ * we have enough memory to be able to hibernate & resume).
  *
  */
-static int suspend_swap_memory_needed(void)
+static int toi_swap_memory_needed(void)
 {
 	return 1;
 }
@@ -875,12 +875,12 @@ static int suspend_swap_memory_needed(void)
  *
  * Description:
  */
-static int suspend_swap_print_debug_stats(char *buffer, int size)
+static int toi_swap_print_debug_stats(char *buffer, int size)
 {
 	int len = 0;
 	struct sysinfo sysinfo;
 	
-	if (suspendActiveAllocator != &suspend_swapops) {
+	if (toiActiveAllocator != &toi_swapops) {
 		len = snprintf_used(buffer, size, "- SwapAllocator inactive.\n");
 		return len;
 	}
@@ -893,7 +893,7 @@ static int suspend_swap_print_debug_stats(char *buffer, int size)
 	si_swapinfo(&sysinfo);
 	
 	len+= snprintf_used(buffer+len, size-len, "  Swap available for image: %ld pages.\n",
-			(int) sysinfo.freeswap + suspend_swap_storage_allocated());
+			(int) sysinfo.freeswap + toi_swap_storage_allocated());
 
 	return len;
 }
@@ -902,17 +902,17 @@ static int suspend_swap_print_debug_stats(char *buffer, int size)
  * Storage needed
  *
  * Returns amount of space in the swap header required
- * for the suspend_swap's data. This ignores the links between
+ * for the toi_swap's data. This ignores the links between
  * pages, which we factor in when allocating the space.
  *
  * We ensure the space is allocated, but actually save the
  * data from write_header_init and therefore don't also define a
  * save_config_info routine.
  */
-static int suspend_swap_storage_needed(void)
+static int toi_swap_storage_needed(void)
 {
 	int i, result;
-	result = sizeof(suspend_writer_posn_save) + sizeof(devinfo);
+	result = sizeof(toi_writer_posn_save) + sizeof(devinfo);
 
 	for (i = 0; i < MAX_SWAPFILES; i++) {
 		result += 3 * sizeof(int);
@@ -926,7 +926,7 @@ static int suspend_swap_storage_needed(void)
 /*
  * Image_exists
  */
-static int suspend_swap_image_exists(void)
+static int toi_swap_image_exists(void)
 {
 	int signature_found;
 	union p_diskpage diskpage;
@@ -944,32 +944,32 @@ static int suspend_swap_image_exists(void)
 		return 0;
 	}
 
-	diskpage.address = get_zeroed_page(S2_ATOMIC_GFP);
+	diskpage.address = get_zeroed_page(TOI_ATOMIC_GFP);
 
-	suspend_bio_ops.bdev_page_io(READ, resume_block_device,
+	toi_bio_ops.bdev_page_io(READ, resume_block_device,
 			resume_firstblock,
 			virt_to_page(diskpage.ptr));
-	suspend_bio_ops.finish_all_io();
+	toi_bio_ops.finish_all_io();
 
 	signature_found = parse_signature(diskpage.pointer->swh.magic.magic, 0);
 	free_page(diskpage.address);
 
 	if (signature_found < 2) {
-		printk("Suspend2: Normal swapspace found.\n");
+		printk("TuxOnIce: Normal swapspace found.\n");
 		return 0;	/* Normal swap space */
 	} else if (signature_found == -1) {
-		printk(KERN_ERR "Suspend2: Unable to find a signature. Could "
+		printk(KERN_ERR "TuxOnIce: Unable to find a signature. Could "
 				"you have moved a swap file?\n");
 		return 0;
 	} else if (signature_found < 6) {
-		printk("Suspend2: Detected another implementation's signature.\n");
+		printk("TuxOnIce: Detected another implementation's signature.\n");
 		return 0;
 	} else if ((signature_found >> 1) != SIGNATURE_VER) {
 		if (!test_toi_state(TOI_NORESUME_SPECIFIED)) {
-			suspend_early_boot_message(1, TOI_CONTINUE_REQ,
-			  "Found a different style suspend image signature.");
+			toi_early_boot_message(1, TOI_CONTINUE_REQ,
+			  "Found a different style hibernate image signature.");
 			set_toi_state(TOI_NORESUME_SPECIFIED);
-			printk("Suspend2: Dectected another implementation's signature.\n");
+			printk("TuxOnIce: Dectected another implementation's signature.\n");
 		}
 	}
 
@@ -981,7 +981,7 @@ static int suspend_swap_image_exists(void)
  *
  * Record that we tried to resume from this image.
  */
-static void suspend_swap_mark_resume_attempted(int mark)
+static void toi_swap_mark_resume_attempted(int mark)
 {
 	union p_diskpage diskpage;
 	int signature_found;
@@ -992,9 +992,9 @@ static void suspend_swap_mark_resume_attempted(int mark)
 		return;
 	}
 	
-	diskpage.address = get_zeroed_page(S2_ATOMIC_GFP);
+	diskpage.address = get_zeroed_page(TOI_ATOMIC_GFP);
 
-	suspend_bio_ops.bdev_page_io(READ, resume_block_device,
+	toi_bio_ops.bdev_page_io(READ, resume_block_device,
 			resume_firstblock,
 			virt_to_page(diskpage.ptr));
 	signature_found = parse_signature(diskpage.pointer->swh.magic.magic, 0);
@@ -1008,10 +1008,10 @@ static void suspend_swap_mark_resume_attempted(int mark)
 			break;
 	}
 	
-	suspend_bio_ops.bdev_page_io(WRITE, resume_block_device,
+	toi_bio_ops.bdev_page_io(WRITE, resume_block_device,
 			resume_firstblock,
 			virt_to_page(diskpage.ptr));
-	suspend_bio_ops.finish_all_io();
+	toi_bio_ops.finish_all_io();
 	free_page(diskpage.address);
 	return;
 }
@@ -1028,11 +1028,11 @@ static void suspend_swap_mark_resume_attempted(int mark)
  * FIRSTBLOCK is the location of the first block in the swap file
  * (specifying for a swap partition is nonsensical but not prohibited).
  * Data is validated by attempting to read a swap header from the
- * location given. Failure will result in suspend_swap refusing to
+ * location given. Failure will result in toi_swap refusing to
  * save an image, and a reboot with correct parameters will be
  * necessary.
  */
-static int suspend_swap_parse_sig_location(char *commandline,
+static int toi_swap_parse_sig_location(char *commandline,
 		int only_allocator, int quiet)
 {
 	char *thischar, *devstart, *colon = NULL;
@@ -1080,31 +1080,31 @@ static int suspend_swap_parse_sig_location(char *commandline,
 	if (temp_result)
 		return -EINVAL;
 
-	diskpage.address = get_zeroed_page(S2_ATOMIC_GFP);
+	diskpage.address = get_zeroed_page(TOI_ATOMIC_GFP);
 	if (!diskpage.address) {
-		printk(KERN_ERR "Suspend2: SwapAllocator: Failed to allocate "
+		printk(KERN_ERR "TuxOnIce: SwapAllocator: Failed to allocate "
 					"a diskpage for I/O.\n");
 		return -ENOMEM;
 	}
 
-	suspend_bio_ops.bdev_page_io(READ, resume_block_device,
+	toi_bio_ops.bdev_page_io(READ, resume_block_device,
 			resume_firstblock, virt_to_page(diskpage.ptr));
 
-	suspend_bio_ops.finish_all_io();
+	toi_bio_ops.finish_all_io();
 	
 	signature_found = parse_signature(diskpage.pointer->swh.magic.magic, 0);
 
 	if (signature_found != -1) {
 		result = 0;
 
-		suspend_bio_ops.set_devinfo(devinfo);
-		suspend_writer_posn.chains = &block_chain[0];
-		suspend_writer_posn.num_chains = MAX_SWAPFILES;
+		toi_bio_ops.set_devinfo(devinfo);
+		toi_writer_posn.chains = &block_chain[0];
+		toi_writer_posn.num_chains = MAX_SWAPFILES;
 		set_toi_state(TOI_CAN_HIBERNATE);
 		set_toi_state(TOI_CAN_RESUME);
 	} else
 		if (!quiet)
-			printk(KERN_ERR "Suspend2: SwapAllocator: No swap "
+			printk(KERN_ERR "TuxOnIce: SwapAllocator: No swap "
 				"signature found at %s.\n", devstart);
 	free_page((unsigned long) diskpage.address);
 	return result;
@@ -1173,76 +1173,76 @@ static int header_locations_read_sysfs(const char *page, int count)
 	return len;
 }
 
-static struct suspend_sysfs_data sysfs_params[] = {
+static struct toi_sysfs_data sysfs_params[] = {
 	{
-	 SUSPEND2_ATTR("swapfilename", SYSFS_RW),
+	 TOI_ATTR("swapfilename", SYSFS_RW),
 	 SYSFS_STRING(swapfilename, 255, 0)
 	},
 
 	{
-	 SUSPEND2_ATTR("headerlocations", SYSFS_READONLY),
+	 TOI_ATTR("headerlocations", SYSFS_READONLY),
 	 SYSFS_CUSTOM(header_locations_read_sysfs, NULL, 0)
 	},
 
-	{ SUSPEND2_ATTR("enabled", SYSFS_RW),
-	  SYSFS_INT(&suspend_swapops.enabled, 0, 1, 0),
+	{ TOI_ATTR("enabled", SYSFS_RW),
+	  SYSFS_INT(&toi_swapops.enabled, 0, 1, 0),
 	  .write_side_effect		= attempt_to_parse_resume_device2,
 	}
 };
 
-static struct suspend_module_ops suspend_swapops = {
+static struct toi_module_ops toi_swapops = {
 	.type					= WRITER_MODULE,
 	.name					= "swap storage",
 	.directory				= "swap",
 	.module					= THIS_MODULE,
-	.memory_needed				= suspend_swap_memory_needed,
-	.print_debug_info			= suspend_swap_print_debug_stats,
-	.storage_needed				= suspend_swap_storage_needed,
-	.initialise				= suspend_swap_initialise,
-	.cleanup				= suspend_swap_cleanup,
+	.memory_needed				= toi_swap_memory_needed,
+	.print_debug_info			= toi_swap_print_debug_stats,
+	.storage_needed				= toi_swap_storage_needed,
+	.initialise				= toi_swap_initialise,
+	.cleanup				= toi_swap_cleanup,
 
-	.noresume_reset		= suspend_swap_noresume_reset,
-	.storage_available 	= suspend_swap_storage_available,
-	.storage_allocated	= suspend_swap_storage_allocated,
-	.release_storage	= suspend_swap_release_storage,
-	.allocate_header_space	= suspend_swap_allocate_header_space,
-	.allocate_storage	= suspend_swap_allocate_storage,
-	.image_exists		= suspend_swap_image_exists,
-	.mark_resume_attempted	= suspend_swap_mark_resume_attempted,
-	.write_header_init	= suspend_swap_write_header_init,
-	.write_header_cleanup	= suspend_swap_write_header_cleanup,
-	.read_header_init	= suspend_swap_read_header_init,
-	.read_header_cleanup	= suspend_swap_read_header_cleanup,
-	.remove_image		= suspend_swap_remove_image,
-	.parse_sig_location	= suspend_swap_parse_sig_location,
+	.noresume_reset		= toi_swap_noresume_reset,
+	.storage_available 	= toi_swap_storage_available,
+	.storage_allocated	= toi_swap_storage_allocated,
+	.release_storage	= toi_swap_release_storage,
+	.allocate_header_space	= toi_swap_allocate_header_space,
+	.allocate_storage	= toi_swap_allocate_storage,
+	.image_exists		= toi_swap_image_exists,
+	.mark_resume_attempted	= toi_swap_mark_resume_attempted,
+	.write_header_init	= toi_swap_write_header_init,
+	.write_header_cleanup	= toi_swap_write_header_cleanup,
+	.read_header_init	= toi_swap_read_header_init,
+	.read_header_cleanup	= toi_swap_read_header_cleanup,
+	.remove_image		= toi_swap_remove_image,
+	.parse_sig_location	= toi_swap_parse_sig_location,
 
 	.sysfs_data		= sysfs_params,
-	.num_sysfs_entries	= sizeof(sysfs_params) / sizeof(struct suspend_sysfs_data),
+	.num_sysfs_entries	= sizeof(sysfs_params) / sizeof(struct toi_sysfs_data),
 };
 
 /* ---- Registration ---- */
-static __init int suspend_swap_load(void)
+static __init int toi_swap_load(void)
 {
-	suspend_swapops.rw_init = suspend_bio_ops.rw_init;
-	suspend_swapops.rw_cleanup = suspend_bio_ops.rw_cleanup;
-	suspend_swapops.read_page = suspend_bio_ops.read_page;
-	suspend_swapops.write_page = suspend_bio_ops.write_page;
-	suspend_swapops.rw_header_chunk = suspend_bio_ops.rw_header_chunk;
+	toi_swapops.rw_init = toi_bio_ops.rw_init;
+	toi_swapops.rw_cleanup = toi_bio_ops.rw_cleanup;
+	toi_swapops.read_page = toi_bio_ops.read_page;
+	toi_swapops.write_page = toi_bio_ops.write_page;
+	toi_swapops.rw_header_chunk = toi_bio_ops.rw_header_chunk;
 
-	return suspend_register_module(&suspend_swapops);
+	return toi_register_module(&toi_swapops);
 }
 
 #ifdef MODULE
-static __exit void suspend_swap_unload(void)
+static __exit void toi_swap_unload(void)
 {
-	suspend_unregister_module(&suspend_swapops);
+	toi_unregister_module(&toi_swapops);
 }
 
-module_init(suspend_swap_load);
-module_exit(suspend_swap_unload);
+module_init(toi_swap_load);
+module_exit(toi_swap_unload);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Nigel Cunningham");
-MODULE_DESCRIPTION("Suspend2 SwapAllocator");
+MODULE_DESCRIPTION("TuxOnIce SwapAllocator");
 #else
-late_initcall(suspend_swap_load);
+late_initcall(toi_swap_load);
 #endif

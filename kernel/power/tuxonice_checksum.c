@@ -6,7 +6,7 @@
  *
  * This file is released under the GPLv2.
  *
- * This file contains data checksum routines for suspend2,
+ * This file contains data checksum routines for TuxOnIce,
  * using cryptoapi. They are used to locate any modifications
  * made to pageset 2 while we're saving it.
  */
@@ -26,21 +26,21 @@
 #include "tuxonice_checksum.h"
 #include "tuxonice_pagedir.h"
 
-static struct suspend_module_ops suspend_checksum_ops;
+static struct toi_module_ops toi_checksum_ops;
 
 /* Constant at the mo, but I might allow tuning later */
-static char suspend_checksum_name[32] = "md5";
+static char toi_checksum_name[32] = "md5";
 /* Bytes per checksum */
 #define CHECKSUM_SIZE (128 / 8)
 
 #define CHECKSUMS_PER_PAGE ((PAGE_SIZE - sizeof(void *)) / CHECKSUM_SIZE)
 
-static struct crypto_hash *suspend_checksum_transform;
+static struct crypto_hash *toi_checksum_transform;
 static struct hash_desc desc;
 static int pages_allocated;
 static unsigned long page_list;
 
-static int suspend_num_resaved = 0;
+static int toi_num_resaved = 0;
 
 #if 1
 #define PRINTK(a, b...) do { } while(0)
@@ -51,52 +51,52 @@ static int suspend_num_resaved = 0;
 /* ---- Local buffer management ---- */
 
 /* 
- * suspend_checksum_cleanup
+ * toi_checksum_cleanup
  *
  * Frees memory allocated for our labours.
  */
-static void suspend_checksum_cleanup(int ending_cycle)
+static void toi_checksum_cleanup(int ending_cycle)
 {
-	if (ending_cycle && suspend_checksum_transform) {
-		crypto_free_hash(suspend_checksum_transform);
-		suspend_checksum_transform = NULL;
+	if (ending_cycle && toi_checksum_transform) {
+		crypto_free_hash(toi_checksum_transform);
+		toi_checksum_transform = NULL;
 		desc.tfm = NULL;
 	}
 }
 
 /* 
- * suspend_crypto_prepare
+ * toi_crypto_prepare
  *
  * Prepare to do some work by allocating buffers and transforms.
  * Returns: Int: Zero. Even if we can't set up checksum, we still
- * seek to suspend.
+ * seek to hibernate.
  */
-static int suspend_checksum_prepare(int starting_cycle)
+static int toi_checksum_prepare(int starting_cycle)
 {
-	if (!starting_cycle || !suspend_checksum_ops.enabled)
+	if (!starting_cycle || !toi_checksum_ops.enabled)
 		return 0;
 
-	if (!*suspend_checksum_name) {
-		printk("Suspend2: No checksum algorithm name set.\n");
+	if (!*toi_checksum_name) {
+		printk("TuxOnIce: No checksum algorithm name set.\n");
 		return 1;
 	}
 
-	suspend_checksum_transform = crypto_alloc_hash(suspend_checksum_name, 0, 0);
-	if (IS_ERR(suspend_checksum_transform)) {
-		printk("Suspend2: Failed to initialise the %s checksum algorithm: %ld.\n",
-				suspend_checksum_name,
-				(long) suspend_checksum_transform);
-		suspend_checksum_transform = NULL;
+	toi_checksum_transform = crypto_alloc_hash(toi_checksum_name, 0, 0);
+	if (IS_ERR(toi_checksum_transform)) {
+		printk("TuxOnIce: Failed to initialise the %s checksum algorithm: %ld.\n",
+				toi_checksum_name,
+				(long) toi_checksum_transform);
+		toi_checksum_transform = NULL;
 		return 1;
 	}
 
-	desc.tfm = suspend_checksum_transform;
+	desc.tfm = toi_checksum_transform;
 	desc.flags = 0;
 
 	return 0;
 }
 
-static int suspend_print_task_if_using_page(struct task_struct *t, struct page *seeking)
+static int toi_print_task_if_using_page(struct task_struct *t, struct page *seeking)
 {
 	struct vm_area_struct *vma;
 	struct mm_struct *mm;
@@ -107,7 +107,7 @@ static int suspend_print_task_if_using_page(struct task_struct *t, struct page *
 	if (!mm || !mm->mmap) return 0;
 
 	/* Don't try to take the sem when processes are frozen, 
-	 * drivers are suspended and irqs are disabled. We're
+	 * drivers are hibernated and irqs are disabled. We're
 	 * not racing with anything anyway.  */
 	if (!irqs_disabled())
 		down_read(&mm->mmap_sem);
@@ -143,14 +143,14 @@ static void print_tasks_using_page(struct page *seeking)
 
 	read_lock(&tasklist_lock);
 	for_each_process(p) {
-		if (suspend_print_task_if_using_page(p, seeking))
+		if (toi_print_task_if_using_page(p, seeking))
 			printk(" ");
 	}
 	read_unlock(&tasklist_lock);
 }
 
 /* 
- * suspend_checksum_print_debug_stats
+ * toi_checksum_print_debug_stats
  * @buffer: Pointer to a buffer into which the debug info will be printed.
  * @size: Size of the buffer.
  *
@@ -158,61 +158,61 @@ static void print_tasks_using_page(struct page *seeking)
  * Returns: Number of characters written to the buffer.
  */
 
-static int suspend_checksum_print_debug_stats(char *buffer, int size)
+static int toi_checksum_print_debug_stats(char *buffer, int size)
 {
 	int len;
 
-	if (!suspend_checksum_ops.enabled)
+	if (!toi_checksum_ops.enabled)
 		return snprintf_used(buffer, size,
 			"- Checksumming disabled.\n");
 	
 	len = snprintf_used(buffer, size, "- Checksum method is '%s'.\n",
-			suspend_checksum_name);
+			toi_checksum_name);
 	len+= snprintf_used(buffer + len, size - len,
-		"  %d pages resaved in atomic copy.\n", suspend_num_resaved);
+		"  %d pages resaved in atomic copy.\n", toi_num_resaved);
 	return len;
 }
 
-static int suspend_checksum_storage_needed(void)
+static int toi_checksum_storage_needed(void)
 {
-	if (suspend_checksum_ops.enabled)
-		return strlen(suspend_checksum_name) + sizeof(int) + 1;
+	if (toi_checksum_ops.enabled)
+		return strlen(toi_checksum_name) + sizeof(int) + 1;
 	else
 		return 0;
 }
 
 /* 
- * suspend_checksum_save_config_info
+ * toi_checksum_save_config_info
  * @buffer: Pointer to a buffer of size PAGE_SIZE.
  *
  * Save informaton needed when reloading the image at resume time.
  * Returns: Number of bytes used for saving our data.
  */
-static int suspend_checksum_save_config_info(char *buffer)
+static int toi_checksum_save_config_info(char *buffer)
 {
-	int namelen = strlen(suspend_checksum_name) + 1;
+	int namelen = strlen(toi_checksum_name) + 1;
 	int total_len;
 	
 	*((unsigned int *) buffer) = namelen;
-	strncpy(buffer + sizeof(unsigned int), suspend_checksum_name, 
+	strncpy(buffer + sizeof(unsigned int), toi_checksum_name, 
 								namelen);
 	total_len = sizeof(unsigned int) + namelen;
 	return total_len;
 }
 
-/* suspend_checksum_load_config_info
+/* toi_checksum_load_config_info
  * @buffer: Pointer to the start of the data.
  * @size: Number of bytes that were saved.
  *
  * Description:	Reload information needed for dechecksuming the image at
  * resume time.
  */
-static void suspend_checksum_load_config_info(char *buffer, int size)
+static void toi_checksum_load_config_info(char *buffer, int size)
 {
 	int namelen;
 
 	namelen = *((unsigned int *) (buffer));
-	strncpy(suspend_checksum_name, buffer + sizeof(unsigned int),
+	strncpy(toi_checksum_name, buffer + sizeof(unsigned int),
 			namelen);
 	return;
 }
@@ -242,13 +242,13 @@ int allocate_checksum_pages(void)
 {
 	int pages_needed = DIV_ROUND_UP(pagedir2.size, CHECKSUMS_PER_PAGE);
 
-	if (!suspend_checksum_ops.enabled)
+	if (!toi_checksum_ops.enabled)
 		return 0;
 
 	PRINTK("Need %d checksum pages for %ld pageset2 pages.\n", pages_needed, pagedir2.size);
 	while (pages_allocated < pages_needed) {
 		unsigned long *new_page =
-			(unsigned long *) get_zeroed_page(S2_ATOMIC_GFP);
+			(unsigned long *) get_zeroed_page(TOI_ATOMIC_GFP);
 		if (!new_page)
 			return -ENOMEM;
 		SetPageNosave(virt_to_page(new_page));
@@ -284,13 +284,13 @@ void calculate_check_checksums(int check)
 	struct scatterlist sg[2];
 	char current_checksum[CHECKSUM_SIZE];
 
-	if (!suspend_checksum_ops.enabled)
+	if (!toi_checksum_ops.enabled)
 		return;
 
 	next_page = (unsigned long) page_list;
 
 	if (check)
-		suspend_num_resaved = 0;
+		toi_num_resaved = 0;
 
 	BITMAP_FOR_EACH_SET(pageset2_map, pfn) {
 		int ret;
@@ -311,7 +311,7 @@ void calculate_check_checksums(int check)
 					"Processes using it:", pfn);
 				print_tasks_using_page(pfn_to_page(pfn));
 				printk("\n");
-				suspend_num_resaved++;
+				toi_num_resaved++;
 				if (test_action_state(TOI_ABORT_ON_RESAVE_NEEDED))
 					set_abort_result(TOI_RESAVE_NEEDED);
 			}
@@ -326,46 +326,46 @@ void calculate_check_checksums(int check)
 	}
 }
 
-static struct suspend_sysfs_data sysfs_params[] = {
-	{ SUSPEND2_ATTR("enabled", SYSFS_RW),
-	  SYSFS_INT(&suspend_checksum_ops.enabled, 0, 1, 0)
+static struct toi_sysfs_data sysfs_params[] = {
+	{ TOI_ATTR("enabled", SYSFS_RW),
+	  SYSFS_INT(&toi_checksum_ops.enabled, 0, 1, 0)
 	},
 
-	{ SUSPEND2_ATTR("abort_if_resave_needed", SYSFS_RW),
-	  SYSFS_BIT(&suspend_action, TOI_ABORT_ON_RESAVE_NEEDED, 0)
+	{ TOI_ATTR("abort_if_resave_needed", SYSFS_RW),
+	  SYSFS_BIT(&toi_action, TOI_ABORT_ON_RESAVE_NEEDED, 0)
 	}
 };
 
 /*
  * Ops structure.
  */
-static struct suspend_module_ops suspend_checksum_ops = {
+static struct toi_module_ops toi_checksum_ops = {
 	.type			= MISC_MODULE,
 	.name			= "checksumming",
 	.directory		= "checksum",
 	.module			= THIS_MODULE,
-	.initialise		= suspend_checksum_prepare,
-	.cleanup		= suspend_checksum_cleanup,
-	.print_debug_info	= suspend_checksum_print_debug_stats,
-	.save_config_info	= suspend_checksum_save_config_info,
-	.load_config_info	= suspend_checksum_load_config_info,
-	.storage_needed		= suspend_checksum_storage_needed,
+	.initialise		= toi_checksum_prepare,
+	.cleanup		= toi_checksum_cleanup,
+	.print_debug_info	= toi_checksum_print_debug_stats,
+	.save_config_info	= toi_checksum_save_config_info,
+	.load_config_info	= toi_checksum_load_config_info,
+	.storage_needed		= toi_checksum_storage_needed,
 
 	.sysfs_data		= sysfs_params,
-	.num_sysfs_entries	= sizeof(sysfs_params) / sizeof(struct suspend_sysfs_data),
+	.num_sysfs_entries	= sizeof(sysfs_params) / sizeof(struct toi_sysfs_data),
 };
 
 /* ---- Registration ---- */
-int s2_checksum_init(void)
+int toi_checksum_init(void)
 {
-	int result = suspend_register_module(&suspend_checksum_ops);
+	int result = toi_register_module(&toi_checksum_ops);
 
 	/* Disabled by default */
-	suspend_checksum_ops.enabled = 0;
+	toi_checksum_ops.enabled = 0;
 	return result;
 }
 
-void s2_checksum_exit(void)
+void toi_checksum_exit(void)
 {
-	suspend_unregister_module(&suspend_checksum_ops);
+	toi_unregister_module(&toi_checksum_ops);
 }

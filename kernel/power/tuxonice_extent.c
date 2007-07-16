@@ -16,15 +16,15 @@
 #include "tuxonice_ui.h"
 #include "tuxonice.h"
 
-/* suspend_get_extent
+/* toi_get_extent
  *
  * Returns a free extent. May fail, returning NULL instead.
  */
-static struct extent *suspend_get_extent(void)
+static struct extent *toi_get_extent(void)
 {
 	struct extent *result;
 	
-	if (!(result = kmalloc(sizeof(struct extent), S2_ATOMIC_GFP)))
+	if (!(result = kmalloc(sizeof(struct extent), TOI_ATOMIC_GFP)))
 		return NULL;
 
 	result->minimum = result->maximum = 0;
@@ -33,11 +33,11 @@ static struct extent *suspend_get_extent(void)
 	return result;
 }
 
-/* suspend_put_extent_chain.
+/* toi_put_extent_chain.
  *
  * Frees a whole chain of extents.
  */
-void suspend_put_extent_chain(struct extent_chain *chain)
+void toi_put_extent_chain(struct extent_chain *chain)
 {
 	struct extent *this;
 
@@ -55,11 +55,11 @@ void suspend_put_extent_chain(struct extent_chain *chain)
 }
 
 /* 
- * suspend_add_to_extent_chain
+ * toi_add_to_extent_chain
  *
  * Add an extent to an existing chain.
  */
-int suspend_add_to_extent_chain(struct extent_chain *chain, 
+int toi_add_to_extent_chain(struct extent_chain *chain, 
 		unsigned long minimum, unsigned long maximum)
 {
 	struct extent *new_extent = NULL, *start_at;
@@ -94,7 +94,7 @@ int suspend_add_to_extent_chain(struct extent_chain *chain,
 		return 0;
 	}
 
-	new_extent = suspend_get_extent();
+	new_extent = toi_get_extent();
 	if (!new_extent) {
 		printk("Error unable to append a new extent to the chain.\n");
 		return 2;
@@ -121,24 +121,24 @@ int suspend_add_to_extent_chain(struct extent_chain *chain,
 	return 0;
 }
 
-/* suspend_serialise_extent_chain
+/* toi_serialise_extent_chain
  *
  * Write a chain in the image.
  */
-int suspend_serialise_extent_chain(struct suspend_module_ops *owner,
+int toi_serialise_extent_chain(struct toi_module_ops *owner,
 		struct extent_chain *chain)
 {
 	struct extent *this;
 	int ret, i = 0;
 	
-	if ((ret = suspendActiveAllocator->rw_header_chunk(WRITE, owner,
+	if ((ret = toiActiveAllocator->rw_header_chunk(WRITE, owner,
 		(char *) chain,
 		2 * sizeof(int))))
 		return ret;
 
 	this = chain->first;
 	while (this) {
-		if ((ret = suspendActiveAllocator->rw_header_chunk(WRITE, owner,
+		if ((ret = toiActiveAllocator->rw_header_chunk(WRITE, owner,
 				(char *) this,
 				2 * sizeof(unsigned long))))
 			return ret;
@@ -155,29 +155,29 @@ int suspend_serialise_extent_chain(struct suspend_module_ops *owner,
 	return ret;
 }
 
-/* suspend_load_extent_chain
+/* toi_load_extent_chain
  *
  * Read back a chain saved in the image.
  */
-int suspend_load_extent_chain(struct extent_chain *chain)
+int toi_load_extent_chain(struct extent_chain *chain)
 {
 	struct extent *this, *last = NULL;
 	int i, ret;
 
-	if ((ret = suspendActiveAllocator->rw_header_chunk(READ, NULL,
+	if ((ret = toiActiveAllocator->rw_header_chunk(READ, NULL,
 		(char *) chain,	2 * sizeof(int)))) {
 		printk("Failed to read size of extent chain.\n");
 		return 1;
 	}
 
 	for (i = 0; i < chain->num_extents; i++) {
-		this = kmalloc(sizeof(struct extent), S2_ATOMIC_GFP);
+		this = kmalloc(sizeof(struct extent), TOI_ATOMIC_GFP);
 		if (!this) {
 			printk("Failed to allocate a new extent.\n");
 			return -ENOMEM;
 		}
 		this->next = NULL;
-		if ((ret = suspendActiveAllocator->rw_header_chunk(READ, NULL,
+		if ((ret = toiActiveAllocator->rw_header_chunk(READ, NULL,
 				(char *) this, 2 * sizeof(unsigned long)))) {
 			printk("Failed to an extent.\n");
 			return 1;
@@ -191,7 +191,7 @@ int suspend_load_extent_chain(struct extent_chain *chain)
 	return 0;
 }
 
-/* suspend_extent_state_next
+/* toi_extent_state_next
  *
  * Given a state, progress to the next valid entry. We may begin in an
  * invalid state, as we do when invoked after extent_state_goto_start below.
@@ -199,7 +199,7 @@ int suspend_load_extent_chain(struct extent_chain *chain)
  * When using compression and expected_compression > 0, we let the image size
  * be larger than storage, so we can validly run out of data to return.
  */
-unsigned long suspend_extent_state_next(struct extent_iterate_state *state)
+unsigned long toi_extent_state_next(struct extent_iterate_state *state)
 {
 	if (state->current_chain == state->num_chains)
 		return 0;
@@ -234,24 +234,24 @@ unsigned long suspend_extent_state_next(struct extent_iterate_state *state)
 	return state->current_offset;
 }
 
-/* suspend_extent_state_goto_start
+/* toi_extent_state_goto_start
  *
  * Find the first valid value in a group of chains.
  */
-void suspend_extent_state_goto_start(struct extent_iterate_state *state)
+void toi_extent_state_goto_start(struct extent_iterate_state *state)
 {
 	state->current_chain = -1;
 	state->current_extent = NULL;
 	state->current_offset = 0;
 }
 
-/* suspend_extent_start_save
+/* toi_extent_start_save
  *
  * Given a state and a struct extent_state_store, save the current
  * position in a format that can be used with relocated chains (at
  * resume time).
  */
-void suspend_extent_state_save(struct extent_iterate_state *state,
+void toi_extent_state_save(struct extent_iterate_state *state,
 		struct extent_iterate_saved_state *saved_state)
 {
 	struct extent *extent;
@@ -271,17 +271,17 @@ void suspend_extent_state_save(struct extent_iterate_state *state,
 	}
 }
 
-/* suspend_extent_start_restore
+/* toi_extent_start_restore
  *
  * Restore the position saved by extent_state_save.
  */
-void suspend_extent_state_restore(struct extent_iterate_state *state,
+void toi_extent_state_restore(struct extent_iterate_state *state,
 		struct extent_iterate_saved_state *saved_state)
 {
 	int posn = saved_state->extent_num;
 
 	if (saved_state->chain_num == -1) {
-		suspend_extent_state_goto_start(state);
+		toi_extent_state_goto_start(state);
 		return;
 	}
 
@@ -294,12 +294,12 @@ void suspend_extent_state_restore(struct extent_iterate_state *state,
 }
 
 #ifdef CONFIG_TOI_EXPORTS
-EXPORT_SYMBOL_GPL(suspend_add_to_extent_chain);
-EXPORT_SYMBOL_GPL(suspend_put_extent_chain);
-EXPORT_SYMBOL_GPL(suspend_load_extent_chain);
-EXPORT_SYMBOL_GPL(suspend_serialise_extent_chain);
-EXPORT_SYMBOL_GPL(suspend_extent_state_save);
-EXPORT_SYMBOL_GPL(suspend_extent_state_restore);
-EXPORT_SYMBOL_GPL(suspend_extent_state_goto_start);
-EXPORT_SYMBOL_GPL(suspend_extent_state_next);
+EXPORT_SYMBOL_GPL(toi_add_to_extent_chain);
+EXPORT_SYMBOL_GPL(toi_put_extent_chain);
+EXPORT_SYMBOL_GPL(toi_load_extent_chain);
+EXPORT_SYMBOL_GPL(toi_serialise_extent_chain);
+EXPORT_SYMBOL_GPL(toi_extent_state_save);
+EXPORT_SYMBOL_GPL(toi_extent_state_restore);
+EXPORT_SYMBOL_GPL(toi_extent_state_goto_start);
+EXPORT_SYMBOL_GPL(toi_extent_state_next);
 #endif

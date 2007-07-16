@@ -12,18 +12,18 @@
  *
  * The user can just
  *
- * echo Suspend2 > /path/to/my_file
+ * echo TuxOnIce > /path/to/my_file
  *
  * dd if=/dev/zero bs=1M count=<file_size_desired> >> /path/to/my_file
  *
  * and
  *
- * echo /path/to/my_file > /sys/power/suspend2/suspend_file/target
+ * echo /path/to/my_file > /sys/power/suspend2/file/target
  *
- * then put what they find in /sys/power/suspend2/resume_from
+ * then put what they find in /sys/power/suspend2/resume
  * as their resume= parameter in lilo.conf (and rerun lilo if using it).
  *
- * Having done this, they're ready to suspend and resume.
+ * Having done this, they're ready to hibernate and resume.
  *
  * TODO:
  * - File resizing.
@@ -50,26 +50,26 @@
 #include "tuxonice_storage.h"
 #include "tuxonice_block_io.h"
 
-static struct suspend_module_ops suspend_fileops;
+static struct toi_module_ops toi_fileops;
 
 /* Details of our target.  */
 
-char suspend_file_target[256];
+char toi_file_target[256];
 static struct inode *target_inode;
 static struct file *target_file;
-static struct block_device *suspend_file_target_bdev;
+static struct block_device *toi_file_target_bdev;
 static dev_t resume_file_dev_t;
 static int used_devt = 0;
-static int setting_suspend_file_target = 0;
+static int setting_toi_file_target = 0;
 static sector_t target_firstblock = 0, target_header_start = 0;
 static int target_storage_available = 0;
 static int target_claim = 0;
 
 static char HaveImage[] = "HaveImage\n";
-static char NoImage[] =   "Suspend2\n";
+static char NoImage[] =   "TuxOnIce\n";
 #define sig_size (sizeof(HaveImage) + 1)
 
-struct suspend_file_header {
+struct toi_file_header {
 	char sig[sig_size];
 	int resumed_before;
 	unsigned long first_header_block;
@@ -85,7 +85,7 @@ static int main_pages_allocated, main_pages_requested;
 
 #define target_is_normal_file() (S_ISREG(target_inode->i_mode))
 
-static struct suspend_bdev_info devinfo;
+static struct toi_bdev_info devinfo;
 
 /* Extent chain for blocks */
 static struct extent_chain block_chain;
@@ -115,10 +115,10 @@ static int adjust_for_extra_pages(int unadjusted)
 			+ sizeof(int));
 }
 
-static int suspend_file_storage_available(void)
+static int toi_file_storage_available(void)
 {
 	int result = 0;
-	struct block_device *bdev=suspend_file_target_bdev;
+	struct block_device *bdev=toi_file_target_bdev;
 
 	if (!target_inode)
 		return 0;
@@ -169,7 +169,7 @@ static int size_ignoring_ignored_pages(void)
 	int mappable = 0, i;
 	
 	if (!target_is_normal_file())
-		return suspend_file_storage_available();
+		return toi_file_storage_available();
 
 	for (i = 0; i < (target_inode->i_size >> PAGE_SHIFT) ; i++)
 		if (has_contiguous_blocks(i))
@@ -184,7 +184,7 @@ static void __populate_block_list(int min, int max)
 		printk("Adding extent %d-%d.\n", min << devinfo.bmap_shift,
 		        ((max + 1) << devinfo.bmap_shift) - 1);
 
-	suspend_add_to_extent_chain(&block_chain, min, max);
+	toi_add_to_extent_chain(&block_chain, min, max);
 }
 
 static void populate_block_list(void)
@@ -193,7 +193,7 @@ static void populate_block_list(void)
 	int extent_min = -1, extent_max = -1, got_header = 0;
 	
 	if (block_chain.first)
-		suspend_put_extent_chain(&block_chain);
+		toi_put_extent_chain(&block_chain);
 
 	if (!target_is_normal_file()) {
 		if (target_storage_available > 0)
@@ -243,19 +243,19 @@ static void populate_block_list(void)
 		__populate_block_list(extent_min, extent_max);
 }
 
-static void suspend_file_cleanup(int finishing_cycle)
+static void toi_file_cleanup(int finishing_cycle)
 {
-	if (suspend_file_target_bdev) {
+	if (toi_file_target_bdev) {
 		if (target_claim) {
-			bd_release(suspend_file_target_bdev);
+			bd_release(toi_file_target_bdev);
 			target_claim = 0;
 		}
 
 		if (used_devt) {
-			blkdev_put(suspend_file_target_bdev);
+			blkdev_put(toi_file_target_bdev);
 			used_devt = 0;
 		}
-		suspend_file_target_bdev = NULL;
+		toi_file_target_bdev = NULL;
 		target_inode = NULL;
 		set_devinfo(NULL, 0);
 		target_storage_available = 0;
@@ -276,21 +276,21 @@ static void suspend_file_cleanup(int finishing_cycle)
  */
 static void reopen_resume_devt(void)
 {
-	suspend_file_target_bdev = open_by_devnum(resume_file_dev_t, FMODE_READ);
-	if (IS_ERR(suspend_file_target_bdev)) {
+	toi_file_target_bdev = open_by_devnum(resume_file_dev_t, FMODE_READ);
+	if (IS_ERR(toi_file_target_bdev)) {
 		printk("Got a dev_num (%lx) but failed to open it.\n",
 				(unsigned long) resume_file_dev_t);
 		return;
 	}
-	target_inode = suspend_file_target_bdev->bd_inode;
-	set_devinfo(suspend_file_target_bdev, target_inode->i_blkbits);
+	target_inode = toi_file_target_bdev->bd_inode;
+	set_devinfo(toi_file_target_bdev, target_inode->i_blkbits);
 }
 
-static void suspend_file_get_target_info(char *target, int get_size,
+static void toi_file_get_target_info(char *target, int get_size,
 		int resume_param)
 {
 	if (target_file)
-		suspend_file_cleanup(0);
+		toi_file_cleanup(0);
 
 	if (!target || !strlen(target))
 		return;
@@ -321,15 +321,15 @@ static void suspend_file_get_target_info(char *target, int get_size,
 			return;
 		}
 
-	     	suspend_file_target_bdev = open_by_devnum(resume_file_dev_t,
+	     	toi_file_target_bdev = open_by_devnum(resume_file_dev_t,
 				FMODE_READ);
-		if (IS_ERR(suspend_file_target_bdev)) {
+		if (IS_ERR(toi_file_target_bdev)) {
 			printk("Got a dev_num (%lx) but failed to open it.\n",
 					(unsigned long) resume_file_dev_t);
 			return;
 		}
 		used_devt = 1;
-		target_inode = suspend_file_target_bdev->bd_inode;
+		target_inode = toi_file_target_bdev->bd_inode;
 	} else
 		target_inode = target_file->f_mapping->host;
 
@@ -342,15 +342,15 @@ static void suspend_file_get_target_info(char *target, int get_size,
 
 	if (!used_devt) {
 		if (S_ISBLK(target_inode->i_mode)) {
-			suspend_file_target_bdev = I_BDEV(target_inode);
-			if (!bd_claim(suspend_file_target_bdev, &suspend_fileops))
+			toi_file_target_bdev = I_BDEV(target_inode);
+			if (!bd_claim(toi_file_target_bdev, &toi_fileops))
 				target_claim = 1;
 		} else
-			suspend_file_target_bdev = target_inode->i_sb->s_bdev;
-		resume_file_dev_t = suspend_file_target_bdev->bd_dev;
+			toi_file_target_bdev = target_inode->i_sb->s_bdev;
+		resume_file_dev_t = toi_file_target_bdev->bd_dev;
 	}
 
-	set_devinfo(suspend_file_target_bdev, target_inode->i_blkbits);
+	set_devinfo(toi_file_target_bdev, target_inode->i_blkbits);
 
 	if (get_size)
 		target_storage_available = size_ignoring_ignored_pages();
@@ -369,7 +369,7 @@ cleanup:
 	target_storage_available = 0;
 }
 
-static int parse_signature(struct suspend_file_header *header)
+static int parse_signature(struct toi_file_header *header)
 {
 	int have_image = !memcmp(HaveImage, header->sig, sizeof(HaveImage) - 1);
 	int no_image_header = !memcmp(NoImage, header->sig, sizeof(NoImage) - 1);
@@ -391,7 +391,7 @@ static int parse_signature(struct suspend_file_header *header)
 
 /* prepare_signature */
 
-static int prepare_signature(struct suspend_file_header *current_header,
+static int prepare_signature(struct toi_file_header *current_header,
 		unsigned long first_header_block)
 {
 	strncpy(current_header->sig, HaveImage, sizeof(HaveImage));
@@ -400,7 +400,7 @@ static int prepare_signature(struct suspend_file_header *current_header,
 	return 0;
 }
 
-static int suspend_file_storage_allocated(void)
+static int toi_file_storage_allocated(void)
 {
 	if (!target_inode)
 		return 0;
@@ -411,13 +411,13 @@ static int suspend_file_storage_allocated(void)
 		return header_pages_allocated + main_pages_requested;
 }
 
-static int suspend_file_release_storage(void)
+static int toi_file_release_storage(void)
 {
 	if (test_action_state(TOI_KEEP_IMAGE) &&
 	    test_toi_state(TOI_NOW_RESUMING))
 		return 0;
 
-	suspend_put_extent_chain(&block_chain);
+	toi_put_extent_chain(&block_chain);
 
 	header_pages_allocated = 0;
 	main_pages_allocated = 0;
@@ -425,24 +425,24 @@ static int suspend_file_release_storage(void)
 	return 0;
 }
 
-static int __suspend_file_allocate_storage(int main_storage_requested,
+static int __toi_file_allocate_storage(int main_storage_requested,
 		int header_storage);
 
-static int suspend_file_allocate_header_space(int space_requested)
+static int toi_file_allocate_header_space(int space_requested)
 {
 	int i;
 
-	if (!block_chain.first && __suspend_file_allocate_storage(
+	if (!block_chain.first && __toi_file_allocate_storage(
 				main_pages_requested, space_requested)) {
 		printk("Failed to allocate space for the header.\n");
 		return -ENOSPC;
 	}
 
-	suspend_extent_state_goto_start(&suspend_writer_posn);
-	suspend_bio_ops.forward_one_page(); /* To first page */
+	toi_extent_state_goto_start(&toi_writer_posn);
+	toi_bio_ops.forward_one_page(); /* To first page */
 
 	for (i = 0; i < space_requested; i++) {
-		if (suspend_bio_ops.forward_one_page()) {
+		if (toi_bio_ops.forward_one_page()) {
 			printk("Out of space while seeking to allocate "
 					"header pages,\n");
 			header_pages_allocated = i;
@@ -453,14 +453,14 @@ static int suspend_file_allocate_header_space(int space_requested)
 	header_pages_allocated = space_requested;
 
 	/* The end of header pages will be the start of pageset 2 */
-	suspend_extent_state_save(&suspend_writer_posn,
-			&suspend_writer_posn_save[2]);
+	toi_extent_state_save(&toi_writer_posn,
+			&toi_writer_posn_save[2]);
 	return 0;
 }
 
-static int suspend_file_allocate_storage(int space_requested)
+static int toi_file_allocate_storage(int space_requested)
 {
-	if (__suspend_file_allocate_storage(space_requested,
+	if (__toi_file_allocate_storage(space_requested,
 				header_pages_allocated))
 		return -ENOSPC;
 
@@ -468,7 +468,7 @@ static int suspend_file_allocate_storage(int space_requested)
 	return -ENOSPC;
 }
 
-static int __suspend_file_allocate_storage(int main_space_requested,
+static int __toi_file_allocate_storage(int main_space_requested,
 		int header_space_requested)
 {
 	int result = 0;
@@ -485,7 +485,7 @@ static int __suspend_file_allocate_storage(int main_space_requested,
 
 	populate_block_list();
 
-	suspend_message(TOI_WRITER, TOI_MEDIUM, 0,
+	toi_message(TOI_WRITER, TOI_MEDIUM, 0,
 		"Finished with block_chain.size == %d.\n",
 		block_chain.size);
 
@@ -499,15 +499,15 @@ static int __suspend_file_allocate_storage(int main_space_requested,
 	main_pages_requested = main_space_requested;
 	main_pages_allocated = main_space_requested + extra_pages;
 
-	suspend_file_allocate_header_space(header_pages_allocated);
+	toi_file_allocate_header_space(header_pages_allocated);
 	return result;
 }
 
-static int suspend_file_write_header_init(void)
+static int toi_file_write_header_init(void)
 {
-	suspend_extent_state_goto_start(&suspend_writer_posn);
+	toi_extent_state_goto_start(&toi_writer_posn);
 
-	suspend_writer_buffer_posn = suspend_header_bytes_used = 0;
+	toi_writer_buffer_posn = toi_header_bytes_used = 0;
 
 	/* Info needed to bootstrap goes at the start of the header.
 	 * First we save the basic info needed for reading, including the number
@@ -518,47 +518,47 @@ static int suspend_file_write_header_init(void)
 	 * next header page by the time we go to use it.
 	 */
 
-	suspend_bio_ops.rw_header_chunk(WRITE, &suspend_fileops,
-			(char *) &suspend_writer_posn_save, 
-			sizeof(suspend_writer_posn_save));
+	toi_bio_ops.rw_header_chunk(WRITE, &toi_fileops,
+			(char *) &toi_writer_posn_save, 
+			sizeof(toi_writer_posn_save));
 
-	suspend_bio_ops.rw_header_chunk(WRITE, &suspend_fileops,
+	toi_bio_ops.rw_header_chunk(WRITE, &toi_fileops,
 			(char *) &devinfo, sizeof(devinfo));
 
-	suspend_serialise_extent_chain(&suspend_fileops, &block_chain);
+	toi_serialise_extent_chain(&toi_fileops, &block_chain);
 	
 	return 0;
 }
 
-static int suspend_file_write_header_cleanup(void)
+static int toi_file_write_header_cleanup(void)
 {
-	struct suspend_file_header *header;
+	struct toi_file_header *header;
 
 	/* Write any unsaved data */
-	if (suspend_writer_buffer_posn)
-		suspend_bio_ops.write_header_chunk_finish();
+	if (toi_writer_buffer_posn)
+		toi_bio_ops.write_header_chunk_finish();
 
-	suspend_bio_ops.finish_all_io();
+	toi_bio_ops.finish_all_io();
 
-	suspend_extent_state_goto_start(&suspend_writer_posn);
-	suspend_bio_ops.forward_one_page();
+	toi_extent_state_goto_start(&toi_writer_posn);
+	toi_bio_ops.forward_one_page();
 
 	/* Adjust image header */
-	suspend_bio_ops.bdev_page_io(READ, suspend_file_target_bdev,
+	toi_bio_ops.bdev_page_io(READ, toi_file_target_bdev,
 			target_firstblock,
-			virt_to_page(suspend_writer_buffer));
+			virt_to_page(toi_writer_buffer));
 
-	header = (struct suspend_file_header *) suspend_writer_buffer;
+	header = (struct toi_file_header *) toi_writer_buffer;
 
 	prepare_signature(header,
-			suspend_writer_posn.current_offset <<
+			toi_writer_posn.current_offset <<
 			devinfo.bmap_shift);
 		
-	suspend_bio_ops.bdev_page_io(WRITE, suspend_file_target_bdev,
+	toi_bio_ops.bdev_page_io(WRITE, toi_file_target_bdev,
 			target_firstblock,
-			virt_to_page(suspend_writer_buffer));
+			virt_to_page(toi_writer_buffer));
 
-	suspend_bio_ops.finish_all_io();
+	toi_bio_ops.finish_all_io();
 
 	return 0;
 }
@@ -577,22 +577,22 @@ static int create_dev(char *name, dev_t dev, char *devfs_name)
 
 static int rd_init(void)
 {
-	suspend_writer_buffer_posn = 0;
+	toi_writer_buffer_posn = 0;
 
 	create_dev("/dev/root", ROOT_DEV, root_device_name);
 	create_dev("/dev/ram", MKDEV(RAMDISK_MAJOR, 0), NULL);
 
-	suspend_read_fd = sys_open("/dev/root", O_RDONLY, 0);
-	if (suspend_read_fd < 0)
+	toi_read_fd = sys_open("/dev/root", O_RDONLY, 0);
+	if (toi_read_fd < 0)
 		goto out;
 	
-	sys_read(suspend_read_fd, suspend_writer_buffer, BLOCK_SIZE);
+	sys_read(toi_read_fd, toi_writer_buffer, BLOCK_SIZE);
 
-	memcpy(&suspend_writer_posn_save,
-		suspend_writer_buffer + suspend_writer_buffer_posn,
-		sizeof(suspend_writer_posn_save));
+	memcpy(&toi_writer_posn_save,
+		toi_writer_buffer + toi_writer_buffer_posn,
+		sizeof(toi_writer_posn_save));
 	
-	suspend_writer_buffer_posn += sizeof(suspend_writer_posn_save);
+	toi_writer_buffer_posn += sizeof(toi_writer_posn_save);
 
 	return 0;
 out:
@@ -603,12 +603,12 @@ out:
 
 static int file_init(void)
 {
-	suspend_writer_buffer_posn = 0;
+	toi_writer_buffer_posn = 0;
 
-	/* Read suspend_file configuration */
-	suspend_bio_ops.bdev_page_io(READ, suspend_file_target_bdev,
+	/* Read toi_file configuration */
+	toi_bio_ops.bdev_page_io(READ, toi_file_target_bdev,
 			target_header_start,
-			virt_to_page((unsigned long) suspend_writer_buffer));
+			virt_to_page((unsigned long) toi_writer_buffer));
 	
 	return 0;
 }
@@ -622,7 +622,7 @@ static int file_init(void)
  * 1. Attempt to read the device specified with resume=.
  * 2. Check the contents of the header for our signature.
  * 3. Warn, ignore, reset and/or continue as appropriate.
- * 4. If continuing, read the suspend_file configuration section
+ * 4. If continuing, read the toi_file configuration section
  *    of the header and set up block device info so we can read
  *    the rest of the header & image.
  *
@@ -632,7 +632,7 @@ static int file_init(void)
  * normally.
  */
 
-static int suspend_file_read_header_init(void)
+static int toi_file_read_header_init(void)
 {
 	int result;
 	struct block_device *tmp;
@@ -648,57 +648,57 @@ static int suspend_file_read_header_init(void)
 		return result;
 	}
 
-	memcpy(&suspend_writer_posn_save,
-	       suspend_writer_buffer + suspend_writer_buffer_posn,
-	       sizeof(suspend_writer_posn_save));
+	memcpy(&toi_writer_posn_save,
+	       toi_writer_buffer + toi_writer_buffer_posn,
+	       sizeof(toi_writer_posn_save));
 	
-	suspend_writer_buffer_posn += sizeof(suspend_writer_posn_save);
+	toi_writer_buffer_posn += sizeof(toi_writer_posn_save);
 
 	tmp = devinfo.bdev;
 
 	memcpy(&devinfo,
-	       suspend_writer_buffer + suspend_writer_buffer_posn,
+	       toi_writer_buffer + toi_writer_buffer_posn,
 	       sizeof(devinfo));
 
 	devinfo.bdev = tmp;
-	suspend_writer_buffer_posn += sizeof(devinfo);
+	toi_writer_buffer_posn += sizeof(devinfo);
 
-	suspend_bio_ops.read_header_init();
-	suspend_extent_state_goto_start(&suspend_writer_posn);
-	suspend_bio_ops.set_extra_page_forward();
+	toi_bio_ops.read_header_init();
+	toi_extent_state_goto_start(&toi_writer_posn);
+	toi_bio_ops.set_extra_page_forward();
 
-	suspend_header_bytes_used = suspend_writer_buffer_posn;
+	toi_header_bytes_used = toi_writer_buffer_posn;
 
-	return suspend_load_extent_chain(&block_chain);
+	return toi_load_extent_chain(&block_chain);
 }
 
-static int suspend_file_read_header_cleanup(void)
+static int toi_file_read_header_cleanup(void)
 {
-	suspend_bio_ops.rw_cleanup(READ);
+	toi_bio_ops.rw_cleanup(READ);
 	return 0;
 }
 
-static int suspend_file_signature_op(int op)
+static int toi_file_signature_op(int op)
 {
 	char *cur;
 	int result = 0, changed = 0;
-	struct suspend_file_header *header;
+	struct toi_file_header *header;
 	
-	if(suspend_file_target_bdev <= 0)
+	if(toi_file_target_bdev <= 0)
 		return -1;
 
-	cur = (char *) get_zeroed_page(S2_ATOMIC_GFP);
+	cur = (char *) get_zeroed_page(TOI_ATOMIC_GFP);
 	if (!cur) {
 		printk("Unable to allocate a page for reading the image "
 				"signature.\n");
 		return -ENOMEM;
 	}
 
-	suspend_bio_ops.bdev_page_io(READ, suspend_file_target_bdev,
+	toi_bio_ops.bdev_page_io(READ, toi_file_target_bdev,
 			target_firstblock,
 			virt_to_page(cur));
 
-	header = (struct suspend_file_header *) cur;
+	header = (struct toi_file_header *) cur;
 	result = parse_signature(header);
 		
 	switch (op) {
@@ -725,12 +725,12 @@ static int suspend_file_signature_op(int op)
 	}
 
 	if (changed)
-		suspend_bio_ops.bdev_page_io(WRITE, suspend_file_target_bdev,
+		toi_bio_ops.bdev_page_io(WRITE, toi_file_target_bdev,
 				target_firstblock,
 				virt_to_page(cur));
 
 out:
-	suspend_bio_ops.finish_all_io();
+	toi_bio_ops.finish_all_io();
 	free_page((unsigned long) cur);
 	return result;
 }
@@ -740,11 +740,11 @@ out:
  * Description:
  */
 
-static int suspend_file_print_debug_stats(char *buffer, int size)
+static int toi_file_print_debug_stats(char *buffer, int size)
 {
 	int len = 0;
 	
-	if (suspendActiveAllocator != &suspend_fileops) {
+	if (toiActiveAllocator != &toi_fileops) {
 		len = snprintf_used(buffer, size, "- FileAllocator inactive.\n");
 		return len;
 	}
@@ -753,7 +753,7 @@ static int suspend_file_print_debug_stats(char *buffer, int size)
 
 	len+= snprintf_used(buffer+len, size-len, "  Storage available for image: "
 			"%ld pages.\n",
-			suspend_file_storage_allocated());
+			toi_file_storage_allocated());
 
 	return len;
 }
@@ -762,15 +762,15 @@ static int suspend_file_print_debug_stats(char *buffer, int size)
  * Storage needed
  *
  * Returns amount of space in the image header required
- * for the suspend_file's data.
+ * for the toi_file's data.
  *
  * We ensure the space is allocated, but actually save the
  * data from write_header_init and therefore don't also define a
  * save_config_info routine.
  */
-static int suspend_file_storage_needed(void)
+static int toi_file_storage_needed(void)
 {
-	return sig_size + strlen(suspend_file_target) + 1 +
+	return sig_size + strlen(toi_file_target) + 1 +
 		3 * sizeof(struct extent_iterate_saved_state) +
 		sizeof(devinfo) +
 		sizeof(struct extent_chain) - 2 * sizeof(void *) +
@@ -778,13 +778,13 @@ static int suspend_file_storage_needed(void)
 }
 
 /* 
- * suspend_file_remove_image
+ * toi_file_remove_image
  * 
  */
-static int suspend_file_remove_image(void)
+static int toi_file_remove_image(void)
 {
-	suspend_file_release_storage();
-	return suspend_file_signature_op(INVALIDATE);
+	toi_file_release_storage();
+	return toi_file_signature_op(INVALIDATE);
 }
 
 /*
@@ -792,12 +792,12 @@ static int suspend_file_remove_image(void)
  *
  */
 
-static int suspend_file_image_exists(void)
+static int toi_file_image_exists(void)
 {
-	if (!suspend_file_target_bdev)
+	if (!toi_file_target_bdev)
 		reopen_resume_devt();
 
-	return suspend_file_signature_op(GET_IMAGE_EXISTS);
+	return toi_file_signature_op(GET_IMAGE_EXISTS);
 }
 
 /*
@@ -806,23 +806,23 @@ static int suspend_file_image_exists(void)
  * Record that we tried to resume from this image.
  */
 
-static void suspend_file_mark_resume_attempted(int mark)
+static void toi_file_mark_resume_attempted(int mark)
 {
-	suspend_file_signature_op(mark ? MARK_RESUME_ATTEMPTED:
+	toi_file_signature_op(mark ? MARK_RESUME_ATTEMPTED:
 		UNMARK_RESUME_ATTEMPTED);
 }
 
-static void suspend_file_set_resume_param(void)
+static void toi_file_set_resume_param(void)
 {
-	char *buffer = (char *) get_zeroed_page(S2_ATOMIC_GFP);
-	char *buffer2 = (char *) get_zeroed_page(S2_ATOMIC_GFP);
+	char *buffer = (char *) get_zeroed_page(TOI_ATOMIC_GFP);
+	char *buffer2 = (char *) get_zeroed_page(TOI_ATOMIC_GFP);
 	unsigned long sector = bmap(target_inode, 0);
 	int offset = 0;
 
-	if (suspend_file_target_bdev) {
-		set_devinfo(suspend_file_target_bdev, target_inode->i_blkbits);
+	if (toi_file_target_bdev) {
+		set_devinfo(toi_file_target_bdev, target_inode->i_blkbits);
 
-		bdevname(suspend_file_target_bdev, buffer2);
+		bdevname(toi_file_target_bdev, buffer2);
 		offset += snprintf(buffer + offset, PAGE_SIZE - offset, 
 				"/dev/%s", buffer2);
 		
@@ -831,28 +831,28 @@ static void suspend_file_set_resume_param(void)
 				":0x%lx", sector << devinfo.bmap_shift);
 	} else
 		offset += snprintf(buffer + offset, PAGE_SIZE - offset,
-				"%s is not a valid target.", suspend_file_target);
+				"%s is not a valid target.", toi_file_target);
 			
 	sprintf(resume_file, "file:%s", buffer);
 
 	free_page((unsigned long) buffer);
 	free_page((unsigned long) buffer2);
 
-	suspend_attempt_to_parse_resume_device(1);
+	toi_attempt_to_parse_resume_device(1);
 }
 
-static int __test_suspend_file_target(char *target, int resume_time, int quiet)
+static int __test_toi_file_target(char *target, int resume_time, int quiet)
 {
-	suspend_file_get_target_info(target, 0, resume_time);
-	if (suspend_file_signature_op(GET_IMAGE_EXISTS) > -1) {
+	toi_file_get_target_info(target, 0, resume_time);
+	if (toi_file_signature_op(GET_IMAGE_EXISTS) > -1) {
 		if (!quiet)
-			printk("Suspend2: FileAllocator: File signature found.\n");
+			printk("TuxOnIce: FileAllocator: File signature found.\n");
 		if (!resume_time)
-			suspend_file_set_resume_param();
+			toi_file_set_resume_param();
 		
-		suspend_bio_ops.set_devinfo(&devinfo);
-		suspend_writer_posn.chains = &block_chain;
-		suspend_writer_posn.num_chains = 1;
+		toi_bio_ops.set_devinfo(&devinfo);
+		toi_writer_posn.chains = &block_chain;
+		toi_writer_posn.num_chains = 1;
 
 		if (!resume_time)
 			set_toi_state(TOI_CAN_HIBERNATE);
@@ -865,25 +865,25 @@ static int __test_suspend_file_target(char *target, int resume_time, int quiet)
 		return 1;
 
 	if (*target)
-		printk("Suspend2: FileAllocator: Sorry. No signature found at"
+		printk("TuxOnIce: FileAllocator: Sorry. No signature found at"
 					" %s.\n", target);
 	else
 		if (!resume_time)
-			printk("Suspend2: FileAllocator: Sorry. Target is not"
-						" set for suspending.\n");
+			printk("TuxOnIce: FileAllocator: Sorry. Target is not"
+						" set for hibernating.\n");
 
 	return 1;
 }
 
-static void test_suspend_file_target(void)
+static void test_toi_file_target(void)
 {
-	setting_suspend_file_target = 1;
+	setting_toi_file_target = 1;
        	
-	printk("Suspend2: Suspending %sabled.\n",
-			__test_suspend_file_target(suspend_file_target, 0, 1) ?
+	printk("TuxOnIce: Hibernating %sabled.\n",
+			__test_toi_file_target(toi_file_target, 0, 1) ?
 			"dis" : "en");
 	
-	setting_suspend_file_target = 0;
+	setting_toi_file_target = 0;
 }
 
 /*
@@ -899,12 +899,12 @@ static void test_suspend_file_target(void)
  * BLOCKSIZE is the logical blocksize >= SECTOR_SIZE & <= PAGE_SIZE, 
  * mod SECTOR_SIZE == 0 of the device.
  * Data is validated by attempting to read a header from the
- * location given. Failure will result in suspend_file refusing to
+ * location given. Failure will result in toi_file refusing to
  * save an image, and a reboot with correct parameters will be
  * necessary.
  */
 
-static int suspend_file_parse_sig_location(char *commandline,
+static int toi_file_parse_sig_location(char *commandline,
 		int only_writer, int quiet)
 {
 	char *thischar, *devstart = NULL, *colon = NULL, *at_symbol = NULL;
@@ -921,7 +921,7 @@ static int suspend_file_parse_sig_location(char *commandline,
 	 * did the initialisation successfully, assume we'll be okay when it comes
 	 * to resuming.
 	 */
-	if (suspend_file_target_bdev)
+	if (toi_file_target_bdev)
 		return 0;
 	
 	devstart = thischar = commandline;
@@ -944,19 +944,19 @@ static int suspend_file_parse_sig_location(char *commandline,
 	}
 	
 	/* 
-	 * For the suspend_file, you can be able to resume, but not suspend,
-	 * because the resume= is set correctly, but the suspend_file_target
+	 * For the toi_file, you can be able to resume, but not hibernate,
+	 * because the resume= is set correctly, but the toi_file_target
 	 * isn't. 
 	 *
 	 * We may have come here as a result of setting resume or
-	 * suspend_file_target. We only test the suspend_file target in the
+	 * toi_file_target. We only test the toi_file target in the
 	 * former case (it's already done in the later), and we do it before
 	 * setting the block number ourselves. It will overwrite the values
 	 * given on the command line if we don't.
 	 */
 
-	if (!setting_suspend_file_target)
-		__test_suspend_file_target(suspend_file_target, 1, 0);
+	if (!setting_toi_file_target)
+		__test_toi_file_target(toi_file_target, 1, 0);
 
 	if (colon)
 		target_firstblock = (int) simple_strtoul(colon + 1, NULL, 0);
@@ -973,20 +973,20 @@ static int suspend_file_parse_sig_location(char *commandline,
 	}
 	
 	if (!quiet)
-		printk("Suspend2 FileAllocator: Testing whether you can resume:\n");
+		printk("TuxOnIce FileAllocator: Testing whether you can resume:\n");
 
-	suspend_file_get_target_info(commandline, 0, 1);
+	toi_file_get_target_info(commandline, 0, 1);
 
-	if (!suspend_file_target_bdev || IS_ERR(suspend_file_target_bdev)) {
-		suspend_file_target_bdev = NULL;
+	if (!toi_file_target_bdev || IS_ERR(toi_file_target_bdev)) {
+		toi_file_target_bdev = NULL;
 		result = -1;
 		goto out;
 	}
 
 	if (target_blocksize)
-		set_devinfo(suspend_file_target_bdev, ffs(target_blocksize));
+		set_devinfo(toi_file_target_bdev, ffs(target_blocksize));
 
-	result = __test_suspend_file_target(commandline, 1, 0);
+	result = __test_toi_file_target(commandline, 1, 0);
 
 out:
 	if (result)
@@ -1003,124 +1003,124 @@ out:
 	return result;
 }
 
-/* suspend_file_save_config_info
+/* toi_file_save_config_info
  *
  * Description:	Save the target's name, not for resume time, but for all_settings.
  * Arguments:	Buffer:		Pointer to a buffer of size PAGE_SIZE.
  * Returns:	Number of bytes used for saving our data.
  */
 
-static int suspend_file_save_config_info(char *buffer)
+static int toi_file_save_config_info(char *buffer)
 {
-	strcpy(buffer, suspend_file_target);
-	return strlen(suspend_file_target) + 1;
+	strcpy(buffer, toi_file_target);
+	return strlen(toi_file_target) + 1;
 }
 
-/* suspend_file_load_config_info
+/* toi_file_load_config_info
  *
  * Description:	Reload target's name.
  * Arguments:	Buffer:		Pointer to the start of the data.
  *		Size:		Number of bytes that were saved.
  */
 
-static void suspend_file_load_config_info(char *buffer, int size)
+static void toi_file_load_config_info(char *buffer, int size)
 {
-	strcpy(suspend_file_target, buffer);
+	strcpy(toi_file_target, buffer);
 }
 
-static int suspend_file_initialise(int starting_cycle)
+static int toi_file_initialise(int starting_cycle)
 {
 	if (starting_cycle) {
-		if (suspendActiveAllocator != &suspend_fileops)
+		if (toiActiveAllocator != &toi_fileops)
 			return 0;
 
-		if (starting_cycle & SYSFS_SUSPEND && !*suspend_file_target) {
+		if (starting_cycle & SYSFS_HIBERNATE && !*toi_file_target) {
 			printk("FileAllocator is the active writer,  "
 					"but no filename has been set.\n");
 			return 1;
 		}
 	}
 
-	if (suspend_file_target)
-		suspend_file_get_target_info(suspend_file_target, starting_cycle, 0);
+	if (toi_file_target)
+		toi_file_get_target_info(toi_file_target, starting_cycle, 0);
 
-	if (starting_cycle && (suspend_file_image_exists() == -1)) {
-		printk("%s is does not have a valid signature for suspending.\n",
-				suspend_file_target);
+	if (starting_cycle && (toi_file_image_exists() == -1)) {
+		printk("%s is does not have a valid signature for hibernating.\n",
+				toi_file_target);
 		return 1;
 	}
 
 	return 0;
 }
 
-static struct suspend_sysfs_data sysfs_params[] = {
+static struct toi_sysfs_data sysfs_params[] = {
 
 	{
-	 SUSPEND2_ATTR("target", SYSFS_RW),
-	 SYSFS_STRING(suspend_file_target, 256, SYSFS_NEEDS_SM_FOR_WRITE),
-	 .write_side_effect		= test_suspend_file_target,
+	 TOI_ATTR("target", SYSFS_RW),
+	 SYSFS_STRING(toi_file_target, 256, SYSFS_NEEDS_SM_FOR_WRITE),
+	 .write_side_effect		= test_toi_file_target,
 	},
 
 	{
-	  SUSPEND2_ATTR("enabled", SYSFS_RW),
-	  SYSFS_INT(&suspend_fileops.enabled, 0, 1, 0),
+	  TOI_ATTR("enabled", SYSFS_RW),
+	  SYSFS_INT(&toi_fileops.enabled, 0, 1, 0),
 	  .write_side_effect		= attempt_to_parse_resume_device2,
 	}
 };
 
-static struct suspend_module_ops suspend_fileops = {
+static struct toi_module_ops toi_fileops = {
 	.type					= WRITER_MODULE,
 	.name					= "file storage",
 	.directory				= "file",
 	.module					= THIS_MODULE,
-	.print_debug_info			= suspend_file_print_debug_stats,
-	.save_config_info			= suspend_file_save_config_info,
-	.load_config_info			= suspend_file_load_config_info,
-	.storage_needed				= suspend_file_storage_needed,
-	.initialise				= suspend_file_initialise,
-	.cleanup				= suspend_file_cleanup,
+	.print_debug_info			= toi_file_print_debug_stats,
+	.save_config_info			= toi_file_save_config_info,
+	.load_config_info			= toi_file_load_config_info,
+	.storage_needed				= toi_file_storage_needed,
+	.initialise				= toi_file_initialise,
+	.cleanup				= toi_file_cleanup,
 
-	.storage_available 	= suspend_file_storage_available,
-	.storage_allocated	= suspend_file_storage_allocated,
-	.release_storage	= suspend_file_release_storage,
-	.allocate_header_space	= suspend_file_allocate_header_space,
-	.allocate_storage	= suspend_file_allocate_storage,
-	.image_exists		= suspend_file_image_exists,
-	.mark_resume_attempted	= suspend_file_mark_resume_attempted,
-	.write_header_init	= suspend_file_write_header_init,
-	.write_header_cleanup	= suspend_file_write_header_cleanup,
-	.read_header_init	= suspend_file_read_header_init,
-	.read_header_cleanup	= suspend_file_read_header_cleanup,
-	.remove_image		= suspend_file_remove_image,
-	.parse_sig_location	= suspend_file_parse_sig_location,
+	.storage_available 	= toi_file_storage_available,
+	.storage_allocated	= toi_file_storage_allocated,
+	.release_storage	= toi_file_release_storage,
+	.allocate_header_space	= toi_file_allocate_header_space,
+	.allocate_storage	= toi_file_allocate_storage,
+	.image_exists		= toi_file_image_exists,
+	.mark_resume_attempted	= toi_file_mark_resume_attempted,
+	.write_header_init	= toi_file_write_header_init,
+	.write_header_cleanup	= toi_file_write_header_cleanup,
+	.read_header_init	= toi_file_read_header_init,
+	.read_header_cleanup	= toi_file_read_header_cleanup,
+	.remove_image		= toi_file_remove_image,
+	.parse_sig_location	= toi_file_parse_sig_location,
 
 	.sysfs_data		= sysfs_params,
-	.num_sysfs_entries	= sizeof(sysfs_params) / sizeof(struct suspend_sysfs_data),
+	.num_sysfs_entries	= sizeof(sysfs_params) / sizeof(struct toi_sysfs_data),
 };
 
 /* ---- Registration ---- */
-static __init int suspend_file_load(void)
+static __init int toi_file_load(void)
 {
-	suspend_fileops.rw_init = suspend_bio_ops.rw_init;
-	suspend_fileops.rw_cleanup = suspend_bio_ops.rw_cleanup;
-	suspend_fileops.read_page = suspend_bio_ops.read_page;
-	suspend_fileops.write_page = suspend_bio_ops.write_page;
-	suspend_fileops.rw_header_chunk = suspend_bio_ops.rw_header_chunk;
+	toi_fileops.rw_init = toi_bio_ops.rw_init;
+	toi_fileops.rw_cleanup = toi_bio_ops.rw_cleanup;
+	toi_fileops.read_page = toi_bio_ops.read_page;
+	toi_fileops.write_page = toi_bio_ops.write_page;
+	toi_fileops.rw_header_chunk = toi_bio_ops.rw_header_chunk;
 
-	return suspend_register_module(&suspend_fileops);
+	return toi_register_module(&toi_fileops);
 }
 
 #ifdef MODULE
-static __exit void suspend_file_unload(void)
+static __exit void toi_file_unload(void)
 {
-	suspend_unregister_module(&suspend_fileops);
+	toi_unregister_module(&toi_fileops);
 }
 
-module_init(suspend_file_load);
-module_exit(suspend_file_unload);
+module_init(toi_file_load);
+module_exit(toi_file_unload);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Nigel Cunningham");
-MODULE_DESCRIPTION("Suspend2 FileAllocator");
+MODULE_DESCRIPTION("TuxOnIce FileAllocator");
 #else
-late_initcall(suspend_file_load);
+late_initcall(toi_file_load);
 #endif

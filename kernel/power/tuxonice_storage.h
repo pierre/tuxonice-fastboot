@@ -7,29 +7,29 @@
  */
 
 #ifdef CONFIG_NET
-int suspend_prepare_usm(void);
-void suspend_cleanup_usm(void);
+int toi_prepare_usm(void);
+void toi_cleanup_usm(void);
 
-int suspend_activate_storage(int force);
-int suspend_deactivate_storage(int force);
-extern int s2_usm_init(void);
-extern void s2_usm_exit(void);
+int toi_activate_storage(int force);
+int toi_deactivate_storage(int force);
+extern int toi_usm_init(void);
+extern void toi_usm_exit(void);
 #else
-static inline int s2_usm_init(void) { return 0; }
-static inline void s2_usm_exit(void) { }
+static inline int toi_usm_init(void) { return 0; }
+static inline void toi_usm_exit(void) { }
 
-static inline int suspend_activate_storage(int force)
+static inline int toi_activate_storage(int force)
 {
 	return 0;
 }
 
-static inline int suspend_deactivate_storage(int force)
+static inline int toi_deactivate_storage(int force)
 {
 	return 0;
 }
 
-static inline int suspend_prepare_usm(void) { return 0; }
-static inline void suspend_cleanup_usm(void) { }
+static inline int toi_prepare_usm(void) { return 0; }
+static inline void toi_cleanup_usm(void) { }
 #endif
 
 enum {
@@ -45,9 +45,9 @@ enum {
 };
 
 #ifdef CONFIG_NET
-extern __init int suspend_usm_init(void);
-extern __exit void suspend_usm_cleanup(void);
+extern __init int toi_usm_init(void);
+extern __exit void toi_usm_cleanup(void);
 #else
-#define suspend_usm_init() do { } while(0)
-#define suspend_usm_cleanup() do { } while(0)
+#define toi_usm_init() do { } while(0)
+#define toi_usm_cleanup() do { } while(0)
 #endif

@@ -110,7 +110,7 @@ extern unsigned long toi_state;
 #define set_toi_state(bit) (set_bit(bit, &toi_state))
 #define clear_toi_state(bit) (clear_bit(bit, &toi_state))
 #define test_toi_state(bit) (test_bit(bit, &toi_state))
-extern int suspend2_running;
+extern int toi_running;
 
 #else /* !CONFIG_TOI */
 
@@ -118,14 +118,14 @@ extern int suspend2_running;
 #define set_toi_state(bit) do { } while(0)
 #define clear_toi_state(bit) do { } while (0)
 #define test_toi_state(bit) (0)
-#define suspend2_running (0)
+#define toi_running (0)
 #endif /* CONFIG_TOI */
 
 #ifdef CONFIG_SOFTWARE_SUSPEND
 #ifdef CONFIG_TOI
-extern void suspend2_try_resume(void);
+extern void toi_try_resume(void);
 #else
-#define suspend2_try_resume() do { } while(0)
+#define toi_try_resume() do { } while(0)
 #endif
 
 extern int resume_attempted;

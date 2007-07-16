@@ -9,8 +9,8 @@
  *
  */
 
-#ifndef KERNEL_POWER_SUSPEND_H
-#define KERNEL_POWER_SUSPEND_H
+#ifndef KERNEL_POWER_TOI_H
+#define KERNEL_POWER_TOI_H
 
 #include <linux/delay.h>
 #include <linux/bootmem.h>
@@ -46,10 +46,10 @@ enum {
 	TOI_LATE_CPU_HOTPLUG,
 };
 
-extern unsigned long suspend_action;
+extern unsigned long toi_action;
 
-#define clear_action_state(bit) (test_and_clear_bit(bit, &suspend_action))
-#define test_action_state(bit) (test_bit(bit, &suspend_action))
+#define clear_action_state(bit) (test_and_clear_bit(bit, &toi_action))
+#define test_action_state(bit) (test_bit(bit, &toi_action))
 
 /*		 == Result states == 		*/
 
@@ -79,13 +79,13 @@ enum {
 	TOI_CANT_SUSPEND,
 };
 
-extern unsigned long suspend_result;
+extern unsigned long toi_result;
 
-#define set_result_state(bit) (test_and_set_bit(bit, &suspend_result))
-#define set_abort_result(bit) (	test_and_set_bit(TOI_ABORTED, &suspend_result), \
-				test_and_set_bit(bit, &suspend_result))
-#define clear_result_state(bit) (test_and_clear_bit(bit, &suspend_result))
-#define test_result_state(bit) (test_bit(bit, &suspend_result))
+#define set_result_state(bit) (test_and_set_bit(bit, &toi_result))
+#define set_abort_result(bit) (	test_and_set_bit(TOI_ABORTED, &toi_result), \
+				test_and_set_bit(bit, &toi_result))
+#define clear_result_state(bit) (test_and_clear_bit(bit, &toi_result))
+#define test_result_state(bit) (test_bit(bit, &toi_result))
 
 /*	 == Debug sections and levels == 	*/
 
@@ -108,13 +108,13 @@ enum {
 	TOI_MEMORY,
 };
 
-extern unsigned long suspend_debug_state;
+extern unsigned long toi_debug_state;
 
-#define set_debug_state(bit) (test_and_set_bit(bit, &suspend_debug_state))
-#define clear_debug_state(bit) (test_and_clear_bit(bit, &suspend_debug_state))
-#define test_debug_state(bit) (test_bit(bit, &suspend_debug_state))
+#define set_debug_state(bit) (test_and_set_bit(bit, &toi_debug_state))
+#define clear_debug_state(bit) (test_and_clear_bit(bit, &toi_debug_state))
+#define test_debug_state(bit) (test_bit(bit, &toi_debug_state))
 
-/*		== Steps in suspending ==	*/
+/*		== Steps in hibernating ==	*/
 
 enum {
 	STEP_HIBERNATE_PREPARE_IMAGE,
@@ -128,7 +128,7 @@ enum {
 	STEP_RESUME_ALT_IMAGE,
 };
 
-/*		== Suspend states ==
+/*		== TuxOnIce states ==
 	(see also include/linux/suspend.h)	*/
 
 #define get_toi_state()  (toi_state)
@@ -137,42 +137,42 @@ enum {
 
 /*		== Module support ==		*/
 
-struct suspend2_core_fns {
+struct toi_core_fns {
 	int (*post_context_save)(void);
 	unsigned long (*get_nonconflicting_page)(void);
-	int (*try_suspend)(int have_pmsem);
+	int (*try_hibernate)(int have_pmsem);
 	void (*try_resume)(void);
 };
 
-extern struct suspend2_core_fns *s2_core_fns;
+extern struct toi_core_fns *toi_core_fns;
 
 /*		== All else ==			*/
 #define KB(x) ((x) << (PAGE_SHIFT - 10))
 #define MB(x) ((x) >> (20 - PAGE_SHIFT))
 
-extern int suspend_start_anything(int suspend_or_resume);
-extern void suspend_finish_anything(int suspend_or_resume);
+extern int toi_start_anything(int toi_or_resume);
+extern void toi_finish_anything(int toi_or_resume);
 
 extern int save_image_part1(void);
-extern int suspend_atomic_restore(void);
+extern int toi_atomic_restore(void);
 
-extern int _suspend2_try_suspend(int have_pmsem);
-extern void __suspend2_try_resume(void);
+extern int _toi_try_hibernate(int have_pmsem);
+extern void __toi_try_resume(void);
 
-extern int __suspend_post_context_save(void);
+extern int __toi_post_context_save(void);
 
-extern unsigned int nr_suspends;
+extern unsigned int nr_hibernates;
 extern char alt_resume_param[256];
 
 extern void copyback_post(void);
-extern int suspend2_suspend(void);
+extern int toi_hibernate(void);
 extern int extra_pd1_pages_used;
 
-extern int suspend_io_time[2][2];
+extern int toi_io_time[2][2];
 
 #define SECTOR_SIZE 512
 
-extern void suspend_early_boot_message 
+extern void toi_early_boot_message 
 	(int can_erase_image, int default_answer, char *warning_reason, ...);
 
 static inline int load_direct(struct page *page)
@@ -182,6 +182,6 @@ static inline int load_direct(struct page *page)
 
 extern int pre_resume_freeze(void);
 
-#define S2_WAIT_GFP (GFP_KERNEL | __GFP_NOWARN)
-#define S2_ATOMIC_GFP (GFP_ATOMIC | __GFP_NOWARN)
+#define TOI_WAIT_GFP (GFP_KERNEL | __GFP_NOWARN)
+#define TOI_ATOMIC_GFP (GFP_ATOMIC | __GFP_NOWARN)
 #endif

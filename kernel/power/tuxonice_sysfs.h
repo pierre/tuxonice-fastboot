@@ -4,17 +4,12 @@
  * Copyright (C) 2004-2007 Nigel Cunningham (nigel at suspend2 net)
  *
  * This file is released under the GPLv2.
- *
- * It provides declarations for suspend to use in managing
- * /sysfs/suspend2. When we switch to kobjects,
- * this will become redundant.
- *
  */
 
 #include <linux/sysfs.h>
 #include "power.h"
 
-struct suspend_sysfs_data {
+struct toi_sysfs_data {
 	struct attribute attr;
 	int type;
 	int flags;
@@ -57,48 +52,48 @@ struct suspend_sysfs_data {
 };
 
 enum {
-	SUSPEND_SYSFS_DATA_NONE = 1,
-	SUSPEND_SYSFS_DATA_CUSTOM,
-	SUSPEND_SYSFS_DATA_BIT,
-	SUSPEND_SYSFS_DATA_INTEGER,
-	SUSPEND_SYSFS_DATA_UL,
-	SUSPEND_SYSFS_DATA_LONG,
-	SUSPEND_SYSFS_DATA_STRING
+	TOI_SYSFS_DATA_NONE = 1,
+	TOI_SYSFS_DATA_CUSTOM,
+	TOI_SYSFS_DATA_BIT,
+	TOI_SYSFS_DATA_INTEGER,
+	TOI_SYSFS_DATA_UL,
+	TOI_SYSFS_DATA_LONG,
+	TOI_SYSFS_DATA_STRING
 };
 
-#define SUSPEND2_ATTR(_name, _mode)      \
+#define TOI_ATTR(_name, _mode)      \
         .attr = {.name  = _name , .mode   = _mode }
 
 #define SYSFS_BIT(_ul, _bit, _flags) \
-	.type = SUSPEND_SYSFS_DATA_BIT, \
+	.type = TOI_SYSFS_DATA_BIT, \
 	.flags = _flags, \
 	.data = { .bit = { .bit_vector = _ul, .bit = _bit } }
 
 #define SYSFS_INT(_int, _min, _max, _flags) \
-	.type = SUSPEND_SYSFS_DATA_INTEGER, \
+	.type = TOI_SYSFS_DATA_INTEGER, \
 	.flags = _flags, \
 	.data = { .integer = { .variable = _int, .minimum = _min, \
 			.maximum = _max } }
 
 #define SYSFS_UL(_ul, _min, _max, _flags) \
-	.type = SUSPEND_SYSFS_DATA_UL, \
+	.type = TOI_SYSFS_DATA_UL, \
 	.flags = _flags, \
 	.data = { .ul = { .variable = _ul, .minimum = _min, \
 			.maximum = _max } }
 
 #define SYSFS_LONG(_long, _min, _max, _flags) \
-	.type = SUSPEND_SYSFS_DATA_LONG, \
+	.type = TOI_SYSFS_DATA_LONG, \
 	.flags = _flags, \
 	.data = { .a_long = { .variable = _long, .minimum = _min, \
 			.maximum = _max } }
 
 #define SYSFS_STRING(_string, _max_len, _flags) \
-	.type = SUSPEND_SYSFS_DATA_STRING, \
+	.type = TOI_SYSFS_DATA_STRING, \
 	.flags = _flags, \
 	.data = { .string = { .variable = _string, .max_length = _max_len } }
 
 #define SYSFS_CUSTOM(_read, _write, _flags) \
-	.type = SUSPEND_SYSFS_DATA_CUSTOM, \
+	.type = TOI_SYSFS_DATA_CUSTOM, \
 	.flags = _flags, \
 	.data = { .special = { .read_sysfs = _read, .write_sysfs = _write } }
 
@@ -109,24 +104,24 @@ enum {
 /* Flags */
 #define SYSFS_NEEDS_SM_FOR_READ 1
 #define SYSFS_NEEDS_SM_FOR_WRITE 2
-#define SYSFS_SUSPEND 4
+#define SYSFS_HIBERNATE 4
 #define SYSFS_RESUME 8
-#define SYSFS_SUSPEND_OR_RESUME (SYSFS_SUSPEND | SYSFS_RESUME)
-#define SYSFS_SUSPENDING (SYSFS_SUSPEND | SYSFS_NEEDS_SM_FOR_WRITE)
+#define SYSFS_HIBERNATE_OR_RESUME (SYSFS_HIBERNATE | SYSFS_RESUME)
+#define SYSFS_HIBERNATING (SYSFS_HIBERNATE | SYSFS_NEEDS_SM_FOR_WRITE)
 #define SYSFS_RESUMING (SYSFS_RESUME | SYSFS_NEEDS_SM_FOR_WRITE)
 #define SYSFS_NEEDS_SM_FOR_BOTH \
  (SYSFS_NEEDS_SM_FOR_READ | SYSFS_NEEDS_SM_FOR_WRITE)
 
-int suspend_register_sysfs_file(struct kobject *kobj,
-		struct suspend_sysfs_data *suspend_sysfs_data);
-void suspend_unregister_sysfs_file(struct kobject *kobj,
-		struct suspend_sysfs_data *suspend_sysfs_data);
+int toi_register_sysfs_file(struct kobject *kobj,
+		struct toi_sysfs_data *toi_sysfs_data);
+void toi_unregister_sysfs_file(struct kobject *kobj,
+		struct toi_sysfs_data *toi_sysfs_data);
 
-extern struct kset suspend2_subsys;
+extern struct kset toi_subsys;
 
-struct kobject *make_suspend2_sysdir(char *name);
-void remove_suspend2_sysdir(struct kobject *obj);
-extern void suspend_cleanup_sysfs(void);
+struct kobject *make_toi_sysdir(char *name);
+void remove_toi_sysdir(struct kobject *obj);
+extern void toi_cleanup_sysfs(void);
 
-extern int s2_sysfs_init(void);
-extern void s2_sysfs_exit(void);
+extern int toi_sysfs_init(void);
+extern void toi_sysfs_exit(void);

@@ -9,11 +9,11 @@
 
 #include <asm/sections.h>
 
-extern int suspend_prepare_image(void);
-extern void suspend_recalculate_image_contents(int storage_available);
+extern int toi_prepare_image(void);
+extern void toi_recalculate_image_contents(int storage_available);
 extern int real_nr_free_pages(unsigned long zone_idx_mask);
 extern int image_size_limit;
-extern void suspend_free_extra_pagedir_memory(void);
+extern void toi_free_extra_pagedir_memory(void);
 extern int extra_pd1_pages_allowance;
 extern void free_attention_list(void);
 

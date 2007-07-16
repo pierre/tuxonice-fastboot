@@ -38,12 +38,12 @@ struct pagedir {
 
 extern struct pagedir pagedir1, pagedir2;
 
-extern void suspend_copy_pageset1(void);
+extern void toi_copy_pageset1(void);
 
-extern int suspend_get_pageset1_load_addresses(void);
+extern int toi_get_pageset1_load_addresses(void);
 
-extern unsigned long __suspend_get_nonconflicting_page(void);
-struct page * ___suspend_get_nonconflicting_page(int can_be_highmem);
+extern unsigned long __toi_get_nonconflicting_page(void);
+struct page * ___toi_get_nonconflicting_page(int can_be_highmem);
 
-extern void suspend_reset_alt_image_pageset2_pfn(void);
+extern void toi_reset_alt_image_pageset2_pfn(void);
 #endif

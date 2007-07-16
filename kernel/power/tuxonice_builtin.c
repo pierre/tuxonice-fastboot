@@ -84,11 +84,11 @@ EXPORT_SYMBOL_GPL(enable_nonboot_cpus);
 #endif
 #endif
 
-int suspend2_wait = CONFIG_TOI_DEFAULT_WAIT;
+int toi_wait = CONFIG_TOI_DEFAULT_WAIT;
 
 #ifdef CONFIG_TOI_USERUI_EXPORTS
 EXPORT_SYMBOL_GPL(kmsg_redirect);
-EXPORT_SYMBOL_GPL(suspend2_wait);
+EXPORT_SYMBOL_GPL(toi_wait);
 #ifndef CONFIG_COMPAT
 EXPORT_SYMBOL_GPL(sys_ioctl);
 #endif
@@ -97,7 +97,7 @@ EXPORT_SYMBOL_GPL(sys_ioctl);
 #if defined(CONFIG_TOI_USERUI_EXPORTS) || defined(CONFIG_TOI_CORE_EXPORTS)
 EXPORT_SYMBOL_GPL(console_printk);
 #endif
-#ifdef CONFIG_TOI_SWAP_EXPORTS	/* Suspend swap specific */
+#ifdef CONFIG_TOI_SWAP_EXPORTS	/* TuxOnIce swap specific */
 EXPORT_SYMBOL_GPL(sys_swapon);
 EXPORT_SYMBOL_GPL(sys_swapoff);
 EXPORT_SYMBOL_GPL(si_swapinfo);
@@ -108,7 +108,7 @@ EXPORT_SYMBOL_GPL(get_swap_info_struct);
 #endif
 
 #ifdef CONFIG_TOI_FILE_EXPORTS
-/* Suspend_file specific */
+/* TuxOnice file allocator specific support */
 extern char * __initdata root_device_name;
 
 EXPORT_SYMBOL_GPL(resume_file);
@@ -127,97 +127,97 @@ EXPORT_SYMBOL_GPL(name_to_dev_t);
 #if defined(CONFIG_TOI_EXPORTS) || defined(CONFIG_TOI_CORE_EXPORTS)
 EXPORT_SYMBOL_GPL(snprintf_used);
 #endif
-struct suspend2_core_fns *s2_core_fns;
-EXPORT_SYMBOL_GPL(s2_core_fns);
+struct toi_core_fns *toi_core_fns;
+EXPORT_SYMBOL_GPL(toi_core_fns);
 
 dyn_pageflags_t pageset1_map;
 dyn_pageflags_t pageset1_copy_map;
 EXPORT_SYMBOL_GPL(pageset1_map);
 EXPORT_SYMBOL_GPL(pageset1_copy_map);
 
-unsigned long suspend_result = 0;
-unsigned long suspend_debug_state = 0;
-int suspend_io_time[2][2];
+unsigned long toi_result = 0;
+unsigned long toi_debug_state = 0;
+int toi_io_time[2][2];
 struct pagedir pagedir1 = {1};
 
-EXPORT_SYMBOL_GPL(suspend_io_time);
-EXPORT_SYMBOL_GPL(suspend_debug_state);
-EXPORT_SYMBOL_GPL(suspend_result);
+EXPORT_SYMBOL_GPL(toi_io_time);
+EXPORT_SYMBOL_GPL(toi_debug_state);
+EXPORT_SYMBOL_GPL(toi_result);
 EXPORT_SYMBOL_GPL(pagedir1);
 
-unsigned long suspend_get_nonconflicting_page(void)
+unsigned long toi_get_nonconflicting_page(void)
 {
-	return s2_core_fns->get_nonconflicting_page();
+	return toi_core_fns->get_nonconflicting_page();
 }
 
-int suspend_post_context_save(void)
+int toi_post_context_save(void)
 {
-	return s2_core_fns->post_context_save();
+	return toi_core_fns->post_context_save();
 }
 
-int suspend2_try_suspend(int have_pmsem)
+int toi_try_hibernate(int have_pmsem)
 {
-	if (!s2_core_fns)
+	if (!toi_core_fns)
 		return -ENODEV;
 
-	return s2_core_fns->try_suspend(have_pmsem);
+	return toi_core_fns->try_hibernate(have_pmsem);
 }
 
-void suspend2_try_resume(void)
+void toi_try_resume(void)
 {
-	if (s2_core_fns)
-		s2_core_fns->try_resume();
+	if (toi_core_fns)
+		toi_core_fns->try_resume();
 }
 
-int suspend2_lowlevel_builtin(void)
+int toi_lowlevel_builtin(void)
 {
 	int error = 0;
 
 	save_processor_state();
 	if ((error = swsusp_arch_suspend()))
-		printk(KERN_ERR "Error %d suspending\n", error);
+		printk(KERN_ERR "Error %d hibernating\n", error);
 	/* Restore control flow appears here */
 	restore_processor_state();
 
 	return error;
 }
 
-EXPORT_SYMBOL_GPL(suspend2_lowlevel_builtin);
+EXPORT_SYMBOL_GPL(toi_lowlevel_builtin);
 
-unsigned long suspend_compress_bytes_in, suspend_compress_bytes_out;
-EXPORT_SYMBOL_GPL(suspend_compress_bytes_in);
-EXPORT_SYMBOL_GPL(suspend_compress_bytes_out);
+unsigned long toi_compress_bytes_in, toi_compress_bytes_out;
+EXPORT_SYMBOL_GPL(toi_compress_bytes_in);
+EXPORT_SYMBOL_GPL(toi_compress_bytes_out);
 
 #ifdef CONFIG_TOI_REPLACE_SWSUSP
-unsigned long suspend_action = (1 << TOI_REPLACE_SWSUSP) | \
+unsigned long toi_action = (1 << TOI_REPLACE_SWSUSP) | \
 			       (1 << TOI_PAGESET2_FULL) | \
 			       (1 << TOI_LATE_CPU_HOTPLUG);
 #else
-unsigned long suspend_action = 	(1 << TOI_PAGESET2_FULL) | \
+unsigned long toi_action = 	(1 << TOI_PAGESET2_FULL) | \
 				(1 << TOI_LATE_CPU_HOTPLUG);
 #endif
-EXPORT_SYMBOL_GPL(suspend_action);
+EXPORT_SYMBOL_GPL(toi_action);
 
 unsigned long toi_state = ((1 << TOI_BOOT_TIME) |
 		(1 << TOI_IGNORE_LOGLEVEL) |
 		(1 << TOI_IO_STOPPED));
 EXPORT_SYMBOL_GPL(toi_state);
 
-/* The number of suspends we have started (some may have been cancelled) */
-unsigned int nr_suspends;
-EXPORT_SYMBOL_GPL(nr_suspends);
+/* The number of hibernates we have started (some may have been cancelled) */
+unsigned int nr_hibernates;
+EXPORT_SYMBOL_GPL(nr_hibernates);
 
-int suspend2_running = 0;
-EXPORT_SYMBOL_GPL(suspend2_running);
+int toi_running = 0;
+EXPORT_SYMBOL_GPL(toi_running);
 
-int suspend2_in_suspend __nosavedata;
-EXPORT_SYMBOL_GPL(suspend2_in_suspend);
+int toi_in_hibernate __nosavedata;
+EXPORT_SYMBOL_GPL(toi_in_hibernate);
 
-unsigned long suspend2_nosave_state1 __nosavedata = 0;
-unsigned long suspend2_nosave_state2 __nosavedata = 0;
-int suspend2_nosave_state3 __nosavedata = 0;
-int suspend2_nosave_io_speed[2][2] __nosavedata;
-__nosavedata char suspend2_nosave_commandline[COMMAND_LINE_SIZE];
+unsigned long toi_nosave_state1 __nosavedata = 0;
+unsigned long toi_nosave_state2 __nosavedata = 0;
+int toi_nosave_state3 __nosavedata = 0;
+int toi_nosave_io_speed[2][2] __nosavedata;
+__nosavedata char toi_nosave_commandline[COMMAND_LINE_SIZE];
 
 __nosavedata struct pbe *restore_highmem_pblist;
 
@@ -228,25 +228,25 @@ EXPORT_SYMBOL_GPL(saveable_highmem_page);
 EXPORT_SYMBOL_GPL(restore_highmem_pblist);
 #endif
 
-EXPORT_SYMBOL_GPL(suspend2_nosave_state1);
-EXPORT_SYMBOL_GPL(suspend2_nosave_state2);
-EXPORT_SYMBOL_GPL(suspend2_nosave_state3);
-EXPORT_SYMBOL_GPL(suspend2_nosave_io_speed);
-EXPORT_SYMBOL_GPL(suspend2_nosave_commandline);
+EXPORT_SYMBOL_GPL(toi_nosave_state1);
+EXPORT_SYMBOL_GPL(toi_nosave_state2);
+EXPORT_SYMBOL_GPL(toi_nosave_state3);
+EXPORT_SYMBOL_GPL(toi_nosave_io_speed);
+EXPORT_SYMBOL_GPL(toi_nosave_commandline);
 #endif
 
-static int __init suspend2_wait_setup(char *str)
+static int __init toi_wait_setup(char *str)
 {
 	int value;
 
 	if (sscanf(str, "=%d", &value)) {
 		if (value < -1 || value > 255)
-			printk("Suspend2_wait outside range -1 to 255.\n");
+			printk("TuxOnIce_wait outside range -1 to 255.\n");
 		else
-			suspend2_wait = value;
+			toi_wait = value;
 	}
 
 	return 1;
 }
 
-__setup("suspend2_wait", suspend2_wait_setup);
+__setup("toi_wait", toi_wait_setup);

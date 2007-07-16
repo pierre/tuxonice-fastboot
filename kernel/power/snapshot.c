@@ -50,7 +50,7 @@ EXPORT_SYMBOL_GPL(resume_attempted);
 
 #ifdef CONFIG_TOI
 #include "tuxonice_pagedir.h"
-int suspend_post_context_save(void);
+int toi_post_context_save(void);
 #endif
 
 /* Pointer to an auxiliary buffer (1 page) */
@@ -95,8 +95,8 @@ static void *get_image_page(gfp_t gfp_mask, int safe_needed)
 unsigned long get_safe_page(gfp_t gfp_mask)
 {
 #ifdef CONFIG_TOI
-	if (suspend2_running)
-		return suspend_get_nonconflicting_page();
+	if (toi_running)
+		return toi_get_nonconflicting_page();
 #endif
 
 	return (unsigned long)get_image_page(gfp_mask, PG_SAFE);
@@ -1215,8 +1215,8 @@ asmlinkage int swsusp_save(void)
 	unsigned int nr_pages, nr_highmem;
 
 #ifdef CONFIG_TOI
-	if (suspend2_running)
-		return suspend_post_context_save();
+	if (toi_running)
+		return toi_post_context_save();
 #endif
 
 	printk("swsusp: critical section: \n");

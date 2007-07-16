@@ -161,22 +161,22 @@ void copyback_post(void)
 {
 	int loop;
 
-	suspend_action = suspend2_nosave_state1;
-	suspend_debug_state = suspend2_nosave_state2;
-	suspend_default_console_level = suspend2_nosave_state3;
+	toi_action = toi_nosave_state1;
+	toi_debug_state = toi_nosave_state2;
+	toi_default_console_level = toi_nosave_state3;
 
 	for (loop = 0; loop < 4; loop++)
-		suspend_io_time[loop/2][loop%2] =
-			suspend2_nosave_io_speed[loop/2][loop%2];
+		toi_io_time[loop/2][loop%2] =
+			toi_nosave_io_speed[loop/2][loop%2];
 
 	set_toi_state(TOI_NOW_RESUMING);
 
-	if (suspend_activate_storage(1))
+	if (toi_activate_storage(1))
 		panic("Failed to reactivate our storage.");
 
-	suspend_ui_post_atomic_restore();
+	toi_ui_post_atomic_restore();
 
-	suspend_cond_pause(1, "About to reload secondary pagedir.");
+	toi_cond_pause(1, "About to reload secondary pagedir.");
 
 	if (read_pageset2(0))
 		panic("Unable to successfully reread the page cache.");
@@ -187,11 +187,11 @@ void copyback_post(void)
 	 * do this check after loading pageset2, to give them the fastest
 	 * wakeup when they are ready to use the computer again.
 	 */
-	suspend2_check_resleep();
+	toi_check_resleep();
 }
 
 /**
- * suspend_copy_pageset1: Do the atomic copy of pageset1.
+ * toi_copy_pageset1: Do the atomic copy of pageset1.
  *
  * Make the atomic copy of pageset1. We can't use copy_page (as we once did)
  * because we can't be sure what side effects it has. On my old Duron, with
@@ -204,7 +204,7 @@ void copyback_post(void)
  * its incremented. This is essentially the same problem.
  **/
 
-void suspend_copy_pageset1(void)
+void toi_copy_pageset1(void)
 {
 	int i;
 	unsigned long source_index, dest_index;
@@ -235,10 +235,10 @@ void suspend_copy_pageset1(void)
 		
 		if (PageHighMem(origpage))
 			kunmap_atomic(origvirt, KM_USER0);
-		else if (suspend2_faulted) {
+		else if (toi_faulted) {
 			printk("%p (%lu) being unmapped after faulting during atomic copy.\n", origpage, source_index);
 			kernel_map_pages(origpage, 1, 0);
-			clear_suspend2_fault();
+			clear_toi_fault();
 		}
 
 		if (PageHighMem(copypage))
@@ -250,15 +250,15 @@ void suspend_copy_pageset1(void)
 }
 
 /**
- * __suspend_post_context_save: Steps after saving the cpu context.
+ * __toi_post_context_save: Steps after saving the cpu context.
  *
  * Steps taken after saving the CPU state to make the actual
  * atomic copy.
  *
- * Called from swsusp_save in snapshot.c via suspend_post_context_save.
+ * Called from swsusp_save in snapshot.c via toi_post_context_save.
  **/
 
-int __suspend_post_context_save(void)
+int __toi_post_context_save(void)
 {
 	int old_ps1_size = pagedir1.size;
 	
@@ -266,7 +266,7 @@ int __suspend_post_context_save(void)
 
 	free_checksum_pages();
 
-	suspend_recalculate_image_contents(1);
+	toi_recalculate_image_contents(1);
 
 	extra_pd1_pages_used = pagedir1.size - old_ps1_size;
 
@@ -281,65 +281,65 @@ int __suspend_post_context_save(void)
 
 	if (!test_action_state(TOI_TEST_FILTER_SPEED) &&
 	    !test_action_state(TOI_TEST_BIO))
-		suspend_copy_pageset1();
+		toi_copy_pageset1();
 
 	return 0;
 }
 
 /**
- * suspend2_suspend: High level code for doing the atomic copy.
+ * toi_hibernate: High level code for doing the atomic copy.
  *
  * High-level code which prepares to do the atomic copy. Loosely based
  * on the swsusp version, but with the following twists:
- * - We set suspend2_running so the swsusp code uses our code paths.
+ * - We set toi_running so the swsusp code uses our code paths.
  * - We give better feedback regarding what goes wrong if there is a problem.
  * - We use an extra function to call the assembly, just in case this code
  *   is in a module (return address).
  **/
 
-int suspend2_suspend(void)
+int toi_hibernate(void)
 {
 	int error;
 
-	suspend2_running = 1; /* For the swsusp code we use :< */
+	toi_running = 1; /* For the swsusp code we use :< */
 
-	error = suspend2_lowlevel_builtin();
+	error = toi_lowlevel_builtin();
 
-	if (!suspend2_in_suspend)
+	if (!toi_in_hibernate)
 		copyback_high();
 
-	suspend2_running = 0;
+	toi_running = 0;
 	return error;
 }
 
 /**
- * suspend_atomic_restore: Prepare to do the atomic restore.
+ * toi_atomic_restore: Prepare to do the atomic restore.
  *
  * Get ready to do the atomic restore. This part gets us into the same
- * state we are in prior to do calling do_suspend2_lowlevel while
- * suspending: hot-unplugging secondary cpus and freeze processes,
+ * state we are in prior to do calling do_toi_lowlevel while
+ * hibernating: hot-unplugging secondary cpus and freeze processes,
  * before starting the thread that will do the restore.
  **/
 
-int suspend_atomic_restore(void)
+int toi_atomic_restore(void)
 {
 	int error, loop;
 
-	suspend2_running = 1;
+	toi_running = 1;
 
-	suspend_prepare_status(DONT_CLEAR_BAR,	"Atomic restore.");
+	toi_prepare_status(DONT_CLEAR_BAR,	"Atomic restore.");
 
-	if (suspend2_go_atomic(PMSG_PRETHAW, 0))
+	if (toi_go_atomic(PMSG_PRETHAW, 0))
 		goto Failed;
 
-	suspend2_nosave_state1 = suspend_action;
-	suspend2_nosave_state2 = suspend_debug_state;
-	suspend2_nosave_state3 = suspend_default_console_level;
+	toi_nosave_state1 = toi_action;
+	toi_nosave_state2 = toi_debug_state;
+	toi_nosave_state3 = toi_default_console_level;
 	
 	for (loop = 0; loop < 4; loop++)
-		suspend2_nosave_io_speed[loop/2][loop%2] =
-			suspend_io_time[loop/2][loop%2];
-	memcpy(suspend2_nosave_commandline, saved_command_line, COMMAND_LINE_SIZE);
+		toi_nosave_io_speed[loop/2][loop%2] =
+			toi_io_time[loop/2][loop%2];
+	memcpy(toi_nosave_commandline, saved_command_line, COMMAND_LINE_SIZE);
 
 	/* We'll ignore saved state, but this gets preempt count (etc) right */
 	save_processor_state();
@@ -361,18 +361,18 @@ Failed:
 #endif
 	if (test_action_state(TOI_PM_PREPARE_CONSOLE))
 		pm_restore_console();
-	suspend2_running = 0;
+	toi_running = 0;
 	return 1;
 }
 
-int suspend2_go_atomic(pm_message_t state, int suspend_time)
+int toi_go_atomic(pm_message_t state, int suspend_time)
 {
 	if (test_action_state(TOI_PM_PREPARE_CONSOLE))
 		pm_prepare_console();
 
-	if (suspend_time && suspend2_platform_prepare()) {
+	if (suspend_time && toi_platform_prepare()) {
 		set_abort_result(TOI_PLATFORM_PREP_FAILED);
-		suspend2_end_atomic(ATOMIC_STEP_RESTORE_CONSOLE, suspend_time);
+		toi_end_atomic(ATOMIC_STEP_RESTORE_CONSOLE, suspend_time);
 		return 1;
 	}
 
@@ -380,15 +380,15 @@ int suspend2_go_atomic(pm_message_t state, int suspend_time)
 
 	if (device_suspend(state)) {
 		set_abort_result(TOI_DEVICE_REFUSED);
-		suspend2_end_atomic(ATOMIC_STEP_RESUME_CONSOLE, suspend_time);
+		toi_end_atomic(ATOMIC_STEP_RESUME_CONSOLE, suspend_time);
 		return 1;
 	}
 
 	if (test_action_state(TOI_LATE_CPU_HOTPLUG)) {
-		suspend_prepare_status(DONT_CLEAR_BAR,	"Disable nonboot cpus.");
+		toi_prepare_status(DONT_CLEAR_BAR,	"Disable nonboot cpus.");
 		if (disable_nonboot_cpus()) {
 			set_abort_result(TOI_CPU_HOTPLUG_FAILED);
-			suspend2_end_atomic(ATOMIC_STEP_DEVICE_RESUME,
+			toi_end_atomic(ATOMIC_STEP_DEVICE_RESUME,
 					suspend_time);
 			return 1;
 		}
@@ -396,7 +396,7 @@ int suspend2_go_atomic(pm_message_t state, int suspend_time)
 
 	if (suspend_time && arch_prepare_suspend()) {
 		set_abort_result(TOI_ARCH_PREPARE_FAILED);
-		suspend2_end_atomic(ATOMIC_STEP_CPU_HOTPLUG, suspend_time);
+		toi_end_atomic(ATOMIC_STEP_CPU_HOTPLUG, suspend_time);
 		return 1;
 	}
 
@@ -411,14 +411,14 @@ int suspend2_go_atomic(pm_message_t state, int suspend_time)
 
 	if (device_power_down(state)) {
 		set_abort_result(TOI_DEVICE_REFUSED);
-		suspend2_end_atomic(ATOMIC_STEP_IRQS, suspend_time);
+		toi_end_atomic(ATOMIC_STEP_IRQS, suspend_time);
 		return 1;
 	}
 
 	return 0;
 }
 
-void suspend2_end_atomic(int stage, int suspend_time)
+void toi_end_atomic(int stage, int suspend_time)
 {
 	switch (stage) {
 		case ATOMIC_ALL_STEPS:
@@ -429,7 +429,7 @@ void suspend2_end_atomic(int stage, int suspend_time)
 			if (test_action_state(TOI_LATE_CPU_HOTPLUG))
 				enable_nonboot_cpus();
 		case ATOMIC_STEP_DEVICE_RESUME:
-			suspend2_platform_finish();
+			toi_platform_finish();
 			device_resume();
 		case ATOMIC_STEP_RESUME_CONSOLE:
 			resume_console();

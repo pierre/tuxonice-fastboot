@@ -42,17 +42,17 @@ struct user_helper_data {
 };
 
 #ifdef CONFIG_NET
-int suspend_netlink_setup(struct user_helper_data *uhd);
-void suspend_netlink_close(struct user_helper_data *uhd);
-void suspend_send_netlink_message(struct user_helper_data *uhd,
+int toi_netlink_setup(struct user_helper_data *uhd);
+void toi_netlink_close(struct user_helper_data *uhd);
+void toi_send_netlink_message(struct user_helper_data *uhd,
 		int type, void* params, size_t len);
 #else
-static inline int suspend_netlink_setup(struct user_helper_data *uhd)
+static inline int toi_netlink_setup(struct user_helper_data *uhd)
 {
 	return 0;
 }
 
-static inline void suspend_netlink_close(struct user_helper_data *uhd) { };
-static inline void suspend_send_netlink_message(struct user_helper_data *uhd,
+static inline void toi_netlink_close(struct user_helper_data *uhd) { };
+static inline void toi_send_netlink_message(struct user_helper_data *uhd,
 		int type, void* params, size_t len) { };
 #endif

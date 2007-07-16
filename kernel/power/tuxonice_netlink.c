@@ -20,11 +20,11 @@ struct user_helper_data *uhd_list = NULL;
  * Refill our pool of SKBs for use in emergencies (eg, when eating memory and none
  * can be allocated).
  */
-static void suspend_fill_skb_pool(struct user_helper_data *uhd)
+static void toi_fill_skb_pool(struct user_helper_data *uhd)
 {
 	while (uhd->pool_level < uhd->pool_limit) {
 		struct sk_buff *new_skb =
-			alloc_skb(NLMSG_SPACE(uhd->skb_size), S2_ATOMIC_GFP);
+			alloc_skb(NLMSG_SPACE(uhd->skb_size), TOI_ATOMIC_GFP);
 
 		if (!new_skb)
 			break;
@@ -39,10 +39,10 @@ static void suspend_fill_skb_pool(struct user_helper_data *uhd)
  * Try to allocate a single skb. If we can't get one, try to use one from
  * our pool.
  */
-static struct sk_buff *suspend_get_skb(struct user_helper_data *uhd)
+static struct sk_buff *toi_get_skb(struct user_helper_data *uhd)
 {
 	struct sk_buff *skb =
-		alloc_skb(NLMSG_SPACE(uhd->skb_size), S2_ATOMIC_GFP);
+		alloc_skb(NLMSG_SPACE(uhd->skb_size), TOI_ATOMIC_GFP);
 
 	if (skb)
 		return skb;
@@ -66,7 +66,7 @@ static void put_skb(struct user_helper_data *uhd, struct sk_buff *skb)
 		kfree_skb(skb);
 }
 
-void suspend_send_netlink_message(struct user_helper_data *uhd,
+void toi_send_netlink_message(struct user_helper_data *uhd,
 		int type, void* params, size_t len)
 {
 	struct sk_buff *skb;
@@ -77,9 +77,9 @@ void suspend_send_netlink_message(struct user_helper_data *uhd,
 	if (uhd->pid == -1)
 		return;
 
-	skb = suspend_get_skb(uhd);
+	skb = toi_get_skb(uhd);
 	if (!skb) {
-		printk("suspend_netlink: Can't allocate skb!\n");
+		printk("toi_netlink: Can't allocate skb!\n");
 		return;
 	}
 
@@ -116,13 +116,13 @@ static void send_whether_debugging(struct user_helper_data *uhd)
 {
 	static int is_debugging = 1;
 
-	suspend_send_netlink_message(uhd, NETLINK_MSG_IS_DEBUGGING,
+	toi_send_netlink_message(uhd, NETLINK_MSG_IS_DEBUGGING,
 			&is_debugging, sizeof(int));
 }
 
 /*
  * Set the PF_NOFREEZE flag on the given process to ensure it can run whilst we
- * are suspending.
+ * are hibernating.
  */
 static int nl_set_nofreeze(struct user_helper_data *uhd, int pid)
 {
@@ -140,7 +140,7 @@ static int nl_set_nofreeze(struct user_helper_data *uhd, int pid)
 	read_unlock(&tasklist_lock);
 	uhd->pid = pid;
 
-	suspend_send_netlink_message(uhd, NETLINK_MSG_NOFREEZE_ACK, NULL, 0);
+	toi_send_netlink_message(uhd, NETLINK_MSG_NOFREEZE_ACK, NULL, 0);
 
 	return 0;
 }
@@ -164,7 +164,7 @@ static int nl_ready(struct user_helper_data *uhd, int version)
 	return 0;
 }
 
-void suspend_netlink_close_complete(struct user_helper_data *uhd)
+void toi_netlink_close_complete(struct user_helper_data *uhd)
 {
 	if (uhd->nl) {
 		sock_release(uhd->nl->sk_socket);
@@ -179,10 +179,10 @@ void suspend_netlink_close_complete(struct user_helper_data *uhd)
 
 	uhd->pid = -1;
 
-	suspend_put_modules();
+	toi_put_modules();
 }
 
-static int suspend_nl_gen_rcv_msg(struct user_helper_data *uhd,
+static int toi_nl_gen_rcv_msg(struct user_helper_data *uhd,
 		struct sk_buff *skb, struct nlmsghdr *nlh)
 {
 	int type;
@@ -221,14 +221,14 @@ static int suspend_nl_gen_rcv_msg(struct user_helper_data *uhd,
 				return err;
 			break;
 		case NETLINK_MSG_CLEANUP:
-			suspend_netlink_close_complete(uhd);
+			toi_netlink_close_complete(uhd);
 			break;
 	}
 
 	return 0;
 }
 
-static void suspend_user_rcv_skb(struct user_helper_data *uhd,
+static void toi_user_rcv_skb(struct user_helper_data *uhd,
 				  struct sk_buff *skb)
 {
 	int err;
@@ -245,7 +245,7 @@ static void suspend_user_rcv_skb(struct user_helper_data *uhd,
 		if (rlen > skb->len)
 			rlen = skb->len;
 
-		if ((err = suspend_nl_gen_rcv_msg(uhd, skb, nlh)) != 0)
+		if ((err = toi_nl_gen_rcv_msg(uhd, skb, nlh)) != 0)
 			netlink_ack(skb, nlh, err);
 		else if (nlh->nlmsg_flags & NLM_F_ACK)
 			netlink_ack(skb, nlh, 0);
@@ -253,7 +253,7 @@ static void suspend_user_rcv_skb(struct user_helper_data *uhd,
 	}
 }
 
-static void suspend_netlink_input(struct sock *sk, int len)
+static void toi_netlink_input(struct sock *sk, int len)
 {
 	struct user_helper_data *uhd = uhd_list;
 
@@ -263,7 +263,7 @@ static void suspend_netlink_input(struct sock *sk, int len)
 	do {
 		struct sk_buff *skb;
 		while ((skb = skb_dequeue(&sk->sk_receive_queue)) != NULL) {
-			suspend_user_rcv_skb(uhd, skb);
+			toi_user_rcv_skb(uhd, skb);
 			put_skb(uhd, skb);
 		}
 	} while (uhd->nl && uhd->nl->sk_receive_queue.qlen);
@@ -271,26 +271,26 @@ static void suspend_netlink_input(struct sock *sk, int len)
 
 static int netlink_prepare(struct user_helper_data *uhd)
 {
-	suspend_get_modules();
+	toi_get_modules();
 
 	uhd->next = uhd_list;
 	uhd_list = uhd;
 
 	uhd->sock_seq = 0x42c0ffee;
 	uhd->nl = netlink_kernel_create(uhd->netlink_id, 0,
-			suspend_netlink_input, NULL, THIS_MODULE);
+			toi_netlink_input, NULL, THIS_MODULE);
 	if (!uhd->nl) {
 		printk("Failed to allocate netlink socket for %s.\n",
 				uhd->name);
 		return -ENOMEM;
 	}
 
-	suspend_fill_skb_pool(uhd);
+	toi_fill_skb_pool(uhd);
 
 	return 0;
 }
 
-void suspend_netlink_close(struct user_helper_data *uhd)
+void toi_netlink_close(struct user_helper_data *uhd)
 {
 	struct task_struct *t;
 
@@ -299,10 +299,10 @@ void suspend_netlink_close(struct user_helper_data *uhd)
 		t->flags &= ~PF_NOFREEZE;
 	read_unlock(&tasklist_lock);
 
-	suspend_send_netlink_message(uhd, NETLINK_MSG_CLEANUP, NULL, 0);
+	toi_send_netlink_message(uhd, NETLINK_MSG_CLEANUP, NULL, 0);
 }
 
-static int suspend2_launch_userspace_program(char *command, int channel_no)
+static int toi_launch_userspace_program(char *command, int channel_no)
 {
 	int retval;
 	static char *envp[] = {
@@ -325,7 +325,7 @@ static int suspend2_launch_userspace_program(char *command, int channel_no)
 		size = strlen(test_read);
 		if (!(size))
 			break;
-		argv[arg] = kmalloc(size + 1, S2_ATOMIC_GFP);
+		argv[arg] = kmalloc(size + 1, TOI_ATOMIC_GFP);
 		strcpy(argv[arg], test_read);
 		orig_posn += size + 1;
 		*test_read = 0;
@@ -356,16 +356,16 @@ static int suspend2_launch_userspace_program(char *command, int channel_no)
 	return retval;
 }
 
-int suspend_netlink_setup(struct user_helper_data *uhd)
+int toi_netlink_setup(struct user_helper_data *uhd)
 {
 	if (netlink_prepare(uhd) < 0) {
 		printk("Netlink prepare failed.\n");
 		return 1;
 	}
 
-	if (suspend2_launch_userspace_program(uhd->program, uhd->netlink_id) < 0) {
+	if (toi_launch_userspace_program(uhd->program, uhd->netlink_id) < 0) {
 		printk("Launch userspace program failed.\n");
-		suspend_netlink_close_complete(uhd);
+		toi_netlink_close_complete(uhd);
 		return 1;
 	}
 
@@ -375,13 +375,13 @@ int suspend_netlink_setup(struct user_helper_data *uhd)
 	if (uhd->pid == -1) {
 		printk("%s: Failed to contact userspace process.\n",
 				uhd->name);
-		suspend_netlink_close_complete(uhd);
+		toi_netlink_close_complete(uhd);
 		return 1;
 	}
 
 	return 0;
 }
 
-EXPORT_SYMBOL_GPL(suspend_netlink_setup);
-EXPORT_SYMBOL_GPL(suspend_netlink_close);
-EXPORT_SYMBOL_GPL(suspend_send_netlink_message);
+EXPORT_SYMBOL_GPL(toi_netlink_setup);
+EXPORT_SYMBOL_GPL(toi_netlink_close);
+EXPORT_SYMBOL_GPL(toi_send_netlink_message);

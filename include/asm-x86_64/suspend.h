@@ -12,8 +12,8 @@ arch_prepare_suspend(void)
 	return 0;
 }
 
-#define suspend2_faulted (0)
-#define clear_suspend2_fault() do { } while(0)
+#define toi_faulted (0)
+#define clear_toi_fault() do { } while(0)
 
 /* Image of the saved processor state. If you touch this, fix acpi_wakeup.S. */
 struct saved_context {

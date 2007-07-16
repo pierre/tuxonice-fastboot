@@ -7,7 +7,7 @@
  *
  * We need to eat memory until we can:
  * 1. Perform the save without changing anything (RAM_NEEDED < #pages)
- * 2. Fit it all in available space (suspendActiveAllocator->available_space() >=
+ * 2. Fit it all in available space (toiActiveAllocator->available_space() >=
  *    main_storage_needed())
  * 3. Reload the pagedir and pageset1 to places that don't collide with their
  *    final destinations, not knowing to what extent the resumed kernel will
@@ -86,7 +86,7 @@ static int build_attention_list(void)
 	 */
 	for (i = 0; i < task_count; i++) {
 		struct attention_list *this =
-			kmalloc(sizeof(struct attention_list), S2_WAIT_GFP);
+			kmalloc(sizeof(struct attention_list), TOI_WAIT_GFP);
 		if (!this) {
 			printk("Failed to allocate slab for attention list.\n");
 			free_attention_list();
@@ -131,12 +131,12 @@ static void pageset2_full(void)
 }
 
 /*
- * suspend_mark_task_as_pageset
+ * toi_mark_task_as_pageset
  * Functionality   : Marks all the saveable pages belonging to a given process
  * 		     as belonging to a particular pageset.
  */
 
-static void suspend_mark_task_as_pageset(struct task_struct *t, int pageset2)
+static void toi_mark_task_as_pageset(struct task_struct *t, int pageset2)
 {
 	struct vm_area_struct *vma;
 	struct mm_struct *mm;
@@ -176,13 +176,13 @@ static void suspend_mark_task_as_pageset(struct task_struct *t, int pageset2)
 
 /* mark_pages_for_pageset2
  *
- * Description:	Mark unshared pages in processes not needed for suspend as
+ * Description:	Mark unshared pages in processes not needed for hibernate as
  * 		being able to be written out in a separate pagedir.
  * 		HighMem pages are simply marked as pageset2. They won't be
- * 		needed during suspend.
+ * 		needed during hibernate.
  */
 
-static void suspend_mark_pages_for_pageset2(void)
+static void toi_mark_pages_for_pageset2(void)
 {
 	struct task_struct *p;
 	struct attention_list *this = attention_list;
@@ -200,19 +200,19 @@ static void suspend_mark_pages_for_pageset2(void)
 			if (!p->mm || (p->flags & PF_BORROWED_MM))
 				continue;
 
-			suspend_mark_task_as_pageset(p, PAGESET2);
+			toi_mark_task_as_pageset(p, PAGESET2);
 		}
 		read_unlock(&tasklist_lock);
 	}
 
 	/* 
-	 * Because the tasks in attention_list are ones related to suspending,
+	 * Because the tasks in attention_list are ones related to hibernating,
 	 * we know that they won't go away under us.
 	 */
 
 	while (this) {
 		if (!test_result_state(TOI_ABORTED))
-			suspend_mark_task_as_pageset(this->task, PAGESET1);
+			toi_mark_task_as_pageset(this->task, PAGESET1);
 		this = this->next;
 	}
 }
@@ -235,11 +235,11 @@ struct extras {
 
 static struct extras *extras_list;
 
-/* suspend_free_extra_pagedir_memory
+/* toi_free_extra_pagedir_memory
  *
  * Description:	Free previously allocated extra pagedir memory.
  */
-void suspend_free_extra_pagedir_memory(void)
+void toi_free_extra_pagedir_memory(void)
 {
 	/* Free allocated pages */
 	while (extras_list) {
@@ -258,17 +258,17 @@ void suspend_free_extra_pagedir_memory(void)
 	extra_pages_allocated = 0;
 }
 
-/* suspend_allocate_extra_pagedir_memory
+/* toi_allocate_extra_pagedir_memory
  *
  * Description:	Allocate memory for making the atomic copy of pagedir1 in the
  * 		case where it is bigger than pagedir2.
  * Arguments:	int	num_to_alloc: Number of extra pages needed.
  * Result:	int. 	Number of extra pages we now have allocated.
  */
-static int suspend_allocate_extra_pagedir_memory(int extra_pages_needed)
+static int toi_allocate_extra_pagedir_memory(int extra_pages_needed)
 {
 	int j, order, num_to_alloc = extra_pages_needed - extra_pages_allocated;
-	unsigned long flags = S2_ATOMIC_GFP;
+	unsigned long flags = TOI_ATOMIC_GFP;
 
 	if (num_to_alloc < 1)
 		return 0;
@@ -286,7 +286,7 @@ static int suspend_allocate_extra_pagedir_memory(int extra_pages_needed)
 			order--;
 
 		extras_entry = (struct extras *) kmalloc(sizeof(struct extras),
-			S2_ATOMIC_GFP);
+			TOI_ATOMIC_GFP);
 
 		if (!extras_entry)
 			return extra_pages_allocated;
@@ -360,14 +360,14 @@ int real_nr_free_pages(unsigned long zone_idx_mask)
 
 /*
  * Discover how much extra memory will be required by the drivers
- * when they're asked to suspend. We can then ensure that amount
+ * when they're asked to hibernate. We can then ensure that amount
  * of memory is available when we really want it.
  */
 static void get_extra_pd1_allowance(void)
 {
 	int orig_num_free = real_nr_free_pages(all_zones_mask), final;
 	
-	suspend_prepare_status(CLEAR_BAR, "Finding allowance for drivers.");
+	toi_prepare_status(CLEAR_BAR, "Finding allowance for drivers.");
 
 	suspend_console();
 	device_suspend(PMSG_FREEZE);
@@ -396,7 +396,7 @@ static int main_storage_needed(int use_ecr,
 {
 	return ((pagedir1.size + pagedir2.size +
 	  (ignore_extra_pd1_allow ? 0 : extra_pd1_pages_allowance)) *
-	 (use_ecr ? suspend_expected_compression_ratio() : 100) / 100);
+	 (use_ecr ? toi_expected_compression_ratio() : 100) / 100);
 }
 
 /*
@@ -404,9 +404,9 @@ static int main_storage_needed(int use_ecr,
  */
 static int header_storage_needed(void)
 {
-	int bytes = (int) sizeof(struct suspend_header) +
-			suspend_header_storage_for_modules() +
-			suspend_pageflags_space_needed();
+	int bytes = (int) sizeof(struct toi_header) +
+			toi_header_storage_for_modules() +
+			toi_pageflags_space_needed();
 
 	return DIV_ROUND_UP(bytes, PAGE_SIZE);
 }
@@ -414,7 +414,7 @@ static int header_storage_needed(void)
 /*
  * When freeing memory, pages from either pageset might be freed.
  *
- * When seeking to free memory to be able to suspend, for every ps1 page freed,
+ * When seeking to free memory to be able to hibernate, for every ps1 page freed,
  * we need 2 less pages for the atomic copy because there is one less page to
  * copy and one more page into which data can be copied.
  *
@@ -440,7 +440,7 @@ static int lowpages_ps1_to_free(void)
 {
 	return max_t(int, 0, DIV_ROUND_UP(get_lowmem_size(pagedir1) +
 		extra_pd1_pages_allowance + MIN_FREE_RAM +
-		suspend_memory_for_modules() - get_lowmem_size(pagedir2) -
+		toi_memory_for_modules() - get_lowmem_size(pagedir2) -
 		real_nr_free_low_pages() - extra_pages_allocated, 2));
 }
 
@@ -474,7 +474,7 @@ static int amount_needed(int use_image_size_limit)
 
 static int image_not_ready(int use_image_size_limit)
 {
-	suspend_message(TOI_EAT_MEMORY, TOI_LOW, 1,
+	toi_message(TOI_EAT_MEMORY, TOI_LOW, 1,
 		"Amount still needed (%d) > 0:%d. Header: %d < %d: %d,"
 		" Storage allocd: %d < %d: %d.\n",
 			amount_needed(use_image_size_limit),
@@ -485,7 +485,7 @@ static int image_not_ready(int use_image_size_limit)
 			main_storage_needed(1, 1),
 			main_storage_allocated < main_storage_needed(1, 1));
 
-	suspend_cond_pause(0, NULL);
+	toi_cond_pause(0, NULL);
 
 	return ((amount_needed(use_image_size_limit) > 0) ||
 		header_space_allocated < header_storage_needed() ||
@@ -523,13 +523,13 @@ static void display_stats(int always, int sub_extra_pd1_allow)
 		/* Needed */
 		lowpages_ps1_to_free(), highpages_ps1_to_free(),
 		any_to_free(1),
-		MIN_FREE_RAM, suspend_memory_for_modules(),
+		MIN_FREE_RAM, toi_memory_for_modules(),
 		extra_pd1_pages_allowance, image_size_limit << 8);
 
 	if (always)
 		printk(buffer);
 	else
-		suspend_message(TOI_EAT_MEMORY, TOI_MEDIUM, 1, buffer);
+		toi_message(TOI_EAT_MEMORY, TOI_MEDIUM, 1, buffer);
 }
 
 /* generate_free_page_map
@@ -682,14 +682,14 @@ static void flag_image_pages(int atomic_copy)
 	if (atomic_copy)
 		return;
 
-	suspend_message(TOI_EAT_MEMORY, TOI_MEDIUM, 0,
+	toi_message(TOI_EAT_MEMORY, TOI_MEDIUM, 0,
 		"Count data pages: Set1 (%d) + Set2 (%d) + Nosave (%d) + "
 		"NumFree (%d) = %d.\n",
 		pagedir1.size, pagedir2.size, num_nosave, num_free,
 		pagedir1.size + pagedir2.size + num_nosave + num_free);
 }
 
-void suspend_recalculate_image_contents(int atomic_copy) 
+void toi_recalculate_image_contents(int atomic_copy) 
 {
 	clear_dyn_pageflags(pageset1_map);
 	if (!atomic_copy) {
@@ -697,12 +697,12 @@ void suspend_recalculate_image_contents(int atomic_copy)
 		BITMAP_FOR_EACH_SET(pageset2_map, pfn)
 			ClearPagePageset1Copy(pfn_to_page(pfn));
 		/* Need to call this before getting pageset1_size! */
-		suspend_mark_pages_for_pageset2();
+		toi_mark_pages_for_pageset2();
 	}
 	flag_image_pages(atomic_copy);
 
 	if (!atomic_copy) {
-		storage_available = suspendActiveAllocator->storage_available();
+		storage_available = toiActiveAllocator->storage_available();
 		display_stats(0, 0);
 	}
 }
@@ -715,15 +715,15 @@ static void update_image(void)
 { 
 	int result, param_used, wanted, got;
 
-	suspend_recalculate_image_contents(0);
+	toi_recalculate_image_contents(0);
 
 	/* Include allowance for growth in pagedir1 while writing pagedir 2 */
 	wanted = pagedir1.size +  extra_pd1_pages_allowance -
 		get_lowmem_size(pagedir2);
 	if (wanted > extra_pages_allocated) {
-		got = suspend_allocate_extra_pagedir_memory(wanted);
+		got = toi_allocate_extra_pagedir_memory(wanted);
 		if (wanted < got) {
-			suspend_message(TOI_EAT_MEMORY, TOI_LOW, 1,
+			toi_message(TOI_EAT_MEMORY, TOI_LOW, 1,
 				"Want %d extra pages for pageset1, got %d.\n",
 				wanted, got);
 			return;
@@ -743,17 +743,17 @@ static void update_image(void)
 	 * don't complain if we can't get the full amount we're after.
 	 */
 
-	suspendActiveAllocator->allocate_storage(
+	toiActiveAllocator->allocate_storage(
 		min(storage_available, main_storage_needed(0, 0)));
 
-	main_storage_allocated = suspendActiveAllocator->storage_allocated();
+	main_storage_allocated = toiActiveAllocator->storage_allocated();
 
 	param_used = header_storage_needed();
 
-	result = suspendActiveAllocator->allocate_header_space(param_used);
+	result = toiActiveAllocator->allocate_header_space(param_used);
 
 	if (result)
-		suspend_message(TOI_EAT_MEMORY, TOI_LOW, 1,
+		toi_message(TOI_EAT_MEMORY, TOI_LOW, 1,
 			"Still need to get more storage space for header.\n");
 	else
 		header_space_allocated = param_used;
@@ -763,7 +763,7 @@ static void update_image(void)
 
 	allocate_checksum_pages();
 
-	suspend_recalculate_image_contents(0);
+	toi_recalculate_image_contents(0);
 }
 
 /* attempt_to_freeze
@@ -777,7 +777,7 @@ static int attempt_to_freeze(void)
 	
 	/* Stop processes before checking again */
 	thaw_processes();
-	suspend_prepare_status(CLEAR_BAR, "Freezing processes & syncing filesystems.");
+	toi_prepare_status(CLEAR_BAR, "Freezing processes & syncing filesystems.");
 	result = freeze_processes();
 
 	if (result)
@@ -815,7 +815,7 @@ static void eat_memory(void)
 	 * to freeze fail, we give up and abort.
 	 */
 
-	suspend_recalculate_image_contents(0);
+	toi_recalculate_image_contents(0);
 	amount_wanted = amount_needed(1);
 
 	switch (image_size_limit) {
@@ -827,7 +827,7 @@ static void eat_memory(void)
 			break;
 		case -2:  /* Free caches only */
 			drop_pagecache();
-			suspend_recalculate_image_contents(0);
+			toi_recalculate_image_contents(0);
 			amount_wanted = amount_needed(1);
 			did_eat_memory = 1;
 			break;
@@ -840,7 +840,7 @@ static void eat_memory(void)
 		struct zone *zone;
 		int zone_idx;
 
-		suspend_prepare_status(CLEAR_BAR, "Seeking to free %dMB of memory.", MB(amount_wanted));
+		toi_prepare_status(CLEAR_BAR, "Seeking to free %dMB of memory.", MB(amount_wanted));
 
 		thaw_kernel_threads();
 
@@ -860,7 +860,7 @@ static void eat_memory(void)
 
 				did_eat_memory = 1;
 
-				suspend_recalculate_image_contents(0);
+				toi_recalculate_image_contents(0);
 
 				amount_wanted = amount_needed(1);
 				zone_type_free = max_t(int, (zone_idx == ZONE_HIGHMEM) ?
@@ -872,7 +872,7 @@ static void eat_memory(void)
 			}
 		}
 
-		suspend_cond_pause(0, NULL);
+		toi_cond_pause(0, NULL);
 
 		if (freeze_processes())
 			set_abort_result(TOI_FREEZING_FAILED);
@@ -882,14 +882,14 @@ static void eat_memory(void)
 		unsigned long orig_state = get_toi_state();
 		/* Freeze_processes will call sys_sync too */
 		restore_toi_state(orig_state);
-		suspend_recalculate_image_contents(0);
+		toi_recalculate_image_contents(0);
 	}
 
 	/* Blank out image size display */
-	suspend_update_status(100, 100, NULL);
+	toi_update_status(100, 100, NULL);
 }
 
-/* suspend_prepare_image
+/* toi_prepare_image
  *
  * Entry point to the whole image preparation section.
  *
@@ -905,7 +905,7 @@ static void eat_memory(void)
  * - Make sure that all dirty buffers are written out.
  */
 #define MAX_TRIES 2
-int suspend_prepare_image(void)
+int toi_prepare_image(void)
 {
 	int result = 1, tries = 1;
 
@@ -918,22 +918,22 @@ int suspend_prepare_image(void)
 	if (!extra_pd1_pages_allowance)
 		get_extra_pd1_allowance();
 
-	storage_available = suspendActiveAllocator->storage_available();
+	storage_available = toiActiveAllocator->storage_available();
 
 	if (!storage_available) {
-		printk(KERN_ERR "You need some storage available to be able to suspend.\n");
+		printk(KERN_ERR "You need some storage available to be able to hibernate.\n");
 		set_abort_result(TOI_NOSTORAGE_AVAILABLE);
 		return 1;
 	}
 
 	if (build_attention_list()) {
-		abort_suspend(TOI_UNABLE_TO_PREPARE_IMAGE,
+		abort_hibernate(TOI_UNABLE_TO_PREPARE_IMAGE,
 				"Unable to successfully prepare the image.\n");
 		return 1;
 	}
 
 	do {
-		suspend_prepare_status(CLEAR_BAR, "Preparing Image. Try %d.", tries);
+		toi_prepare_status(CLEAR_BAR, "Preparing Image. Try %d.", tries);
 	
 		eat_memory();
 
@@ -952,11 +952,11 @@ int suspend_prepare_image(void)
 	if (!test_result_state(TOI_ABORTED)) {
 		if (result) {
 			display_stats(1, 0);
-			abort_suspend(TOI_UNABLE_TO_PREPARE_IMAGE,
+			abort_hibernate(TOI_UNABLE_TO_PREPARE_IMAGE,
 				"Unable to successfully prepare the image.\n");
 		} else {
 			unlink_lru_lists();
-			suspend_cond_pause(1, "Image preparation complete.");
+			toi_cond_pause(1, "Image preparation complete.");
 		}
 	}
 

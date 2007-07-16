@@ -6,20 +6,20 @@
  * This file is released under the GPLv2.
  *
  * It contains declarations for modules. Modules are additions to
- * suspend2 that provide facilities such as image compression or
+ * TuxOnIce that provide facilities such as image compression or
  * encryption, backends for storage of the image and user interfaces.
  *
  */
 
-#ifndef SUSPEND_MODULES_H
-#define SUSPEND_MODULES_H
+#ifndef TOI_MODULES_H
+#define TOI_MODULES_H
 
 /* This is the maximum size we store in the image header for a module name */
-#define SUSPEND_MAX_MODULE_NAME_LENGTH 30
+#define TOI_MAX_MODULE_NAME_LENGTH 30
 
 /* Per-module metadata */
-struct suspend_module_header {
-	char name[SUSPEND_MAX_MODULE_NAME_LENGTH];
+struct toi_module_header {
+	char name[TOI_MAX_MODULE_NAME_LENGTH];
 	int enabled;
 	int type;
 	int index;
@@ -35,11 +35,11 @@ enum {
 };
 
 enum {
-	SUSPEND_ASYNC,
-	SUSPEND_SYNC
+	TOI_ASYNC,
+	TOI_SYNC
 };
 
-struct suspend_module_ops {
+struct toi_module_ops {
 	/* Functions common to all modules */
 	int type;
 	char *name;
@@ -115,7 +115,7 @@ struct suspend_module_ops {
 	int (*read_header_init) (void);
 	int (*read_header_cleanup) (void);
 
-	int (*rw_header_chunk) (int rw, struct suspend_module_ops *owner,
+	int (*rw_header_chunk) (int rw, struct toi_module_ops *owner,
 			char *buffer_start, int buffer_size);
 	
 	/* Attempt to parse an image location */
@@ -131,37 +131,37 @@ struct suspend_module_ops {
 	int (*remove_image) (void);
 	
 	/* Sysfs Data */
-	struct suspend_sysfs_data *sysfs_data;
+	struct toi_sysfs_data *sysfs_data;
 	int num_sysfs_entries;
 };
 
-extern int suspend_num_modules, suspendNumAllocators;
+extern int toi_num_modules, toiNumAllocators;
 
-extern struct suspend_module_ops *suspendActiveAllocator;
-extern struct list_head suspend_filters, suspendAllocators, suspend_modules;
+extern struct toi_module_ops *toiActiveAllocator;
+extern struct list_head toi_filters, toiAllocators, toi_modules;
 
-extern void suspend_prepare_console_modules(void);
-extern void suspend_cleanup_console_modules(void);
+extern void toi_prepare_console_modules(void);
+extern void toi_cleanup_console_modules(void);
 
-extern struct suspend_module_ops *suspend_find_module_given_name(char *name);
-extern struct suspend_module_ops *suspend_get_next_filter(struct suspend_module_ops *);
+extern struct toi_module_ops *toi_find_module_given_name(char *name);
+extern struct toi_module_ops *toi_get_next_filter(struct toi_module_ops *);
 
-extern int suspend_register_module(struct suspend_module_ops *module);
-extern void suspend_move_module_tail(struct suspend_module_ops *module);
+extern int toi_register_module(struct toi_module_ops *module);
+extern void toi_move_module_tail(struct toi_module_ops *module);
 
-extern int suspend_header_storage_for_modules(void);
-extern int suspend_memory_for_modules(void);
-extern int suspend_expected_compression_ratio(void);
+extern int toi_header_storage_for_modules(void);
+extern int toi_memory_for_modules(void);
+extern int toi_expected_compression_ratio(void);
 
-extern int suspend_print_module_debug_info(char *buffer, int buffer_size);
-extern int suspend_register_module(struct suspend_module_ops *module);
-extern void suspend_unregister_module(struct suspend_module_ops *module);
+extern int toi_print_module_debug_info(char *buffer, int buffer_size);
+extern int toi_register_module(struct toi_module_ops *module);
+extern void toi_unregister_module(struct toi_module_ops *module);
 
-extern int suspend_initialise_modules(int starting_cycle);
-extern void suspend_cleanup_modules(int finishing_cycle);
+extern int toi_initialise_modules(int starting_cycle);
+extern void toi_cleanup_modules(int finishing_cycle);
 
-extern void suspend_print_modules(void);
+extern void toi_print_modules(void);
 
-int suspend_get_modules(void);
-void suspend_put_modules(void);
+int toi_get_modules(void);
+void toi_put_modules(void);
 #endif

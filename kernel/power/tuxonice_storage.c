@@ -27,7 +27,7 @@
 #include "tuxonice_ui.h"
 
 static struct user_helper_data usm_helper_data;
-static struct suspend_module_ops usm_ops;
+static struct toi_module_ops usm_ops;
 static int message_received = 0;
 static int usm_prepare_count = 0;
 static int storage_manager_last_action = 0;
@@ -74,7 +74,7 @@ static int usm_user_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 #ifdef CONFIG_NET
 static int activations = 0;
 
-int suspend_activate_storage(int force)
+int toi_activate_storage(int force)
 {
 	int tries = 1;
 
@@ -88,11 +88,11 @@ int suspend_activate_storage(int force)
 		return 0;
 
 	while ((!message_received || message_received == USM_MSG_FAILED) && tries < 2) {
-		suspend_prepare_status(DONT_CLEAR_BAR, "Activate storage attempt %d.\n", tries);
+		toi_prepare_status(DONT_CLEAR_BAR, "Activate storage attempt %d.\n", tries);
 
 		init_completion(&usm_helper_data.wait_for_process);
 
-		suspend_send_netlink_message(&usm_helper_data,
+		toi_send_netlink_message(&usm_helper_data,
 			USM_MSG_CONNECT,
 			NULL, 0);
 
@@ -105,7 +105,7 @@ int suspend_activate_storage(int force)
 	return 0;
 }
 
-int suspend_deactivate_storage(int force)
+int toi_deactivate_storage(int force)
 {
 	if (usm_helper_data.pid == -1 || !usm_ops.enabled)
 		return 0;
@@ -118,7 +118,7 @@ int suspend_deactivate_storage(int force)
 
 	init_completion(&usm_helper_data.wait_for_process);
 
-	suspend_send_netlink_message(&usm_helper_data,
+	toi_send_netlink_message(&usm_helper_data,
 			USM_MSG_DISCONNECT,
 			NULL, 0);
 
@@ -136,16 +136,16 @@ int suspend_deactivate_storage(int force)
 static void storage_manager_simulate(void)
 {
 	printk("--- Storage manager simulate ---\n");
-	suspend_prepare_usm();
+	toi_prepare_usm();
 	schedule();
 	printk("--- Activate storage 1 ---\n");
-	suspend_activate_storage(1);
+	toi_activate_storage(1);
 	schedule();
 	printk("--- Deactivate storage 1 ---\n");
-	suspend_deactivate_storage(1);
+	toi_deactivate_storage(1);
 	schedule();
 	printk("--- Cleanup usm ---\n");
-	suspend_cleanup_usm();
+	toi_cleanup_usm();
 	schedule();
 	printk("--- Storage manager simulate ends ---\n");
 }
@@ -177,9 +177,9 @@ static int usm_memory_needed(void)
 	return (32 * PAGE_SIZE);
 }
 
-/* suspend_prepare_usm
+/* toi_prepare_usm
  */
-int suspend_prepare_usm(void)
+int toi_prepare_usm(void)
 {
 	usm_prepare_count++;
 
@@ -191,23 +191,23 @@ int suspend_prepare_usm(void)
 	if (!*usm_helper_data.program)
 		return 0;
 
-	suspend_netlink_setup(&usm_helper_data);
+	toi_netlink_setup(&usm_helper_data);
 
 	if (usm_helper_data.pid == -1)
-		printk("Suspend2 Storage Manager wanted, but couldn't start it.\n");
+		printk("TuxOnIce Storage Manager wanted, but couldn't start it.\n");
 
-	suspend_activate_storage(0);
+	toi_activate_storage(0);
 
 	return (usm_helper_data.pid != -1);
 }
 
-void suspend_cleanup_usm(void)
+void toi_cleanup_usm(void)
 {
 	usm_prepare_count--;
 
 	if (usm_helper_data.pid > -1 && !usm_prepare_count) {
-		suspend_deactivate_storage(0);
-		suspend_netlink_close(&usm_helper_data);
+		toi_deactivate_storage(0);
+		toi_netlink_close(&usm_helper_data);
 	}
 }
 
@@ -217,9 +217,9 @@ static void storage_manager_activate(void)
 		return;
 
 	if (storage_manager_action)
-		suspend_prepare_usm();
+		toi_prepare_usm();
 	else
-		suspend_cleanup_usm();
+		toi_cleanup_usm();
 
 	storage_manager_last_action = storage_manager_action;
 }
@@ -228,27 +228,27 @@ static void storage_manager_activate(void)
  * User interface specific /sys/power/suspend2 entries.
  */
 
-static struct suspend_sysfs_data sysfs_params[] = {
-	{ SUSPEND2_ATTR("simulate_atomic_copy", SYSFS_RW),
-	  .type				= SUSPEND_SYSFS_DATA_NONE,
+static struct toi_sysfs_data sysfs_params[] = {
+	{ TOI_ATTR("simulate_atomic_copy", SYSFS_RW),
+	  .type				= TOI_SYSFS_DATA_NONE,
 	  .write_side_effect		= storage_manager_simulate,
 	},
 
-	{ SUSPEND2_ATTR("enabled", SYSFS_RW),
+	{ TOI_ATTR("enabled", SYSFS_RW),
 	  SYSFS_INT(&usm_ops.enabled, 0, 1, 0)
 	},
 
-	{ SUSPEND2_ATTR("program", SYSFS_RW),
+	{ TOI_ATTR("program", SYSFS_RW),
 	  SYSFS_STRING(usm_helper_data.program, 254, 0)
 	},
 
-	{ SUSPEND2_ATTR("activate_storage", SYSFS_RW),
+	{ TOI_ATTR("activate_storage", SYSFS_RW),
 	  SYSFS_INT(&storage_manager_action, 0, 1, 0),
 	  .write_side_effect		= storage_manager_activate,
 	}
 };
 
-static struct suspend_module_ops usm_ops = {
+static struct toi_module_ops usm_ops = {
 	.type				= MISC_MODULE,
 	.name				= "usm",
 	.directory			= "storage_manager",
@@ -259,13 +259,13 @@ static struct suspend_module_ops usm_ops = {
 	.memory_needed			= usm_memory_needed,
 
 	.sysfs_data			= sysfs_params,
-	.num_sysfs_entries		= sizeof(sysfs_params) / sizeof(struct suspend_sysfs_data),
+	.num_sysfs_entries		= sizeof(sysfs_params) / sizeof(struct toi_sysfs_data),
 };
 
-/* suspend_usm_sysfs_init
+/* toi_usm_sysfs_init
  * Description: Boot time initialisation for user interface.
  */
-int s2_usm_init(void)
+int toi_usm_init(void)
 {
 	usm_helper_data.nl = NULL;
 	usm_helper_data.program[0] = '\0';
@@ -279,10 +279,10 @@ int s2_usm_init(void)
 	usm_helper_data.must_init = 0;
 	init_completion(&usm_helper_data.wait_for_process);
 
-	return suspend_register_module(&usm_ops);
+	return toi_register_module(&usm_ops);
 }
 
-void s2_usm_exit(void)
+void toi_usm_exit(void)
 {
-	suspend_unregister_module(&usm_ops);
+	toi_unregister_module(&usm_ops);
 }

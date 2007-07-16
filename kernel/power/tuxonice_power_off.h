@@ -8,11 +8,11 @@
  * Support for the powering down.
  */
 
-int suspend_pm_state_finish(void);
-void suspend2_power_down(void);
-extern unsigned long suspend2_poweroff_method;
-extern int suspend2_platform_prepare(void);
-extern void suspend2_platform_finish(void);
-int s2_poweroff_init(void);
-void s2_poweroff_exit(void);
-void suspend2_check_resleep(void);
+int toi_pm_state_finish(void);
+void toi_power_down(void);
+extern unsigned long toi_poweroff_method;
+extern int toi_platform_prepare(void);
+extern void toi_platform_finish(void);
+int toi_poweroff_init(void);
+void toi_poweroff_exit(void);
+void toi_check_resleep(void);

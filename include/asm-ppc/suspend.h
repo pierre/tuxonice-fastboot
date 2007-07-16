@@ -11,5 +11,5 @@ static inline void restore_processor_state(void)
 {
 }
 
-#define suspend2_faulted (0)
-#define clear_suspend2_fault() do { } while(0)
+#define toi_faulted (0)
+#define clear_toi_fault() do { } while(0)

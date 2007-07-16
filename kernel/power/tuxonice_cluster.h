@@ -8,10 +8,10 @@
  */
 
 #ifdef CONFIG_TOI_CLUSTER
-extern int s2_cluster_init(void);
-extern void s2_cluster_exit(void);
+extern int toi_cluster_init(void);
+extern void toi_cluster_exit(void);
 #else
-static inline int s2_cluster_init(void) { return 0; }
-static inline void s2_cluster_exit(void) { }
+static inline int toi_cluster_init(void) { return 0; }
+static inline void toi_cluster_exit(void) { }
 #endif
 

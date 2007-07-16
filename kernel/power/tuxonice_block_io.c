@@ -5,7 +5,7 @@
  *
  * Distributed under GPLv2.
  *
- * This file contains block io functions for suspend2. These are
+ * This file contains block io functions for TuxOnIce. These are
  * used by the swapwriter and it is planned that they will also
  * be used by the NFSwriter.
  *
@@ -64,40 +64,40 @@ static atomic_t outstanding_io;
 
 static int extra_page_forward = 0;
 
-static volatile unsigned long suspend_readahead_flags[
+static volatile unsigned long toi_readahead_flags[
 	DIV_ROUND_UP(MAX_OUTSTANDING_IO, BITS_PER_LONG)];
-static spinlock_t suspend_readahead_flags_lock = SPIN_LOCK_UNLOCKED;
-static struct page *suspend_ra_pages[MAX_OUTSTANDING_IO];
+static spinlock_t toi_readahead_flags_lock = SPIN_LOCK_UNLOCKED;
+static struct page *toi_ra_pages[MAX_OUTSTANDING_IO];
 static int readahead_index, ra_submit_index;
 
 static int current_stream;
 /* 0 = Header, 1 = Pageset1, 2 = Pageset2 */
-struct extent_iterate_saved_state suspend_writer_posn_save[3];
+struct extent_iterate_saved_state toi_writer_posn_save[3];
 
 /* Pointer to current entry being loaded/saved. */
-struct extent_iterate_state suspend_writer_posn;
+struct extent_iterate_state toi_writer_posn;
 
 /* Not static, so that the allocators can setup and complete
  * writing the header */
-char *suspend_writer_buffer;
-int suspend_writer_buffer_posn;
+char *toi_writer_buffer;
+int toi_writer_buffer_posn;
 
-int suspend_read_fd;
+int toi_read_fd;
 
-static struct suspend_bdev_info *suspend_devinfo;
+static struct toi_bdev_info *toi_devinfo;
 
-int suspend_header_bytes_used = 0;
+int toi_header_bytes_used = 0;
 
-DEFINE_MUTEX(suspend_bio_mutex);
+DEFINE_MUTEX(toi_bio_mutex);
 
 /**
- * suspend_bio_cleanup_one: Cleanup one bio.
+ * toi_bio_cleanup_one: Cleanup one bio.
  * @io_info : Struct io_info to be cleaned up.
  *
  * Cleanup the bio pointed to by io_info and record as appropriate that the
  * cleanup is done.
  */
-static void suspend_bio_cleanup_one(struct io_info *io_info)
+static void toi_bio_cleanup_one(struct io_info *io_info)
 {
 	int readahead_index = io_info->readahead_index;
 	unsigned long flags;
@@ -120,9 +120,9 @@ static void suspend_bio_cleanup_one(struct io_info *io_info)
 	if (readahead_index > -1) {
 		int index = readahead_index/BITS_PER_LONG;
 		int bit = readahead_index - (index * BITS_PER_LONG);
-		spin_lock_irqsave(&suspend_readahead_flags_lock, flags);
-		set_bit(bit, &suspend_readahead_flags[index]);
-		spin_unlock_irqrestore(&suspend_readahead_flags_lock, flags);
+		spin_lock_irqsave(&toi_readahead_flags_lock, flags);
+		set_bit(bit, &toi_readahead_flags[index]);
+		spin_unlock_irqrestore(&toi_readahead_flags_lock, flags);
 	}
 
 	if (waiting_on == io_info)
@@ -132,7 +132,7 @@ static void suspend_bio_cleanup_one(struct io_info *io_info)
 }
 
 /**
- * suspend_cleanup_some_completed_io: Cleanup completed Suspend2 i/o.
+ * toi_cleanup_some_completed_io: Cleanup completed TuxOnIce i/o.
  *
  * Cleanup i/o that has been completed. In the end_bio routine (below), we only
  * move the associated io_info struct from the busy list to the
@@ -142,7 +142,7 @@ static void suspend_bio_cleanup_one(struct io_info *io_info)
  * This routine is designed so that multiple callers can be in here
  * simultaneously.
  */
-static void suspend_cleanup_some_completed_io(void)
+static void toi_cleanup_some_completed_io(void)
 {
 	int num_cleaned = 0;
 	unsigned long flags;
@@ -156,7 +156,7 @@ static void suspend_cleanup_some_completed_io(void)
 		list_del_init(&first->list);
 
 		spin_unlock_irqrestore(&ioinfo_ready_lock, flags);
-		suspend_bio_cleanup_one(first);
+		toi_bio_cleanup_one(first);
 		spin_lock_irqsave(&ioinfo_ready_lock, flags);
 
 		num_cleaned++;
@@ -167,7 +167,7 @@ static void suspend_cleanup_some_completed_io(void)
 }
 
 /**
- * do_bio_wait: Wait for some Suspend2 i/o to complete.
+ * do_bio_wait: Wait for some TuxOnIce i/o to complete.
  *
  * Submit any I/O that's batched up (if we're not already doing
  * that, schedule and clean up whatever we can.
@@ -184,64 +184,64 @@ static void do_bio_wait(void)
 	}
 
 	io_schedule();
-	suspend_cleanup_some_completed_io();
+	toi_cleanup_some_completed_io();
 }
 
 /**
- * suspend_finish_all_io: Complete all outstanding i/o.
+ * toi_finish_all_io: Complete all outstanding i/o.
  */
-static void suspend_finish_all_io(void)
+static void toi_finish_all_io(void)
 {
 	while (atomic_read(&outstanding_io))
 		do_bio_wait();
 }
 
 /**
- * suspend_readahead_ready: Is this readahead finished?
+ * toi_readahead_ready: Is this readahead finished?
  *
  * Returns whether the readahead requested is ready.
  */
-static int suspend_readahead_ready(int readahead_index)
+static int toi_readahead_ready(int readahead_index)
 {
 	int index = readahead_index / BITS_PER_LONG;
 	int bit = readahead_index - (index * BITS_PER_LONG);
 
-	return test_bit(bit, &suspend_readahead_flags[index]);
+	return test_bit(bit, &toi_readahead_flags[index]);
 }
 
 /**
- * suspend_wait_on_readahead: Wait on a particular page.
+ * toi_wait_on_readahead: Wait on a particular page.
  *
  * @readahead_index: Index of the readahead to wait for.
  */
-static void suspend_wait_on_readahead(int readahead_index)
+static void toi_wait_on_readahead(int readahead_index)
 {
-	while (!suspend_readahead_ready(readahead_index))
+	while (!toi_readahead_ready(readahead_index))
 		do_bio_wait();
 }
 
-static int suspend_prepare_readahead(int index)
+static int toi_prepare_readahead(int index)
 {
-	unsigned long new_page = get_zeroed_page(S2_ATOMIC_GFP);
+	unsigned long new_page = get_zeroed_page(TOI_ATOMIC_GFP);
 
 	if(!new_page)
 		return -ENOMEM;
 
-	suspend_ra_pages[index] = virt_to_page(new_page);
+	toi_ra_pages[index] = virt_to_page(new_page);
 	return 0;
 }
 
-/* suspend_readahead_cleanup
+/* toi_readahead_cleanup
  * Clean up structures used for readahead */
-static void suspend_cleanup_readahead(int page)
+static void toi_cleanup_readahead(int page)
 {
-	__free_page(suspend_ra_pages[page]);
-	suspend_ra_pages[page] = 0;
+	__free_page(toi_ra_pages[page]);
+	toi_ra_pages[page] = 0;
 	return;
 }
 
 /**
- * suspend_end_bio: bio completion function.
+ * toi_end_bio: bio completion function.
  *
  * @bio: bio that has completed.
  * @bytes_done: Number of bytes written/read.
@@ -252,7 +252,7 @@ static void suspend_cleanup_readahead(int page)
  * the fs/buffer.c version, but we want to mark the page as done in our own
  * structures too.
  */
-static int suspend_end_bio(struct bio *bio, unsigned int bytes_done, int err)
+static int toi_end_bio(struct bio *bio, unsigned int bytes_done, int err)
 {
 	struct io_info *io_info = bio->bi_private;
 	unsigned long flags;
@@ -294,7 +294,7 @@ static int submit(struct io_info *io_info)
 	bio->bi_bdev = io_info->dev;
 	bio->bi_sector = io_info->first_block;
 	bio->bi_private = io_info;
-	bio->bi_end_io = suspend_end_bio;
+	bio->bi_end_io = toi_end_bio;
 	io_info->sys_struct = bio;
 
 	if (bio_add_page(bio, io_info->bio_page, PAGE_SIZE, 0) < PAGE_SIZE) {
@@ -391,7 +391,7 @@ static struct io_info *get_io_info_struct(void)
 }
 
 /**
- * suspend_do_io: Prepare to do some i/o on a page and submit or batch it.
+ * toi_do_io: Prepare to do some i/o on a page and submit or batch it.
  *
  * @writing: Whether reading or writing.
  * @bdev: The block device which we're using.
@@ -409,7 +409,7 @@ static struct io_info *get_io_info_struct(void)
  *
  * Failure? What's that?
  */
-static void suspend_do_io(int writing, struct block_device *bdev, long block0,
+static void toi_do_io(int writing, struct block_device *bdev, long block0,
 	struct page *page, int readahead_index, int syncio)
 {
 	struct io_info *io_info = get_io_info_struct();
@@ -428,7 +428,7 @@ static void suspend_do_io(int writing, struct block_device *bdev, long block0,
 	io_info->readahead_index = readahead_index;
 
 	if (io_info->readahead_index == -1) {
-		while (!(buffer_virt = get_zeroed_page(S2_ATOMIC_GFP)))
+		while (!(buffer_virt = get_zeroed_page(TOI_ATOMIC_GFP)))
 			do_bio_wait();
 
 		io_info->bio_page = virt_to_page(buffer_virt);
@@ -437,9 +437,9 @@ static void suspend_do_io(int writing, struct block_device *bdev, long block0,
 		int index = io_info->readahead_index / BITS_PER_LONG;
 		int bit = io_info->readahead_index - index * BITS_PER_LONG;
 
-		spin_lock_irqsave(&suspend_readahead_flags_lock, flags);
-		clear_bit(bit, &suspend_readahead_flags[index]);
-		spin_unlock_irqrestore(&suspend_readahead_flags_lock, flags);
+		spin_lock_irqsave(&toi_readahead_flags_lock, flags);
+		clear_bit(bit, &toi_readahead_flags[index]);
+		spin_unlock_irqrestore(&toi_readahead_flags_lock, flags);
 
 		io_info->bio_page = page;
 	}
@@ -471,7 +471,7 @@ static void suspend_do_io(int writing, struct block_device *bdev, long block0,
 }
 
 /**
- * suspend_bdev_page_io: Simpler interface to do directly i/o on a single page.
+ * toi_bdev_page_io: Simpler interface to do directly i/o on a single page.
  *
  * @writing: Whether reading or writing.
  * @bdev: Block device on which we're operating.
@@ -482,36 +482,36 @@ static void suspend_do_io(int writing, struct block_device *bdev, long block0,
  * blocksize != PAGE_SIZE. Now we create a submit_info to get the data we
  * want and use our normal routines (synchronously).
  */
-static void suspend_bdev_page_io(int writing, struct block_device *bdev,
+static void toi_bdev_page_io(int writing, struct block_device *bdev,
 		long pos, struct page *page)
 {
-	suspend_do_io(writing, bdev, pos, page, -1, 1);
+	toi_do_io(writing, bdev, pos, page, -1, 1);
 }
 
 /**
- * suspend_bio_memory_needed: Report amount of memory needed for block i/o.
+ * toi_bio_memory_needed: Report amount of memory needed for block i/o.
  *
  * We want to have at least enough memory so as to have max_outstanding_io
  * transactions on the fly at once. If we can do more, fine.
  */
-static int suspend_bio_memory_needed(void)
+static int toi_bio_memory_needed(void)
 {
 	return (max_outstanding_io * (PAGE_SIZE + sizeof(struct request) +
 				sizeof(struct bio) + sizeof(struct io_info)));
 }
 
 /**
- * suspend_set_devinfo: Set the bdev info used for i/o.
+ * toi_set_devinfo: Set the bdev info used for i/o.
  *
- * @info: Pointer to array of struct suspend_bdev_info - the list of
+ * @info: Pointer to array of struct toi_bdev_info - the list of
  * bdevs and blocks on them in which the image is stored.
  *
  * Set the list of bdevs and blocks in which the image will be stored.
  * Sort of like putting a tape in the cassette player.
  */
-static void suspend_set_devinfo(struct suspend_bdev_info *info)
+static void toi_set_devinfo(struct toi_bdev_info *info)
 {
-	suspend_devinfo = info;
+	toi_devinfo = info;
 }
 
 /**
@@ -521,12 +521,12 @@ static void dump_block_chains(void)
 {
 	int i;
 
-	for (i = 0; i < suspend_writer_posn.num_chains; i++) {
+	for (i = 0; i < toi_writer_posn.num_chains; i++) {
 		struct extent *this;
 
 		printk("Chain %d:", i);
 
-		this = (suspend_writer_posn.chains + i)->first;
+		this = (toi_writer_posn.chains + i)->first;
 
 		if (!this)
 			printk(" (Empty)");
@@ -542,9 +542,9 @@ static void dump_block_chains(void)
 
 	for (i = 0; i < 3; i++)
 		printk("Posn %d: Chain %d, extent %d, offset %lu.\n", i,
-				suspend_writer_posn_save[i].chain_num,
-				suspend_writer_posn_save[i].extent_num,
-				suspend_writer_posn_save[i].offset);
+				toi_writer_posn_save[i].chain_num,
+				toi_writer_posn_save[i].extent_num,
+				toi_writer_posn_save[i].offset);
 }
 
 /**
@@ -556,13 +556,13 @@ static void dump_block_chains(void)
  */
 static int go_next_page(void)
 {
-	int i, max = (suspend_writer_posn.current_chain == -1) ? 1 :
-	  suspend_devinfo[suspend_writer_posn.current_chain].blocks_per_page;
+	int i, max = (toi_writer_posn.current_chain == -1) ? 1 :
+	  toi_devinfo[toi_writer_posn.current_chain].blocks_per_page;
 
 	for (i = 0; i < max; i++)
-		suspend_extent_state_next(&suspend_writer_posn);
+		toi_extent_state_next(&toi_writer_posn);
 
-	if (suspend_extent_state_eof(&suspend_writer_posn)) {
+	if (toi_extent_state_eof(&toi_writer_posn)) {
 		printk("Extent state eof. "
 			"Expected compression ratio too optimistic?\n");
 		dump_block_chains();
@@ -589,7 +589,7 @@ static void set_extra_page_forward(void)
 }
 
 /**
- * suspend_bio_rw_page: Do i/o on the next disk page in the image.
+ * toi_bio_rw_page: Do i/o on the next disk page in the image.
  *
  * @writing: Whether reading or writing.
  * @page: Page to do i/o on.
@@ -597,10 +597,10 @@ static void set_extra_page_forward(void)
  *
  * Submit a page for reading or writing, possibly readahead.
  */
-static int suspend_bio_rw_page(int writing, struct page *page,
+static int toi_bio_rw_page(int writing, struct page *page,
 		int readahead_index)
 {
-	struct suspend_bdev_info *dev_info;
+	struct toi_bdev_info *dev_info;
 
 	if (test_action_state(TOI_TEST_FILTER_SPEED))
 		return 0;
@@ -611,16 +611,16 @@ static int suspend_bio_rw_page(int writing, struct page *page,
 	}
 
 	if (current_stream == 0 && writing &&
-		suspend_writer_posn.current_chain == suspend_writer_posn_save[2].chain_num &&
-		suspend_writer_posn.current_offset == suspend_writer_posn_save[2].offset) {
+		toi_writer_posn.current_chain == toi_writer_posn_save[2].chain_num &&
+		toi_writer_posn.current_offset == toi_writer_posn_save[2].offset) {
 		dump_block_chains();
 		BUG();
 	}
 
-	dev_info = &suspend_devinfo[suspend_writer_posn.current_chain];
+	dev_info = &toi_devinfo[toi_writer_posn.current_chain];
 
-	suspend_do_io(writing, dev_info->bdev,
-		suspend_writer_posn.current_offset <<
+	toi_do_io(writing, dev_info->bdev,
+		toi_writer_posn.current_offset <<
 			dev_info->bmap_shift,
 		page, readahead_index, 0);
 
@@ -628,19 +628,19 @@ static int suspend_bio_rw_page(int writing, struct page *page,
 }
 
 /**
- * suspend_rw_init: Prepare to read or write a stream in the image.
+ * toi_rw_init: Prepare to read or write a stream in the image.
  *
  * @writing: Whether reading or writing.
  * @stream number: Section of the image being processed.
  */
-static int suspend_rw_init(int writing, int stream_number)
+static int toi_rw_init(int writing, int stream_number)
 {
-	suspend_header_bytes_used = 0;
+	toi_header_bytes_used = 0;
 
-	suspend_extent_state_restore(&suspend_writer_posn,
-			&suspend_writer_posn_save[stream_number]);
+	toi_extent_state_restore(&toi_writer_posn,
+			&toi_writer_posn_save[stream_number]);
 
-	suspend_writer_buffer_posn = writing ? 0 : PAGE_SIZE;
+	toi_writer_buffer_posn = writing ? 0 : PAGE_SIZE;
 
 	current_stream = stream_number;
 
@@ -652,35 +652,35 @@ static int suspend_rw_init(int writing, int stream_number)
 }
 
 /**
- * suspend_read_header_init: Prepare to read the image header.
+ * toi_read_header_init: Prepare to read the image header.
  *
  * Reset readahead indices prior to starting to read a section of the image.
  */
-static void suspend_read_header_init(void)
+static void toi_read_header_init(void)
 {
 	readahead_index = ra_submit_index = -1;
 }
 
 /**
- * suspend_rw_cleanup: Cleanup after i/o.
+ * toi_rw_cleanup: Cleanup after i/o.
  *
  * @writing: Whether we were reading or writing.
  */
-static int suspend_rw_cleanup(int writing)
+static int toi_rw_cleanup(int writing)
 {
-	if (writing && suspend_bio_rw_page(WRITE,
-			virt_to_page(suspend_writer_buffer), -1))
+	if (writing && toi_bio_rw_page(WRITE,
+			virt_to_page(toi_writer_buffer), -1))
 		return -EIO;
 
 	if (writing && current_stream == 2)
-		suspend_extent_state_save(&suspend_writer_posn,
-				&suspend_writer_posn_save[1]);
+		toi_extent_state_save(&toi_writer_posn,
+				&toi_writer_posn_save[1]);
 
-	suspend_finish_all_io();
+	toi_finish_all_io();
 
 	if (!writing)
 		while (readahead_index != ra_submit_index) {
-			suspend_cleanup_readahead(readahead_index);
+			toi_cleanup_readahead(readahead_index);
 			readahead_index++;
 			if (readahead_index == max_outstanding_io)
 				readahead_index = 0;
@@ -692,12 +692,12 @@ static int suspend_rw_cleanup(int writing)
 }
 
 /**
- * suspend_bio_read_page_with_readahead: Read a disk page with readahead.
+ * toi_bio_read_page_with_readahead: Read a disk page with readahead.
  *
  * Read a page from disk, submitting readahead and cleaning up finished i/o
  * while we wait for the page we're after.
  */
-static int suspend_bio_read_page_with_readahead(void)
+static int toi_bio_read_page_with_readahead(void)
 {
 	static int last_result;
 	unsigned long *virt;
@@ -712,7 +712,7 @@ static int suspend_bio_read_page_with_readahead(void)
 		/* We failed to submit a read, and have cleaned up
 		 * all the readahead previously submitted */
 		if (ra_submit_index == readahead_index) {
-			abort_suspend(TOI_FAILED_IO, "Failed to submit"
+			abort_hibernate(TOI_FAILED_IO, "Failed to submit"
 				" a read and no readahead left.");
 			return -EIO;
 		}
@@ -720,17 +720,17 @@ static int suspend_bio_read_page_with_readahead(void)
 	}
 
 	do {
-		if (suspend_prepare_readahead(ra_submit_index))
+		if (toi_prepare_readahead(ra_submit_index))
 			break;
 
-		last_result = suspend_bio_rw_page(READ,
-			suspend_ra_pages[ra_submit_index],
+		last_result = toi_bio_rw_page(READ,
+			toi_ra_pages[ra_submit_index],
 			ra_submit_index);
 
 		if (last_result) {
 			printk("Begin read chunk for page %d returned %d.\n",
 				ra_submit_index, last_result);
-			suspend_cleanup_readahead(ra_submit_index);
+			toi_cleanup_readahead(ra_submit_index);
 			break;
 		}
 
@@ -740,16 +740,16 @@ static int suspend_bio_read_page_with_readahead(void)
 			ra_submit_index = 0;
 
 	} while((!last_result) && (ra_submit_index != readahead_index) &&
-			(!suspend_readahead_ready(readahead_index)));
+			(!toi_readahead_ready(readahead_index)));
 
 wait:
-	suspend_wait_on_readahead(readahead_index);
+	toi_wait_on_readahead(readahead_index);
 
-	virt = kmap_atomic(suspend_ra_pages[readahead_index], KM_USER1);
-	memcpy(suspend_writer_buffer, virt, PAGE_SIZE);
+	virt = kmap_atomic(toi_ra_pages[readahead_index], KM_USER1);
+	memcpy(toi_writer_buffer, virt, PAGE_SIZE);
 	kunmap_atomic(virt, KM_USER1);
 
-	suspend_cleanup_readahead(readahead_index);
+	toi_cleanup_readahead(readahead_index);
 
 	readahead_index++;
 	if (readahead_index == max_outstanding_io)
@@ -759,56 +759,56 @@ wait:
 }
 
 /*
- * suspend_rw_buffer: Combine smaller buffers into PAGE_SIZE I/O.
+ * toi_rw_buffer: Combine smaller buffers into PAGE_SIZE I/O.
  *
  * @writing: Bool - whether writing (or reading).
  * @buffer: The start of the buffer to write or fill.
  * @buffer_size: The size of the buffer to write or fill.
  */
-static int suspend_rw_buffer(int writing, char *buffer, int buffer_size)
+static int toi_rw_buffer(int writing, char *buffer, int buffer_size)
 {
 	int bytes_left = buffer_size;
 
 	while (bytes_left) {
 		char *source_start = buffer + buffer_size - bytes_left;
-		char *dest_start = suspend_writer_buffer + suspend_writer_buffer_posn;
-		int capacity = PAGE_SIZE - suspend_writer_buffer_posn;
+		char *dest_start = toi_writer_buffer + toi_writer_buffer_posn;
+		int capacity = PAGE_SIZE - toi_writer_buffer_posn;
 		char *to = writing ? dest_start : source_start;
 		char *from = writing ? source_start : dest_start;
 
 		if (bytes_left <= capacity) {
 			memcpy(to, from, bytes_left);
-			suspend_writer_buffer_posn += bytes_left;
-			suspend_header_bytes_used += bytes_left;
+			toi_writer_buffer_posn += bytes_left;
+			toi_header_bytes_used += bytes_left;
 			return 0;
 		}
 
 		/* Complete this page and start a new one */
 		memcpy(to, from, capacity);
 		bytes_left -= capacity;
-		suspend_header_bytes_used += capacity;
+		toi_header_bytes_used += capacity;
 
 		if (!writing) {
 			if (test_toi_state(TOI_TRY_RESUME_RD))
-				sys_read(suspend_read_fd,
-					suspend_writer_buffer, BLOCK_SIZE);
+				sys_read(toi_read_fd,
+					toi_writer_buffer, BLOCK_SIZE);
 			else
-				if (suspend_bio_read_page_with_readahead())
+				if (toi_bio_read_page_with_readahead())
 					return -EIO;
-		} else if (suspend_bio_rw_page(WRITE,
-					virt_to_page(suspend_writer_buffer),
+		} else if (toi_bio_rw_page(WRITE,
+					virt_to_page(toi_writer_buffer),
 					-1))
 				return -EIO;
 
-		suspend_writer_buffer_posn = 0;
-		suspend_cond_pause(0, NULL);
+		toi_writer_buffer_posn = 0;
+		toi_cond_pause(0, NULL);
 	}
 
 	return 0;
 }
 
 /**
- * suspend_bio_read_page - read a page of the image.
+ * toi_bio_read_page - read a page of the image.
  *
  * @pfn: The pfn where the data belongs.
  * @buffer_page: The page containing the (possibly compressed) data.
@@ -817,7 +817,7 @@ static int suspend_rw_buffer(int writing, char *buffer, int buffer_size)
  * Read a (possibly compressed) page from the image, into buffer_page,
  * returning its pfn and the buffer size.
  */
-static int suspend_bio_read_page(unsigned long *pfn, struct page *buffer_page,
+static int toi_bio_read_page(unsigned long *pfn, struct page *buffer_page,
 		unsigned int *buf_size)
 {
 	int result = 0;
@@ -825,24 +825,24 @@ static int suspend_bio_read_page(unsigned long *pfn, struct page *buffer_page,
 
 	pr_index++;
 
-	while (!mutex_trylock(&suspend_bio_mutex))
+	while (!mutex_trylock(&toi_bio_mutex))
 		do_bio_wait();
 
-	if (suspend_rw_buffer(READ, (char *) pfn, sizeof(unsigned long)) ||
-	    suspend_rw_buffer(READ, (char *) buf_size, sizeof(int)) ||
-	    suspend_rw_buffer(READ, buffer_virt, *buf_size)) {
-		abort_suspend(TOI_FAILED_IO, "Read of data failed.");
+	if (toi_rw_buffer(READ, (char *) pfn, sizeof(unsigned long)) ||
+	    toi_rw_buffer(READ, (char *) buf_size, sizeof(int)) ||
+	    toi_rw_buffer(READ, buffer_virt, *buf_size)) {
+		abort_hibernate(TOI_FAILED_IO, "Read of data failed.");
 		result = 1;
 	} else
 		PR_DEBUG("%d: PFN %ld, %d bytes.\n", pr_index, *pfn, *buf_size);
 
-	mutex_unlock(&suspend_bio_mutex);
+	mutex_unlock(&toi_bio_mutex);
 	kunmap(buffer_page);
 	return result;
 }
 
 /**
- * suspend_bio_write_page - Write a page of the image.
+ * toi_bio_write_page - Write a page of the image.
  *
  * @pfn: The pfn where the data belongs.
  * @buffer_page: The page containing the (possibly compressed) data.
@@ -851,7 +851,7 @@ static int suspend_bio_read_page(unsigned long *pfn, struct page *buffer_page,
  * Write a (possibly compressed) page to the image from the buffer, together
  * with it's index and buffer size.
  */
-static int suspend_bio_write_page(unsigned long pfn, struct page *buffer_page,
+static int toi_bio_write_page(unsigned long pfn, struct page *buffer_page,
 		unsigned int buf_size)
 {
 	char *buffer_virt = kmap(buffer_page);
@@ -859,24 +859,24 @@ static int suspend_bio_write_page(unsigned long pfn, struct page *buffer_page,
 
 	pr_index++;
 
-	while (!mutex_trylock(&suspend_bio_mutex))
+	while (!mutex_trylock(&toi_bio_mutex))
 		do_bio_wait();
 
-	if (suspend_rw_buffer(WRITE, (char *) &pfn, sizeof(unsigned long)) ||
-	    suspend_rw_buffer(WRITE, (char *) &buf_size, sizeof(int)) ||
-	    suspend_rw_buffer(WRITE, buffer_virt, buf_size))
+	if (toi_rw_buffer(WRITE, (char *) &pfn, sizeof(unsigned long)) ||
+	    toi_rw_buffer(WRITE, (char *) &buf_size, sizeof(int)) ||
+	    toi_rw_buffer(WRITE, buffer_virt, buf_size))
 		result = -EIO;
 
 	PR_DEBUG("%d: Index %ld, %d bytes. Result %d.\n", pr_index, pfn,
 			buf_size, result);
 
-	mutex_unlock(&suspend_bio_mutex);
+	mutex_unlock(&toi_bio_mutex);
 	kunmap(buffer_page);
 	return result;
 }
 
 /**
- * suspend_rw_header_chunk: Read or write a portion of the image header.
+ * toi_rw_header_chunk: Read or write a portion of the image header.
  *
  * @writing: Whether reading or writing.
  * @owner: The module for which we're writing. Used for confirming that modules
@@ -884,14 +884,14 @@ static int suspend_bio_write_page(unsigned long pfn, struct page *buffer_page,
  * @buffer: Address of the data to write.
  * @buffer_size: Size of the data buffer.
  */
-static int suspend_rw_header_chunk(int writing,
-		struct suspend_module_ops *owner,
+static int toi_rw_header_chunk(int writing,
+		struct toi_module_ops *owner,
 		char *buffer, int buffer_size)
 {
 	if (owner) {
 		owner->header_used += buffer_size;
 		if (owner->header_used > owner->header_requested) {
-			printk(KERN_EMERG "Suspend2 module %s is using more"
+			printk(KERN_EMERG "TuxOnIce module %s is using more"
 				"header space (%u) than it requested (%u).\n",
 				owner->name,
 				owner->header_used,
@@ -900,7 +900,7 @@ static int suspend_rw_header_chunk(int writing,
 		}
 	}
 
-	return suspend_rw_buffer(writing, buffer, buffer_size);
+	return toi_rw_buffer(writing, buffer, buffer_size);
 }
 
 /**
@@ -908,27 +908,27 @@ static int suspend_rw_header_chunk(int writing,
  */
 static int write_header_chunk_finish(void)
 {
-	if (!suspend_writer_buffer_posn)
+	if (!toi_writer_buffer_posn)
 		return 0;
 
-	return suspend_bio_rw_page(WRITE, virt_to_page(suspend_writer_buffer),
+	return toi_bio_rw_page(WRITE, virt_to_page(toi_writer_buffer),
 		-1) ? -EIO : 0;
 }
 
 /**
- * suspend_bio_storage_needed: Get the amount of storage needed for my fns.
+ * toi_bio_storage_needed: Get the amount of storage needed for my fns.
  */
-static int suspend_bio_storage_needed(void)
+static int toi_bio_storage_needed(void)
 {
 	return 2 * sizeof(int);
 }
 
 /**
- * suspend_bio_save_config_info: Save block i/o config to image header.
+ * toi_bio_save_config_info: Save block i/o config to image header.
  *
  * @buf: PAGE_SIZE'd buffer into which data should be saved.
  */
-static int suspend_bio_save_config_info(char *buf)
+static int toi_bio_save_config_info(char *buf)
 {
 	int *ints = (int *) buf;
 	ints[0] = max_outstanding_io;
@@ -937,12 +937,12 @@ static int suspend_bio_save_config_info(char *buf)
 }
 
 /**
- * suspend_bio_load_config_info: Restore block i/o config.
+ * toi_bio_load_config_info: Restore block i/o config.
  *
  * @buf: Data to be reloaded.
  * @size: Size of the buffer saved.
  */
-static void suspend_bio_load_config_info(char *buf, int size)
+static void toi_bio_load_config_info(char *buf, int size)
 {
 	int *ints = (int *) buf;
 	max_outstanding_io  = ints[0];
@@ -950,105 +950,105 @@ static void suspend_bio_load_config_info(char *buf, int size)
 }
 
 /**
- * suspend_bio_initialise: Initialise bio code at start of some action.
+ * toi_bio_initialise: Initialise bio code at start of some action.
  *
- * @starting_cycle: Whether starting a suspend cycle, or just reading or
+ * @starting_cycle: Whether starting a hibernation cycle, or just reading or
  * writing a sysfs value.
  */
-static int suspend_bio_initialise(int starting_cycle)
+static int toi_bio_initialise(int starting_cycle)
 {
-	suspend_writer_buffer = (char *) get_zeroed_page(S2_ATOMIC_GFP);
+	toi_writer_buffer = (char *) get_zeroed_page(TOI_ATOMIC_GFP);
 
-	return suspend_writer_buffer ? 0 : -ENOMEM;
+	return toi_writer_buffer ? 0 : -ENOMEM;
 }
 
 /**
- * suspend_bio_cleanup: Cleanup after some action.
+ * toi_bio_cleanup: Cleanup after some action.
  *
  * @finishing_cycle: Whether completing a cycle.
  */
-static void suspend_bio_cleanup(int finishing_cycle)
+static void toi_bio_cleanup(int finishing_cycle)
 {
-	if (suspend_writer_buffer) {
-		free_page((unsigned long) suspend_writer_buffer);
-		suspend_writer_buffer = NULL;
+	if (toi_writer_buffer) {
+		free_page((unsigned long) toi_writer_buffer);
+		toi_writer_buffer = NULL;
 	}
 }
 
-struct suspend_bio_ops suspend_bio_ops = {
-	.bdev_page_io = suspend_bdev_page_io,
-	.finish_all_io = suspend_finish_all_io,
+struct toi_bio_ops toi_bio_ops = {
+	.bdev_page_io = toi_bdev_page_io,
+	.finish_all_io = toi_finish_all_io,
 	.forward_one_page = go_next_page,
 	.set_extra_page_forward = set_extra_page_forward,
-	.set_devinfo = suspend_set_devinfo,
-	.read_page = suspend_bio_read_page,
-	.write_page = suspend_bio_write_page,
-	.rw_init = suspend_rw_init,
-	.rw_cleanup = suspend_rw_cleanup,
-	.read_header_init = suspend_read_header_init,
-	.rw_header_chunk = suspend_rw_header_chunk,
+	.set_devinfo = toi_set_devinfo,
+	.read_page = toi_bio_read_page,
+	.write_page = toi_bio_write_page,
+	.rw_init = toi_rw_init,
+	.rw_cleanup = toi_rw_cleanup,
+	.read_header_init = toi_read_header_init,
+	.rw_header_chunk = toi_rw_header_chunk,
 	.write_header_chunk_finish = write_header_chunk_finish,
 };
 
-static struct suspend_sysfs_data sysfs_params[] = {
-	{ SUSPEND2_ATTR("max_outstanding_io", SYSFS_RW),
+static struct toi_sysfs_data sysfs_params[] = {
+	{ TOI_ATTR("max_outstanding_io", SYSFS_RW),
 	  SYSFS_INT(&max_outstanding_io, 16, MAX_OUTSTANDING_IO, 0),
 	},
 
-	{ SUSPEND2_ATTR("submit_batch_size", SYSFS_RW),
+	{ TOI_ATTR("submit_batch_size", SYSFS_RW),
 	  SYSFS_INT(&submit_batch_size, 16, SUBMIT_BATCH_SIZE, 0),
 	}
 };
 
-static struct suspend_module_ops suspend_blockwriter_ops =
+static struct toi_module_ops toi_blockwriter_ops =
 {
 	.name					= "lowlevel i/o",
 	.type					= MISC_HIDDEN_MODULE,
 	.directory				= "block_io",
 	.module					= THIS_MODULE,
-	.memory_needed				= suspend_bio_memory_needed,
-	.storage_needed				= suspend_bio_storage_needed,
-	.save_config_info			= suspend_bio_save_config_info,
-	.load_config_info			= suspend_bio_load_config_info,
-	.initialise				= suspend_bio_initialise,
-	.cleanup				= suspend_bio_cleanup,
+	.memory_needed				= toi_bio_memory_needed,
+	.storage_needed				= toi_bio_storage_needed,
+	.save_config_info			= toi_bio_save_config_info,
+	.load_config_info			= toi_bio_load_config_info,
+	.initialise				= toi_bio_initialise,
+	.cleanup				= toi_bio_cleanup,
 
 	.sysfs_data		= sysfs_params,
-	.num_sysfs_entries	= sizeof(sysfs_params) / sizeof(struct suspend_sysfs_data),
+	.num_sysfs_entries	= sizeof(sysfs_params) / sizeof(struct toi_sysfs_data),
 };
 
 /**
- * suspend_block_io_load: Load time routine for block i/o module.
+ * toi_block_io_load: Load time routine for block i/o module.
  *
  * Register block i/o ops and sysfs entries.
  */
-static __init int suspend_block_io_load(void)
+static __init int toi_block_io_load(void)
 {
-	return suspend_register_module(&suspend_blockwriter_ops);
+	return toi_register_module(&toi_blockwriter_ops);
 }
 
 #ifdef CONFIG_TOI_FILE_EXPORTS
-EXPORT_SYMBOL_GPL(suspend_read_fd);
+EXPORT_SYMBOL_GPL(toi_read_fd);
 #endif
 #if defined(CONFIG_TOI_FILE_EXPORTS) || defined(CONFIG_TOI_SWAP_EXPORTS)
-EXPORT_SYMBOL_GPL(suspend_writer_posn);
-EXPORT_SYMBOL_GPL(suspend_writer_posn_save);
-EXPORT_SYMBOL_GPL(suspend_writer_buffer);
-EXPORT_SYMBOL_GPL(suspend_writer_buffer_posn);
-EXPORT_SYMBOL_GPL(suspend_header_bytes_used);
-EXPORT_SYMBOL_GPL(suspend_bio_ops);
+EXPORT_SYMBOL_GPL(toi_writer_posn);
+EXPORT_SYMBOL_GPL(toi_writer_posn_save);
+EXPORT_SYMBOL_GPL(toi_writer_buffer);
+EXPORT_SYMBOL_GPL(toi_writer_buffer_posn);
+EXPORT_SYMBOL_GPL(toi_header_bytes_used);
+EXPORT_SYMBOL_GPL(toi_bio_ops);
 #endif
 #ifdef MODULE
-static __exit void suspend_block_io_unload(void)
+static __exit void toi_block_io_unload(void)
 {
-	suspend_unregister_module(&suspend_blockwriter_ops);
+	toi_unregister_module(&toi_blockwriter_ops);
 }
 
-module_init(suspend_block_io_load);
-module_exit(suspend_block_io_unload);
+module_init(toi_block_io_load);
+module_exit(toi_block_io_unload);
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Nigel Cunningham");
-MODULE_DESCRIPTION("Suspend2 block io functions");
+MODULE_DESCRIPTION("TuxOnIce block io functions");
 #else
-late_initcall(suspend_block_io_load);
+late_initcall(toi_block_io_load);
 #endif

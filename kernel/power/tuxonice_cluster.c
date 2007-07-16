@@ -17,11 +17,11 @@
 #include "tuxonice_sysfs.h"
 #include "tuxonice_io.h"
 
-static char suspend_cluster_master[63] = CONFIG_TOI_DEFAULT_CLUSTER_MASTER;
+static char toi_cluster_master[63] = CONFIG_TOI_DEFAULT_CLUSTER_MASTER;
 
-static struct suspend_module_ops suspend_cluster_ops;
+static struct toi_module_ops toi_cluster_ops;
 
-/* suspend_cluster_print_debug_stats
+/* toi_cluster_print_debug_stats
  *
  * Description:	Print information to be recorded for debugging purposes into a
  * 		buffer.
@@ -30,13 +30,13 @@ static struct suspend_module_ops suspend_cluster_ops;
  * 		size:	Size of the buffer.
  * Returns:	Number of characters written to the buffer.
  */
-static int suspend_cluster_print_debug_stats(char *buffer, int size)
+static int toi_cluster_print_debug_stats(char *buffer, int size)
 {
 	int len;
 	
-	if (strlen(suspend_cluster_master))
+	if (strlen(toi_cluster_master))
 		len = snprintf_used(buffer, size, "- Cluster master is '%s'.\n",
-				suspend_cluster_master);
+				toi_cluster_master);
 	else
 		len = snprintf_used(buffer, size, "- Cluster support is disabled.\n");
 	return len;
@@ -45,57 +45,57 @@ static int suspend_cluster_print_debug_stats(char *buffer, int size)
 /* cluster_memory_needed
  *
  * Description:	Tell the caller how much memory we need to operate during
- * 		suspend/resume.
+ * 		hibernate/resume.
  * Returns:	Unsigned long. Maximum number of bytes of memory required for
  * 		operation.
  */
-static int suspend_cluster_memory_needed(void)
+static int toi_cluster_memory_needed(void)
 {
 	return 0;
 }
 
-static int suspend_cluster_storage_needed(void)
+static int toi_cluster_storage_needed(void)
 {
-	return 1 + strlen(suspend_cluster_master);
+	return 1 + strlen(toi_cluster_master);
 }
 	
-/* suspend_cluster_save_config_info
+/* toi_cluster_save_config_info
  *
  * Description:	Save informaton needed when reloading the image at resume time.
  * Arguments:	Buffer:		Pointer to a buffer of size PAGE_SIZE.
  * Returns:	Number of bytes used for saving our data.
  */
-static int suspend_cluster_save_config_info(char *buffer)
+static int toi_cluster_save_config_info(char *buffer)
 {
-	strcpy(buffer, suspend_cluster_master);
-	return strlen(suspend_cluster_master + 1);
+	strcpy(buffer, toi_cluster_master);
+	return strlen(toi_cluster_master + 1);
 }
 
-/* suspend_cluster_load_config_info
+/* toi_cluster_load_config_info
  *
  * Description:	Reload information needed for declustering the image at 
  * 		resume time.
  * Arguments:	Buffer:		Pointer to the start of the data.
  *		Size:		Number of bytes that were saved.
  */
-static void suspend_cluster_load_config_info(char *buffer, int size)
+static void toi_cluster_load_config_info(char *buffer, int size)
 {
-	strncpy(suspend_cluster_master, buffer, size);
+	strncpy(toi_cluster_master, buffer, size);
 	return;
 }
 
 /*
  * data for our sysfs entries.
  */
-static struct suspend_sysfs_data sysfs_params[] = {
+static struct toi_sysfs_data sysfs_params[] = {
 	{
-		SUSPEND2_ATTR("master", SYSFS_RW),
-		SYSFS_STRING(suspend_cluster_master, 63, SYSFS_SM_NOT_NEEDED)
+		TOI_ATTR("master", SYSFS_RW),
+		SYSFS_STRING(toi_cluster_master, 63, SYSFS_SM_NOT_NEEDED)
 	},
 
 	{
-		SUSPEND2_ATTR("enabled", SYSFS_RW),
-		SYSFS_INT(&suspend_cluster_ops.enabled, 0, 1)
+		TOI_ATTR("enabled", SYSFS_RW),
+		SYSFS_INT(&toi_cluster_ops.enabled, 0, 1)
 	}
 };
 
@@ -103,19 +103,19 @@ static struct suspend_sysfs_data sysfs_params[] = {
  * Ops structure.
  */
 
-static struct suspend_module_ops suspend_cluster_ops = {
+static struct toi_module_ops toi_cluster_ops = {
 	.type			= FILTER_MODULE,
 	.name			= "Cluster",
 	.directory		= "cluster",
 	.module			= THIS_MODULE,
-	.memory_needed 		= suspend_cluster_memory_needed,
-	.print_debug_info	= suspend_cluster_print_debug_stats,
-	.save_config_info	= suspend_cluster_save_config_info,
-	.load_config_info	= suspend_cluster_load_config_info,
-	.storage_needed		= suspend_cluster_storage_needed,
+	.memory_needed 		= toi_cluster_memory_needed,
+	.print_debug_info	= toi_cluster_print_debug_stats,
+	.save_config_info	= toi_cluster_save_config_info,
+	.load_config_info	= toi_cluster_load_config_info,
+	.storage_needed		= toi_cluster_storage_needed,
 	
 	.sysfs_data		= sysfs_params,
-	.num_sysfs_entries	= sizeof(sysfs_params) / sizeof(struct suspend_sysfs_data),
+	.num_sysfs_entries	= sizeof(sysfs_params) / sizeof(struct toi_sysfs_data),
 };
 
 /* ---- Registration ---- */
@@ -129,24 +129,24 @@ static struct suspend_module_ops suspend_cluster_ops = {
 #define EXIT
 #endif
 
-INIT int s2_cluster_init(void)
+INIT int toi_cluster_init(void)
 {
-	int temp = suspend_register_module(&suspend_cluster_ops);
+	int temp = toi_register_module(&toi_cluster_ops);
 
-	if (!strlen(suspend_cluster_master))
-		suspend_cluster_ops.enabled = 0;
+	if (!strlen(toi_cluster_master))
+		toi_cluster_ops.enabled = 0;
 	return temp;	
 }
 
-EXIT void s2_cluster_exit(void)
+EXIT void toi_cluster_exit(void)
 {
-	suspend_unregister_module(&suspend_cluster_ops);
+	toi_unregister_module(&toi_cluster_ops);
 }
 
 #ifdef MODULE
 MODULE_LICENSE("GPL");
-module_init(s2_cluster_init);
-module_exit(s2_cluster_exit);
+module_init(toi_cluster_init);
+module_exit(toi_cluster_exit);
 MODULE_AUTHOR("Nigel Cunningham");
-MODULE_DESCRIPTION("Cluster Support for Suspend2");
+MODULE_DESCRIPTION("Cluster Support for TuxOnIce");
 #endif

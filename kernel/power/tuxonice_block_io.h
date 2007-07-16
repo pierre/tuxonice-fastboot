@@ -13,7 +13,7 @@
 #include <linux/buffer_head.h>
 #include "tuxonice_extent.h"
 
-struct suspend_bdev_info {
+struct toi_bdev_info {
 	struct block_device *bdev;
 	dev_t dev_t;
 	int bmap_shift;
@@ -24,7 +24,7 @@ struct suspend_bdev_info {
  * Our exported interface so the swapwriter and filewriter don't
  * need these functions duplicated.
  */
-struct suspend_bio_ops {
+struct toi_bio_ops {
 	void (*bdev_page_io) (int rw, struct block_device *bdev, long pos,
 			struct page *page);
 	void (*check_io_stats) (void);
@@ -32,24 +32,24 @@ struct suspend_bio_ops {
 	void (*finish_all_io) (void);
 	int (*forward_one_page) (void);
 	void (*set_extra_page_forward) (void);
-	void (*set_devinfo) (struct suspend_bdev_info *info);
+	void (*set_devinfo) (struct toi_bdev_info *info);
 	int (*read_page) (unsigned long *index, struct page *buffer_page,
 			unsigned int *buf_size);
 	int (*write_page) (unsigned long index, struct page *buffer_page,
 			unsigned int buf_size);
 	void (*read_header_init) (void);
-	int (*rw_header_chunk) (int rw, struct suspend_module_ops *owner,
+	int (*rw_header_chunk) (int rw, struct toi_module_ops *owner,
 			char *buffer, int buffer_size);
 	int (*write_header_chunk_finish) (void);
 	int (*rw_init) (int rw, int stream_number);
 	int (*rw_cleanup) (int rw);
 };
 
-extern struct suspend_bio_ops suspend_bio_ops;
+extern struct toi_bio_ops toi_bio_ops;
 
-extern char *suspend_writer_buffer;
-extern int suspend_writer_buffer_posn;
-extern int suspend_read_fd;
-extern struct extent_iterate_saved_state suspend_writer_posn_save[3];
-extern struct extent_iterate_state suspend_writer_posn;
-extern int suspend_header_bytes_used;
+extern char *toi_writer_buffer;
+extern int toi_writer_buffer_posn;
+extern int toi_read_fd;
+extern struct extent_iterate_saved_state toi_writer_posn_save[3];
+extern struct extent_iterate_state toi_writer_posn;
+extern int toi_header_bytes_used;

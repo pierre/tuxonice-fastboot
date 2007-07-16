@@ -50,56 +50,56 @@ struct ui_ops {
 		int normally_logged, const char *fmt, ...);
 };
 
-extern struct ui_ops *s2_current_ui;
+extern struct ui_ops *toi_current_ui;
 
-#define suspend_update_status(val, max, fmt, args...) \
- (s2_current_ui ? (s2_current_ui->update_status) (val, max, fmt, ##args) : max)
+#define toi_update_status(val, max, fmt, args...) \
+ (toi_current_ui ? (toi_current_ui->update_status) (val, max, fmt, ##args) : max)
 
-#define suspend_ui_post_atomic_restore(void) \
-	do { if (s2_current_ui) \
-		(s2_current_ui->post_atomic_restore)(); \
+#define toi_ui_post_atomic_restore(void) \
+	do { if (toi_current_ui) \
+		(toi_current_ui->post_atomic_restore)(); \
 	} while(0)
 
-#define suspend_prepare_console(void) \
-	do { if (s2_current_ui) \
-		(s2_current_ui->prepare)(); \
+#define toi_prepare_console(void) \
+	do { if (toi_current_ui) \
+		(toi_current_ui->prepare)(); \
 	} while(0)
 
-#define suspend_cleanup_console(void) \
-	do { if (s2_current_ui) \
-		(s2_current_ui->cleanup)(); \
+#define toi_cleanup_console(void) \
+	do { if (toi_current_ui) \
+		(toi_current_ui->cleanup)(); \
 	} while(0)
 
-#define abort_suspend(result, fmt, args...) \
-	do { if (s2_current_ui) \
-		(s2_current_ui->abort)(result, fmt, ##args); \
+#define abort_hibernate(result, fmt, args...) \
+	do { if (toi_current_ui) \
+		(toi_current_ui->abort)(result, fmt, ##args); \
 	     else { \
 		set_abort_result(result); \
 	     } \
 	} while(0)
 
-#define suspend_cond_pause(pause, message) \
-	do { if (s2_current_ui) \
-		(s2_current_ui->cond_pause)(pause, message); \
+#define toi_cond_pause(pause, message) \
+	do { if (toi_current_ui) \
+		(toi_current_ui->cond_pause)(pause, message); \
 	} while(0)
 
-#define suspend_prepare_status(clear, fmt, args...) \
-	do { if (s2_current_ui) \
-		(s2_current_ui->prepare_status)(clear, fmt, ##args); \
+#define toi_prepare_status(clear, fmt, args...) \
+	do { if (toi_current_ui) \
+		(toi_current_ui->prepare_status)(clear, fmt, ##args); \
 	     else \
 		printk(fmt, ##args); \
 	} while(0)
 
-extern int suspend_default_console_level;
+extern int toi_default_console_level;
 
-#define suspend_message(sn, lev, log, fmt, a...) \
+#define toi_message(sn, lev, log, fmt, a...) \
 do { \
-	if (s2_current_ui && (!sn || test_debug_state(sn))) \
-		s2_current_ui->message(sn, lev, log, fmt, ##a); \
+	if (toi_current_ui && (!sn || test_debug_state(sn))) \
+		toi_current_ui->message(sn, lev, log, fmt, ##a); \
 } while(0)
 
-__exit void suspend_ui_cleanup(void);
-extern int s2_ui_init(void);
-extern void s2_ui_exit(void);
-extern int s2_register_ui_ops(struct ui_ops *this_ui);
-extern void s2_remove_ui_ops(struct ui_ops *this_ui);
+__exit void toi_ui_cleanup(void);
+extern int toi_ui_init(void);
+extern void toi_ui_exit(void);
+extern int toi_register_ui_ops(struct ui_ops *this_ui);
+extern void toi_remove_ui_ops(struct ui_ops *this_ui);

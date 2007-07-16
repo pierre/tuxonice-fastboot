@@ -31,7 +31,7 @@ static int pages_for_zone(struct zone *zone)
 	return DIV_ROUND_UP(zone->spanned_pages, (PAGE_SIZE << 3));
 }
 
-int suspend_pageflags_space_needed(void)
+int toi_pageflags_space_needed(void)
 {
 	int total = 0;
 	struct zone *zone;
@@ -67,23 +67,23 @@ void save_dyn_pageflags(dyn_pageflags_t pagemap)
 			if (!populated_zone(zone))
 				continue;
 
-			suspendActiveAllocator->rw_header_chunk(WRITE, NULL,
+			toiActiveAllocator->rw_header_chunk(WRITE, NULL,
 					(char *) &node, sizeof(int));
-			suspendActiveAllocator->rw_header_chunk(WRITE, NULL,
+			toiActiveAllocator->rw_header_chunk(WRITE, NULL,
 					(char *) &zone_idx, sizeof(int));
 			size = pages_for_zone(zone);
-			suspendActiveAllocator->rw_header_chunk(WRITE, NULL,
+			toiActiveAllocator->rw_header_chunk(WRITE, NULL,
 					(char *) &size, sizeof(int));
 
 			for (i = 0; i < size; i++)
-				suspendActiveAllocator->rw_header_chunk(WRITE,
+				toiActiveAllocator->rw_header_chunk(WRITE,
 					NULL, (char *) pagemap[node][zone_idx][i],
 					PAGE_SIZE);
 		}
 		node++;
 	}
 	node = -1;
-	suspendActiveAllocator->rw_header_chunk(WRITE, NULL,
+	toiActiveAllocator->rw_header_chunk(WRITE, NULL,
 			(char *) &node, sizeof(int));
 }
 
@@ -111,7 +111,7 @@ int load_dyn_pageflags(dyn_pageflags_t pagemap)
 				continue;
 
 			/* Same node? */
-			suspendActiveAllocator->rw_header_chunk(READ, NULL,
+			toiActiveAllocator->rw_header_chunk(READ, NULL,
 					(char *) &zone_check, sizeof(int));
 			if (zone_check != node) {
 				printk("Node read (%d) != node (%d).\n",
@@ -120,7 +120,7 @@ int load_dyn_pageflags(dyn_pageflags_t pagemap)
 			}
 
 			/* Same zone? */
-			suspendActiveAllocator->rw_header_chunk(READ, NULL,
+			toiActiveAllocator->rw_header_chunk(READ, NULL,
 					(char *) &zone_check, sizeof(int));
 			if (zone_check != zone_idx) {
 				printk("Zone read (%d) != node (%d).\n",
@@ -129,17 +129,17 @@ int load_dyn_pageflags(dyn_pageflags_t pagemap)
 			}
 
 
-			suspendActiveAllocator->rw_header_chunk(READ, NULL,
+			toiActiveAllocator->rw_header_chunk(READ, NULL,
 				(char *) &size, sizeof(int));
 
 			for (i = 0; i < size; i++)
-				suspendActiveAllocator->rw_header_chunk(READ, NULL,
+				toiActiveAllocator->rw_header_chunk(READ, NULL,
 					(char *) pagemap[node][zone_idx][i],
 					PAGE_SIZE);
 		}
 		node++;
 	}
-	suspendActiveAllocator->rw_header_chunk(READ, NULL, (char *) &zone_check,
+	toiActiveAllocator->rw_header_chunk(READ, NULL, (char *) &zone_check,
 			sizeof(int));
 	if (zone_check != -1) {
 		printk("Didn't read end of dyn pageflag data marker.(%x)\n",

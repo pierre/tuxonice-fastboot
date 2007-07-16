@@ -17,5 +17,5 @@ enum {
 	ATOMIC_STEP_RESTORE_CONSOLE
 };
 
-int suspend2_go_atomic(pm_message_t state, int suspend_time);
-void suspend2_end_atomic(int stage, int suspend_time);
+int toi_go_atomic(pm_message_t state, int toi_time);
+void toi_end_atomic(int stage, int toi_time);

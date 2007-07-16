@@ -5,7 +5,7 @@
  *
  * This file is released under the GPLv2.
  *
- * It contains high level IO routines for suspending.
+ * It contains high level IO routines for hibernating.
  *
  */
 
@@ -13,7 +13,7 @@
 #include "tuxonice_pagedir.h"
 
 /* Non-module data saved in our image header */
-struct suspend_header {
+struct toi_header {
 	u32 version_code;
 	unsigned long num_physpages;
 	unsigned long orig_mem_free;
@@ -39,7 +39,7 @@ extern int write_image_header(void);
 extern int read_pageset1(void);
 extern int read_pageset2(int overwrittenpagesonly);
 
-extern int suspend_attempt_to_parse_resume_device(int quiet);
+extern int toi_attempt_to_parse_resume_device(int quiet);
 extern void attempt_to_parse_resume_device2(void);
 extern void attempt_to_parse_alt_resume_param(void);
 int image_exists_read(const char *page, int count);

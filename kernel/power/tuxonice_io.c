@@ -8,7 +8,7 @@
  *
  * This file is released under the GPLv2.
  *
- * It contains high level IO routines for suspending.
+ * It contains high level IO routines for hibernating.
  *
  */
 
@@ -45,40 +45,40 @@ static DEFINE_PER_CPU(struct pbe *, last_low_page);
 static atomic_t worker_thread_count;
 static atomic_t io_count;
 
-/* suspend_attempt_to_parse_resume_device
+/* toi_attempt_to_parse_resume_device
  *
- * Can we suspend, using the current resume= parameter?
+ * Can we hibernate, using the current resume= parameter?
  */
-int suspend_attempt_to_parse_resume_device(int quiet)
+int toi_attempt_to_parse_resume_device(int quiet)
 {
 	struct list_head *Allocator;
-	struct suspend_module_ops *thisAllocator;
+	struct toi_module_ops *thisAllocator;
 	int result, returning = 0;
 
-	if (suspend_activate_storage(0))
+	if (toi_activate_storage(0))
 		return 0;
 
-	suspendActiveAllocator = NULL;
+	toiActiveAllocator = NULL;
 	clear_toi_state(TOI_RESUME_DEVICE_OK);
 	clear_toi_state(TOI_CAN_RESUME);
 	clear_result_state(TOI_ABORTED);
 
-	if (!suspendNumAllocators) {
+	if (!toiNumAllocators) {
 		if (!quiet)
-			printk("Suspend2: No storage allocators have been "
-				"registered. Suspending will be disabled.\n");
+			printk("TuxOnIce: No storage allocators have been "
+				"registered. Hibernating will be disabled.\n");
 		goto cleanup;
 	}
 	
 	if (!resume_file[0]) {
 		if (!quiet)
-			printk("Suspend2: Resume= parameter is empty."
-				" Suspending will be disabled.\n");
+			printk("TuxOnIce: Resume= parameter is empty."
+				" Hibernating will be disabled.\n");
 		goto cleanup;
 	}
 
-	list_for_each(Allocator, &suspendAllocators) {
-		thisAllocator = list_entry(Allocator, struct suspend_module_ops,
+	list_for_each(Allocator, &toiAllocators) {
+		thisAllocator = list_entry(Allocator, struct toi_module_ops,
 								type_list);
 
 		/* 
@@ -89,7 +89,7 @@ int suspend_attempt_to_parse_resume_device(int quiet)
 			continue;
 
 		result = thisAllocator->parse_sig_location(
-				resume_file, (suspendNumAllocators == 1),
+				resume_file, (toiNumAllocators == 1),
 				quiet);
 
 		switch (result) {
@@ -100,7 +100,7 @@ int suspend_attempt_to_parse_resume_device(int quiet)
 
 			case 0:
 				/* For this allocator and valid. */
-				suspendActiveAllocator = thisAllocator;
+				toiActiveAllocator = thisAllocator;
 
 				set_toi_state(TOI_RESUME_DEVICE_OK);
 				set_toi_state(TOI_CAN_RESUME);
@@ -109,18 +109,18 @@ int suspend_attempt_to_parse_resume_device(int quiet)
 		}
 	}
 	if (!quiet)
-		printk("Suspend2: No matching enabled allocator found. "
+		printk("TuxOnIce: No matching enabled allocator found. "
 				"Resuming disabled.\n");
 cleanup:
-	suspend_deactivate_storage(0);
+	toi_deactivate_storage(0);
 	return returning;
 }
 
 void attempt_to_parse_resume_device2(void)
 {
-	suspend_prepare_usm();
-	suspend_attempt_to_parse_resume_device(0);
-	suspend_cleanup_usm();
+	toi_prepare_usm();
+	toi_attempt_to_parse_resume_device(0);
+	toi_cleanup_usm();
 }
 
 void save_restore_alt_param(int replace, int quiet)
@@ -136,7 +136,7 @@ void save_restore_alt_param(int replace, int quiet)
 		strcpy(resume_file, resume_param_save);
 		toi_state = toi_state_save;
 	}
-	suspend_attempt_to_parse_resume_device(quiet);
+	toi_attempt_to_parse_resume_device(quiet);
 }
 
 void attempt_to_parse_alt_resume_param(void)
@@ -172,23 +172,23 @@ void attempt_to_parse_alt_resume_param(void)
 
 static void noresume_reset_modules(void)
 {
-	struct suspend_module_ops *this_filter;
+	struct toi_module_ops *this_filter;
 	
-	list_for_each_entry(this_filter, &suspend_filters, type_list)
+	list_for_each_entry(this_filter, &toi_filters, type_list)
 		if (this_filter->noresume_reset)
 			this_filter->noresume_reset();
 
-	if (suspendActiveAllocator && suspendActiveAllocator->noresume_reset)
-		suspendActiveAllocator->noresume_reset();
+	if (toiActiveAllocator && toiActiveAllocator->noresume_reset)
+		toiActiveAllocator->noresume_reset();
 }
 
-/* fill_suspend_header()
+/* fill_toi_header()
  * 
- * Description:	Fill the suspend header structure.
- * Arguments:	struct suspend_header: Header data structure to be filled.
+ * Description:	Fill the hibernate header structure.
+ * Arguments:	struct toi_header: Header data structure to be filled.
  */
 
-static void fill_suspend_header(struct suspend_header *sh)
+static void fill_toi_header(struct toi_header *sh)
 {
 	int i;
 	
@@ -200,13 +200,13 @@ static void fill_suspend_header(struct suspend_header *sh)
 	sh->page_size = PAGE_SIZE;
 	sh->pagedir = pagedir1;
 	sh->pageset_2_size = pagedir2.size;
-	sh->param0 = suspend_result;
-	sh->param1 = suspend_action;
-	sh->param2 = suspend_debug_state;
+	sh->param0 = toi_result;
+	sh->param1 = toi_action;
+	sh->param2 = toi_debug_state;
 	sh->param3 = console_loglevel;
 	sh->root_fs = current->fs->rootmnt->mnt_sb->s_dev;
 	for (i = 0; i < 4; i++)
-		sh->io_time[i/2][i%2] = suspend_io_time[i/2][i%2];
+		sh->io_time[i/2][i%2] = toi_io_time[i/2][i%2];
 }
 
 /*
@@ -217,13 +217,13 @@ static void fill_suspend_header(struct suspend_header *sh)
  */
 static int rw_init_modules(int rw, int which)
 {
-	struct suspend_module_ops *this_module;
+	struct toi_module_ops *this_module;
 	/* Initialise page transformers */
-	list_for_each_entry(this_module, &suspend_filters, type_list) {
+	list_for_each_entry(this_module, &toi_filters, type_list) {
 		if (!this_module->enabled)
 			continue;
 		if (this_module->rw_init && this_module->rw_init(rw, which)) {
-			abort_suspend(TOI_FAILED_MODULE_INIT,
+			abort_hibernate(TOI_FAILED_MODULE_INIT,
 				"Failed to initialise the %s filter.",
 				this_module->name);
 			return 1;
@@ -231,16 +231,16 @@ static int rw_init_modules(int rw, int which)
 	}
 
 	/* Initialise allocator */
-	if (suspendActiveAllocator->rw_init(rw, which)) {
-		abort_suspend(TOI_FAILED_MODULE_INIT,
+	if (toiActiveAllocator->rw_init(rw, which)) {
+		abort_hibernate(TOI_FAILED_MODULE_INIT,
 				"Failed to initialise the allocator."); 
 		if (!rw)
-			suspendActiveAllocator->remove_image();
+			toiActiveAllocator->remove_image();
 		return 1;
 	}
 
 	/* Initialise other modules */
-	list_for_each_entry(this_module, &suspend_modules, module_list) {
+	list_for_each_entry(this_module, &toi_modules, module_list) {
 		if (!this_module->enabled ||
 		    this_module->type == FILTER_MODULE ||
 		    this_module->type == WRITER_MODULE)
@@ -263,11 +263,11 @@ static int rw_init_modules(int rw, int which)
  */
 static int rw_cleanup_modules(int rw)
 {
-	struct suspend_module_ops *this_module;
+	struct toi_module_ops *this_module;
 	int result = 0;
 
 	/* Cleanup other modules */
-	list_for_each_entry(this_module, &suspend_modules, module_list) {
+	list_for_each_entry(this_module, &toi_modules, module_list) {
 		if (!this_module->enabled ||
 		    this_module->type == FILTER_MODULE ||
 		    this_module->type == WRITER_MODULE)
@@ -277,14 +277,14 @@ static int rw_cleanup_modules(int rw)
 	}
 
 	/* Flush data and cleanup */
-	list_for_each_entry(this_module, &suspend_filters, type_list) {
+	list_for_each_entry(this_module, &toi_filters, type_list) {
 		if (!this_module->enabled)
 			continue;
 		if (this_module->rw_cleanup)
 			result |= this_module->rw_cleanup(rw);
 	}
 
-	result |= suspendActiveAllocator->rw_cleanup(rw);
+	result |= toiActiveAllocator->rw_cleanup(rw);
 
 	return result;
 }
@@ -353,7 +353,7 @@ static struct page *copy_page_from_orig_page(struct page *orig_page)
 	if (is_high)
 		kunmap(high_page);
 
-	abort_suspend(TOI_FAILED_IO, "Failed to get destination page for"
+	abort_hibernate(TOI_FAILED_IO, "Failed to get destination page for"
 		" orig page %p. This[min].orig_address=%p.\n", orig_page,
 		this[index].orig_address);
 	return NULL;
@@ -368,8 +368,8 @@ static int worker_rw_loop(void *data)
 {
 	unsigned long orig_pfn, write_pfn;
 	int result, my_io_index = 0;
-	struct suspend_module_ops *first_filter = suspend_get_next_filter(NULL);
-	struct page *buffer = alloc_page(S2_ATOMIC_GFP);
+	struct toi_module_ops *first_filter = toi_get_next_filter(NULL);
+	struct page *buffer = alloc_page(TOI_ATOMIC_GFP);
 
 	atomic_inc(&worker_thread_count);
 
@@ -440,7 +440,7 @@ static int worker_rw_loop(void *data)
 			result = first_filter->read_page(&write_pfn, buffer,
 					&buf_size);
 			if (buf_size != PAGE_SIZE) {
-				abort_suspend(TOI_FAILED_IO,
+				abort_hibernate(TOI_FAILED_IO,
 					"I/O pipeline returned %d bytes instead "
 					"of %d.\n", buf_size, PAGE_SIZE);
 				mutex_lock(&io_mutex);
@@ -452,7 +452,7 @@ static int worker_rw_loop(void *data)
 			io_result = result;
 			if (io_write) {
 				printk("Write chunk returned %d.\n", result);
-				abort_suspend(TOI_FAILED_IO,
+				abort_hibernate(TOI_FAILED_IO,
 					"Failed to write a chunk of the "
 					"image.");
 				mutex_lock(&io_mutex);
@@ -500,7 +500,7 @@ static int worker_rw_loop(void *data)
 		 * this under the mutex seems an unnecessary slowdown.
 		 */
 		if ((my_io_index + io_base) >= io_nextupdate)
-			io_nextupdate = suspend_update_status(my_io_index +
+			io_nextupdate = toi_update_status(my_io_index +
 				io_base, io_barmax, " %d/%d MB ",
 				MB(io_base+my_io_index+1), MB(io_barmax));
 
@@ -510,7 +510,7 @@ static int worker_rw_loop(void *data)
 			io_pc = io_finish_at * io_pc_step / 5;
 		}
 		
-		suspend_cond_pause(0, NULL);
+		toi_cond_pause(0, NULL);
 
 		/* 
 		 * Subtle: If there's less I/O still to be done than threads
@@ -626,7 +626,7 @@ static int do_rw_loop(int write, int finish_at, dyn_pageflags_t *pageflags,
 	if (!io_result) {
 		printk("done.\n");
 
-		suspend_update_status(io_base + io_finish_at, io_barmax, " %d/%d MB ",
+		toi_update_status(io_base + io_finish_at, io_barmax, " %d/%d MB ",
 				MB(io_base + io_finish_at), MB(io_barmax));
 	}
 
@@ -660,7 +660,7 @@ int write_pageset(struct pagedir *pagedir)
 	finish_at = pagedir->size;
 
 	if (pagedir->id == 1) {
-		suspend_prepare_status(DONT_CLEAR_BAR,
+		toi_prepare_status(DONT_CLEAR_BAR,
 				"Writing kernel & process data...");
 		base = pagedir2.size;
 		if (test_action_state(TOI_TEST_FILTER_SPEED) ||
@@ -669,14 +669,14 @@ int write_pageset(struct pagedir *pagedir)
 		else
 			pageflags = &pageset1_copy_map;
 	} else {
-		suspend_prepare_status(CLEAR_BAR, "Writing caches...");
+		toi_prepare_status(CLEAR_BAR, "Writing caches...");
 		pageflags = &pageset2_map;
 	}	
 	
 	start_time = jiffies;
 
 	if (rw_init_modules(1, pagedir->id)) {
-		abort_suspend(TOI_FAILED_MODULE_INIT,
+		abort_hibernate(TOI_FAILED_MODULE_INIT,
 				"Failed to initialise modules for writing.");
 		error = 1;
 	}
@@ -686,7 +686,7 @@ int write_pageset(struct pagedir *pagedir)
 				pagedir->id);
 
 	if (rw_cleanup_modules(WRITE) && !error) {
-		abort_suspend(TOI_FAILED_MODULE_CLEANUP,
+		abort_hibernate(TOI_FAILED_MODULE_CLEANUP,
 				"Failed to cleanup after writing.");
 		error = 1;
 	}
@@ -694,8 +694,8 @@ int write_pageset(struct pagedir *pagedir)
 	end_time = jiffies;
 	
 	if ((end_time - start_time) && (!test_result_state(TOI_ABORTED))) {
-		suspend_io_time[0][0] += finish_at,
-		suspend_io_time[0][1] += (end_time - start_time);
+		toi_io_time[0][0] += finish_at,
+		toi_io_time[0][1] += (end_time - start_time);
 	}
 
 	return error;
@@ -718,11 +718,11 @@ static int read_pageset(struct pagedir *pagedir, int overwrittenpagesonly)
 	dyn_pageflags_t *pageflags;
 
 	if (pagedir->id == 1) {
-		suspend_prepare_status(CLEAR_BAR,
+		toi_prepare_status(CLEAR_BAR,
 				"Reading kernel & process data...");
 		pageflags = &pageset1_map;
 	} else {
-		suspend_prepare_status(DONT_CLEAR_BAR, "Reading caches...");
+		toi_prepare_status(DONT_CLEAR_BAR, "Reading caches...");
 		if (overwrittenpagesonly)
 			barmax = finish_at = min(pagedir1.size, 
 						 pagedir2.size);
@@ -735,14 +735,14 @@ static int read_pageset(struct pagedir *pagedir, int overwrittenpagesonly)
 	start_time = jiffies;
 
 	if (rw_init_modules(0, pagedir->id)) {
-		suspendActiveAllocator->remove_image();
+		toiActiveAllocator->remove_image();
 		result = 1;
 	} else
 		result = do_rw_loop(0, finish_at, pageflags, base, barmax,
 				pagedir->id);
 
 	if (rw_cleanup_modules(READ) && !result) {
-		abort_suspend(TOI_FAILED_MODULE_CLEANUP,
+		abort_hibernate(TOI_FAILED_MODULE_CLEANUP,
 				"Failed to cleanup after reading.");
 		result = 1;
 	}
@@ -751,8 +751,8 @@ static int read_pageset(struct pagedir *pagedir, int overwrittenpagesonly)
 	end_time=jiffies;
 
 	if ((end_time - start_time) && (!test_result_state(TOI_ABORTED))) {
-		suspend_io_time[1][0] += finish_at,
-		suspend_io_time[1][1] += (end_time - start_time);
+		toi_io_time[1][0] += finish_at,
+		toi_io_time[1][1] += (end_time - start_time);
 	}
 
 	return result;
@@ -765,10 +765,10 @@ static int read_pageset(struct pagedir *pagedir, int overwrittenpagesonly)
  */
 static int write_module_configs(void)
 {
-	struct suspend_module_ops *this_module;
-	char *buffer = (char *) get_zeroed_page(S2_ATOMIC_GFP);
+	struct toi_module_ops *this_module;
+	char *buffer = (char *) get_zeroed_page(TOI_ATOMIC_GFP);
 	int len, index = 1;
-	struct suspend_module_header suspend_module_header;
+	struct toi_module_header toi_module_header;
 
 	if (!buffer) {
 		printk("Failed to allocate a buffer for saving "
@@ -783,10 +783,10 @@ static int write_module_configs(void)
 	 */
 
 	/* For each module (in registration order) */
-	list_for_each_entry(this_module, &suspend_modules, module_list) {
+	list_for_each_entry(this_module, &toi_modules, module_list) {
 		if (!this_module->enabled || !this_module->storage_needed ||
 		    (this_module->type == WRITER_MODULE &&
-		     suspendActiveAllocator != this_module))
+		     toiActiveAllocator != this_module))
 			continue;
 
 		/* Get the data from the module */
@@ -795,31 +795,31 @@ static int write_module_configs(void)
 			len = this_module->save_config_info(buffer);
 
 		/* Save the details of the module */
-		suspend_module_header.enabled = this_module->enabled;
-		suspend_module_header.type = this_module->type;
-		suspend_module_header.index = index++;
-		strncpy(suspend_module_header.name, this_module->name, 
-					sizeof(suspend_module_header.name));
-		suspendActiveAllocator->rw_header_chunk(WRITE,
+		toi_module_header.enabled = this_module->enabled;
+		toi_module_header.type = this_module->type;
+		toi_module_header.index = index++;
+		strncpy(toi_module_header.name, this_module->name, 
+					sizeof(toi_module_header.name));
+		toiActiveAllocator->rw_header_chunk(WRITE,
 				this_module,
-				(char *) &suspend_module_header,
-				sizeof(suspend_module_header));
+				(char *) &toi_module_header,
+				sizeof(toi_module_header));
 
 		/* Save the size of the data and any data returned */
-		suspendActiveAllocator->rw_header_chunk(WRITE,
+		toiActiveAllocator->rw_header_chunk(WRITE,
 				this_module,
 				(char *) &len, sizeof(int));
 		if (len)
-			suspendActiveAllocator->rw_header_chunk(
+			toiActiveAllocator->rw_header_chunk(
 				WRITE, this_module, buffer, len);
 	}
 
 	/* Write a blank header to terminate the list */
-	suspend_module_header.name[0] = '\0';
-	suspendActiveAllocator->rw_header_chunk(WRITE, 
+	toi_module_header.name[0] = '\0';
+	toiActiveAllocator->rw_header_chunk(WRITE, 
 			NULL,
-			(char *) &suspend_module_header,
-			sizeof(suspend_module_header));
+			(char *) &toi_module_header,
+			sizeof(toi_module_header));
 
 	free_page((unsigned long) buffer);
 	return 0;
@@ -833,10 +833,10 @@ static int write_module_configs(void)
 
 static int read_module_configs(void)
 {
-	struct suspend_module_ops *this_module;
-	char *buffer = (char *) get_zeroed_page(S2_ATOMIC_GFP);
+	struct toi_module_ops *this_module;
+	char *buffer = (char *) get_zeroed_page(TOI_ATOMIC_GFP);
 	int len, result = 0;
-	struct suspend_module_header suspend_module_header;
+	struct toi_module_header toi_module_header;
 
 	if (!buffer) {
 		printk("Failed to allocate a buffer for reloading module "
@@ -845,16 +845,16 @@ static int read_module_configs(void)
 	}
 		
 	/* All modules are initially disabled. That way, if we have a module
-	 * loaded now that wasn't loaded when we suspended, it won't be used
+	 * loaded now that wasn't loaded when we hibernated, it won't be used
 	 * in trying to read the data.
 	 */
-	list_for_each_entry(this_module, &suspend_modules, module_list)
+	list_for_each_entry(this_module, &toi_modules, module_list)
 		this_module->enabled = 0;
 	
 	/* Get the first module header */
-	result = suspendActiveAllocator->rw_header_chunk(READ, NULL,
-			(char *) &suspend_module_header,
-			sizeof(suspend_module_header));
+	result = toiActiveAllocator->rw_header_chunk(READ, NULL,
+			(char *) &toi_module_header,
+			sizeof(toi_module_header));
 	if (result) {
 		printk("Failed to read the next module header.\n");
 		free_page((unsigned long) buffer);
@@ -862,24 +862,24 @@ static int read_module_configs(void)
 	}
 
 	/* For each module (in registration order) */
-	while (suspend_module_header.name[0]) {
+	while (toi_module_header.name[0]) {
 
 		/* Find the module */
-		this_module = suspend_find_module_given_name(suspend_module_header.name);
+		this_module = toi_find_module_given_name(toi_module_header.name);
 
 		if (!this_module) {
 			/* 
 			 * Is it used? Only need to worry about filters. The active
 			 * allocator must be loaded!
 			 */
-			if (suspend_module_header.enabled) {
-				suspend_early_boot_message(1, TOI_CONTINUE_REQ,
+			if (toi_module_header.enabled) {
+				toi_early_boot_message(1, TOI_CONTINUE_REQ,
 					"It looks like we need module %s for "
 					"reading the image but it hasn't been "
 					"registered.\n",
-					suspend_module_header.name);
+					toi_module_header.name);
 				if (!(test_toi_state(TOI_CONTINUE_REQ))) {
-					suspendActiveAllocator->remove_image();
+					toiActiveAllocator->remove_image();
 					free_page((unsigned long) buffer);
 					return -EINVAL;
 				}
@@ -888,23 +888,23 @@ static int read_module_configs(void)
 					" the module hasn't registered. Looks "
 					"like it was disabled, so we're "
 					"ignoring it's data.",
-					suspend_module_header.name);
+					toi_module_header.name);
 		}
 		
 		/* Get the length of the data (if any) */
-		result = suspendActiveAllocator->rw_header_chunk(READ, NULL,
+		result = toiActiveAllocator->rw_header_chunk(READ, NULL,
 				(char *) &len, sizeof(int));
 		if (result) {
 			printk("Failed to read the length of the module %s's"
 					" configuration data.\n",
-					suspend_module_header.name);
+					toi_module_header.name);
 			free_page((unsigned long) buffer);
 			return -EINVAL;
 		}
 
 		/* Read any data and pass to the module (if we found one) */
 		if (len) {
-			suspendActiveAllocator->rw_header_chunk(READ, NULL,
+			toiActiveAllocator->rw_header_chunk(READ, NULL,
 					buffer, len);
 			if (this_module) {
 				if (!this_module->save_config_info) {
@@ -922,24 +922,24 @@ static int read_module_configs(void)
 			 * will put it in order. Any new modules will end up at
 			 * the top of the lists. They should have been set to
 			 * disabled when loaded (people will normally not edit
-			 * an initrd to load a new module and then suspend
+			 * an initrd to load a new module and then hibernate
 			 * without using it!).
 			 */
 
-			suspend_move_module_tail(this_module);
+			toi_move_module_tail(this_module);
 
 			/* 
 			 * We apply the disabled state; modules don't need to
 			 * save whether they were disabled and if they do, we
 			 * override them anyway.
 			 */
-			this_module->enabled = suspend_module_header.enabled;
+			this_module->enabled = toi_module_header.enabled;
 		}
 
 		/* Get the next module header */
-		result = suspendActiveAllocator->rw_header_chunk(READ, NULL,
-				(char *) &suspend_module_header,
-				sizeof(suspend_module_header));
+		result = toiActiveAllocator->rw_header_chunk(READ, NULL,
+				(char *) &toi_module_header,
+				sizeof(toi_module_header));
 
 		if (result) {
 			printk("Failed to read the next module header.\n");
@@ -966,31 +966,31 @@ int write_image_header(void)
 	char *header_buffer = NULL;
 
 	/* Now prepare to write the header */
-	if ((ret = suspendActiveAllocator->write_header_init())) {
-		abort_suspend(TOI_FAILED_MODULE_INIT,
+	if ((ret = toiActiveAllocator->write_header_init())) {
+		abort_hibernate(TOI_FAILED_MODULE_INIT,
 				"Active allocator's write_header_init"
 				" function failed.");
 		goto write_image_header_abort;
 	}
 
 	/* Get a buffer */
-	header_buffer = (char *) get_zeroed_page(S2_ATOMIC_GFP);
+	header_buffer = (char *) get_zeroed_page(TOI_ATOMIC_GFP);
 	if (!header_buffer) {
-		abort_suspend(TOI_OUT_OF_MEMORY,
+		abort_hibernate(TOI_OUT_OF_MEMORY,
 			"Out of memory when trying to get page for header!");
 		goto write_image_header_abort;
 	}
 
-	/* Write suspend header */
-	fill_suspend_header((struct suspend_header *) header_buffer);
-	suspendActiveAllocator->rw_header_chunk(WRITE, NULL,
-			header_buffer, sizeof(struct suspend_header));
+	/* Write hibernate header */
+	fill_toi_header((struct toi_header *) header_buffer);
+	toiActiveAllocator->rw_header_chunk(WRITE, NULL,
+			header_buffer, sizeof(struct toi_header));
 
 	free_page((unsigned long) header_buffer);
 
 	/* Write module configurations */
 	if ((ret = write_module_configs())) {
-		abort_suspend(TOI_FAILED_IO,
+		abort_hibernate(TOI_FAILED_IO,
 				"Failed to write module configs.");
 		goto write_image_header_abort;
 	}
@@ -998,8 +998,8 @@ int write_image_header(void)
 	save_dyn_pageflags(pageset1_map);
 
 	/* Flush data and let allocator cleanup */
-	if (suspendActiveAllocator->write_header_cleanup()) {
-		abort_suspend(TOI_FAILED_IO,
+	if (toiActiveAllocator->write_header_cleanup()) {
+		abort_hibernate(TOI_FAILED_IO,
 				"Failed to cleanup writing header.");
 		goto write_image_header_abort_no_cleanup;
 	}
@@ -1007,13 +1007,13 @@ int write_image_header(void)
 	if (test_result_state(TOI_ABORTED))
 		goto write_image_header_abort_no_cleanup;
 
-	suspend_message(TOI_IO, TOI_VERBOSE, 1, "|\n");
-	suspend_update_status(total, total, NULL);
+	toi_message(TOI_IO, TOI_VERBOSE, 1, "|\n");
+	toi_update_status(total, total, NULL);
 
 	return 0;
 
 write_image_header_abort:
-	suspendActiveAllocator->write_header_cleanup();
+	toiActiveAllocator->write_header_cleanup();
 write_image_header_abort_no_cleanup:
 	return -1;
 }
@@ -1021,13 +1021,13 @@ write_image_header_abort_no_cleanup:
 /* sanity_check()
  *
  * Description:	Perform a few checks, seeking to ensure that the kernel being
- * 		booted matches the one suspended. They need to match so we can
+ * 		booted matches the one hibernated. They need to match so we can
  * 		be _sure_ things will work. It is not absolutely impossible for
  * 		resuming from a different kernel to work, just not assured.
- * Arguments:	Struct suspend_header. The header which was saved at suspend
+ * Arguments:	Struct toi_header. The header which was saved at hibernate
  * 		time.
  */
-static char *sanity_check(struct suspend_header *sh)
+static char *sanity_check(struct toi_header *sh)
 {
 	if (sh->version_code != LINUX_VERSION_CODE)
 		return "Incorrect kernel version.";
@@ -1073,9 +1073,9 @@ static char *sanity_check(struct suspend_header *sh)
 static int __read_pageset1(void)
 {			
 	int i, result = 0;
-	char *header_buffer = (char *) get_zeroed_page(S2_ATOMIC_GFP),
+	char *header_buffer = (char *) get_zeroed_page(TOI_ATOMIC_GFP),
 	     *sanity_error = NULL;
-	struct suspend_header *suspend_header;
+	struct toi_header *toi_header;
 
 	if (!header_buffer) {
 		printk("Unable to allocate a page for reading the signature.\n");
@@ -1083,24 +1083,24 @@ static int __read_pageset1(void)
 	}
 	
 	/* Check for an image */
-	if (!(result = suspendActiveAllocator->image_exists())) {
+	if (!(result = toiActiveAllocator->image_exists())) {
 		result = -ENODATA;
 		noresume_reset_modules();
-		printk("Suspend2: No image found.\n");
+		printk("TuxOnIce: No image found.\n");
 		goto out;
 	}
 
 	/* Check for noresume command line option */
 	if (test_toi_state(TOI_NORESUME_SPECIFIED)) {
-		printk("Suspend2: Noresume on command line. Removed image.\n");
+		printk("TuxOnIce: Noresume on command line. Removed image.\n");
 		goto out_remove_image;
 	}
 
 	/* Check whether we've resumed before */
 	if (test_toi_state(TOI_RESUMED_BEFORE)) {
-		suspend_early_boot_message(1, 0, NULL);
+		toi_early_boot_message(1, 0, NULL);
 		if (!(test_toi_state(TOI_CONTINUE_REQ))) {
-			printk("Suspend2: Tried to resume before: "
+			printk("TuxOnIce: Tried to resume before: "
 					"Invalidated image.\n");
 			goto out_remove_image;
 		}
@@ -1119,30 +1119,30 @@ static int __read_pageset1(void)
 	 * network connection.
 	 */
 
-	if ((result = suspendActiveAllocator->read_header_init())) {
-		printk("Suspend2: Failed to initialise, reading the image "
+	if ((result = toiActiveAllocator->read_header_init())) {
+		printk("TuxOnIce: Failed to initialise, reading the image "
 				"header.\n");
 		goto out_remove_image;
 	}
 	
-	/* Read suspend header */
-	if ((result = suspendActiveAllocator->rw_header_chunk(READ, NULL,
-			header_buffer, sizeof(struct suspend_header))) < 0) {
-		printk("Suspend2: Failed to read the image signature.\n");
+	/* Read hibernate header */
+	if ((result = toiActiveAllocator->rw_header_chunk(READ, NULL,
+			header_buffer, sizeof(struct toi_header))) < 0) {
+		printk("TuxOnIce: Failed to read the image signature.\n");
 		goto out_remove_image;
 	}
 	
-	suspend_header = (struct suspend_header *) header_buffer;
+	toi_header = (struct toi_header *) header_buffer;
 
 	/*
 	 * NB: This call may also result in a reboot rather than returning.
 	 */
 
-	sanity_error = sanity_check(suspend_header);
+	sanity_error = sanity_check(toi_header);
 	if (sanity_error) {
-		suspend_early_boot_message(1, TOI_CONTINUE_REQ,
+		toi_early_boot_message(1, TOI_CONTINUE_REQ,
 				sanity_error);
-		printk("Suspend2: Sanity check failed.\n");
+		printk("TuxOnIce: Sanity check failed.\n");
 		goto out_remove_image;
 	}
 
@@ -1156,34 +1156,34 @@ static int __read_pageset1(void)
 	 */
 	
 	memcpy((char *) &pagedir1,
-		(char *) &suspend_header->pagedir, sizeof(pagedir1));
-	suspend_result = suspend_header->param0;
-	suspend_action = suspend_header->param1;
-	suspend_debug_state = suspend_header->param2;
-	suspend_default_console_level = suspend_header->param3;
+		(char *) &toi_header->pagedir, sizeof(pagedir1));
+	toi_result = toi_header->param0;
+	toi_action = toi_header->param1;
+	toi_debug_state = toi_header->param2;
+	toi_default_console_level = toi_header->param3;
 	clear_toi_state(TOI_IGNORE_LOGLEVEL);
-	pagedir2.size = suspend_header->pageset_2_size;
+	pagedir2.size = toi_header->pageset_2_size;
 	for (i = 0; i < 4; i++)
-		suspend_io_time[i/2][i%2] =
-			suspend_header->io_time[i/2][i%2];
+		toi_io_time[i/2][i%2] =
+			toi_header->io_time[i/2][i%2];
 
 	/* Read module configurations */
 	if ((result = read_module_configs())) {
 		pagedir1.size = pagedir2.size = 0;
-		printk("Suspend2: Failed to read Suspend module "
+		printk("TuxOnIce: Failed to read TuxOnIce module "
 				"configurations.\n");
 		clear_action_state(TOI_KEEP_IMAGE);
 		goto out_remove_image;
 	}
 
-	suspend_prepare_console();
+	toi_prepare_console();
 
 	set_toi_state(TOI_NOW_RESUMING);
 
 	if (pre_resume_freeze())
 		goto out_reset_console;
 
-	suspend_cond_pause(1, "About to read original pageset1 locations.");
+	toi_cond_pause(1, "About to read original pageset1 locations.");
 
 	/*
 	 * Read original pageset1 locations. These are the addresses we can't
@@ -1199,46 +1199,46 @@ static int __read_pageset1(void)
 		goto out_reset_console;
 
 	/* Clean up after reading the header */
-	if ((result = suspendActiveAllocator->read_header_cleanup())) {
-		printk("Suspend2: Failed to cleanup after reading the image "
+	if ((result = toiActiveAllocator->read_header_cleanup())) {
+		printk("TuxOnIce: Failed to cleanup after reading the image "
 				"header.\n");
 		goto out_reset_console;
 	}
 
-	suspend_cond_pause(1, "About to read pagedir.");
+	toi_cond_pause(1, "About to read pagedir.");
 
 	/* 
 	 * Get the addresses of pages into which we will load the kernel to
 	 * be copied back
 	 */
-	if (suspend_get_pageset1_load_addresses()) {
-		printk("Suspend2: Failed to get load addresses for pageset1.\n");
+	if (toi_get_pageset1_load_addresses()) {
+		printk("TuxOnIce: Failed to get load addresses for pageset1.\n");
 		goto out_reset_console;
 	}
 
 	/* Read the original kernel back */
-	suspend_cond_pause(1, "About to read pageset 1.");
+	toi_cond_pause(1, "About to read pageset 1.");
 
 	if (read_pageset(&pagedir1, 0)) {
-		suspend_prepare_status(CLEAR_BAR, "Failed to read pageset 1.");
+		toi_prepare_status(CLEAR_BAR, "Failed to read pageset 1.");
 		result = -EIO;
-		printk("Suspend2: Failed to get load pageset1.\n");
+		printk("TuxOnIce: Failed to get load pageset1.\n");
 		goto out_reset_console;
 	}
 
-	suspend_cond_pause(1, "About to restore original kernel.");
+	toi_cond_pause(1, "About to restore original kernel.");
 	result = 0;
 
 	if (!test_action_state(TOI_KEEP_IMAGE) &&
-	    suspendActiveAllocator->mark_resume_attempted)
-		suspendActiveAllocator->mark_resume_attempted(1);
+	    toiActiveAllocator->mark_resume_attempted)
+		toiActiveAllocator->mark_resume_attempted(1);
 
 out:
 	free_page((unsigned long) header_buffer);
 	return result;
 
 out_reset_console:
-	suspend_cleanup_console();
+	toi_cleanup_console();
 
 out_remove_image:
 	free_dyn_pageflags(&pageset1_map);
@@ -1246,15 +1246,15 @@ out_remove_image:
 	free_dyn_pageflags(&io_map);
 	result = -EINVAL;
 	if (!test_action_state(TOI_KEEP_IMAGE))
-		suspendActiveAllocator->remove_image();
-	suspendActiveAllocator->read_header_cleanup();
+		toiActiveAllocator->remove_image();
+	toiActiveAllocator->read_header_cleanup();
 	noresume_reset_modules();
 	goto out;
 }
 
 /* read_pageset1()
  *
- * Description:	Attempt to read the header and pageset1 of a suspend image.
+ * Description:	Attempt to read the header and pageset1 of a hibernate image.
  * 		Handle the outcome, complaining where appropriate.
  */
 
@@ -1273,8 +1273,8 @@ int read_pageset1(void)
 			if (test_result_state(TOI_ABORTED))
 				break;
 
-			abort_suspend(TOI_IMAGE_ERROR,
-					"Suspend2: Error %d resuming\n",
+			abort_hibernate(TOI_IMAGE_ERROR,
+					"TuxOnIce: Error %d resuming\n",
 					error);
 	}
 	return error;
@@ -1285,8 +1285,8 @@ int read_pageset1(void)
  */
 static char *get_have_image_data(void)
 {
-	char *output_buffer = (char *) get_zeroed_page(S2_ATOMIC_GFP);
-	struct suspend_header *suspend_header;
+	char *output_buffer = (char *) get_zeroed_page(TOI_ATOMIC_GFP);
+	struct toi_header *toi_header;
 
 	if (!output_buffer) {
 		printk("Output buffer null.\n");
@@ -1294,19 +1294,19 @@ static char *get_have_image_data(void)
 	}
 
 	/* Check for an image */
-	if (!suspendActiveAllocator->image_exists() ||
-	    suspendActiveAllocator->read_header_init() ||
-	    suspendActiveAllocator->rw_header_chunk(READ, NULL,
-			output_buffer, sizeof(struct suspend_header))) {
+	if (!toiActiveAllocator->image_exists() ||
+	    toiActiveAllocator->read_header_init() ||
+	    toiActiveAllocator->rw_header_chunk(READ, NULL,
+			output_buffer, sizeof(struct toi_header))) {
 		sprintf(output_buffer, "0\n");
 		goto out;
 	}
 
-	suspend_header = (struct suspend_header *) output_buffer;
+	toi_header = (struct toi_header *) output_buffer;
 
 	sprintf(output_buffer, "1\n%s\n%s\n",
-			suspend_header->uts.machine,
-			suspend_header->uts.version);
+			toi_header->uts.machine,
+			toi_header->uts.version);
 
 	/* Check whether we've resumed before */
 	if (test_toi_state(TOI_RESUMED_BEFORE))
@@ -1320,7 +1320,7 @@ out:
 /* read_pageset2()
  *
  * Description:	Read in part or all of pageset2 of an image, depending upon
- * 		whether we are suspending and have only overwritten a portion
+ * 		whether we are hibernating and have only overwritten a portion
  * 		with pageset1 pages, or are resuming and need to read them 
  * 		all.
  * Arguments:	Int. Boolean. Read only pages which would have been
@@ -1336,8 +1336,8 @@ int read_pageset2(int overwrittenpagesonly)
 
 	result = read_pageset(&pagedir2, overwrittenpagesonly);
 
-	suspend_update_status(100, 100, NULL);
-	suspend_cond_pause(1, "Pagedir 2 read.");
+	toi_update_status(100, 100, NULL);
+	toi_cond_pause(1, "Pagedir 2 read.");
 
 	return result;
 }
@@ -1354,13 +1354,13 @@ int image_exists_read(const char *page, int count)
 	int len = 0;
 	char *result;
 	
-	if (suspend_activate_storage(0))
+	if (toi_activate_storage(0))
 		return count;
 
 	if (!test_toi_state(TOI_RESUME_DEVICE_OK))
-		suspend_attempt_to_parse_resume_device(0);
+		toi_attempt_to_parse_resume_device(0);
 
-	if (!suspendActiveAllocator) {
+	if (!toiActiveAllocator) {
 		len = sprintf((char *) page, "-1\n");
 	} else {
 		result = get_have_image_data();
@@ -1370,7 +1370,7 @@ int image_exists_read(const char *page, int count)
 		}
 	}
 
-	suspend_deactivate_storage(0);
+	toi_deactivate_storage(0);
 
 	return len;
 }
@@ -1381,13 +1381,13 @@ int image_exists_read(const char *page, int count)
  */
 int image_exists_write(const char *buffer, int count)
 {
-	if (suspend_activate_storage(0))
+	if (toi_activate_storage(0))
 		return count;
 
-	if (suspendActiveAllocator && suspendActiveAllocator->image_exists())
-		suspendActiveAllocator->remove_image();
+	if (toiActiveAllocator && toiActiveAllocator->image_exists())
+		toiActiveAllocator->remove_image();
 
-	suspend_deactivate_storage(0);
+	toi_deactivate_storage(0);
 
 	clear_result_state(TOI_KEPT_IMAGE);
 
@@ -1395,7 +1395,7 @@ int image_exists_write(const char *buffer, int count)
 }
 
 #ifdef CONFIG_TOI_EXPORTS
-EXPORT_SYMBOL_GPL(suspend_attempt_to_parse_resume_device);
+EXPORT_SYMBOL_GPL(toi_attempt_to_parse_resume_device);
 EXPORT_SYMBOL_GPL(attempt_to_parse_resume_device2);
 #endif
 
