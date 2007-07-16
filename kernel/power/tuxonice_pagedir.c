@@ -65,7 +65,7 @@ struct page * ___suspend_get_nonconflicting_page(int can_be_highmem)
 		flags |= __GFP_HIGHMEM;
 
 
-	if (test_suspend_state(TOI_LOADING_ALT_IMAGE) && pageset2_map &&
+	if (test_toi_state(TOI_LOADING_ALT_IMAGE) && pageset2_map &&
 				(ps2_pfn < (max_pfn + 2))) {
 		/*
 		 * ps2_pfn = max_pfn + 1 when yet to find first ps2 pfn that can

@@ -265,8 +265,8 @@ void suspend_unregister_module(struct suspend_module_ops *module)
 			suspendNumAllocators--;
 			if (suspendActiveAllocator == module) {
 				suspendActiveAllocator = NULL;
-				clear_suspend_state(TOI_CAN_RESUME);
-				clear_suspend_state(TOI_CAN_HIBERNATE);
+				clear_toi_state(TOI_CAN_RESUME);
+				clear_toi_state(TOI_CAN_HIBERNATE);
 			}
 			break;
 		

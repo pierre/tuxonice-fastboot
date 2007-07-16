@@ -106,18 +106,18 @@ enum {
 #ifdef CONFIG_TOI
 
 /* Used in init dir files */
-extern unsigned long suspend_state;
-#define set_suspend_state(bit) (set_bit(bit, &suspend_state))
-#define clear_suspend_state(bit) (clear_bit(bit, &suspend_state))
-#define test_suspend_state(bit) (test_bit(bit, &suspend_state))
+extern unsigned long toi_state;
+#define set_toi_state(bit) (set_bit(bit, &toi_state))
+#define clear_toi_state(bit) (clear_bit(bit, &toi_state))
+#define test_toi_state(bit) (test_bit(bit, &toi_state))
 extern int suspend2_running;
 
 #else /* !CONFIG_TOI */
 
-#define suspend_state		(0)
-#define set_suspend_state(bit) do { } while(0)
-#define clear_suspend_state(bit) do { } while (0)
-#define test_suspend_state(bit) (0)
+#define toi_state		(0)
+#define set_toi_state(bit) do { } while(0)
+#define clear_toi_state(bit) do { } while (0)
+#define test_toi_state(bit) (0)
 #define suspend2_running (0)
 #endif /* CONFIG_TOI */
 

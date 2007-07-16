@@ -131,9 +131,9 @@ enum {
 /*		== Suspend states ==
 	(see also include/linux/suspend.h)	*/
 
-#define get_suspend_state()  (suspend_state)
-#define restore_suspend_state(saved_state) \
-	do { suspend_state = saved_state; } while(0)
+#define get_toi_state()  (toi_state)
+#define restore_toi_state(saved_state) \
+	do { toi_state = saved_state; } while(0)
 
 /*		== Module support ==		*/
 

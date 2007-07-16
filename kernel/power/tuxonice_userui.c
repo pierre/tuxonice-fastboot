@@ -388,11 +388,11 @@ static void request_abort_suspend(void)
 	if (test_result_state(TOI_ABORT_REQUESTED))
 		return;
 
-	if (test_suspend_state(TOI_NOW_RESUMING)) {
+	if (test_toi_state(TOI_NOW_RESUMING)) {
 		suspend_prepare_status(CLEAR_BAR, "Escape pressed. "
 					"Powering down again.");
-		set_suspend_state(TOI_STOP_RESUME);
-		while (!test_suspend_state(TOI_IO_STOPPED))
+		set_toi_state(TOI_STOP_RESUME);
+		while (!test_toi_state(TOI_IO_STOPPED))
 			schedule();
 		if (suspendActiveAllocator->mark_resume_attempted)
 			suspendActiveAllocator->mark_resume_attempted(0);

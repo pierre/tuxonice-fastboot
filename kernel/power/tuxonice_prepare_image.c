@@ -879,9 +879,9 @@ static void eat_memory(void)
 	}
 	
 	if (did_eat_memory) {
-		unsigned long orig_state = get_suspend_state();
+		unsigned long orig_state = get_toi_state();
 		/* Freeze_processes will call sys_sync too */
-		restore_suspend_state(orig_state);
+		restore_toi_state(orig_state);
 		suspend_recalculate_image_contents(0);
 	}
 

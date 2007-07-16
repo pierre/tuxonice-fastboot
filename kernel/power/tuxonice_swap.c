@@ -243,7 +243,7 @@ static int try_to_parse_resume_device(char *commandline, int quiet)
 		if (quiet)
 			return 1;
 
-		if (test_suspend_state(TOI_TRYING_TO_RESUME))
+		if (test_toi_state(TOI_TRYING_TO_RESUME))
 			suspend_early_boot_message(1, TOI_CONTINUE_REQ,
 			  "Failed to translate \"%s\" into a device id.\n",
 			  commandline);
@@ -310,9 +310,9 @@ static int parse_signature(char *header, int restore)
 		 * We are now using the highest bit of the char to indicate
 		 * whether we have attempted to resume from this image before.
 		 */
-		clear_suspend_state(TOI_RESUMED_BEFORE);
+		clear_toi_state(TOI_RESUMED_BEFORE);
 		if (((int) *headerblocksize_ptr) & 0x80)
-			set_suspend_state(TOI_RESUMED_BEFORE);
+			set_toi_state(TOI_RESUMED_BEFORE);
 		headerblock = (unsigned long) *headerblock_ptr;
 	}
 
@@ -492,7 +492,7 @@ static int suspend_swap_release_storage(void)
 	int i = 0;
 
 	if (test_action_state(TOI_KEEP_IMAGE) &&
-	    test_suspend_state(TOI_NOW_RESUMING))
+	    test_toi_state(TOI_NOW_RESUMING))
 		return 0;
 
 	header_pages_allocated = 0;
@@ -965,10 +965,10 @@ static int suspend_swap_image_exists(void)
 		printk("Suspend2: Detected another implementation's signature.\n");
 		return 0;
 	} else if ((signature_found >> 1) != SIGNATURE_VER) {
-		if (!test_suspend_state(TOI_NORESUME_SPECIFIED)) {
+		if (!test_toi_state(TOI_NORESUME_SPECIFIED)) {
 			suspend_early_boot_message(1, TOI_CONTINUE_REQ,
 			  "Found a different style suspend image signature.");
-			set_suspend_state(TOI_NORESUME_SPECIFIED);
+			set_toi_state(TOI_NORESUME_SPECIFIED);
 			printk("Suspend2: Dectected another implementation's signature.\n");
 		}
 	}
@@ -1069,8 +1069,8 @@ static int suspend_swap_parse_sig_location(char *commandline,
 	else
 		resume_firstblock = 0;
 
-	clear_suspend_state(TOI_CAN_HIBERNATE);
-	clear_suspend_state(TOI_CAN_RESUME);
+	clear_toi_state(TOI_CAN_HIBERNATE);
+	clear_toi_state(TOI_CAN_RESUME);
 	
 	temp_result = try_to_parse_resume_device(devstart, quiet);
 
@@ -1100,8 +1100,8 @@ static int suspend_swap_parse_sig_location(char *commandline,
 		suspend_bio_ops.set_devinfo(devinfo);
 		suspend_writer_posn.chains = &block_chain[0];
 		suspend_writer_posn.num_chains = MAX_SWAPFILES;
-		set_suspend_state(TOI_CAN_HIBERNATE);
-		set_suspend_state(TOI_CAN_RESUME);
+		set_toi_state(TOI_CAN_HIBERNATE);
+		set_toi_state(TOI_CAN_RESUME);
 	} else
 		if (!quiet)
 			printk(KERN_ERR "Suspend2: SwapAllocator: No swap "

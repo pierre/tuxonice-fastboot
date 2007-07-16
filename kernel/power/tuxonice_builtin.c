@@ -198,10 +198,10 @@ unsigned long suspend_action = 	(1 << TOI_PAGESET2_FULL) | \
 #endif
 EXPORT_SYMBOL_GPL(suspend_action);
 
-unsigned long suspend_state = ((1 << TOI_BOOT_TIME) |
+unsigned long toi_state = ((1 << TOI_BOOT_TIME) |
 		(1 << TOI_IGNORE_LOGLEVEL) |
 		(1 << TOI_IO_STOPPED));
-EXPORT_SYMBOL_GPL(suspend_state);
+EXPORT_SYMBOL_GPL(toi_state);
 
 /* The number of suspends we have started (some may have been cancelled) */
 unsigned int nr_suspends;

@@ -381,9 +381,9 @@ static int parse_signature(struct suspend_file_header *header)
 		return -1;
 
 	if (header->resumed_before)
-		set_suspend_state(TOI_RESUMED_BEFORE);
+		set_toi_state(TOI_RESUMED_BEFORE);
 	else
-		clear_suspend_state(TOI_RESUMED_BEFORE);
+		clear_toi_state(TOI_RESUMED_BEFORE);
 
 	target_header_start = header->first_header_block;
 	return 1;
@@ -414,7 +414,7 @@ static int suspend_file_storage_allocated(void)
 static int suspend_file_release_storage(void)
 {
 	if (test_action_state(TOI_KEEP_IMAGE) &&
-	    test_suspend_state(TOI_NOW_RESUMING))
+	    test_toi_state(TOI_NOW_RESUMING))
 		return 0;
 
 	suspend_put_extent_chain(&block_chain);
@@ -637,7 +637,7 @@ static int suspend_file_read_header_init(void)
 	int result;
 	struct block_device *tmp;
 
-	if (test_suspend_state(TOI_TRY_RESUME_RD))
+	if (test_toi_state(TOI_TRY_RESUME_RD))
 		result = rd_init();
 	else
 		result = file_init();
@@ -855,11 +855,11 @@ static int __test_suspend_file_target(char *target, int resume_time, int quiet)
 		suspend_writer_posn.num_chains = 1;
 
 		if (!resume_time)
-			set_suspend_state(TOI_CAN_HIBERNATE);
+			set_toi_state(TOI_CAN_HIBERNATE);
 		return 0;
 	}
 
-	clear_suspend_state(TOI_CAN_HIBERNATE);
+	clear_toi_state(TOI_CAN_HIBERNATE);
 
 	if (quiet)
 		return 1;
@@ -990,7 +990,7 @@ static int suspend_file_parse_sig_location(char *commandline,
 
 out:
 	if (result)
-		clear_suspend_state(TOI_CAN_HIBERNATE);
+		clear_toi_state(TOI_CAN_HIBERNATE);
 
 	if (!quiet)
 		printk("Resuming %sabled.\n",  result ? "dis" : "en");

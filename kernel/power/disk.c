@@ -561,7 +561,7 @@ static int __init resume_offset_setup(char *str)
 static int __init noresume_setup(char *str)
 {
 	noresume = 1;
-	set_suspend_state(TOI_NORESUME_SPECIFIED);
+	set_toi_state(TOI_NORESUME_SPECIFIED);
 	return 1;
 }
 

@@ -59,8 +59,8 @@ int suspend_attempt_to_parse_resume_device(int quiet)
 		return 0;
 
 	suspendActiveAllocator = NULL;
-	clear_suspend_state(TOI_RESUME_DEVICE_OK);
-	clear_suspend_state(TOI_CAN_RESUME);
+	clear_toi_state(TOI_RESUME_DEVICE_OK);
+	clear_toi_state(TOI_CAN_RESUME);
 	clear_result_state(TOI_ABORTED);
 
 	if (!suspendNumAllocators) {
@@ -102,8 +102,8 @@ int suspend_attempt_to_parse_resume_device(int quiet)
 				/* For this allocator and valid. */
 				suspendActiveAllocator = thisAllocator;
 
-				set_suspend_state(TOI_RESUME_DEVICE_OK);
-				set_suspend_state(TOI_CAN_RESUME);
+				set_toi_state(TOI_RESUME_DEVICE_OK);
+				set_toi_state(TOI_CAN_RESUME);
 				returning = 1;
 				goto cleanup;
 		}
@@ -126,15 +126,15 @@ void attempt_to_parse_resume_device2(void)
 void save_restore_alt_param(int replace, int quiet)
 {
 	static char resume_param_save[255];
-	static unsigned long suspend_state_save;
+	static unsigned long toi_state_save;
 
 	if (replace) {
-		suspend_state_save = suspend_state;
+		toi_state_save = toi_state;
 		strcpy(resume_param_save, resume_file);
 		strcpy(resume_file, alt_resume_param);	
 	} else {
 		strcpy(resume_file, resume_param_save);
-		suspend_state = suspend_state_save;
+		toi_state = toi_state_save;
 	}
 	suspend_attempt_to_parse_resume_device(quiet);
 }
@@ -149,7 +149,7 @@ void attempt_to_parse_alt_resume_param(void)
 
 	printk("=== Trying Poweroff Resume2 ===\n");
 	save_restore_alt_param(SAVE, NOQUIET);
-	if (test_suspend_state(TOI_CAN_RESUME))
+	if (test_toi_state(TOI_CAN_RESUME))
 		ok = 1;
 	
 	printk("=== Done ===\n");
@@ -429,10 +429,10 @@ static int worker_rw_loop(void *data)
 			 * resetting the resume_attempted flag (from ui.c) will
 			 * clear the bdev flags, making this thread oops.
 			 */
-			if (unlikely(test_suspend_state(TOI_STOP_RESUME))) {
+			if (unlikely(test_toi_state(TOI_STOP_RESUME))) {
 				atomic_dec(&worker_thread_count);
 				if (!atomic_read(&worker_thread_count))
-					set_suspend_state(TOI_IO_STOPPED);
+					set_toi_state(TOI_IO_STOPPED);
 				while (1)
 					schedule();
 			}
@@ -608,7 +608,7 @@ static int do_rw_loop(int write, int finish_at, dyn_pageflags_t *pageflags,
 	pfn = max_pfn + 1;
 	other_pfn = pfn;
 
-	clear_suspend_state(TOI_IO_STOPPED);
+	clear_toi_state(TOI_IO_STOPPED);
 
 	if (!test_action_state(TOI_NO_MULTITHREADED_IO))
 		start_other_threads();
@@ -617,8 +617,8 @@ static int do_rw_loop(int write, int finish_at, dyn_pageflags_t *pageflags,
 	while (atomic_read(&worker_thread_count))
 		schedule();
 
-	set_suspend_state(TOI_IO_STOPPED);
-	if (unlikely(test_suspend_state(TOI_STOP_RESUME))) {
+	set_toi_state(TOI_IO_STOPPED);
+	if (unlikely(test_toi_state(TOI_STOP_RESUME))) {
 		while (1)
 			schedule();
 	}
@@ -878,7 +878,7 @@ static int read_module_configs(void)
 					"reading the image but it hasn't been "
 					"registered.\n",
 					suspend_module_header.name);
-				if (!(test_suspend_state(TOI_CONTINUE_REQ))) {
+				if (!(test_toi_state(TOI_CONTINUE_REQ))) {
 					suspendActiveAllocator->remove_image();
 					free_page((unsigned long) buffer);
 					return -EINVAL;
@@ -1091,22 +1091,22 @@ static int __read_pageset1(void)
 	}
 
 	/* Check for noresume command line option */
-	if (test_suspend_state(TOI_NORESUME_SPECIFIED)) {
+	if (test_toi_state(TOI_NORESUME_SPECIFIED)) {
 		printk("Suspend2: Noresume on command line. Removed image.\n");
 		goto out_remove_image;
 	}
 
 	/* Check whether we've resumed before */
-	if (test_suspend_state(TOI_RESUMED_BEFORE)) {
+	if (test_toi_state(TOI_RESUMED_BEFORE)) {
 		suspend_early_boot_message(1, 0, NULL);
-		if (!(test_suspend_state(TOI_CONTINUE_REQ))) {
+		if (!(test_toi_state(TOI_CONTINUE_REQ))) {
 			printk("Suspend2: Tried to resume before: "
 					"Invalidated image.\n");
 			goto out_remove_image;
 		}
 	}
 
-	clear_suspend_state(TOI_CONTINUE_REQ);
+	clear_toi_state(TOI_CONTINUE_REQ);
 
 	/* 
 	 * Prepare the active allocator for reading the image header. The
@@ -1161,7 +1161,7 @@ static int __read_pageset1(void)
 	suspend_action = suspend_header->param1;
 	suspend_debug_state = suspend_header->param2;
 	suspend_default_console_level = suspend_header->param3;
-	clear_suspend_state(TOI_IGNORE_LOGLEVEL);
+	clear_toi_state(TOI_IGNORE_LOGLEVEL);
 	pagedir2.size = suspend_header->pageset_2_size;
 	for (i = 0; i < 4; i++)
 		suspend_io_time[i/2][i%2] =
@@ -1178,7 +1178,7 @@ static int __read_pageset1(void)
 
 	suspend_prepare_console();
 
-	set_suspend_state(TOI_NOW_RESUMING);
+	set_toi_state(TOI_NOW_RESUMING);
 
 	if (pre_resume_freeze())
 		goto out_reset_console;
@@ -1309,7 +1309,7 @@ static char *get_have_image_data(void)
 			suspend_header->uts.version);
 
 	/* Check whether we've resumed before */
-	if (test_suspend_state(TOI_RESUMED_BEFORE))
+	if (test_toi_state(TOI_RESUMED_BEFORE))
 		strcat(output_buffer, "Resumed before.\n");
 
 out:
@@ -1357,7 +1357,7 @@ int image_exists_read(const char *page, int count)
 	if (suspend_activate_storage(0))
 		return count;
 
-	if (!test_suspend_state(TOI_RESUME_DEVICE_OK))
+	if (!test_toi_state(TOI_RESUME_DEVICE_OK))
 		suspend_attempt_to_parse_resume_device(0);
 
 	if (!suspendActiveAllocator) {

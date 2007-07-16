@@ -107,9 +107,9 @@ new_timeout:
 			break;
 		}
 		key = tolower(key);
-		if (test_suspend_state(TOI_SANITY_CHECK_PROMPT)) {
+		if (test_toi_state(TOI_SANITY_CHECK_PROMPT)) {
 			if (key == 'c') {
-				set_suspend_state(TOI_CONTINUE_REQ);
+				set_toi_state(TOI_CONTINUE_REQ);
 				break;
 			} else if (key == ' ')
 				break;
@@ -152,7 +152,7 @@ out:
 void suspend_early_boot_message(int message_detail, int default_answer, char *warning_reason, ...)
 {
 #if defined(CONFIG_VT) || defined(CONFIG_SERIAL_CONSOLE)
-	unsigned long orig_state = get_suspend_state(), continue_req = 0;
+	unsigned long orig_state = get_toi_state(), continue_req = 0;
 	unsigned long orig_loglevel = console_loglevel;
 	int can_ask = 1;
 #else
@@ -163,7 +163,7 @@ void suspend_early_boot_message(int message_detail, int default_answer, char *wa
 	int printed_len;
 
 	if (!suspend2_wait) {
-		set_suspend_state(TOI_CONTINUE_REQ);
+		set_toi_state(TOI_CONTINUE_REQ);
 		can_ask = 0;
 	}
 
@@ -176,7 +176,7 @@ void suspend_early_boot_message(int message_detail, int default_answer, char *wa
 		va_end(args);
 	}
 
-	if (!test_suspend_state(TOI_BOOT_TIME)) {
+	if (!test_toi_state(TOI_BOOT_TIME)) {
 		printk("Suspend2: %s\n", local_printf_buf);
 		return;
 	}
@@ -227,13 +227,13 @@ void suspend_early_boot_message(int message_detail, int default_answer, char *wa
 	}
 	console_loglevel = orig_loglevel;
 	
-	set_suspend_state(TOI_SANITY_CHECK_PROMPT);
-	clear_suspend_state(TOI_CONTINUE_REQ);
+	set_toi_state(TOI_SANITY_CHECK_PROMPT);
+	clear_toi_state(TOI_CONTINUE_REQ);
 
 	if (suspend_wait_for_keypress(suspend2_wait) == 0) /* We timed out */
 		continue_req = !!default_answer;
 	else
-		continue_req = test_suspend_state(TOI_CONTINUE_REQ);
+		continue_req = test_toi_state(TOI_CONTINUE_REQ);
 
 #endif /* CONFIG_VT or CONFIG_SERIAL_CONSOLE */
 
@@ -241,9 +241,9 @@ post_ask:
 	if ((warning_reason) && (!continue_req))
 		machine_restart(NULL);
 	
-	restore_suspend_state(orig_state);
+	restore_toi_state(orig_state);
 	if (continue_req)
-		set_suspend_state(TOI_CONTINUE_REQ);
+		set_toi_state(TOI_CONTINUE_REQ);
 }
 #undef say
 

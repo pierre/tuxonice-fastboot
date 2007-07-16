@@ -380,9 +380,9 @@ static void do_cleanup(int get_debug_info)
 
 	suspend_deactivate_storage(0);
 
-	clear_suspend_state(TOI_IGNORE_LOGLEVEL);
-	clear_suspend_state(TOI_TRYING_TO_RESUME);
-	clear_suspend_state(TOI_NOW_RESUMING);
+	clear_toi_state(TOI_IGNORE_LOGLEVEL);
+	clear_toi_state(TOI_TRYING_TO_RESUME);
+	clear_toi_state(TOI_NOW_RESUMING);
 
 	if (got_pmsem) {
 		mutex_unlock(&pm_mutex);
@@ -436,7 +436,7 @@ static int suspend_init(void)
 	suspend_io_time[0][0] = suspend_io_time[0][1] =
 		suspend_io_time[1][0] =	suspend_io_time[1][1] = 0;
 
-	if (!test_suspend_state(TOI_CAN_HIBERNATE) ||
+	if (!test_toi_state(TOI_CAN_HIBERNATE) ||
 	    allocate_bitmaps())
 		return 1;
 
@@ -470,10 +470,10 @@ static int can_hibernate(void)
 		got_pmsem = 1;
 	}
 
-	if (!test_suspend_state(TOI_CAN_HIBERNATE))
+	if (!test_toi_state(TOI_CAN_HIBERNATE))
 		suspend_attempt_to_parse_resume_device(0);
 
-	if (!test_suspend_state(TOI_CAN_HIBERNATE)) {
+	if (!test_toi_state(TOI_CAN_HIBERNATE)) {
 		printk("Suspend2: Software suspend is disabled.\n"
 			"This may be because you haven't put something along "
 			"the lines of\n\nresume=swap:/dev/hda1\n\n"
@@ -729,7 +729,7 @@ static int do_load_atomic_copy(void)
 
 	suspend_activate_storage(0);
 
-	if (!(test_suspend_state(TOI_RESUME_DEVICE_OK)) &&
+	if (!(test_toi_state(TOI_RESUME_DEVICE_OK)) &&
 		!suspend_attempt_to_parse_resume_device(0)) {
 		/*
 		 * Without a usable storage device we can do nothing -
@@ -751,8 +751,8 @@ static int do_load_atomic_copy(void)
 
 	read_image_result = read_pageset1(); /* non fatal error ignored */
 
-	if (test_suspend_state(TOI_NORESUME_SPECIFIED))
-		clear_suspend_state(TOI_NORESUME_SPECIFIED);
+	if (test_toi_state(TOI_NORESUME_SPECIFIED))
+		clear_toi_state(TOI_NORESUME_SPECIFIED);
 
 	suspend_deactivate_storage(0);
 
@@ -776,7 +776,7 @@ static void prepare_restore_load_alt_image(int prepare)
 		pageset1_map = NULL;
 		pageset1_copy_map_save = pageset1_copy_map;
 		pageset1_copy_map = NULL;
-		set_suspend_state(TOI_LOADING_ALT_IMAGE);
+		set_toi_state(TOI_LOADING_ALT_IMAGE);
 		suspend_reset_alt_image_pageset2_pfn();
 	} else {
 		if (pageset1_map)
@@ -785,8 +785,8 @@ static void prepare_restore_load_alt_image(int prepare)
 		if (pageset1_copy_map)
 			free_dyn_pageflags(&pageset1_copy_map);
 		pageset1_copy_map = pageset1_copy_map_save;
-		clear_suspend_state(TOI_NOW_RESUMING);
-		clear_suspend_state(TOI_LOADING_ALT_IMAGE);
+		clear_toi_state(TOI_NOW_RESUMING);
+		clear_toi_state(TOI_LOADING_ALT_IMAGE);
 	}
 }
 
@@ -875,7 +875,7 @@ out:
  */
 void __suspend2_try_resume(void)
 {
-	set_suspend_state(TOI_TRYING_TO_RESUME);
+	set_toi_state(TOI_TRYING_TO_RESUME);
 	resume_attempted = 1;
 
 	suspend_print_modules();
@@ -886,9 +886,9 @@ void __suspend2_try_resume(void)
 
 	do_cleanup(0);
 
-	clear_suspend_state(TOI_IGNORE_LOGLEVEL);
-	clear_suspend_state(TOI_TRYING_TO_RESUME);
-	clear_suspend_state(TOI_NOW_RESUMING);
+	clear_toi_state(TOI_IGNORE_LOGLEVEL);
+	clear_toi_state(TOI_TRYING_TO_RESUME);
+	clear_toi_state(TOI_NOW_RESUMING);
 }
 
 /**
@@ -914,7 +914,7 @@ void _suspend2_try_resume(void)
 	 * For initramfs, we have to clear the boot time
 	 * flag after trying to resume
 	 */
-	clear_suspend_state(TOI_BOOT_TIME);
+	clear_toi_state(TOI_BOOT_TIME);
 	suspend_finish_anything(SYSFS_RESUMING);
 }
 

@@ -789,7 +789,7 @@ static int suspend_rw_buffer(int writing, char *buffer, int buffer_size)
 		suspend_header_bytes_used += capacity;
 
 		if (!writing) {
-			if (test_suspend_state(TOI_TRY_RESUME_RD))
+			if (test_toi_state(TOI_TRY_RESUME_RD))
 				sys_read(suspend_read_fd,
 					suspend_writer_buffer, BLOCK_SIZE);
 			else
