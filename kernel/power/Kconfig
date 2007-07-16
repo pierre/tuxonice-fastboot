@@ -150,14 +150,14 @@ config PM_STD_PARTITION
 	  device.
 
 menuconfig TOI_CORE
-	tristate "Enhanced Hibernation (Suspend2)"
+	tristate "Enhanced Hibernation (TuxOnIce)"
 	depends on SOFTWARE_SUSPEND
 	select DYN_PAGEFLAGS
 	default y
 	---help---
-	  Suspend2 is the 'new and improved' suspend support.
+	  TuxOnIce is the 'new and improved' suspend support.
 	  
-	  See the Suspend2 home page (suspend2.net)
+	  See the TuxOnIce home page (tuxonice.net)
 	  for FAQs, HOWTOs and other documentation.
 
 	comment "Image Storage (you need at least one allocator)"
@@ -190,7 +190,7 @@ menuconfig TOI_CORE
 		---help---
 		  This option adds support for using cryptoapi compression
 		  algorithms. Compression is particularly useful as
-		  the LZF support that comes with the Suspend2 patch can double
+		  the LZF support that comes with the TuxOnIce patch can double
 		  your suspend and resume speed.
 
 		  You probably want this, so say Y here.
@@ -204,7 +204,7 @@ menuconfig TOI_CORE
 		default y
 		---help---
 		  This option enabled support for a userspace based user interface
-		  to Suspend2, which allows you to have a nice display while suspending
+		  to TuxOnIce, which allows you to have a nice display while suspending
 		  and resuming, and also enables features such as pressing escape to
 		  cancel a cycle or interactive debugging.
 
@@ -215,7 +215,7 @@ menuconfig TOI_CORE
 		  This option allows you to keep and image and reuse it. It is intended
 		  __ONLY__ for use with systems where all filesystems are mounted read-
 		  only (kiosks, for example). To use it, compile this option in and boot
-		  normally. Set the KEEP_IMAGE flag in /sys/power/suspend2 and suspend.
+		  normally. Set the KEEP_IMAGE flag in /sys/power/tuxonice and suspend.
 		  When you resume, the image will not be removed. You will be unable to turn
 		  off swap partitions (assuming you are using the swap allocator), but future
 		  suspends simply do a power-down. The image can be updated using the
@@ -228,14 +228,14 @@ menuconfig TOI_CORE
 		default y
 		depends on TOI_CORE
 		---help---
-		  Suspend2 can replace swsusp. This option makes that the default state,
-		  requiring you to echo 0 > /sys/power/suspend2/replace_swsusp if you want
+		  TuxOnIce can replace swsusp. This option makes that the default state,
+		  requiring you to echo 0 > /sys/power/tuxonice/replace_swsusp if you want
 		  to use the vanilla kernel functionality. Note that your initrd/ramfs will
 		  need to do this before trying to resume, too.
-		  With overriding swsusp enabled, Suspend2 will use both the resume= and
+		  With overriding swsusp enabled, TuxOnIce will use both the resume= and
 		  noresume commandline options _and_ the resume= and noresume ones (for
 		  compatibility). resume= takes precedence over resume=. Echoing disk 
-		  to /sys/power/state will start a Suspend2 cycle. If resume= doesn't
+		  to /sys/power/state will start a TuxOnIce cycle. If resume= doesn't
 		  specify an allocator and both the swap and file allocators are compiled in,
 		  the swap allocator will be used by default.
 
@@ -274,7 +274,7 @@ menuconfig TOI_CORE
 		range -1 32768
 		depends on TOI_CORE
 		help
-		  Suspend2 can display warnings very early in the process of resuming,
+		  TuxOnIce can display warnings very early in the process of resuming,
 		  if (for example) it appears that you have booted a kernel that doesn't
 		  match an image on disk. It can then give you the opportunity to either
 		  continue booting that kernel, or reboot the machine. This option can be
