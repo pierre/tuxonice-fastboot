@@ -49,26 +49,26 @@
 #include "hipz_fns.h"
 #include "ipz_pt_fn.h"
 
-#define EQE_COMPLETION_EVENT   EHCA_BMASK_IBM(1,1)
-#define EQE_CQ_QP_NUMBER       EHCA_BMASK_IBM(8,31)
-#define EQE_EE_IDENTIFIER      EHCA_BMASK_IBM(2,7)
-#define EQE_CQ_NUMBER          EHCA_BMASK_IBM(8,31)
-#define EQE_QP_NUMBER          EHCA_BMASK_IBM(8,31)
-#define EQE_QP_TOKEN           EHCA_BMASK_IBM(32,63)
-#define EQE_CQ_TOKEN           EHCA_BMASK_IBM(32,63)
+#define EQE_COMPLETION_EVENT   EHCA_BMASK_IBM( 1,  1)
+#define EQE_CQ_QP_NUMBER       EHCA_BMASK_IBM( 8, 31)
+#define EQE_EE_IDENTIFIER      EHCA_BMASK_IBM( 2,  7)
+#define EQE_CQ_NUMBER          EHCA_BMASK_IBM( 8, 31)
+#define EQE_QP_NUMBER          EHCA_BMASK_IBM( 8, 31)
+#define EQE_QP_TOKEN           EHCA_BMASK_IBM(32, 63)
+#define EQE_CQ_TOKEN           EHCA_BMASK_IBM(32, 63)
 
-#define NEQE_COMPLETION_EVENT  EHCA_BMASK_IBM(1,1)
-#define NEQE_EVENT_CODE        EHCA_BMASK_IBM(2,7)
-#define NEQE_PORT_NUMBER       EHCA_BMASK_IBM(8,15)
-#define NEQE_PORT_AVAILABILITY EHCA_BMASK_IBM(16,16)
-#define NEQE_DISRUPTIVE        EHCA_BMASK_IBM(16,16)
+#define NEQE_COMPLETION_EVENT  EHCA_BMASK_IBM( 1,  1)
+#define NEQE_EVENT_CODE        EHCA_BMASK_IBM( 2,  7)
+#define NEQE_PORT_NUMBER       EHCA_BMASK_IBM( 8, 15)
+#define NEQE_PORT_AVAILABILITY EHCA_BMASK_IBM(16, 16)
+#define NEQE_DISRUPTIVE        EHCA_BMASK_IBM(16, 16)
 
-#define ERROR_DATA_LENGTH      EHCA_BMASK_IBM(52,63)
-#define ERROR_DATA_TYPE        EHCA_BMASK_IBM(0,7)
+#define ERROR_DATA_LENGTH      EHCA_BMASK_IBM(52, 63)
+#define ERROR_DATA_TYPE        EHCA_BMASK_IBM( 0,  7)
 
 static void queue_comp_task(struct ehca_cq *__cq);
 
-static struct ehca_comp_pool* pool;
+static struct ehca_comp_pool *pool;
 #ifdef CONFIG_HOTPLUG_CPU
 static struct notifier_block comp_pool_callback_nb;
 #endif
@@ -85,8 +85,8 @@ static inline void comp_event_callback(struct ehca_cq *cq)
 	return;
 }
 
-static void print_error_data(struct ehca_shca * shca, void* data,
-			     u64* rblock, int length)
+static void print_error_data(struct ehca_shca *shca, void *data,
+			     u64 *rblock, int length)
 {
 	u64 type = EHCA_BMASK_GET(ERROR_DATA_TYPE, rblock[2]);
 	u64 resource = rblock[1];
@@ -94,7 +94,7 @@ static void print_error_data(struct ehca_shca * shca, void* data,
 	switch (type) {
 	case 0x1: /* Queue Pair */
 	{
-		struct ehca_qp *qp = (struct ehca_qp*)data;
+		struct ehca_qp *qp = (struct ehca_qp *)data;
 
 		/* only print error data if AER is set */
 		if (rblock[6] == 0)
@@ -107,7 +107,7 @@ static void print_error_data(struct ehca_shca * shca, void* data,
 	}
 	case 0x4: /* Completion Queue */
 	{
-		struct ehca_cq *cq = (struct ehca_cq*)data;
+		struct ehca_cq *cq = (struct ehca_cq *)data;
 
 		ehca_err(&shca->ib_device,
 			 "CQ 0x%x (resource=%lx) has errors.",
@@ -175,9 +175,8 @@ error_data1:
 
 }
 
-static void qp_event_callback(struct ehca_shca *shca,
-			      u64 eqe,
-			      enum ib_event_type event_type)
+static void qp_event_callback(struct ehca_shca *shca, u64 eqe,
+			      enum ib_event_type event_type, int fatal)
 {
 	struct ib_event event;
 	struct ehca_qp *qp;
@@ -191,16 +190,26 @@ static void qp_event_callback(struct ehca_shca *shca,
 	if (!qp)
 		return;
 
-	ehca_error_data(shca, qp, qp->ipz_qp_handle.handle);
+	if (fatal)
+		ehca_error_data(shca, qp, qp->ipz_qp_handle.handle);
 
-	if (!qp->ib_qp.event_handler)
-		return;
+	event.device = &shca->ib_device;
 
-	event.device     = &shca->ib_device;
-	event.event      = event_type;
-	event.element.qp = &qp->ib_qp;
+	if (qp->ext_type == EQPT_SRQ) {
+		if (!qp->ib_srq.event_handler)
+			return;
 
-	qp->ib_qp.event_handler(&event, qp->ib_qp.qp_context);
+		event.event = fatal ? IB_EVENT_SRQ_ERR : event_type;
+		event.element.srq = &qp->ib_srq;
+		qp->ib_srq.event_handler(&event, qp->ib_srq.srq_context);
+	} else {
+		if (!qp->ib_qp.event_handler)
+			return;
+
+		event.event = event_type;
+		event.element.qp = &qp->ib_qp;
+		qp->ib_qp.event_handler(&event, qp->ib_qp.qp_context);
+	}
 
 	return;
 }
@@ -234,17 +243,17 @@ static void parse_identifier(struct ehca_shca *shca, u64 eqe)
 
 	switch (identifier) {
 	case 0x02: /* path migrated */
-		qp_event_callback(shca, eqe, IB_EVENT_PATH_MIG);
+		qp_event_callback(shca, eqe, IB_EVENT_PATH_MIG, 0);
 		break;
 	case 0x03: /* communication established */
-		qp_event_callback(shca, eqe, IB_EVENT_COMM_EST);
+		qp_event_callback(shca, eqe, IB_EVENT_COMM_EST, 0);
 		break;
 	case 0x04: /* send queue drained */
-		qp_event_callback(shca, eqe, IB_EVENT_SQ_DRAINED);
+		qp_event_callback(shca, eqe, IB_EVENT_SQ_DRAINED, 0);
 		break;
 	case 0x05: /* QP error */
 	case 0x06: /* QP error */
-		qp_event_callback(shca, eqe, IB_EVENT_QP_FATAL);
+		qp_event_callback(shca, eqe, IB_EVENT_QP_FATAL, 1);
 		break;
 	case 0x07: /* CQ error */
 	case 0x08: /* CQ error */
@@ -278,6 +287,11 @@ static void parse_identifier(struct ehca_shca *shca, u64 eqe)
 		ehca_err(&shca->ib_device, "Interface trace stopped.");
 		break;
 	case 0x14: /* first error capture info available */
+		ehca_info(&shca->ib_device, "First error capture available");
+		break;
+	case 0x15: /* SRQ limit reached */
+		qp_event_callback(shca, eqe, IB_EVENT_SRQ_LIMIT_REACHED, 0);
+		break;
 	default:
 		ehca_err(&shca->ib_device, "Unknown identifier: %x on %s.",
 			 identifier, shca->ib_device.name);
@@ -572,7 +586,7 @@ void ehca_tasklet_eq(unsigned long data)
 	ehca_process_eq((struct ehca_shca*)data, 1);
 }
 
-static inline int find_next_online_cpu(struct ehca_comp_pool* pool)
+static inline int find_next_online_cpu(struct ehca_comp_pool *pool)
 {
 	int cpu;
 	unsigned long flags;
@@ -636,7 +650,7 @@ static void queue_comp_task(struct ehca_cq *__cq)
 	__queue_comp_task(__cq, cct);
 }
 
-static void run_comp_task(struct ehca_cpu_comp_task* cct)
+static void run_comp_task(struct ehca_cpu_comp_task *cct)
 {
 	struct ehca_cq *cq;
 	unsigned long flags;
@@ -666,12 +680,12 @@ static void run_comp_task(struct ehca_cpu_comp_task* cct)
 
 static int comp_task(void *__cct)
 {
-	struct ehca_cpu_comp_task* cct = __cct;
+	struct ehca_cpu_comp_task *cct = __cct;
 	int cql_empty;
 	DECLARE_WAITQUEUE(wait, current);
 
 	set_current_state(TASK_INTERRUPTIBLE);
-	while(!kthread_should_stop()) {
+	while (!kthread_should_stop()) {
 		add_wait_queue(&cct->wait_queue, &wait);
 
 		spin_lock_irq(&cct->task_lock);
@@ -745,7 +759,7 @@ static void take_over_work(struct ehca_comp_pool *pool,
 
 	list_splice_init(&cct->cq_list, &list);
 
-	while(!list_empty(&list)) {
+	while (!list_empty(&list)) {
 		cq = list_entry(cct->cq_list.next, struct ehca_cq, entry);
 
 		list_del(&cq->entry);
@@ -768,7 +782,7 @@ static int comp_pool_callback(struct notifier_block *nfb,
 	case CPU_UP_PREPARE:
 	case CPU_UP_PREPARE_FROZEN:
 		ehca_gen_dbg("CPU: %x (CPU_PREPARE)", cpu);
-		if(!create_comp_task(pool, cpu)) {
+		if (!create_comp_task(pool, cpu)) {
 			ehca_gen_err("Can't create comp_task for cpu: %x", cpu);
 			return NOTIFY_BAD;
 		}
@@ -838,7 +852,7 @@ int ehca_create_comp_pool(void)
 
 #ifdef CONFIG_HOTPLUG_CPU
 	comp_pool_callback_nb.notifier_call = comp_pool_callback;
-	comp_pool_callback_nb.priority =0;
+	comp_pool_callback_nb.priority = 0;
 	register_cpu_notifier(&comp_pool_callback_nb);
 #endif
 

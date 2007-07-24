@@ -338,6 +338,34 @@ config SERIAL_AMBA_PL011_CONSOLE
 	  your boot loader (lilo or loadlin) about how to pass options to the
 	  kernel at boot time.)
 
+config SERIAL_SB1250_DUART
+	tristate "BCM1xxx on-chip DUART serial support"
+	depends on SIBYTE_SB1xxx_SOC=y
+	select SERIAL_CORE
+	default y
+	---help---
+	  Support for the asynchronous serial interface (DUART) included in
+	  the BCM1250 and derived System-On-a-Chip (SOC) devices.  Note that
+	  the letter D in DUART stands for "dual", which is how the device
+	  is implemented.  Depending on the SOC configuration there may be
+	  one or more DUARTs available of which all are handled.
+
+	  If unsure, say Y.  To compile this driver as a module, choose M here:
+	  the module will be called sb1250-duart.
+
+config SERIAL_SB1250_DUART_CONSOLE
+	bool "Support for console on a BCM1xxx DUART serial port"
+	depends on SERIAL_SB1250_DUART=y
+	select SERIAL_CORE_CONSOLE
+	default y
+	---help---
+	  If you say Y here, it will be possible to use a serial port as the
+	  system console (the system console is the device which receives all
+	  kernel messages and warnings and which allows logins in single user
+	  mode).
+
+	  If unsure, say Y.
+
 config SERIAL_ATMEL
 	bool "AT91 / AT32 on-chip serial port support"
 	depends on (ARM && ARCH_AT91) || AVR32
@@ -455,6 +483,36 @@ config SERIAL_DZ_CONSOLE
 	  kernel messages and warnings and which allows logins in single user
 	  mode).  Note that the firmware uses ttyS0 as the serial console on
 	  the Maxine and ttyS2 on the others.
+
+	  If unsure, say Y.
+
+config SERIAL_ZS
+	tristate "DECstation Z85C30 serial support"
+	depends on MACH_DECSTATION
+	select SERIAL_CORE
+	default y
+	---help---
+	  Support for the Zilog 85C350 serial communications controller used
+	  for serial ports in newer DECstation systems.  These include the
+	  DECsystem 5900 and all models of the DECstation and DECsystem 5000
+	  systems except from model 200.
+
+	  If unsure, say Y.  To compile this driver as a module, choose M here:
+	  the module will be called zs.
+
+config SERIAL_ZS_CONSOLE
+	bool "Support for console on a DECstation Z85C30 serial port"
+	depends on SERIAL_ZS=y
+	select SERIAL_CORE_CONSOLE
+	default y
+	---help---
+	  If you say Y here, it will be possible to use a serial port as the
+	  system console (the system console is the device which receives all
+	  kernel messages and warnings and which allows logins in single user
+	  mode).
+
+	  Note that the firmware uses ttyS1 as the serial console on the
+	  Maxine and ttyS3 on the others using this driver.
 
 	  If unsure, say Y.
 

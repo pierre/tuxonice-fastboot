@@ -83,7 +83,7 @@ static void mdesc_handle_init(struct mdesc_handle *hp,
 	hp->handle_size = handle_size;
 }
 
-static struct mdesc_handle *mdesc_bootmem_alloc(unsigned int mdesc_size)
+static struct mdesc_handle * __init mdesc_bootmem_alloc(unsigned int mdesc_size)
 {
 	struct mdesc_handle *hp;
 	unsigned int handle_size, alloc_size;
@@ -123,7 +123,7 @@ static void mdesc_bootmem_free(struct mdesc_handle *hp)
 	}
 }
 
-static struct mdesc_mem_ops bootmem_mdesc_memops = {
+static struct mdesc_mem_ops bootmem_mdesc_ops = {
 	.alloc = mdesc_bootmem_alloc,
 	.free  = mdesc_bootmem_free,
 };
@@ -137,7 +137,7 @@ static struct mdesc_handle *mdesc_kmalloc(unsigned int mdesc_size)
 		       sizeof(struct mdesc_hdr) +
 		       mdesc_size);
 
-	base = kmalloc(handle_size + 15, GFP_KERNEL);
+	base = kmalloc(handle_size + 15, GFP_KERNEL | __GFP_NOFAIL);
 	if (base) {
 		struct mdesc_handle *hp;
 		unsigned long addr;
@@ -214,18 +214,131 @@ void mdesc_release(struct mdesc_handle *hp)
 }
 EXPORT_SYMBOL(mdesc_release);
 
-static void do_mdesc_update(struct work_struct *work)
+static DEFINE_MUTEX(mdesc_mutex);
+static struct mdesc_notifier_client *client_list;
+
+void mdesc_register_notifier(struct mdesc_notifier_client *client)
+{
+	u64 node;
+
+	mutex_lock(&mdesc_mutex);
+	client->next = client_list;
+	client_list = client;
+
+	mdesc_for_each_node_by_name(cur_mdesc, node, client->node_name)
+		client->add(cur_mdesc, node);
+
+	mutex_unlock(&mdesc_mutex);
+}
+
+static const u64 *parent_cfg_handle(struct mdesc_handle *hp, u64 node)
+{
+	const u64 *id;
+	u64 a;
+
+	id = NULL;
+	mdesc_for_each_arc(a, hp, node, MDESC_ARC_TYPE_BACK) {
+		u64 target;
+
+		target = mdesc_arc_target(hp, a);
+		id = mdesc_get_property(hp, target,
+					"cfg-handle", NULL);
+		if (id)
+			break;
+	}
+
+	return id;
+}
+
+/* Run 'func' on nodes which are in A but not in B.  */
+static void invoke_on_missing(const char *name,
+			      struct mdesc_handle *a,
+			      struct mdesc_handle *b,
+			      void (*func)(struct mdesc_handle *, u64))
+{
+	u64 node;
+
+	mdesc_for_each_node_by_name(a, node, name) {
+		int found = 0, is_vdc_port = 0;
+		const char *name_prop;
+		const u64 *id;
+		u64 fnode;
+
+		name_prop = mdesc_get_property(a, node, "name", NULL);
+		if (name_prop && !strcmp(name_prop, "vdc-port")) {
+			is_vdc_port = 1;
+			id = parent_cfg_handle(a, node);
+		} else
+			id = mdesc_get_property(a, node, "id", NULL);
+
+		if (!id) {
+			printk(KERN_ERR "MD: Cannot find ID for %s node.\n",
+			       (name_prop ? name_prop : name));
+			continue;
+		}
+
+		mdesc_for_each_node_by_name(b, fnode, name) {
+			const u64 *fid;
+
+			if (is_vdc_port) {
+				name_prop = mdesc_get_property(b, fnode,
+							       "name", NULL);
+				if (!name_prop ||
+				    strcmp(name_prop, "vdc-port"))
+					continue;
+				fid = parent_cfg_handle(b, fnode);
+				if (!fid) {
+					printk(KERN_ERR "MD: Cannot find ID "
+					       "for vdc-port node.\n");
+					continue;
+				}
+			} else
+				fid = mdesc_get_property(b, fnode,
+							 "id", NULL);
+
+			if (*id == *fid) {
+				found = 1;
+				break;
+			}
+		}
+		if (!found)
+			func(a, node);
+	}
+}
+
+static void notify_one(struct mdesc_notifier_client *p,
+		       struct mdesc_handle *old_hp,
+		       struct mdesc_handle *new_hp)
+{
+	invoke_on_missing(p->node_name, old_hp, new_hp, p->remove);
+	invoke_on_missing(p->node_name, new_hp, old_hp, p->add);
+}
+
+static void mdesc_notify_clients(struct mdesc_handle *old_hp,
+				 struct mdesc_handle *new_hp)
+{
+	struct mdesc_notifier_client *p = client_list;
+
+	while (p) {
+		notify_one(p, old_hp, new_hp);
+		p = p->next;
+	}
+}
+
+void mdesc_update(void)
 {
 	unsigned long len, real_len, status;
 	struct mdesc_handle *hp, *orig_hp;
 	unsigned long flags;
+
+	mutex_lock(&mdesc_mutex);
 
 	(void) sun4v_mach_desc(0UL, 0UL, &len);
 
 	hp = mdesc_alloc(len, &kmalloc_mdesc_memops);
 	if (!hp) {
 		printk(KERN_ERR "MD: mdesc alloc fails\n");
-		return;
+		goto out;
 	}
 
 	status = sun4v_mach_desc(__pa(&hp->mdesc), len, &real_len);
@@ -234,25 +347,25 @@ static void do_mdesc_update(struct work_struct *work)
 		       status);
 		atomic_dec(&hp->refcnt);
 		mdesc_free(hp);
-		return;
+		goto out;
 	}
 
 	spin_lock_irqsave(&mdesc_lock, flags);
 	orig_hp = cur_mdesc;
 	cur_mdesc = hp;
+	spin_unlock_irqrestore(&mdesc_lock, flags);
 
+	mdesc_notify_clients(orig_hp, hp);
+
+	spin_lock_irqsave(&mdesc_lock, flags);
 	if (atomic_dec_and_test(&orig_hp->refcnt))
 		mdesc_free(orig_hp);
 	else
 		list_add(&orig_hp->list, &mdesc_zombie_list);
 	spin_unlock_irqrestore(&mdesc_lock, flags);
-}
 
-static DECLARE_WORK(mdesc_update_work, do_mdesc_update);
-
-void mdesc_update(void)
-{
-	schedule_work(&mdesc_update_work);
+out:
+	mutex_unlock(&mdesc_mutex);
 }
 
 static struct mdesc_elem *node_block(struct mdesc_hdr *mdesc)
@@ -278,13 +391,14 @@ u64 mdesc_node_by_name(struct mdesc_handle *hp,
 	u64 last_node = hp->mdesc.node_sz / 16;
 	u64 ret;
 
-	if (from_node == MDESC_NODE_NULL)
-		from_node = 0;
-
-	if (from_node >= last_node)
+	if (from_node == MDESC_NODE_NULL) {
+		ret = from_node = 0;
+	} else if (from_node >= last_node) {
 		return MDESC_NODE_NULL;
+	} else {
+		ret = ep[from_node].d.val;
+	}
 
-	ret = ep[from_node].d.val;
 	while (ret < last_node) {
 		if (ep[ret].tag != MD_NODE)
 			return MDESC_NODE_NULL;
@@ -746,7 +860,7 @@ void __init sun4v_mdesc_init(void)
 
 	printk("MDESC: Size is %lu bytes.\n", len);
 
-	hp = mdesc_alloc(len, &bootmem_mdesc_memops);
+	hp = mdesc_alloc(len, &bootmem_mdesc_ops);
 	if (hp == NULL) {
 		prom_printf("MDESC: alloc of %lu bytes failed.\n", len);
 		prom_halt();

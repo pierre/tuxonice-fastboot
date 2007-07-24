@@ -300,7 +300,10 @@ static const struct super_operations nfs4_sops = {
 };
 #endif
 
-static struct shrinker *acl_shrinker;
+static struct shrinker acl_shrinker = {
+	.shrink		= nfs_access_cache_shrinker,
+	.seeks		= DEFAULT_SEEKS,
+};
 
 /*
  * Register the NFS filesystems
@@ -321,7 +324,7 @@ int __init register_nfs_fs(void)
 	if (ret < 0)
 		goto error_2;
 #endif
-	acl_shrinker = set_shrinker(DEFAULT_SEEKS, nfs_access_cache_shrinker);
+	register_shrinker(&acl_shrinker);
 	return 0;
 
 #ifdef CONFIG_NFS_V4
@@ -339,8 +342,7 @@ error_0:
  */
 void __exit unregister_nfs_fs(void)
 {
-	if (acl_shrinker != NULL)
-		remove_shrinker(acl_shrinker);
+	unregister_shrinker(&acl_shrinker);
 #ifdef CONFIG_NFS_V4
 	unregister_filesystem(&nfs4_fs_type);
 	nfs_unregister_sysctl();
@@ -730,7 +732,7 @@ static int nfs_parse_mount_options(char *raw,
 				return 0;
 			if (option < 0 || option > 65535)
 				return 0;
-			mnt->nfs_server.address.sin_port = htonl(option);
+			mnt->nfs_server.address.sin_port = htons(option);
 			break;
 		case Opt_rsize:
 			if (match_int(args, &mnt->rsize))
@@ -1683,6 +1685,9 @@ static int nfs4_validate_mount_data(struct nfs4_mount_data **options,
 
 		dprintk("MNTPATH: %s\n", *mntpath);
 
+		if (args.client_address == NULL)
+			goto out_no_client_address;
+
 		*ip_addr = args.client_address;
 
 		break;
@@ -1702,6 +1707,10 @@ out_inval_auth:
 
 out_no_address:
 	dfprintk(MOUNT, "NFS4: mount program didn't pass remote address\n");
+	return -EINVAL;
+
+out_no_client_address:
+	dfprintk(MOUNT, "NFS4: mount program didn't pass callback address\n");
 	return -EINVAL;
 }
 

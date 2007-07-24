@@ -624,7 +624,7 @@ extern unsigned long blk_max_low_pfn, blk_max_pfn;
  */
 #define BLK_DEFAULT_SG_TIMEOUT	(60 * HZ)
 
-#ifdef CONFIG_MMU
+#ifdef CONFIG_BOUNCE
 extern int init_emergency_isa_pool(void);
 extern void blk_queue_bounce(request_queue_t *q, struct bio **bio);
 #else
@@ -698,11 +698,6 @@ extern int blk_execute_rq(request_queue_t *, struct gendisk *,
 			  struct request *, int);
 extern void blk_execute_rq_nowait(request_queue_t *, struct gendisk *,
 				  struct request *, int, rq_end_io_fn *);
-extern int blk_fill_sghdr_rq(request_queue_t *, struct request *,
-		      struct sg_io_hdr *, int);
-extern int blk_unmap_sghdr_rq(struct request *, struct sg_io_hdr *);
-extern int blk_complete_sghdr_rq(struct request *, struct sg_io_hdr *,
-			  struct bio *);
 extern int blk_verify_command(unsigned char *, int);
 
 static inline request_queue_t *bdev_get_queue(struct block_device *bdev)

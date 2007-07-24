@@ -293,6 +293,7 @@ static void *slob_page_alloc(struct slob_page *sp, size_t size, int align)
 static void *slob_alloc(size_t size, gfp_t gfp, int align, int node)
 {
 	struct slob_page *sp;
+	struct list_head *prev;
 	slob_t *b = NULL;
 	unsigned long flags;
 
@@ -307,12 +308,22 @@ static void *slob_alloc(size_t size, gfp_t gfp, int align, int node)
 		if (node != -1 && page_to_nid(&sp->page) != node)
 			continue;
 #endif
+		/* Enough room on this page? */
+		if (sp->units < SLOB_UNITS(size))
+			continue;
 
-		if (sp->units >= SLOB_UNITS(size)) {
-			b = slob_page_alloc(sp, size, align);
-			if (b)
-				break;
-		}
+		/* Attempt to alloc */
+		prev = sp->list.prev;
+		b = slob_page_alloc(sp, size, align);
+		if (!b)
+			continue;
+
+		/* Improve fragment distribution and reduce our average
+		 * search time by starting our next search here. (see
+		 * Knuth vol 1, sec 2.5, pg 449) */
+		if (free_slob_pages.next != prev->next)
+			list_move_tail(&free_slob_pages, prev->next);
+		break;
 	}
 	spin_unlock_irqrestore(&slob_lock, flags);
 
@@ -334,6 +345,8 @@ static void *slob_alloc(size_t size, gfp_t gfp, int align, int node)
 		BUG_ON(!b);
 		spin_unlock_irqrestore(&slob_lock, flags);
 	}
+	if (unlikely((gfp & __GFP_ZERO) && b))
+		memset(b, 0, size);
 	return b;
 }
 
@@ -347,7 +360,7 @@ static void slob_free(void *block, int size)
 	slobidx_t units;
 	unsigned long flags;
 
-	if (!block)
+	if (ZERO_OR_NULL_PTR(block))
 		return;
 	BUG_ON(!size);
 
@@ -424,10 +437,13 @@ out:
 
 void *__kmalloc_node(size_t size, gfp_t gfp, int node)
 {
+	unsigned int *m;
 	int align = max(ARCH_KMALLOC_MINALIGN, ARCH_SLAB_MINALIGN);
 
 	if (size < PAGE_SIZE - align) {
-		unsigned int *m;
+		if (!size)
+			return ZERO_SIZE_PTR;
+
 		m = slob_alloc(size + align, gfp, align, node);
 		if (m)
 			*m = size;
@@ -446,44 +462,11 @@ void *__kmalloc_node(size_t size, gfp_t gfp, int node)
 }
 EXPORT_SYMBOL(__kmalloc_node);
 
-/**
- * krealloc - reallocate memory. The contents will remain unchanged.
- *
- * @p: object to reallocate memory for.
- * @new_size: how many bytes of memory are required.
- * @flags: the type of memory to allocate.
- *
- * The contents of the object pointed to are preserved up to the
- * lesser of the new and old sizes.  If @p is %NULL, krealloc()
- * behaves exactly like kmalloc().  If @size is 0 and @p is not a
- * %NULL pointer, the object pointed to is freed.
- */
-void *krealloc(const void *p, size_t new_size, gfp_t flags)
-{
-	void *ret;
-
-	if (unlikely(!p))
-		return kmalloc_track_caller(new_size, flags);
-
-	if (unlikely(!new_size)) {
-		kfree(p);
-		return NULL;
-	}
-
-	ret = kmalloc_track_caller(new_size, flags);
-	if (ret) {
-		memcpy(ret, p, min(new_size, ksize(p)));
-		kfree(p);
-	}
-	return ret;
-}
-EXPORT_SYMBOL(krealloc);
-
 void kfree(const void *block)
 {
 	struct slob_page *sp;
 
-	if (!block)
+	if (ZERO_OR_NULL_PTR(block))
 		return;
 
 	sp = (struct slob_page *)virt_to_page(block);
@@ -501,7 +484,7 @@ size_t ksize(const void *block)
 {
 	struct slob_page *sp;
 
-	if (!block)
+	if (ZERO_OR_NULL_PTR(block))
 		return 0;
 
 	sp = (struct slob_page *)virt_to_page(block);
@@ -520,8 +503,7 @@ struct kmem_cache {
 
 struct kmem_cache *kmem_cache_create(const char *name, size_t size,
 	size_t align, unsigned long flags,
-	void (*ctor)(void*, struct kmem_cache *, unsigned long),
-	void (*dtor)(void*, struct kmem_cache *, unsigned long))
+	void (*ctor)(void*, struct kmem_cache *, unsigned long))
 {
 	struct kmem_cache *c;
 
@@ -570,16 +552,6 @@ void *kmem_cache_alloc_node(struct kmem_cache *c, gfp_t flags, int node)
 	return b;
 }
 EXPORT_SYMBOL(kmem_cache_alloc_node);
-
-void *kmem_cache_zalloc(struct kmem_cache *c, gfp_t flags)
-{
-	void *ret = kmem_cache_alloc(c, flags);
-	if (ret)
-		memset(ret, 0, c->size);
-
-	return ret;
-}
-EXPORT_SYMBOL(kmem_cache_zalloc);
 
 static void __kmem_cache_free(void *b, int size)
 {

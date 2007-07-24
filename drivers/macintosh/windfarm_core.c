@@ -80,7 +80,8 @@ int wf_critical_overtemp(void)
 				"PATH=/sbin:/usr/sbin:/bin:/usr/bin",
 				NULL };
 
-	return call_usermodehelper(critical_overtemp_path, argv, envp, 0);
+	return call_usermodehelper(critical_overtemp_path,
+				   argv, envp, UMH_WAIT_EXEC);
 }
 EXPORT_SYMBOL_GPL(wf_critical_overtemp);
 
@@ -92,6 +93,7 @@ static int wf_thread_func(void *data)
 
 	DBG("wf: thread started\n");
 
+	set_freezable();
 	while(!kthread_should_stop()) {
 		if (time_after_eq(jiffies, next)) {
 			wf_notify(WF_EVENT_TICK, NULL);

@@ -174,3 +174,5 @@ asmlinkage long sys_ioctl(unsigned int fd, unsigned int cmd, unsigned long arg)
  out:
 	return error;
 }
+
+EXPORT_SYMBOL(sys_ioctl);

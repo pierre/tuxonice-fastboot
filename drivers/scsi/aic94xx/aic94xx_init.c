@@ -81,6 +81,9 @@ static struct scsi_host_template aic94xx_sht = {
 	.use_clustering		= ENABLE_CLUSTERING,
 	.eh_device_reset_handler	= sas_eh_device_reset_handler,
 	.eh_bus_reset_handler	= sas_eh_bus_reset_handler,
+	.slave_alloc		= sas_slave_alloc,
+	.target_destroy		= sas_target_destroy,
+	.ioctl			= sas_ioctl,
 };
 
 static int __devinit asd_map_memio(struct asd_ha_struct *asd_ha)
@@ -462,7 +465,7 @@ static int asd_create_global_caches(void)
 					    sizeof(struct asd_dma_tok),
 					    0,
 					    SLAB_HWCACHE_ALIGN,
-					    NULL, NULL);
+					    NULL);
 		if (!asd_dma_token_cache) {
 			asd_printk("couldn't create dma token cache\n");
 			return -ENOMEM;
@@ -474,7 +477,7 @@ static int asd_create_global_caches(void)
 						   sizeof(struct asd_ascb),
 						   0,
 						   SLAB_HWCACHE_ALIGN,
-						   NULL, NULL);
+						   NULL);
 		if (!asd_ascb_cache) {
 			asd_printk("couldn't create ascb cache\n");
 			goto Err;

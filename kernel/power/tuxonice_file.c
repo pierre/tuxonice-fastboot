@@ -75,8 +75,6 @@ struct toi_file_header {
 	unsigned long first_header_block;
 };
 
-extern char *__initdata root_device_name;
-
 /* Header Page Information */
 static int header_pages_allocated;
 
@@ -565,42 +563,6 @@ static int toi_file_write_header_cleanup(void)
 
 /* HEADER READING */
 
-#ifdef CONFIG_DEVFS_FS
-int  create_dev(char *name, dev_t dev, char *devfs_name);
-#else
-static int create_dev(char *name, dev_t dev, char *devfs_name)
-{
-	sys_unlink(name);
-	return sys_mknod(name, S_IFBLK|0600, new_encode_dev(dev));
-}
-#endif
-
-static int rd_init(void)
-{
-	toi_writer_buffer_posn = 0;
-
-	create_dev("/dev/root", ROOT_DEV, root_device_name);
-	create_dev("/dev/ram", MKDEV(RAMDISK_MAJOR, 0), NULL);
-
-	toi_read_fd = sys_open("/dev/root", O_RDONLY, 0);
-	if (toi_read_fd < 0)
-		goto out;
-	
-	sys_read(toi_read_fd, toi_writer_buffer, BLOCK_SIZE);
-
-	memcpy(&toi_writer_posn_save,
-		toi_writer_buffer + toi_writer_buffer_posn,
-		sizeof(toi_writer_posn_save));
-	
-	toi_writer_buffer_posn += sizeof(toi_writer_posn_save);
-
-	return 0;
-out:
-	sys_unlink("/dev/ram");
-	sys_unlink("/dev/root");
-	return -EIO;
-}
-
 static int file_init(void)
 {
 	toi_writer_buffer_posn = 0;
@@ -616,8 +578,6 @@ static int file_init(void)
 /*
  * read_header_init()
  * 
- * Ramdisk support based heavily on init/do_mounts_rd.c
- *
  * Description:
  * 1. Attempt to read the device specified with resume=.
  * 2. Check the contents of the header for our signature.
@@ -637,10 +597,7 @@ static int toi_file_read_header_init(void)
 	int result;
 	struct block_device *tmp;
 
-	if (test_toi_state(TOI_TRY_RESUME_RD))
-		result = rd_init();
-	else
-		result = file_init();
+	result = file_init();
 	
 	if (result) {
 		printk("FileAllocator read header init: Failed to initialise "

@@ -30,6 +30,7 @@
 #include "tuxonice_modules.h"
 #include "tuxonice_builtin.h"
 
+extern struct hibernation_ops *hibernation_ops;
 EXPORT_SYMBOL_GPL(hibernation_ops);
 
 #ifdef CONFIG_TOI_CORE_EXPORTS
@@ -109,11 +110,7 @@ EXPORT_SYMBOL_GPL(get_swap_info_struct);
 
 #ifdef CONFIG_TOI_FILE_EXPORTS
 /* TuxOnice file allocator specific support */
-extern char * __initdata root_device_name;
-
 EXPORT_SYMBOL_GPL(resume_file);
-EXPORT_SYMBOL_GPL(ROOT_DEV);
-EXPORT_SYMBOL_GPL(root_device_name);
 EXPORT_SYMBOL_GPL(sys_unlink);
 EXPORT_SYMBOL_GPL(sys_mknod);
 #endif

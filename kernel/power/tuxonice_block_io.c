@@ -789,12 +789,8 @@ static int toi_rw_buffer(int writing, char *buffer, int buffer_size)
 		toi_header_bytes_used += capacity;
 
 		if (!writing) {
-			if (test_toi_state(TOI_TRY_RESUME_RD))
-				sys_read(toi_read_fd,
-					toi_writer_buffer, BLOCK_SIZE);
-			else
-				if (toi_bio_read_page_with_readahead())
-					return -EIO;
+			if (toi_bio_read_page_with_readahead())
+				return -EIO;
 		} else if (toi_bio_rw_page(WRITE,
 					virt_to_page(toi_writer_buffer),
 					-1))

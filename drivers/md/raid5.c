@@ -493,12 +493,12 @@ async_copy_data(int frombio, struct bio *bio, struct page *page,
 			if (frombio)
 				tx = async_memcpy(page, bio_page, page_offset,
 					b_offset, clen,
-					ASYNC_TX_DEP_ACK | ASYNC_TX_KMAP_SRC,
+					ASYNC_TX_DEP_ACK,
 					tx, NULL, NULL);
 			else
 				tx = async_memcpy(bio_page, page, b_offset,
 					page_offset, clen,
-					ASYNC_TX_DEP_ACK | ASYNC_TX_KMAP_DST,
+					ASYNC_TX_DEP_ACK,
 					tx, NULL, NULL);
 		}
 		if (clen < len) /* hit end of page */
@@ -951,7 +951,7 @@ static int grow_stripes(raid5_conf_t *conf, int num)
 	conf->active_name = 0;
 	sc = kmem_cache_create(conf->cache_name[conf->active_name],
 			       sizeof(struct stripe_head)+(devs-1)*sizeof(struct r5dev),
-			       0, 0, NULL, NULL);
+			       0, 0, NULL);
 	if (!sc)
 		return 1;
 	conf->slab_cache = sc;
@@ -1003,7 +1003,7 @@ static int resize_stripes(raid5_conf_t *conf, int newsize)
 	/* Step 1 */
 	sc = kmem_cache_create(conf->cache_name[1-conf->active_name],
 			       sizeof(struct stripe_head)+(newsize-1)*sizeof(struct r5dev),
-			       0, 0, NULL, NULL);
+			       0, 0, NULL);
 	if (!sc)
 		return -ENOMEM;
 

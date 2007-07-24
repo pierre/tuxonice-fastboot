@@ -13,7 +13,6 @@
 #include <linux/errno.h>
 #include <linux/sunrpc/clnt.h>
 #include <linux/spinlock.h>
-#include <linux/smp_lock.h>
 
 #ifdef RPC_DEBUG
 # define RPCDBG_FACILITY	RPCDBG_AUTH
@@ -476,17 +475,13 @@ rpcauth_wrap_req(struct rpc_task *task, kxdrproc_t encode, void *rqstp,
 		__be32 *data, void *obj)
 {
 	struct rpc_cred *cred = task->tk_msg.rpc_cred;
-	int ret;
 
 	dprintk("RPC: %5u using %s cred %p to wrap rpc data\n",
 			task->tk_pid, cred->cr_ops->cr_name, cred);
 	if (cred->cr_ops->crwrap_req)
 		return cred->cr_ops->crwrap_req(task, encode, rqstp, data, obj);
 	/* By default, we encode the arguments normally. */
-	lock_kernel();
-	ret = encode(rqstp, data, obj);
-	unlock_kernel();
-	return ret;
+	return rpc_call_xdrproc(encode, rqstp, data, obj);
 }
 
 int
@@ -494,7 +489,6 @@ rpcauth_unwrap_resp(struct rpc_task *task, kxdrproc_t decode, void *rqstp,
 		__be32 *data, void *obj)
 {
 	struct rpc_cred *cred = task->tk_msg.rpc_cred;
-	int ret;
 
 	dprintk("RPC: %5u using %s cred %p to unwrap rpc data\n",
 			task->tk_pid, cred->cr_ops->cr_name, cred);
@@ -502,10 +496,7 @@ rpcauth_unwrap_resp(struct rpc_task *task, kxdrproc_t decode, void *rqstp,
 		return cred->cr_ops->crunwrap_resp(task, decode, rqstp,
 						   data, obj);
 	/* By default, we decode the arguments normally. */
-	lock_kernel();
-	ret = decode(rqstp, data, obj);
-	unlock_kernel();
-	return ret;
+	return rpc_call_xdrproc(decode, rqstp, data, obj);
 }
 
 int
@@ -543,17 +534,18 @@ rpcauth_uptodatecred(struct rpc_task *task)
 		test_bit(RPCAUTH_CRED_UPTODATE, &cred->cr_flags) != 0;
 }
 
-
-static struct shrinker *rpc_cred_shrinker;
+static struct shrinker rpc_cred_shrinker = {
+	.shrink = rpcauth_cache_shrinker,
+	.seeks = DEFAULT_SEEKS,
+};
 
 void __init rpcauth_init_module(void)
 {
 	rpc_init_authunix();
-	rpc_cred_shrinker = set_shrinker(DEFAULT_SEEKS, rpcauth_cache_shrinker);
+	register_shrinker(&rpc_cred_shrinker);
 }
 
 void __exit rpcauth_remove_module(void)
 {
-	if (rpc_cred_shrinker != NULL)
-		remove_shrinker(rpc_cred_shrinker);
+	unregister_shrinker(&rpc_cred_shrinker);
 }
