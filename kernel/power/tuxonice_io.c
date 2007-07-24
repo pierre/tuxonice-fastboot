@@ -387,7 +387,7 @@ static int worker_rw_loop(void *data)
 		if (io_write) {
 			struct page *page;
 
-			pfn = get_next_bit_on(io_map, pfn);
+			pfn = get_next_bit_on(&io_map, pfn);
 
 			/* Another thread could have beaten us to it. */
 			if (pfn == max_pfn + 1) {
@@ -409,7 +409,7 @@ static int worker_rw_loop(void *data)
 			 */
 			clear_dynpageflag(&io_map, pfn_to_page(pfn));
 			if (io_pageset == 1) {
-				other_pfn = get_next_bit_on(pageset1_map, other_pfn);
+				other_pfn = get_next_bit_on(&pageset1_map, other_pfn);
 				write_pfn = other_pfn;
 			}
 			page = pfn_to_page(pfn);
@@ -561,7 +561,7 @@ void start_other_threads(void)
  *
  * The main I/O loop for reading or writing pages.
  */
-static int do_rw_loop(int write, int finish_at, dyn_pageflags_t *pageflags,
+static int do_rw_loop(int write, int finish_at, struct dyn_pageflags *pageflags,
 		int base, int barmax, int pageset)
 {
 	int index = 0, cpu;
@@ -587,19 +587,19 @@ static int do_rw_loop(int write, int finish_at, dyn_pageflags_t *pageflags,
 	}
 
 	/* Ensure all bits clear */
-	pfn = get_next_bit_on(io_map, max_pfn + 1);
+	pfn = get_next_bit_on(&io_map, max_pfn + 1);
 
 	while (pfn < max_pfn + 1) {
 		clear_dynpageflag(&io_map, pfn_to_page(pfn));
-		pfn = get_next_bit_on(io_map, pfn);
+		pfn = get_next_bit_on(&io_map, pfn);
 	}
 
 	/* Set the bits for the pages to write */
-	pfn = get_next_bit_on(*pageflags, max_pfn + 1);
+	pfn = get_next_bit_on(pageflags, max_pfn + 1);
 
 	while (pfn < max_pfn + 1 && index < finish_at) {
 		set_dynpageflag(&io_map, pfn_to_page(pfn));
-		pfn = get_next_bit_on(*pageflags, pfn);
+		pfn = get_next_bit_on(pageflags, pfn);
 		index++;
 	}
 
@@ -635,7 +635,7 @@ static int do_rw_loop(int write, int finish_at, dyn_pageflags_t *pageflags,
 	if (io_write && test_result_state(TOI_ABORTED))
 		io_result = 1;
 	else /* All I/O done? */
-		BUG_ON(get_next_bit_on(io_map, max_pfn + 1) != max_pfn + 1);
+		BUG_ON(get_next_bit_on(&io_map, max_pfn + 1) != max_pfn + 1);
 
 	return io_result;
 }
@@ -652,7 +652,7 @@ int write_pageset(struct pagedir *pagedir)
 	int finish_at, base = 0, start_time, end_time;
 	int barmax = pagedir1.size + pagedir2.size;
 	long error = 0;
-	dyn_pageflags_t *pageflags;
+	struct dyn_pageflags *pageflags;
 
 	/* 
 	 * Even if there is nothing to read or write, the allocator
@@ -717,7 +717,7 @@ static int read_pageset(struct pagedir *pagedir, int overwrittenpagesonly)
 	int result = 0, base = 0, start_time, end_time;
 	int finish_at = pagedir->size;
 	int barmax = pagedir1.size + pagedir2.size;
-	dyn_pageflags_t *pageflags;
+	struct dyn_pageflags *pageflags;
 
 	if (pagedir->id == 1) {
 		toi_prepare_status(CLEAR_BAR,
@@ -997,7 +997,7 @@ int write_image_header(void)
 		goto write_image_header_abort;
 	}
 
-	save_dyn_pageflags(pageset1_map);
+	save_dyn_pageflags(&pageset1_map);
 
 	/* Flush data and let allocator cleanup */
 	if (toiActiveAllocator->write_header_cleanup()) {
@@ -1192,12 +1192,12 @@ static int __read_pageset1(void)
 	 * use for the data to be restored.
 	 */
 
-	if (allocate_dyn_pageflags(&pageset1_map) ||
-	    allocate_dyn_pageflags(&pageset1_copy_map) ||
-	    allocate_dyn_pageflags(&io_map))
+	if (allocate_dyn_pageflags(&pageset1_map, 0) ||
+	    allocate_dyn_pageflags(&pageset1_copy_map, 0) ||
+	    allocate_dyn_pageflags(&io_map, 0))
 		goto out_reset_console;
 
-	if (load_dyn_pageflags(pageset1_map))
+	if (load_dyn_pageflags(&pageset1_map))
 		goto out_reset_console;
 
 	/* Clean up after reading the header */

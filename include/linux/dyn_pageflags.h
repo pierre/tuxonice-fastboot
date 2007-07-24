@@ -1,7 +1,7 @@
 /*
  * include/linux/dyn_pageflags.h
  *
- * Copyright (C) 2004-2006 Nigel Cunningham <nigel@suspend2.net>
+ * Copyright (C) 2004-2007 Nigel Cunningham <nigel@suspend2.net>
  *
  * This file is released under the GPLv2.
  *
@@ -15,49 +15,39 @@
 
 #include <linux/mm.h>
 
-/* [pg_dat][zone][page_num] */
-typedef unsigned long **** dyn_pageflags_t;
+struct dyn_pageflags {
+	unsigned long ****bitmap; /* [pg_dat][zone][page_num] */
+	int sparse, initialised;
+	struct list_head list;
+	spinlock_t struct_lock;
+};
 
-#if BITS_PER_LONG == 32
-#define UL_SHIFT 5
-#else 
-#if BITS_PER_LONG == 64
-#define UL_SHIFT 6
-#else
-#error Bits per long not 32 or 64?
-#endif
-#endif
+#define DYN_PAGEFLAGS_INIT(name) { \
+	.list = LIST_HEAD_INIT(name.list), \
+	.struct_lock = __SPIN_LOCK_UNLOCKED(name.lock) \
+}
 
-#define BIT_NUM_MASK (sizeof(unsigned long) * 8 - 1)
-#define PAGE_NUM_MASK (~((1 << (PAGE_SHIFT + 3)) - 1))
-#define UL_NUM_MASK (~(BIT_NUM_MASK | PAGE_NUM_MASK))
-
-/*
- * PAGENUMBER gives the index of the page within the zone.
- * PAGEINDEX gives the index of the unsigned long within that page.
- * PAGEBIT gives the index of the bit within the unsigned long.
- */
-#define BITS_PER_PAGE (PAGE_SIZE << 3)
-#define PAGENUMBER(zone_offset) ((int) (zone_offset >> (PAGE_SHIFT + 3)))
-#define PAGEINDEX(zone_offset) ((int) ((zone_offset & UL_NUM_MASK) >> UL_SHIFT))
-#define PAGEBIT(zone_offset) ((int) (zone_offset & BIT_NUM_MASK))
-
-#define PAGE_UL_PTR(bitmap, node, zone_num, zone_pfn) \
-       ((bitmap[node][zone_num][PAGENUMBER(zone_pfn)])+PAGEINDEX(zone_pfn))
+#define DECLARE_DYN_PAGEFLAGS(name) \
+	struct dyn_pageflags name = DYN_PAGEFLAGS_INIT(name);
 
 #define BITMAP_FOR_EACH_SET(bitmap, counter) \
 	for (counter = get_next_bit_on(bitmap, max_pfn + 1); counter <= max_pfn; \
 		counter = get_next_bit_on(bitmap, counter))
 
-extern void clear_dyn_pageflags(dyn_pageflags_t pagemap);
-extern int allocate_dyn_pageflags(dyn_pageflags_t *pagemap);
-extern void free_dyn_pageflags(dyn_pageflags_t *pagemap);
-extern unsigned long get_next_bit_on(dyn_pageflags_t bitmap, unsigned long counter);
+extern void clear_dyn_pageflags(struct dyn_pageflags *pagemap);
+extern int allocate_dyn_pageflags(struct dyn_pageflags *pagemap, int sparse);
+extern void free_dyn_pageflags(struct dyn_pageflags *pagemap);
+extern unsigned long get_next_bit_on(struct dyn_pageflags *bitmap, unsigned long counter);
 
-extern int test_dynpageflag(dyn_pageflags_t *bitmap, struct page *page);
-extern void set_dynpageflag(dyn_pageflags_t *bitmap, struct page *page);
-extern void clear_dynpageflag(dyn_pageflags_t *bitmap, struct page *page);
-#endif
+extern int test_dynpageflag(struct dyn_pageflags *bitmap, struct page *page);
+/*
+ * In sparse bitmaps, setting a flag can fail (we can fail to allocate
+ * the page to store the bit. If this happens, we will BUG(). If you don't
+ * want this behaviour, don't allocate sparse pageflags.
+ */
+extern void set_dynpageflag(struct dyn_pageflags *bitmap, struct page *page);
+extern void clear_dynpageflag(struct dyn_pageflags *bitmap, struct page *page);
+extern void dump_pagemap(struct dyn_pageflags *pagemap);
 
 /* 
  * With the above macros defined, you can do...
@@ -66,3 +56,10 @@ extern void clear_dynpageflag(dyn_pageflags_t *bitmap, struct page *page);
  * #define ClearPagePageset1(page) (clear_dynpageflag(&pageset1_map, page))
  */
 
+extern void __init dyn_pageflags_init(void);
+extern void __init dyn_pageflags_use_kzalloc(void);
+
+#ifdef CONFIG_MEMORY_HOTPLUG_SPARSE
+extern void dyn_pageflags_hotplug(struct zone *zone);
+#endif
+#endif

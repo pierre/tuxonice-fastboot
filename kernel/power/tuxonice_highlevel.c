@@ -213,13 +213,13 @@ static void mark_nosave_pages(void)
  */
 static int allocate_bitmaps(void)
 {
-	if (allocate_dyn_pageflags(&pageset1_map) ||
-	    allocate_dyn_pageflags(&pageset1_copy_map) ||
-	    allocate_dyn_pageflags(&pageset2_map) ||
-	    allocate_dyn_pageflags(&io_map) ||
-	    allocate_dyn_pageflags(&nosave_map) ||
-	    allocate_dyn_pageflags(&free_map) ||
-	    allocate_dyn_pageflags(&page_resave_map))
+	if (allocate_dyn_pageflags(&pageset1_map, 0) ||
+	    allocate_dyn_pageflags(&pageset1_copy_map, 0) ||
+	    allocate_dyn_pageflags(&pageset2_map, 0) ||
+	    allocate_dyn_pageflags(&io_map, 0) ||
+	    allocate_dyn_pageflags(&nosave_map, 0) ||
+	    allocate_dyn_pageflags(&free_map, 0) ||
+	    allocate_dyn_pageflags(&page_resave_map, 0))
 		return 1;
 
 	return 0;
@@ -769,22 +769,26 @@ static int do_load_atomic_copy(void)
  */
 static void prepare_restore_load_alt_image(int prepare)
 {
-	static dyn_pageflags_t pageset1_map_save, pageset1_copy_map_save;
+	static struct dyn_pageflags pageset1_map_save, pageset1_copy_map_save;
 
 	if (prepare) {
-		pageset1_map_save = pageset1_map;
-		pageset1_map = NULL;
-		pageset1_copy_map_save = pageset1_copy_map;
-		pageset1_copy_map = NULL;
+		memcpy(&pageset1_map_save, &pageset1_map,
+				sizeof(struct dyn_pageflags));
+		memset(&pageset1_map, 0, sizeof(struct dyn_pageflags));
+		memcpy(&pageset1_copy_map_save, &pageset1_copy_map,
+			sizeof(struct dyn_pageflags));
+		memset(&pageset1_copy_map, 0, sizeof(struct dyn_pageflags));
 		set_toi_state(TOI_LOADING_ALT_IMAGE);
 		toi_reset_alt_image_pageset2_pfn();
 	} else {
-		if (pageset1_map)
+		if (pageset1_map.bitmap)
 			free_dyn_pageflags(&pageset1_map);
-		pageset1_map = pageset1_map_save;
-		if (pageset1_copy_map)
+		memcpy(&pageset1_map, &pageset1_map_save,
+			sizeof(struct dyn_pageflags));
+		if (pageset1_copy_map.bitmap)
 			free_dyn_pageflags(&pageset1_copy_map);
-		pageset1_copy_map = pageset1_copy_map_save;
+		memcpy(&pageset1_copy_map, &pageset1_copy_map_save,
+			sizeof(struct dyn_pageflags));
 		clear_toi_state(TOI_NOW_RESUMING);
 		clear_toi_state(TOI_LOADING_ALT_IMAGE);
 	}

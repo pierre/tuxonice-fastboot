@@ -18,13 +18,13 @@
 #include <linux/dyn_pageflags.h>
 #include <linux/suspend.h>
 
-extern dyn_pageflags_t pageset1_map;
-extern dyn_pageflags_t pageset1_copy_map;
-extern dyn_pageflags_t pageset2_map;
-extern dyn_pageflags_t page_resave_map;
-extern dyn_pageflags_t io_map;
-extern dyn_pageflags_t nosave_map;
-extern dyn_pageflags_t free_map;
+extern struct dyn_pageflags pageset1_map;
+extern struct dyn_pageflags pageset1_copy_map;
+extern struct dyn_pageflags pageset2_map;
+extern struct dyn_pageflags page_resave_map;
+extern struct dyn_pageflags io_map;
+extern struct dyn_pageflags nosave_map;
+extern struct dyn_pageflags free_map;
 
 #define PagePageset1(page) (test_dynpageflag(&pageset1_map, page))
 #define SetPagePageset1(page) (set_dynpageflag(&pageset1_map, page))
@@ -42,18 +42,18 @@ extern dyn_pageflags_t free_map;
 #define SetPageWasRW(page) (set_dynpageflag(&pageset2_map, page))
 #define ClearPageWasRW(page) (clear_dynpageflag(&pageset2_map, page))
 
-#define PageResave(page) (page_resave_map ? test_dynpageflag(&page_resave_map, page) : 0)
+#define PageResave(page) (page_resave_map.bitmap ? test_dynpageflag(&page_resave_map, page) : 0)
 #define SetPageResave(page) (set_dynpageflag(&page_resave_map, page))
 #define ClearPageResave(page) (clear_dynpageflag(&page_resave_map, page))
 
-#define PageNosave(page) (nosave_map ? test_dynpageflag(&nosave_map, page) : 0)
+#define PageNosave(page) (nosave_map.bitmap ? test_dynpageflag(&nosave_map, page) : 0)
 #define SetPageNosave(page) (set_dynpageflag(&nosave_map, page))
 #define ClearPageNosave(page) (clear_dynpageflag(&nosave_map, page))
 
-#define PageNosaveFree(page) (free_map ? test_dynpageflag(&free_map, page) : 0)
+#define PageNosaveFree(page) (free_map.bitmap ? test_dynpageflag(&free_map, page) : 0)
 #define SetPageNosaveFree(page) (set_dynpageflag(&free_map, page))
 #define ClearPageNosaveFree(page) (clear_dynpageflag(&free_map, page))
 
-extern void save_dyn_pageflags(dyn_pageflags_t pagemap);
-extern int load_dyn_pageflags(dyn_pageflags_t pagemap);
+extern void save_dyn_pageflags(struct dyn_pageflags *pagemap);
+extern int load_dyn_pageflags(struct dyn_pageflags *pagemap);
 extern int toi_pageflags_space_needed(void);

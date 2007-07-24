@@ -55,6 +55,7 @@
 #include <linux/pid_namespace.h>
 #include <linux/device.h>
 #include <linux/kthread.h>
+#include <linux/dyn_pageflags.h>
 
 #include <asm/io.h>
 #include <asm/bugs.h>
@@ -577,6 +578,7 @@ asmlinkage void __init start_kernel(void)
 	softirq_init();
 	timekeeping_init();
 	time_init();
+	dyn_pageflags_init();
 	profile_init();
 	if (!irqs_disabled())
 		printk("start_kernel(): bug: interrupts were enabled early\n");
@@ -613,6 +615,7 @@ asmlinkage void __init start_kernel(void)
 	cpuset_init_early();
 	mem_init();
 	kmem_cache_init();
+	dyn_pageflags_use_kzalloc();
 	setup_per_cpu_pageset();
 	numa_policy_init();
 	if (late_time_init)

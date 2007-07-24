@@ -190,7 +190,7 @@ static void toi_mark_pages_for_pageset2(void)
 	if (test_action_state(TOI_NO_PAGESET2))
 		return;
 
-	clear_dyn_pageflags(pageset2_map);
+	clear_dyn_pageflags(&pageset2_map);
 	
 	if (test_action_state(TOI_PAGESET2_FULL))
 		pageset2_full();
@@ -617,7 +617,7 @@ static void flag_image_pages(int atomic_copy)
 
 	num_nosave = 0;
 
-	clear_dyn_pageflags(pageset1_map);
+	clear_dyn_pageflags(&pageset1_map);
 
 	generate_free_page_map();
 
@@ -691,10 +691,10 @@ static void flag_image_pages(int atomic_copy)
 
 void toi_recalculate_image_contents(int atomic_copy) 
 {
-	clear_dyn_pageflags(pageset1_map);
+	clear_dyn_pageflags(&pageset1_map);
 	if (!atomic_copy) {
 		int pfn;
-		BITMAP_FOR_EACH_SET(pageset2_map, pfn)
+		BITMAP_FOR_EACH_SET(&pageset2_map, pfn)
 			ClearPagePageset1Copy(pfn_to_page(pfn));
 		/* Need to call this before getting pageset1_size! */
 		toi_mark_pages_for_pageset2();

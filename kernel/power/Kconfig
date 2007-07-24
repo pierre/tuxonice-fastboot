@@ -147,7 +147,6 @@ config PM_STD_PARTITION
 menuconfig TOI_CORE
 	tristate "Enhanced Hibernation (TuxOnIce)"
 	depends on SOFTWARE_SUSPEND
-	select DYN_PAGEFLAGS
 	default y
 	---help---
 	  TuxOnIce is the 'new and improved' suspend support.

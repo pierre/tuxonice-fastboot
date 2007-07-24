@@ -209,8 +209,8 @@ void toi_copy_pageset1(void)
 	int i;
 	unsigned long source_index, dest_index;
 
-	source_index = get_next_bit_on(pageset1_map, max_pfn + 1);
-	dest_index = get_next_bit_on(pageset1_copy_map, max_pfn + 1);
+	source_index = get_next_bit_on(&pageset1_map, max_pfn + 1);
+	dest_index = get_next_bit_on(&pageset1_copy_map, max_pfn + 1);
 
 	for (i = 0; i < pagedir1.size; i++) {
 		unsigned long *origvirt, *copyvirt;
@@ -244,8 +244,8 @@ void toi_copy_pageset1(void)
 		if (PageHighMem(copypage))
 			kunmap_atomic(copyvirt, KM_USER1);
 		
-		source_index = get_next_bit_on(pageset1_map, source_index);
-		dest_index = get_next_bit_on(pageset1_copy_map, dest_index);
+		source_index = get_next_bit_on(&pageset1_map, source_index);
+		dest_index = get_next_bit_on(&pageset1_copy_map, dest_index);
 	}
 }
 

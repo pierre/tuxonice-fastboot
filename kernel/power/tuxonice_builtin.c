@@ -42,6 +42,7 @@ EXPORT_SYMBOL_GPL(set_dynpageflag);
 EXPORT_SYMBOL_GPL(get_next_bit_on);
 EXPORT_SYMBOL_GPL(allocate_dyn_pageflags);
 EXPORT_SYMBOL_GPL(clear_dyn_pageflags);
+EXPORT_SYMBOL_GPL(dump_pagemap);
 
 #ifdef CONFIG_X86_64
 EXPORT_SYMBOL_GPL(restore_processor_state);
@@ -127,8 +128,8 @@ EXPORT_SYMBOL_GPL(snprintf_used);
 struct toi_core_fns *toi_core_fns;
 EXPORT_SYMBOL_GPL(toi_core_fns);
 
-dyn_pageflags_t pageset1_map;
-dyn_pageflags_t pageset1_copy_map;
+struct dyn_pageflags pageset1_map;
+struct dyn_pageflags pageset1_copy_map;
 EXPORT_SYMBOL_GPL(pageset1_map);
 EXPORT_SYMBOL_GPL(pageset1_copy_map);
 

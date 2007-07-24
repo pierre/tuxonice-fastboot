@@ -74,6 +74,8 @@ static int __add_zone(struct zone *zone, unsigned long phys_start_pfn)
 	}
 	memmap_init_zone(nr_pages, nid, zone_type,
 			 phys_start_pfn, MEMMAP_HOTPLUG);
+
+	dyn_pageflags_hotplug(zone);
 	return 0;
 }
 

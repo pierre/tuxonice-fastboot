@@ -20,11 +20,8 @@
 #include "tuxonice_pagedir.h"
 #include "tuxonice.h"
 
-dyn_pageflags_t pageset2_map;
-dyn_pageflags_t page_resave_map;
-dyn_pageflags_t io_map;
-dyn_pageflags_t nosave_map;
-dyn_pageflags_t free_map;
+struct dyn_pageflags pageset2_map, page_resave_map, io_map, nosave_map,
+		     free_map;
 
 static int pages_for_zone(struct zone *zone)
 {
@@ -48,16 +45,16 @@ int toi_pageflags_space_needed(void)
 /* save_dyn_pageflags
  *
  * Description: Save a set of pageflags.
- * Arguments:   dyn_pageflags_t *: Pointer to the bitmap being saved.
+ * Arguments:   struct dyn_pageflags *: Pointer to the bitmap being saved.
  */
 
-void save_dyn_pageflags(dyn_pageflags_t pagemap)
+void save_dyn_pageflags(struct dyn_pageflags *pagemap)
 {
 	int i, zone_idx, size, node = 0;
 	struct zone *zone;
 	struct pglist_data *pgdat;
 
-	if (!*pagemap)
+	if (!pagemap)
 		return;
 
 	for_each_online_pgdat(pgdat) {
@@ -75,10 +72,16 @@ void save_dyn_pageflags(dyn_pageflags_t pagemap)
 			toiActiveAllocator->rw_header_chunk(WRITE, NULL,
 					(char *) &size, sizeof(int));
 
-			for (i = 0; i < size; i++)
+			for (i = 0; i < size; i++) {
+				if (!pagemap->bitmap[node][zone_idx][i+2]) {
+					printk("Sparse pagemap?\n");
+					dump_pagemap(pagemap);
+					BUG();
+				}
 				toiActiveAllocator->rw_header_chunk(WRITE,
-					NULL, (char *) pagemap[node][zone_idx][i],
+					NULL, (char *) pagemap->bitmap[node][zone_idx][i+2],
 					PAGE_SIZE);
+			}
 		}
 		node++;
 	}
@@ -90,11 +93,11 @@ void save_dyn_pageflags(dyn_pageflags_t pagemap)
 /* load_dyn_pageflags
  *
  * Description: Load a set of pageflags.
- * Arguments:   dyn_pageflags_t *: Pointer to the bitmap being loaded.
+ * Arguments:   struct dyn_pageflags *: Pointer to the bitmap being loaded.
  *              (It must be allocated before calling this routine).
  */
 
-int load_dyn_pageflags(dyn_pageflags_t pagemap)
+int load_dyn_pageflags(struct dyn_pageflags *pagemap)
 {
 	int i, zone_idx, zone_check = 0, size, node = 0;
 	struct zone *zone;
@@ -134,7 +137,7 @@ int load_dyn_pageflags(dyn_pageflags_t pagemap)
 
 			for (i = 0; i < size; i++)
 				toiActiveAllocator->rw_header_chunk(READ, NULL,
-					(char *) pagemap[node][zone_idx][i],
+					(char *) pagemap->bitmap[node][zone_idx][i+2],
 					PAGE_SIZE);
 		}
 		node++;

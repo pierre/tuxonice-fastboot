@@ -21,8 +21,8 @@ extern __nosavedata struct pbe *restore_highmem_pblist;
 
 int toi_lowlevel_builtin(void);
 
-extern dyn_pageflags_t __nosavedata toi_nosave_origmap;
-extern dyn_pageflags_t __nosavedata toi_nosave_copymap;
+extern struct dyn_pageflags __nosavedata toi_nosave_origmap;
+extern struct dyn_pageflags __nosavedata toi_nosave_copymap;
 
 #ifdef CONFIG_HIGHMEM
 extern __nosavedata struct zone_data *toi_nosave_zone_list;

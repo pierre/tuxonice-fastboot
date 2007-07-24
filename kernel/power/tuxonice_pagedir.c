@@ -65,7 +65,7 @@ struct page * ___toi_get_nonconflicting_page(int can_be_highmem)
 		flags |= __GFP_HIGHMEM;
 
 
-	if (test_toi_state(TOI_LOADING_ALT_IMAGE) && pageset2_map &&
+	if (test_toi_state(TOI_LOADING_ALT_IMAGE) && pageset2_map.bitmap &&
 				(ptoi_pfn < (max_pfn + 2))) {
 		/*
 		 * ptoi_pfn = max_pfn + 1 when yet to find first ps2 pfn that can
@@ -74,7 +74,7 @@ struct page * ___toi_get_nonconflicting_page(int can_be_highmem)
 		 * 	   = max_pfn + 2 when gone through whole list.
 		 */
 		do {
-			ptoi_pfn = get_next_bit_on(pageset2_map, ptoi_pfn);
+			ptoi_pfn = get_next_bit_on(&pageset2_map, ptoi_pfn);
 			if (ptoi_pfn <= max_pfn) {
 				page = pfn_to_page(ptoi_pfn);
 				if (!PagePageset1(page) &&
@@ -183,7 +183,7 @@ int toi_get_pageset1_load_addresses(void)
 	 * and how many pages we can reload directly to their original
 	 * location.
 	 */
-	BITMAP_FOR_EACH_SET(pageset1_copy_map, pfn) {
+	BITMAP_FOR_EACH_SET(&pageset1_copy_map, pfn) {
 		int is_high;
 		page = pfn_to_page(pfn);
 		is_high = PageHighMem(page);
@@ -227,7 +227,7 @@ int toi_get_pageset1_load_addresses(void)
 	 * Now generate our pbes (which will be used for the atomic restore,
 	 * and free unneeded pages.
 	 */
-	BITMAP_FOR_EACH_SET(pageset1_copy_map, pfn) {
+	BITMAP_FOR_EACH_SET(&pageset1_copy_map, pfn) {
 		int is_high;
 		page = pfn_to_page(pfn);
 		is_high = PageHighMem(page);
@@ -254,7 +254,7 @@ int toi_get_pageset1_load_addresses(void)
 			if (!is_high)
 				low_pages_for_highmem--;
 			do {
-				orig_high_pfn = get_next_bit_on(pageset1_map,
+				orig_high_pfn = get_next_bit_on(&pageset1_map,
 						orig_high_pfn);
 				BUG_ON(orig_high_pfn > max_pfn);
 				orig_page = pfn_to_page(orig_high_pfn);
@@ -283,7 +283,7 @@ int toi_get_pageset1_load_addresses(void)
 			struct page *orig_page;
 			low_pbes_done++;
 			do {
-				orig_low_pfn = get_next_bit_on(pageset1_map,
+				orig_low_pfn = get_next_bit_on(&pageset1_map,
 						orig_low_pfn);
 				BUG_ON(orig_low_pfn > max_pfn);
 				orig_page = pfn_to_page(orig_low_pfn);
