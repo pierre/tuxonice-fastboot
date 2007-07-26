@@ -35,8 +35,8 @@ extern void die(const char *,struct pt_regs *,long);
 
 static ATOMIC_NOTIFIER_HEAD(notify_page_fault_chain);
 
-int suspend2_faulted = 0;
-EXPORT_SYMBOL(suspend2_faulted);
+int toi_faulted = 0;
+EXPORT_SYMBOL(toi_faulted);
 
 int register_page_fault_notifier(struct notifier_block *nb)
 {
@@ -325,9 +325,9 @@ fastcall void __kprobes do_page_fault(struct pt_regs *regs,
 	 */
 
 #ifdef CONFIG_DEBUG_PAGEALLOC
-	if (unlikely(suspend2_running && !suspend2_faulted)) {
+	if (unlikely(toi_running && !toi_faulted)) {
 		struct page *page = NULL;
-		suspend2_faulted = 1;
+		toi_faulted = 1;
 		page = virt_to_page(address);
 		kernel_map_pages(page, 1, 1);
 		return;
