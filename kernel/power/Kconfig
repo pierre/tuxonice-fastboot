@@ -202,6 +202,13 @@ menuconfig TOI_CORE
 		  and resuming, and also enables features such as pressing escape to
 		  cancel a cycle or interactive debugging.
 
+	config TOI_USERUI_DEFAULT_PATH
+		string "Default userui program location"
+		default "/usr/local/sbin/tuxonice_fbsplash"
+		depends on TOI_USERUI
+		---help---
+		  This entry allows you to specify a default path to the userui binary.
+
 	config TOI_KEEP_IMAGE
 		bool "Allow Keep Image Mode"
 		depends on TOI_CORE
