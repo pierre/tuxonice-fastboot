@@ -19,7 +19,7 @@ struct swsusp_info {
 
 
 
-#ifdef CONFIG_SOFTWARE_SUSPEND
+#ifdef CONFIG_HIBERNATION
 extern char resume_file[256];
 /*
  * Keep some memory free so that I/O operations can succeed without paging
@@ -185,9 +185,17 @@ struct timeval;
 extern void swsusp_show_speed(struct timeval *, struct timeval *,
 				unsigned int, char *);
 
+#ifdef CONFIG_SUSPEND
 /* kernel/power/main.c */
-extern int suspend_enter(suspend_state_t state);
 extern int suspend_devices_and_enter(suspend_state_t state);
+#else /* !CONFIG_SUSPEND */
+static inline int suspend_devices_and_enter(suspend_state_t state)
+{
+	return -ENOSYS;
+}
+#endif /* !CONFIG_SUSPEND */
+
+/* kernel/power/common.c */
 extern struct blocking_notifier_head pm_chain_head;
 
 static inline int pm_notifier_call_chain(unsigned long val)

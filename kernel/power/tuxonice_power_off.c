@@ -60,48 +60,15 @@ static void __toi_power_down(int method)
 		case 0:
 			break;
 		case 3:
-			if (!pm_ops ||
-			    (pm_ops->prepare && pm_ops->prepare(PM_SUSPEND_MEM))) {
-				printk("No pm_ops or prepare failed.\n");
-				break;
-			}
-
-			suspend_console();
-
-			if (device_suspend(PMSG_SUSPEND)) {
-				toi_prepare_status(DONT_CLEAR_BAR, "Device "
-					"suspend failure.");
-				goto ResumeConsole;
-			}
-
-			if (test_action_state(TOI_LATE_CPU_HOTPLUG) &&
-				disable_nonboot_cpus())
-				goto DeviceResume;
-	
-			if (!suspend_enter(PM_SUSPEND_MEM)) {
-				printk("Failed to enter suspend to ram state.\n");
-				result = 1;
-			}
-
-			if (test_action_state(TOI_LATE_CPU_HOTPLUG))
-				enable_nonboot_cpus();
-
-DeviceResume:
-			device_resume();
-
-ResumeConsole:
-			resume_console();
-
-			if (pm_ops->finish)
-				pm_ops->finish(PM_SUSPEND_MEM);
+			result = suspend_devices_and_enter(PM_SUSPEND_MEM);
 
 			/* If suspended to ram and later woke. */
-			if (result)
+			if (!result)
 				return;
 			break;
 		case 4:
-			kernel_shutdown_prepare(SYSTEM_SUSPEND_DISK);
-			hibernation_ops->enter();
+			if (hibernation_platform_enter())
+				return;
 			break;
 		case 5:
 			/* Historic entry only now */

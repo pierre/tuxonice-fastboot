@@ -348,6 +348,11 @@ static void do_cleanup(int get_debug_info)
 
 	restore_avenrun();
 
+	if (test_toi_state(TOI_NOTIFIERS_PREPARE)) {
+		pm_notifier_call_chain(PM_POST_HIBERNATION);
+		clear_toi_state(TOI_NOTIFIERS_PREPARE);
+	}
+
 	thaw_processes();
 
 #ifdef CONFIG_TOI_KEEP_IMAGE
@@ -424,6 +429,8 @@ static int check_still_keeping_image(void)
  */
 static int toi_init(void)
 {
+	int result;
+
 	toi_result = 0;
 
 	toi_print_modules();
@@ -443,6 +450,14 @@ static int toi_init(void)
 	mark_nosave_pages();
 
 	toi_prepare_console();
+
+	result = pm_notifier_call_chain(PM_HIBERNATION_PREPARE);
+	if (result) {
+		set_result_state(TOI_NOTIFIERS_PREPARE_FAILED);
+		return 1;
+	}
+	set_toi_state(TOI_NOTIFIERS_PREPARE);
+
 	if (test_action_state(TOI_LATE_CPU_HOTPLUG) ||
 			!disable_nonboot_cpus())
 		return 1;
@@ -813,7 +828,7 @@ int pre_resume_freeze(void)
 	toi_prepare_status(DONT_CLEAR_BAR,	"Freeze processes.");
 
 	if (freeze_processes()) {
-		printk("Some processes failed to hibernate\n");
+		printk("Some processes failed to stop.\n");
 		return 1;
 	}
 

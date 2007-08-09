@@ -16,6 +16,7 @@
 #include <linux/bootmem.h>
 #include <linux/suspend.h>
 #include <linux/dyn_pageflags.h>
+#include <linux/fs.h>
 #include <asm/setup.h>
 #include "tuxonice_pageflags.h"
 
@@ -77,6 +78,7 @@ enum {
 	TOI_ARCH_PREPARE_FAILED,
 	TOI_RESAVE_NEEDED,
 	TOI_CANT_SUSPEND,
+	TOI_NOTIFIERS_PREPARE_FAILED,
 };
 
 extern unsigned long toi_result;

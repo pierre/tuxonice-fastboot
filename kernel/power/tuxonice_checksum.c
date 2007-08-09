@@ -292,7 +292,7 @@ void calculate_check_checksums(int check)
 	if (check)
 		toi_num_resaved = 0;
 
-	BITMAP_FOR_EACH_SET(pageset2_map, pfn) {
+	BITMAP_FOR_EACH_SET(&pageset2_map, pfn) {
 		int ret;
 		if (index % CHECKSUMS_PER_PAGE) {
 			this_checksum += CHECKSUM_SIZE;

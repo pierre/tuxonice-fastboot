@@ -32,6 +32,7 @@
 
 extern struct hibernation_ops *hibernation_ops;
 EXPORT_SYMBOL_GPL(hibernation_ops);
+EXPORT_SYMBOL_GPL(hibernation_platform_enter);
 
 #ifdef CONFIG_TOI_CORE_EXPORTS
 EXPORT_SYMBOL_GPL(max_pfn);
@@ -49,6 +50,7 @@ EXPORT_SYMBOL_GPL(restore_processor_state);
 EXPORT_SYMBOL_GPL(save_processor_state);
 #endif
 
+EXPORT_SYMBOL_GPL(pm_chain_head);
 EXPORT_SYMBOL_GPL(kernel_shutdown_prepare);
 EXPORT_SYMBOL_GPL(drop_pagecache);
 EXPORT_SYMBOL_GPL(restore_pblist);
@@ -74,7 +76,7 @@ EXPORT_SYMBOL_GPL(unlink_lru_lists);
 EXPORT_SYMBOL_GPL(relink_lru_lists);
 EXPORT_SYMBOL_GPL(power_subsys);
 EXPORT_SYMBOL_GPL(machine_power_off);
-EXPORT_SYMBOL_GPL(suspend_enter);
+EXPORT_SYMBOL_GPL(suspend_devices_and_enter);
 EXPORT_SYMBOL_GPL(first_online_pgdat);
 EXPORT_SYMBOL_GPL(next_online_pgdat);
 EXPORT_SYMBOL_GPL(machine_restart);
