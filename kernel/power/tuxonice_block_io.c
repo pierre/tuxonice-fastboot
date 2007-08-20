@@ -90,6 +90,8 @@ int toi_header_bytes_used = 0;
 
 DEFINE_MUTEX(toi_bio_mutex);
 
+static atomic_t toi_bio_waits;
+
 /**
  * toi_bio_cleanup_one: Cleanup one bio.
  * @io_info : Struct io_info to be cleaned up.
@@ -177,6 +179,8 @@ static void do_bio_wait(void)
 	struct backing_dev_info *bdi;
 
 	submit_batched();
+
+	atomic_inc(&toi_bio_waits);
 
 	if (waiting_on) {
 		bdi = waiting_on->dev->bd_inode->i_mapping->backing_dev_info;
@@ -325,9 +329,10 @@ static int submit(struct io_info *io_info)
 static int submit_batched(void)
 {
 	static int running_already = 0;
-	struct io_info *first;
+	struct io_info *first = NULL;
 	unsigned long flags;
 	int num_submitted = 0;
+	struct backing_dev_info *bdi = NULL;
 
 	if (running_already)
 		return 0;
@@ -337,6 +342,8 @@ static int submit_batched(void)
 	while(!list_empty(&ioinfo_submit_batch)) {
 		first = list_entry(ioinfo_submit_batch.next, struct io_info,
 				list);
+		if (!num_submitted)
+			bdi = first->dev->bd_inode->i_mapping->backing_dev_info;
 		list_del_init(&first->list);
 		atomic_dec(&submit_batch);
 		spin_unlock_irqrestore(&ioinfo_submit_lock, flags);
@@ -349,6 +356,8 @@ static int submit_batched(void)
 	spin_unlock_irqrestore(&ioinfo_submit_lock, flags);
 	running_already = 0;
 
+	if (bdi)
+		blk_run_backing_dev(bdi, NULL);
 	return num_submitted;
 }
 
@@ -688,6 +697,8 @@ static int toi_rw_cleanup(int writing)
 
 	current_stream = 0;
 
+	printk("Waited on I/O %d times.\n", atomic_read(&toi_bio_waits));
+	atomic_set(&toi_bio_waits, 0);
 	return 0;
 }
 
