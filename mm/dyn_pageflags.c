@@ -309,7 +309,7 @@ static int resize_zone_bitmap(struct dyn_pageflags *pagemap, struct zone *zone,
 {
 	unsigned long **new_ptr = NULL, ****bitmap = pagemap->bitmap;
 	int node_id = zone_to_nid(zone), zone_idx = zone_idx(zone),
-	    to_copy = min(old_pages, new_pages);
+	    to_copy = min(old_pages, new_pages), result = 0;
 	unsigned long **old_ptr = bitmap[node_id][zone_idx], i;
 
 	if (new_pages) {
@@ -333,8 +333,10 @@ static int resize_zone_bitmap(struct dyn_pageflags *pagemap, struct zone *zone,
 	} else if (!pagemap->sparse) {
 		for (i = old_pages + 2; i < new_pages + 2; i++)
 			if (populate_bitmap_page(NULL,
-					(unsigned long **) &new_ptr[i]))
+					(unsigned long **) &new_ptr[i])) {
+				result = -ENOMEM;
 				break;
+			}
 	}
 
 	bitmap[node_id][zone_idx] = new_ptr;
@@ -342,7 +344,7 @@ static int resize_zone_bitmap(struct dyn_pageflags *pagemap, struct zone *zone,
 	if (old_ptr)
 		kfree(old_ptr);
 
-	return 0;
+	return result;
 }
 
 /**
@@ -456,7 +458,7 @@ void free_dyn_pageflags(struct dyn_pageflags *pagemap)
  */
 int allocate_dyn_pageflags(struct dyn_pageflags *pagemap, int sparse)
 {
-	int zone_idx, result = 0;
+	int zone_idx, result = -ENOMEM;
 	struct zone *zone;
 	struct pglist_data *pgdat;
 	unsigned long flags;
@@ -473,28 +475,27 @@ int allocate_dyn_pageflags(struct dyn_pageflags *pagemap, int sparse)
 	pagemap->sparse = sparse;
 
 	if (!pagemap->bitmap && try_alloc_dyn_pageflag_part((1 << NODES_WIDTH),
-				(void **) &pagemap->bitmap)) {
-		result = -ENOMEM;
+				(void **) &pagemap->bitmap))
 		goto out;
-	}
 
 	for_each_online_pgdat(pgdat) {
 		int node_id = pgdat->node_id;
 
 		if (!pagemap->bitmap[node_id] &&
 		    try_alloc_dyn_pageflag_part(MAX_NR_ZONES,
-			(void **) &(pagemap->bitmap)[node_id])) {
-				result = -ENOMEM;
+			(void **) &(pagemap->bitmap)[node_id]))
 				goto out;
-		}
 
 		for (zone_idx = 0; zone_idx < MAX_NR_ZONES; zone_idx++) {
 			zone = &pgdat->node_zones[zone_idx];
 
-			if (populated_zone(zone))
-				check_dyn_pageflag_zone(pagemap, zone, 0);
+			if (populated_zone(zone) &&
+			    check_dyn_pageflag_zone(pagemap, zone, 0))
+				goto out;
 		}
 	}
+
+	result = 0;
 
 out:
 	spin_unlock_irqrestore(&pagemap->struct_lock, flags);
