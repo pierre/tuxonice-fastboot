@@ -397,7 +397,7 @@ static int toi_swap_allocate_header_space(int space_requested)
 	return 0;
 }
 
-static void get_main_pool_phys_params(void)
+static int get_main_pool_phys_params(void)
 {
 	struct extent *extentpointer = NULL;
 	unsigned long address;
@@ -427,9 +427,10 @@ static void get_main_pool_phys_params(void)
 						extent_max <<
 						 devinfo[last_chain].bmap_shift);
 						
-				toi_add_to_extent_chain(
+				if (toi_add_to_extent_chain(
 					&block_chain[last_chain],
-					extent_min, extent_max);
+					extent_min, extent_max))
+					return -ENOMEM;
 			}
 			extent_min = extent_max = new_sector;
 			last_chain = swapfilenum;
@@ -444,12 +445,13 @@ static void get_main_pool_phys_params(void)
 					devinfo[last_chain].bmap_shift,
 				extent_max <<
 					devinfo[last_chain].bmap_shift);
-		toi_add_to_extent_chain(
+		if (toi_add_to_extent_chain(
 			&block_chain[last_chain],
-			extent_min, extent_max);
+			extent_min, extent_max))
+			return -ENOMEM;
 	}
 
-	toi_swap_allocate_header_space(header_pages_allocated);
+	return toi_swap_allocate_header_space(header_pages_allocated);
 }
 
 static int toi_swap_storage_allocated(void)
@@ -616,8 +618,8 @@ static int __toi_swap_allocate_storage(int main_space_requested,
 		result = -ENOSPC;
 
 	main_pages_allocated += gotten;
-	get_main_pool_phys_params();
-	return result;
+
+	return result ? result : get_main_pool_phys_params();
 }
 
 static int toi_swap_write_header_init(void)
