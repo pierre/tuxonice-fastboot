@@ -644,7 +644,7 @@ static int toi_file_signature_op(int op)
 	if(toi_file_target_bdev <= 0)
 		return -1;
 
-	cur = (char *) get_zeroed_page(TOI_ATOMIC_GFP);
+	cur = (char *) toi_get_zeroed_page(17, TOI_ATOMIC_GFP);
 	if (!cur) {
 		printk("Unable to allocate a page for reading the image "
 				"signature.\n");
@@ -771,10 +771,20 @@ static void toi_file_mark_resume_attempted(int mark)
 
 static void toi_file_set_resume_param(void)
 {
-	char *buffer = (char *) get_zeroed_page(TOI_ATOMIC_GFP);
-	char *buffer2 = (char *) get_zeroed_page(TOI_ATOMIC_GFP);
+	char *buffer = (char *) toi_get_zeroed_page(18, TOI_ATOMIC_GFP);
+	char *buffer2 = (char *) toi_get_zeroed_page(19, TOI_ATOMIC_GFP);
 	unsigned long sector = bmap(target_inode, 0);
 	int offset = 0;
+
+	if (!buffer || !buffer2) {
+		if (buffer)
+			free_page((unsigned long) buffer);
+		if (buffer2)
+			free_page((unsigned long) buffer2);
+		printk("TuxOnIce: Failed to allocate memory while setting "
+				"resume= parameter.\n");
+		return;
+	}
 
 	if (toi_file_target_bdev) {
 		set_devinfo(toi_file_target_bdev, target_inode->i_blkbits);

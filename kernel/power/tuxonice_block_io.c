@@ -226,7 +226,7 @@ static void toi_wait_on_readahead(int readahead_index)
 
 static int toi_prepare_readahead(int index)
 {
-	unsigned long new_page = get_zeroed_page(TOI_ATOMIC_GFP);
+	unsigned long new_page = toi_get_zeroed_page(12, TOI_ATOMIC_GFP);
 
 	if(!new_page)
 		return -ENOMEM;
@@ -392,7 +392,7 @@ static struct io_info *get_io_info_struct(void)
 		while (atomic_read(&outstanding_io) >= max_outstanding_io)
 			do_bio_wait();
 
-		this = kmalloc(sizeof(struct io_info), GFP_ATOMIC);
+		this = toi_kmalloc(1, sizeof(struct io_info), GFP_ATOMIC);
 	} while (!this);
 
 	INIT_LIST_HEAD(&this->list);
@@ -437,7 +437,7 @@ static void toi_do_io(int writing, struct block_device *bdev, long block0,
 	io_info->readahead_index = readahead_index;
 
 	if (io_info->readahead_index == -1) {
-		while (!(buffer_virt = get_zeroed_page(TOI_ATOMIC_GFP)))
+		while (!(buffer_virt = toi_get_zeroed_page(13, TOI_ATOMIC_GFP)))
 			do_bio_wait();
 
 		io_info->bio_page = virt_to_page(buffer_virt);
@@ -970,7 +970,7 @@ static void toi_bio_load_config_info(char *buf, int size)
  */
 static int toi_bio_initialise(int starting_cycle)
 {
-	toi_writer_buffer = (char *) get_zeroed_page(TOI_ATOMIC_GFP);
+	toi_writer_buffer = (char *) toi_get_zeroed_page(14, TOI_ATOMIC_GFP);
 
 	return toi_writer_buffer ? 0 : -ENOMEM;
 }

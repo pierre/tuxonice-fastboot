@@ -766,7 +766,7 @@ static int read_pageset(struct pagedir *pagedir, int overwrittenpagesonly)
 static int write_module_configs(void)
 {
 	struct toi_module_ops *this_module;
-	char *buffer = (char *) get_zeroed_page(TOI_ATOMIC_GFP);
+	char *buffer = (char *) toi_get_zeroed_page(22, TOI_ATOMIC_GFP);
 	int len, index = 1;
 	struct toi_module_header toi_module_header;
 
@@ -834,7 +834,7 @@ static int write_module_configs(void)
 static int read_module_configs(void)
 {
 	struct toi_module_ops *this_module;
-	char *buffer = (char *) get_zeroed_page(TOI_ATOMIC_GFP);
+	char *buffer = (char *) toi_get_zeroed_page(23, TOI_ATOMIC_GFP);
 	int len, result = 0;
 	struct toi_module_header toi_module_header;
 
@@ -974,7 +974,7 @@ int write_image_header(void)
 	}
 
 	/* Get a buffer */
-	header_buffer = (char *) get_zeroed_page(TOI_ATOMIC_GFP);
+	header_buffer = (char *) toi_get_zeroed_page(24, TOI_ATOMIC_GFP);
 	if (!header_buffer) {
 		abort_hibernate(TOI_OUT_OF_MEMORY,
 			"Out of memory when trying to get page for header!");
@@ -1073,7 +1073,7 @@ static char *sanity_check(struct toi_header *sh)
 static int __read_pageset1(void)
 {			
 	int i, result = 0;
-	char *header_buffer = (char *) get_zeroed_page(TOI_ATOMIC_GFP),
+	char *header_buffer = (char *) toi_get_zeroed_page(25, TOI_ATOMIC_GFP),
 	     *sanity_error = NULL;
 	struct toi_header *toi_header;
 
@@ -1285,7 +1285,7 @@ int read_pageset1(void)
  */
 static char *get_have_image_data(void)
 {
-	char *output_buffer = (char *) get_zeroed_page(TOI_ATOMIC_GFP);
+	char *output_buffer = (char *) toi_get_zeroed_page(26, TOI_ATOMIC_GFP);
 	struct toi_header *toi_header;
 
 	if (!output_buffer) {

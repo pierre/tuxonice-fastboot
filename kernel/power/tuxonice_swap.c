@@ -156,7 +156,7 @@ static struct block_device *open_bdev(int index, dev_t device, int display_errs)
 		return ERR_PTR(-EINVAL);
 	}
 
-	this = kmalloc(sizeof(struct bdev_opened), GFP_KERNEL);
+	this = toi_kmalloc(8, sizeof(struct bdev_opened), GFP_KERNEL);
 	if (!this) {
 		printk(KERN_WARNING "TuxOnIce: Failed to allocate memory for "
 				"opening a bdev.");
@@ -815,7 +815,7 @@ static int toi_swap_remove_image(void)
 	int result = 0;
 	char newsig[11];
 	
-	cur.address = get_zeroed_page(TOI_ATOMIC_GFP);
+	cur.address = toi_get_zeroed_page(27, TOI_ATOMIC_GFP);
 	if (!cur.address) {
 		printk("Unable to allocate a page for restoring the swap signature.\n");
 		return -ENOMEM;
@@ -946,7 +946,7 @@ static int toi_swap_image_exists(void)
 		return 0;
 	}
 
-	diskpage.address = get_zeroed_page(TOI_ATOMIC_GFP);
+	diskpage.address = toi_get_zeroed_page(28, TOI_ATOMIC_GFP);
 
 	toi_bio_ops.bdev_page_io(READ, resume_block_device,
 			resume_firstblock,
@@ -994,7 +994,7 @@ static void toi_swap_mark_resume_attempted(int mark)
 		return;
 	}
 	
-	diskpage.address = get_zeroed_page(TOI_ATOMIC_GFP);
+	diskpage.address = toi_get_zeroed_page(29, TOI_ATOMIC_GFP);
 
 	toi_bio_ops.bdev_page_io(READ, resume_block_device,
 			resume_firstblock,
@@ -1082,7 +1082,7 @@ static int toi_swap_parse_sig_location(char *commandline,
 	if (temp_result)
 		return -EINVAL;
 
-	diskpage.address = get_zeroed_page(TOI_ATOMIC_GFP);
+	diskpage.address = toi_get_zeroed_page(30, TOI_ATOMIC_GFP);
 	if (!diskpage.address) {
 		printk(KERN_ERR "TuxOnIce: SwapAllocator: Failed to allocate "
 					"a diskpage for I/O.\n");
@@ -1118,7 +1118,7 @@ static int header_locations_read_sysfs(const char *page, int count)
 	int i, printedpartitionsmessage = 0, len = 0, haveswap = 0;
 	struct inode *swapf = 0;
 	int zone;
-	char *path_page = (char *) __get_free_page(GFP_KERNEL);
+	char *path_page = (char *) toi_get_free_page(10, GFP_KERNEL);
 	char *path, *output = (char *) page;
 	int path_len;
 	

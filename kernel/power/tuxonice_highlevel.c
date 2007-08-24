@@ -95,6 +95,8 @@ static atomic_t actions_running;
 static int block_dump_save;
 extern int block_dump;
 
+int toi_fail_num;
+
 int do_toi_step(int step);
 
 /**
@@ -335,7 +337,7 @@ static void do_cleanup(int get_debug_info)
 	free_checksum_pages();
 
 	if (get_debug_info)
-		buffer = (char *) get_zeroed_page(TOI_ATOMIC_GFP);
+		buffer = (char *) toi_get_zeroed_page(20, TOI_ATOMIC_GFP);
 
 	if (buffer)
 		i = get_toi_debug_info(buffer, PAGE_SIZE);
@@ -701,7 +703,7 @@ cleanup:
  */
 static int do_check_can_resume(void)
 {
-	char *buf = (char *) get_zeroed_page(GFP_KERNEL);
+	char *buf = (char *) toi_get_zeroed_page(21, GFP_KERNEL);
 	int result = 0;
 
 	if (!buf)
@@ -1042,6 +1044,10 @@ static struct toi_sysfs_data sysfs_params[] = {
 	  SYSFS_UL(&toi_result, 0, 0, 0)
 	},
 
+	{ TOI_ATTR("failure_test", SYSFS_RW),
+	  SYSFS_INT(&toi_fail_num, 0, 99, 0)
+	},
+
 	{ TOI_ATTR("no_multithreaded_io", SYSFS_RW),
 	  SYSFS_BIT(&toi_action, TOI_NO_MULTITHREADED_IO, 0)
 	},
@@ -1175,4 +1181,5 @@ late_initcall(core_load);
 
 #ifdef CONFIG_TOI_EXPORTS
 EXPORT_SYMBOL_GPL(pagedir2);
+EXPORT_SYMBOL_GPL(toi_fail_num);
 #endif

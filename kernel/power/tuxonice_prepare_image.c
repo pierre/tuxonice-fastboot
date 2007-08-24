@@ -86,7 +86,8 @@ static int build_attention_list(void)
 	 */
 	for (i = 0; i < task_count; i++) {
 		struct attention_list *this =
-			kmalloc(sizeof(struct attention_list), TOI_WAIT_GFP);
+			toi_kmalloc(6, sizeof(struct attention_list),
+					TOI_WAIT_GFP);
 		if (!this) {
 			printk("Failed to allocate slab for attention list.\n");
 			free_attention_list();
@@ -285,16 +286,16 @@ static int toi_allocate_extra_pagedir_memory(int extra_pages_needed)
 		while ((1 << order) > num_to_alloc)
 			order--;
 
-		extras_entry = (struct extras *) kmalloc(sizeof(struct extras),
-			TOI_ATOMIC_GFP);
+		extras_entry = (struct extras *) toi_kmalloc(7,
+			sizeof(struct extras), TOI_ATOMIC_GFP);
 
 		if (!extras_entry)
 			return extra_pages_allocated;
 
-		virt = __get_free_pages(flags, order);
+		virt = toi_get_free_pages(9, flags, order);
 		while (!virt && order) {
 			order--;
-			virt = __get_free_pages(flags, order);
+			virt = toi_get_free_pages(9, flags, order);
 		}
 
 		if (!virt) {

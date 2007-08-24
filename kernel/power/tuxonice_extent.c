@@ -24,7 +24,7 @@ static struct extent *toi_get_extent(void)
 {
 	struct extent *result;
 	
-	if (!(result = kmalloc(sizeof(struct extent), TOI_ATOMIC_GFP)))
+	if (!(result = toi_kmalloc(2, sizeof(struct extent), TOI_ATOMIC_GFP)))
 		return NULL;
 
 	result->minimum = result->maximum = 0;
@@ -171,7 +171,7 @@ int toi_load_extent_chain(struct extent_chain *chain)
 	}
 
 	for (i = 0; i < chain->num_extents; i++) {
-		this = kmalloc(sizeof(struct extent), TOI_ATOMIC_GFP);
+		this = toi_kmalloc(3, sizeof(struct extent), TOI_ATOMIC_GFP);
 		if (!this) {
 			printk("Failed to allocate a new extent.\n");
 			return -ENOMEM;

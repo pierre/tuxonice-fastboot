@@ -94,7 +94,8 @@ static int toi_compress_crypto_prepare(void)
 			return 1;
 		}
 
-		this->page_buffer = (char *) get_zeroed_page(TOI_ATOMIC_GFP);
+		this->page_buffer =
+			(char *) toi_get_zeroed_page(16, TOI_ATOMIC_GFP);
 	
 		if (!this->page_buffer) {
 			printk(KERN_ERR
