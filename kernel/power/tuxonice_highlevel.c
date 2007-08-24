@@ -899,11 +899,15 @@ void __toi_try_resume(void)
 
 	toi_print_modules();
 
+	current->flags |= PF_MEMALLOC;
+
 	if (do_toi_step(STEP_RESUME_CAN_RESUME) &&
 	    !do_toi_step(STEP_RESUME_LOAD_PS1))
 	    do_toi_step(STEP_RESUME_DO_RESTORE);
 
 	do_cleanup(0);
+
+	current->flags &= ~PF_MEMALLOC;
 
 	clear_toi_state(TOI_IGNORE_LOGLEVEL);
 	clear_toi_state(TOI_TRYING_TO_RESUME);
@@ -974,6 +978,8 @@ int _toi_try_hibernate(int have_pmsem)
 		}
 	}
 
+	current->flags |= PF_MEMALLOC;
+
 	if ((result = do_toi_step(STEP_HIBERNATE_PREPARE_IMAGE)))
 		goto out;
 
@@ -989,6 +995,8 @@ int _toi_try_hibernate(int have_pmsem)
 	if (toi_in_hibernate)
 		result = do_toi_step(STEP_HIBERNATE_POWERDOWN);
 out:
+	current->flags &= ~PF_MEMALLOC;
+
 	if (sys_power_disk)
 		toi_finish_anything(SYSFS_HIBERNATING);
 	return result;
