@@ -897,6 +897,10 @@ static int toi_rw_header_chunk(int writing,
 {
 	if (owner) {
 		owner->header_used += buffer_size;
+		toi_message(TOI_HEADER, TOI_LOW, 1,
+			"Header: %s : %d bytes (%d/%d).\n",
+			buffer_size, owner->header_used,
+			owner->header_requested);
 		if (owner->header_used > owner->header_requested) {
 			printk(KERN_EMERG "TuxOnIce module %s is using more"
 				"header space (%u) than it requested (%u).\n",
@@ -905,7 +909,9 @@ static int toi_rw_header_chunk(int writing,
 				owner->header_requested);
 			return buffer_size;
 		}
-	}
+	} else
+		toi_message(TOI_HEADER, TOI_LOW, 1,
+			"Header: (No owner): %d bytes.\n", buffer_size);
 
 	return toi_rw_buffer(writing, buffer, buffer_size);
 }
