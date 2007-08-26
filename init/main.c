@@ -147,9 +147,14 @@ static unsigned int __initdata max_cpus = NR_CPUS;
  * greater than 0, limits the maximum number of CPUs activated in
  * SMP mode to <NUM>.
  */
+#ifndef CONFIG_X86_IO_APIC
+static inline void disable_ioapic_setup(void) {};
+#endif
+
 static int __init nosmp(char *str)
 {
 	max_cpus = 0;
+	disable_ioapic_setup();
 	return 0;
 }
 
@@ -158,10 +163,13 @@ early_param("nosmp", nosmp);
 static int __init maxcpus(char *str)
 {
 	get_option(&str, &max_cpus);
-	return 1;
+	if (max_cpus == 0)
+		disable_ioapic_setup();
+
+	return 0;
 }
 
-__setup("maxcpus=", maxcpus);
+early_param("maxcpus=", maxcpus);
 #else
 #define max_cpus NR_CPUS
 #endif
