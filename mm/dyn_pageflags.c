@@ -265,13 +265,13 @@ static int try_alloc_dyn_pageflag_part(int nr_ptrs, void **ptr)
 	return -ENOMEM;
 }
 
-static int populate_bitmap_page(struct dyn_pageflags *pageflags,
+static int populate_bitmap_page(struct dyn_pageflags *pageflags, int take_lock,
 			unsigned long **page_ptr)
 {
 	void *address;
 	unsigned long flags = 0;
 
-	if (pageflags)
+	if (take_lock)
 		spin_lock_irqsave(&pageflags->struct_lock, flags);
 
 	/*
@@ -292,7 +292,7 @@ static int populate_bitmap_page(struct dyn_pageflags *pageflags,
 
 	*page_ptr = address;
 out:
-	if (pageflags)
+	if (take_lock)
 		spin_unlock_irqrestore(&pageflags->struct_lock, flags);
 	return 0;
 }
@@ -305,7 +305,7 @@ out:
  */
 static int resize_zone_bitmap(struct dyn_pageflags *pagemap, struct zone *zone,
 		unsigned long old_pages, unsigned long new_pages,
-		unsigned long copy_offset)
+		unsigned long copy_offset, int take_lock)
 {
 	unsigned long **new_ptr = NULL, ****bitmap = pagemap->bitmap;
 	int node_id = zone_to_nid(zone), zone_idx = zone_idx(zone),
@@ -332,7 +332,7 @@ static int resize_zone_bitmap(struct dyn_pageflags *pagemap, struct zone *zone,
 				free_page((unsigned long) old_ptr[i]);
 	} else if (!pagemap->sparse) {
 		for (i = old_pages + 2; i < new_pages + 2; i++)
-			if (populate_bitmap_page(NULL,
+			if (populate_bitmap_page(NULL, take_lock,
 					(unsigned long **) &new_ptr[i])) {
 				result = -ENOMEM;
 				break;
@@ -360,7 +360,7 @@ static int resize_zone_bitmap(struct dyn_pageflags *pagemap, struct zone *zone,
  * of zone_start_pfn having changed.
  */
 int check_dyn_pageflag_zone(struct dyn_pageflags *pagemap, struct zone *zone,
-		int force_free_all)
+		int force_free_all, int take_lock)
 {
 	int node_id = zone_to_nid(zone), zone_idx = zone_idx(zone);
 	unsigned long copy_offset = 0, old_pages, new_pages;
@@ -380,7 +380,7 @@ int check_dyn_pageflag_zone(struct dyn_pageflags *pagemap, struct zone *zone,
 
 	/* New/expanded zone? */
 	return resize_zone_bitmap(pagemap, zone, old_pages, new_pages,
-			copy_offset);
+			copy_offset, take_lock);
 }
 
 #ifdef CONFIG_MEMORY_HOTPLUG_SPARSE
@@ -396,7 +396,7 @@ void dyn_pageflags_hotplug(struct zone *zone)
 	struct dyn_pageflags *this;
 
 	list_for_each_entry(this, &flags_list, list)
-		check_dyn_pageflag_zone(this, zone, 0);
+		check_dyn_pageflag_zone(this, zone, 0, 1);
 }
 #endif
 
@@ -420,7 +420,7 @@ void free_dyn_pageflags(struct dyn_pageflags *pagemap)
 	
 	for_each_online_pgdat_zone(pgdat, zone_idx)
 		check_dyn_pageflag_zone(pagemap,
-				&pgdat->node_zones[zone_idx], 1);
+				&pgdat->node_zones[zone_idx], 1, 1);
 
 	for_each_online_pgdat(pgdat) {
 		int i = pgdat->node_id;
@@ -437,8 +437,8 @@ void free_dyn_pageflags(struct dyn_pageflags *pagemap)
 	if (!pagemap->sparse) {
 		spin_lock_irqsave(&flags_list_lock, flags);
 		list_del_init(&pagemap->list);
-		spin_unlock_irqrestore(&flags_list_lock, flags);
 		pagemap->sparse = 1;
+		spin_unlock_irqrestore(&flags_list_lock, flags);
 	}
 }
 
@@ -490,7 +490,7 @@ int allocate_dyn_pageflags(struct dyn_pageflags *pagemap, int sparse)
 			zone = &pgdat->node_zones[zone_idx];
 
 			if (populated_zone(zone) &&
-			    check_dyn_pageflag_zone(pagemap, zone, 0))
+			    check_dyn_pageflag_zone(pagemap, zone, 0, 0))
 				goto out;
 		}
 	}
@@ -533,7 +533,7 @@ void set_dynpageflag(struct dyn_pageflags *pageflags, struct page *page)
 	if (!ul) {	/* Sparse, hotplugged or unprepared */
 		/* Allocate / fill gaps in high levels */
 		if (allocate_dyn_pageflags(pageflags, 1) ||
-		    populate_bitmap_page(pageflags, (unsigned long **)
+		    populate_bitmap_page(pageflags, 1, (unsigned long **)
 				&pageflags->bitmap[node][zone_num][pagenum])) {
 			printk(KERN_EMERG "Failed to allocate storage in a "
 					"sparse bitmap.\n");

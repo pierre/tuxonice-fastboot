@@ -791,10 +791,14 @@ static void prepare_restore_load_alt_image(int prepare)
 	if (prepare) {
 		memcpy(&pageset1_map_save, &pageset1_map,
 				sizeof(struct dyn_pageflags));
-		memset(&pageset1_map, 0, sizeof(struct dyn_pageflags));
+		pageset1_map.bitmap = NULL;
+		pageset1_map.sparse = 0;
+		pageset1_map.initialised = 0;
 		memcpy(&pageset1_copy_map_save, &pageset1_copy_map,
 			sizeof(struct dyn_pageflags));
-		memset(&pageset1_copy_map, 0, sizeof(struct dyn_pageflags));
+		pageset1_copy_map.bitmap = NULL;
+		pageset1_copy_map.sparse = 0;
+		pageset1_copy_map.initialised = 0;
 		set_toi_state(TOI_LOADING_ALT_IMAGE);
 		toi_reset_alt_image_pageset2_pfn();
 	} else {

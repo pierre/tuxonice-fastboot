@@ -20,8 +20,11 @@
 #include "tuxonice_pagedir.h"
 #include "tuxonice.h"
 
-struct dyn_pageflags pageset2_map, page_resave_map, io_map, nosave_map,
-		     free_map;
+DECLARE_DYN_PAGEFLAGS(pageset2_map);
+DECLARE_DYN_PAGEFLAGS(page_resave_map);
+DECLARE_DYN_PAGEFLAGS(io_map);
+DECLARE_DYN_PAGEFLAGS(nosave_map);
+DECLARE_DYN_PAGEFLAGS(free_map);
 
 static int pages_for_zone(struct zone *zone)
 {

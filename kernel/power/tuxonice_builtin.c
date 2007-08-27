@@ -130,8 +130,8 @@ EXPORT_SYMBOL_GPL(snprintf_used);
 struct toi_core_fns *toi_core_fns;
 EXPORT_SYMBOL_GPL(toi_core_fns);
 
-struct dyn_pageflags pageset1_map;
-struct dyn_pageflags pageset1_copy_map;
+DECLARE_DYN_PAGEFLAGS(pageset1_map);
+DECLARE_DYN_PAGEFLAGS(pageset1_copy_map);
 EXPORT_SYMBOL_GPL(pageset1_map);
 EXPORT_SYMBOL_GPL(pageset1_copy_map);
 
