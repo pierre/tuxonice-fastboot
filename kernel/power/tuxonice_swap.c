@@ -397,15 +397,22 @@ static int toi_swap_allocate_header_space(int space_requested)
 	return 0;
 }
 
-static int get_main_pool_phys_params(void)
+static void free_block_chains(void)
 {
-	struct extent *extentpointer = NULL;
-	unsigned long address;
-	int i, extent_min = -1, extent_max = -1, last_chain = -1;
+	int i;
 
 	for (i = 0; i < MAX_SWAPFILES; i++)
 		if (block_chain[i].first)
 			toi_put_extent_chain(&block_chain[i]);
+}
+
+static int get_main_pool_phys_params(void)
+{
+	struct extent *extentpointer = NULL;
+	unsigned long address;
+	int extent_min = -1, extent_max = -1, last_chain = -1;
+
+	free_block_chains();
 
 	toi_extent_for_each(&swapextents, extentpointer, address) {
 		swp_entry_t swap_address = extent_val_to_swap_entry(address);
@@ -429,8 +436,10 @@ static int get_main_pool_phys_params(void)
 						
 				if (toi_add_to_extent_chain(
 					&block_chain[last_chain],
-					extent_min, extent_max))
+					extent_min, extent_max)) {
+					free_block_chains();
 					return -ENOMEM;
+				}
 			}
 			extent_min = extent_max = new_sector;
 			last_chain = swapfilenum;
@@ -447,8 +456,10 @@ static int get_main_pool_phys_params(void)
 					devinfo[last_chain].bmap_shift);
 		if (toi_add_to_extent_chain(
 			&block_chain[last_chain],
-			extent_min, extent_max))
+			extent_min, extent_max)) {
+			free_block_chains();
 			return -ENOMEM;
+		}
 	}
 
 	return toi_swap_allocate_header_space(header_pages_allocated);
@@ -491,8 +502,6 @@ static void toi_swap_cleanup(int ending_cycle)
 
 static int toi_swap_release_storage(void)
 {
-	int i = 0;
-
 	if (test_action_state(TOI_KEEP_IMAGE) &&
 	    test_toi_state(TOI_NOW_RESUMING))
 		return 0;
@@ -510,9 +519,7 @@ static int toi_swap_release_storage(void)
 
 		toi_put_extent_chain(&swapextents);
 
-		for (i = 0; i < MAX_SWAPFILES; i++)
-			if (block_chain[i].first)
-				toi_put_extent_chain(&block_chain[i]);
+		free_block_chains();
 	}
 
 	return 0;
@@ -533,7 +540,7 @@ static void free_swap_range(unsigned long min, unsigned long max)
 {
 	int j;
 
-	for (j = min; j < max; j++)
+	for (j = min; j <= max; j++)
 		swap_free(extent_val_to_swap_entry(j));
 }
 
@@ -545,7 +552,8 @@ static void free_swap_range(unsigned long min, unsigned long max)
 static int __toi_swap_allocate_storage(int main_space_requested,
 		int header_space_requested)
 {
-	int i, result = 0, first[MAX_SWAPFILES], pages_to_get, extra_pages, gotten = 0;
+	int i, result = 0, to_add[MAX_SWAPFILES], pages_to_get, extra_pages,
+	    gotten = 0;
 	unsigned long extent_min[MAX_SWAPFILES], extent_max[MAX_SWAPFILES];
 
 	extra_pages = DIV_ROUND_UP(main_space_requested * (sizeof(unsigned long)
@@ -562,7 +570,7 @@ static int __toi_swap_allocate_storage(int main_space_requested,
 			devinfo[i].dev_t = si->bdev->bd_dev;
 		devinfo[i].bmap_shift = 3;
 		devinfo[i].blocks_per_page = 1;
-		first[i] = 1;
+		to_add[i] = 0;
 	}
 
 	for(i=0; i < pages_to_get; i++) {
@@ -577,8 +585,8 @@ static int __toi_swap_allocate_storage(int main_space_requested,
 		swapfilenum = swp_type(entry);
 		new_value = swap_entry_to_extent_val(entry);
 
-		if (first[swapfilenum]) {
-			first[swapfilenum] = 0;
+		if (!to_add[swapfilenum]) {
+			to_add[swapfilenum] = 1;
 			extent_min[swapfilenum] = new_value;
 			extent_max[swapfilenum] = new_value;
 			gotten++;
@@ -594,11 +602,13 @@ static int __toi_swap_allocate_storage(int main_space_requested,
 		if (toi_add_to_extent_chain(&swapextents,
 					extent_min[swapfilenum],
 					extent_max[swapfilenum])) {
+			printk("Failed to allocate extent for %lu-%lu.\n", extent_min[swapfilenum], extent_max[swapfilenum]);
 			free_swap_range(extent_min[swapfilenum],
 					extent_max[swapfilenum]);
 			swap_free(entry);
 			gotten -= (extent_max[swapfilenum] -
-					extent_min[swapfilenum]);
+					extent_min[swapfilenum] + 1);
+			to_add[swapfilenum] = 0; /* Don't try to add again below */
 			break;
 		} else {
 			extent_min[swapfilenum] = new_value;
@@ -607,12 +617,15 @@ static int __toi_swap_allocate_storage(int main_space_requested,
 		}
 	}
 
-	for (i = 0; i < MAX_SWAPFILES; i++)
-		if (!first[i] && toi_add_to_extent_chain(&swapextents,
-					extent_min[i], extent_max[i])) {
-			free_swap_range(extent_min[i], extent_max[i]);
-			gotten -= (extent_max[i] - extent_min[i]);
-		}
+	for (i = 0; i < MAX_SWAPFILES; i++) {
+		if (!to_add[i] || !toi_add_to_extent_chain(&swapextents,
+					extent_min[i], extent_max[i]))
+			continue;
+
+		free_swap_range(extent_min[i], extent_max[i]);
+		gotten -= (extent_max[i] - extent_min[i] + 1);
+		break;
+	}
 
 	if (gotten < pages_to_get)
 		result = -ENOSPC;
