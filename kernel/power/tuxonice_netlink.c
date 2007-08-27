@@ -319,6 +319,12 @@ static int toi_launch_userspace_program(char *command, int channel_no)
 	if (!strlen(orig_posn))
 		return 1;
 
+	if (!channel) {
+		printk("Failed to allocate memory in preparing to launch "
+				"userspace program.\n");
+		return 1;
+	}
+
 	/* Up to 7 args supported */
 	while (arg < 7) {
 		sscanf(orig_posn, "%s", test_read);
