@@ -208,6 +208,6 @@ extern int toi_fail_num;
 #define toi_kmalloc(FAIL, SIZE, FLAGS) (kmalloc(SIZE, FLAGS))
 #define toi_get_free_pages(FAIL, FLAGS, ORDER) (__get_free_pages(FLAGS, ORDER))
 #define toi_get_free_page(FAIL, FLAGS) (__get_free_page(FLAGS))
-#define toi_get_zeroed_page(FAIL, FLAGS) (get_zeroed_page(FLAGS)))
+#define toi_get_zeroed_page(FAIL, FLAGS) (get_zeroed_page(FLAGS))
 #endif
 #endif
