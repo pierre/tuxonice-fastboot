@@ -28,78 +28,6 @@
 
 int extra_pd1_pages_used;
 
-/*
- * Highmem related functions (x86 only).
- */
-
-#ifdef CONFIG_HIGHMEM
-
-/**
- * copyback_high: Restore highmem pages.
- *
- * Highmem data and pbe lists are/can be stored in highmem.
- * The format is slightly different to the lowmem pbe lists
- * used for the assembly code: the last pbe in each page is
- * a struct page * instead of struct pbe *, pointing to the
- * next page where pbes are stored (or NULL if happens to be
- * the end of the list). Since we don't want to generate
- * unnecessary deltas against swsusp code, we use a cast
- * instead of a union.
- **/
-
-static void copyback_high(void)
-{
-	struct page * pbe_page = (struct page *) restore_highmem_pblist;
-	struct pbe *this_pbe, *first_pbe;
-	unsigned long *origpage, *copypage;
-	int pbe_index = 1;
-
-	if (!pbe_page)
-		return;
-
-	this_pbe = (struct pbe *) kmap_atomic(pbe_page, KM_BOUNCE_READ);
-	first_pbe = this_pbe;
-
-	while (this_pbe) {
-		int loop = (PAGE_SIZE / sizeof(unsigned long)) - 1;
-
-		origpage = kmap_atomic((struct page *) this_pbe->orig_address,
-			KM_BIO_DST_IRQ);
-		copypage = kmap_atomic((struct page *) this_pbe->address,
-			KM_BIO_SRC_IRQ);
-
-		while (loop >= 0) {
-			*(origpage + loop) = *(copypage + loop);
-			loop--;
-		}
-
-		kunmap_atomic(origpage, KM_BIO_DST_IRQ);
-		kunmap_atomic(copypage, KM_BIO_SRC_IRQ);
-
-		if (!this_pbe->next)
-			break;
-
-		if (pbe_index < PBES_PER_PAGE) {
-			this_pbe++;
-			pbe_index++;
-		} else {
-			pbe_page = (struct page *) this_pbe->next;
-			kunmap_atomic(first_pbe, KM_BOUNCE_READ);
-			if (!pbe_page)
-				return;
-			this_pbe = (struct pbe *) kmap_atomic(pbe_page,
-					KM_BOUNCE_READ);
-			first_pbe = this_pbe;
-			pbe_index = 1;
-		}
-	}
-	kunmap_atomic(first_pbe, KM_BOUNCE_READ);
-}
-
-#else /* CONFIG_HIGHMEM */
-void copyback_high(void) { }
-#endif
-
 /**
  * free_pbe_list: Free page backup entries used by the atomic copy code.
  *
@@ -304,9 +232,6 @@ int toi_hibernate(void)
 	toi_running = 1; /* For the swsusp code we use :< */
 
 	error = toi_lowlevel_builtin();
-
-	if (!toi_in_hibernate)
-		copyback_high();
 
 	toi_running = 0;
 	return error;
