@@ -82,8 +82,6 @@ struct extent_iterate_state toi_writer_posn;
 char *toi_writer_buffer;
 int toi_writer_buffer_posn;
 
-int toi_read_fd;
-
 static struct toi_bdev_info *toi_devinfo;
 
 int toi_header_bytes_used = 0;
@@ -1040,9 +1038,6 @@ static __init int toi_block_io_load(void)
 	return toi_register_module(&toi_blockwriter_ops);
 }
 
-#ifdef CONFIG_TOI_FILE_EXPORTS
-EXPORT_SYMBOL_GPL(toi_read_fd);
-#endif
 #if defined(CONFIG_TOI_FILE_EXPORTS) || defined(CONFIG_TOI_SWAP_EXPORTS)
 EXPORT_SYMBOL_GPL(toi_writer_posn);
 EXPORT_SYMBOL_GPL(toi_writer_posn_save);
