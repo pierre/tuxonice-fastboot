@@ -234,6 +234,63 @@ void thaw_bdev(struct block_device *bdev, struct super_block *sb)
 }
 EXPORT_SYMBOL(thaw_bdev);
 
+/**
+ * freeze_filesystems - lock all filesystems and force them into a consistent
+ * state
+ */
+void freeze_filesystems(void)
+{
+	struct super_block *sb;
+
+	lockdep_off();
+
+	/*
+	 * Freeze in reverse order so filesystems dependant upon others are
+	 * frozen in the right order (eg. loopback on ext3).
+	 */
+	list_for_each_entry_reverse(sb, &super_blocks, s_list) {
+		if (sb->s_type->fs_flags & FS_IS_FUSE &&
+		    sb->s_frozen == SB_UNFROZEN) {
+			sb->s_frozen = SB_FREEZE_TRANS;
+			sb->s_flags |= MS_FROZEN;
+			continue;
+		}
+
+		if (!sb->s_root || !sb->s_bdev ||
+		    (sb->s_frozen == SB_FREEZE_TRANS) ||
+		    (sb->s_flags & MS_RDONLY) ||
+		    (sb->s_flags & MS_FROZEN)) {
+			continue;
+		}
+
+		freeze_bdev(sb->s_bdev);
+		sb->s_flags |= MS_FROZEN;
+	}
+
+	lockdep_on();
+}
+
+/**
+ * thaw_filesystems - unlock all filesystems
+ */
+void thaw_filesystems(void)
+{
+	struct super_block *sb;
+
+	lockdep_off();
+
+	list_for_each_entry(sb, &super_blocks, s_list)
+		if (sb->s_flags & MS_FROZEN) {
+			if (sb->s_type->fs_flags & FS_IS_FUSE)
+				sb->s_frozen = SB_UNFROZEN;
+			else
+				thaw_bdev(sb->s_bdev, sb);
+			sb->s_flags &= ~MS_FROZEN;
+		}
+
+	lockdep_on();
+}
+
 /*
  * Various filesystems appear to want __find_get_block to be non-blocking.
  * But it's the page lock which protects the buffers.  To get around this,

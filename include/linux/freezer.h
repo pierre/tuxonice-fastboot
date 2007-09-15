@@ -128,8 +128,9 @@ static inline void set_freezable(void)
 
 extern int freezer_state;
 #define FREEZER_OFF 0
-#define FREEZER_USERSPACE_FROZEN 1
-#define FREEZER_FULLY_ON 2
+#define FREEZER_FILESYSTEMS_FROZEN 1
+#define FREEZER_USERSPACE_FROZEN 2
+#define FREEZER_FULLY_ON 3
 
 static inline int freezer_is_on(void)
 {

@@ -6,13 +6,14 @@
  */
 
 
-#undef DEBUG
+#define DEBUG
 
 #include <linux/interrupt.h>
 #include <linux/suspend.h>
 #include <linux/module.h>
 #include <linux/syscalls.h>
 #include <linux/freezer.h>
+#include <linux/buffer_head.h>
 
 int freezer_state = 0;
 
@@ -188,6 +189,9 @@ int freeze_processes(void)
 {
 	int error;
 
+	printk("Stopping filesystems.\n");
+	freeze_filesystems();
+	freezer_state = FREEZER_FILESYSTEMS_FROZEN;
 	printk("Stopping tasks ... ");
 	error = try_to_freeze_tasks(FREEZER_USER_SPACE);
 	if (error)
@@ -241,6 +245,8 @@ void thaw_processes(void)
 	thaw_tasks(FREEZER_USER_SPACE);
 	schedule();
 	printk("done.\n");
+	printk("Restarting filesystems ...\n");
+	thaw_filesystems();
 }
 
 void thaw_kernel_threads(void)

@@ -7,11 +7,13 @@
 */
 
 #include "fuse_i.h"
+#include "fuse.h"
 
 #include <linux/pagemap.h>
 #include <linux/slab.h>
 #include <linux/kernel.h>
 #include <linux/sched.h>
+#include <linux/freezer.h>
 
 static const struct file_operations fuse_direct_io_file_operations;
 
@@ -22,6 +24,8 @@ static int fuse_send_open(struct inode *inode, struct file *file, int isdir,
 	struct fuse_open_in inarg;
 	struct fuse_req *req;
 	int err;
+
+	FUSE_MIGHT_FREEZE(inode->i_sb, "fuse_send_open");
 
 	req = fuse_get_req(fc);
 	if (IS_ERR(req))
@@ -465,6 +469,8 @@ static int fuse_commit_write(struct file *file, struct page *page,
 	if (is_bad_inode(inode))
 		return -EIO;
 
+	FUSE_MIGHT_FREEZE(inode->i_sb, "fuse_commit_write");
+
 	req = fuse_get_req(fc);
 	if (IS_ERR(req))
 		return PTR_ERR(req);
@@ -541,6 +547,8 @@ static ssize_t fuse_direct_io(struct file *file, const char __user *buf,
 
 	if (is_bad_inode(inode))
 		return -EIO;
+
+	FUSE_MIGHT_FREEZE(file->f_mapping->host->i_sb, "fuse_direct_io");
 
 	req = fuse_get_req(fc);
 	if (IS_ERR(req))
@@ -689,6 +697,8 @@ static int fuse_getlk(struct file *file, struct file_lock *fl)
 	struct fuse_lk_out outarg;
 	int err;
 
+	FUSE_MIGHT_FREEZE(file->f_mapping->host->i_sb, "fuse_getlk");
+
 	req = fuse_get_req(fc);
 	if (IS_ERR(req))
 		return PTR_ERR(req);
@@ -718,6 +728,8 @@ static int fuse_setlk(struct file *file, struct file_lock *fl)
 	/* Unlock on close is handled by the flush method */
 	if (fl->fl_flags & FL_CLOSE)
 		return 0;
+
+	FUSE_MIGHT_FREEZE(file->f_mapping->host->i_sb, "fuse_setlk");
 
 	req = fuse_get_req(fc);
 	if (IS_ERR(req))
@@ -765,6 +777,8 @@ static sector_t fuse_bmap(struct address_space *mapping, sector_t block)
 
 	if (!inode->i_sb->s_bdev || fc->no_bmap)
 		return 0;
+
+	FUSE_MIGHT_FREEZE(inode->i_sb, "fuse_bmap");
 
 	req = fuse_get_req(fc);
 	if (IS_ERR(req))
