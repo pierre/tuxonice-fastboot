@@ -47,8 +47,6 @@ int toi_platform_prepare(void)
 
 static void __toi_power_down(int method)
 {
-	int result = 0;
-
 	if (test_action_state(TOI_REBOOT)) {
 		toi_prepare_status(DONT_CLEAR_BAR, "Ready to reboot.");
 		kernel_restart(NULL);
@@ -60,14 +58,11 @@ static void __toi_power_down(int method)
 		case 0:
 			break;
 		case 3:
-			result = suspend_devices_and_enter(PM_SUSPEND_MEM);
-
-			/* If suspended to ram and later woke. */
-			if (!result)
+			if (!suspend_devices_and_enter(PM_SUSPEND_MEM))
 				return;
 			break;
 		case 4:
-			if (hibernation_platform_enter())
+			if (!hibernation_platform_enter())
 				return;
 			break;
 		case 5:
@@ -75,7 +70,7 @@ static void __toi_power_down(int method)
 			break;
 	}
 
-	if (method)
+	if (method && method != 5)
 		toi_prepare_status(DONT_CLEAR_BAR,
 				"Falling back to alternate power off method.");
 	kernel_power_off();
