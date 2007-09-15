@@ -191,7 +191,8 @@ extern void swap_setup(void);
 extern unsigned long try_to_free_pages(struct zone **zones, int order,
 					gfp_t gfp_mask);
 extern unsigned long shrink_all_memory(unsigned long nr_pages);
-extern void shrink_one_zone(struct zone *zone, int desired_size);
+extern void shrink_one_zone(struct zone *zone, unsigned long desired_size,
+		int ps_wanted);
 extern int vm_swappiness;
 extern int remove_mapping(struct address_space *mapping, struct page *page);
 extern long vm_total_pages;

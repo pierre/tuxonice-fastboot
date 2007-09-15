@@ -1606,25 +1606,36 @@ void wakeup_kswapd(struct zone *zone, int order)
 }
 
 #ifdef CONFIG_PM
-void shrink_one_zone(struct zone *zone, int total_to_free)
+static unsigned long shrink_ps1_zone(struct zone *zone, unsigned long total_to_free,
+		struct scan_control sc)
+{
+	unsigned long freed = 0;
+
+	while (total_to_free > freed) {
+		unsigned long nr_slab = global_page_state(NR_SLAB_RECLAIMABLE);
+		struct reclaim_state reclaim_state;
+
+		if (nr_slab > total_to_free)
+			nr_slab = total_to_free;
+
+		reclaim_state.reclaimed_slab = 0;
+		shrink_slab(nr_slab, sc.gfp_mask, nr_slab);
+		if (!reclaim_state.reclaimed_slab)
+			return freed;
+
+		freed += reclaim_state.reclaimed_slab;
+	}
+
+	return freed;
+}
+
+unsigned long shrink_ps2_zone(struct zone *zone, unsigned long total_to_free,
+		struct scan_control sc)
 {
 	int prio;
-	unsigned long still_to_free = total_to_free;
-	struct scan_control sc = {
-		.gfp_mask = GFP_KERNEL,
-		.may_swap = 0,
-		.may_writepage = 1,
-		.swappiness = vm_swappiness,
-	};
-
+	unsigned long freed = 0;
 	if (!populated_zone(zone) || zone->all_unreclaimable)
-		return;
-
-	if (still_to_free <= 0)
-		return;
-
-	if (is_highmem(zone))
-		sc.gfp_mask |= __GFP_HIGHMEM;
+		return 0;
 
 	for (prio = DEF_PRIORITY; prio >= 0; prio--) {
 		unsigned long to_free, just_freed, orig_size;
@@ -1632,10 +1643,10 @@ void shrink_one_zone(struct zone *zone, int total_to_free)
 
 		to_free = min(zone_page_state(zone, NR_ACTIVE) +
 				zone_page_state(zone, NR_INACTIVE),
-				still_to_free);
+				total_to_free - freed);
 
 		if (to_free <= 0)
-			return;
+			return freed;
 
 		sc.swap_cluster_max = to_free -
 			zone_page_state(zone, NR_INACTIVE);
@@ -1655,7 +1666,7 @@ void shrink_one_zone(struct zone *zone, int total_to_free)
 
 		to_free = min(zone_page_state(zone, NR_ACTIVE) +
 				zone_page_state(zone, NR_INACTIVE),
-				still_to_free);
+				total_to_free - freed);
 		
 		do {
 			orig_size = zone_page_state(zone, NR_ACTIVE) +
@@ -1667,29 +1678,34 @@ void shrink_one_zone(struct zone *zone, int total_to_free)
 				(zone_page_state(zone, NR_ACTIVE) +
 				 zone_page_state(zone, NR_INACTIVE)));
 			zone->nr_scan_inactive = 0;
-			still_to_free -= just_freed;
-			to_free -= just_freed;
-		} while (just_freed > 0 && still_to_free > 0);
-	};
-
-	while (still_to_free > 0) {
-		unsigned long nr_slab = global_page_state(NR_SLAB_RECLAIMABLE);
-		struct reclaim_state reclaim_state;
-
-		if (nr_slab > still_to_free)
-			nr_slab = still_to_free;
-
-		reclaim_state.reclaimed_slab = 0;
-		shrink_slab(nr_slab, sc.gfp_mask, nr_slab);
-		if (!reclaim_state.reclaimed_slab)
-			break;
-
-		still_to_free -= reclaim_state.reclaimed_slab;
+			freed += just_freed;
+		} while (just_freed > 0 && freed < total_to_free);
 	}
 
-	return;
+	return freed;
 }
 
+void shrink_one_zone(struct zone *zone, unsigned long total_to_free, int ps_wanted)
+{
+	unsigned long freed = 0;
+	struct scan_control sc = {
+		.gfp_mask = GFP_KERNEL,
+		.may_swap = 0,
+		.may_writepage = 1,
+		.swappiness = vm_swappiness,
+	};
+
+	if (total_to_free <= 0)
+		return;
+
+	if (is_highmem(zone))
+		sc.gfp_mask |= __GFP_HIGHMEM;
+
+	if (ps_wanted & 2)
+		freed = shrink_ps2_zone(zone, total_to_free, sc);
+	if (ps_wanted & 1)
+		shrink_ps1_zone(zone, total_to_free - freed, sc);
+}
 
 /*
  * Helper function for shrink_all_memory().  Tries to reclaim 'nr_pages' pages

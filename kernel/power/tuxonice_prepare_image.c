@@ -846,7 +846,7 @@ static void eat_memory(void)
 		thaw_kernel_threads();
 
 		for (zone_idx = 0; zone_idx < MAX_NR_ZONES; zone_idx++) {
-			int zone_type_free = max_t(int, (zone_idx == ZONE_HIGHMEM) ?
+			unsigned long zone_type_free = max_t(int, (zone_idx == ZONE_HIGHMEM) ?
 				highpages_ps1_to_free() :
 				lowpages_ps1_to_free(), amount_wanted);
 
@@ -857,7 +857,7 @@ static void eat_memory(void)
 				if (zone_idx(zone) != zone_idx)
 					continue;
 
-				shrink_one_zone(zone, zone_type_free);
+				shrink_one_zone(zone, zone_type_free, 3);
 
 				did_eat_memory = 1;
 
