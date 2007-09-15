@@ -297,7 +297,7 @@ static int lzf_decompress(struct crypto_tfm *tfm, const u8 *src,
 static struct crypto_alg alg = {
 	.cra_name = "lzf",
 	.cra_flags = CRYPTO_ALG_TYPE_COMPRESS,
-	.cra_ctxsize = 0,
+	.cra_ctxsize = sizeof(struct lzf_ctx),
 	.cra_module = THIS_MODULE,
 	.cra_list = LIST_HEAD_INIT(alg.cra_list),
 	.cra_init = lzf_compress_init,
