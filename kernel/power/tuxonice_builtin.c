@@ -165,9 +165,6 @@ int toi_wait = CONFIG_TOI_DEFAULT_WAIT;
 #ifdef CONFIG_TOI_USERUI_EXPORTS
 EXPORT_SYMBOL_GPL(kmsg_redirect);
 EXPORT_SYMBOL_GPL(toi_wait);
-#ifndef CONFIG_COMPAT
-EXPORT_SYMBOL_GPL(sys_ioctl);
-#endif
 #endif
 
 #if defined(CONFIG_TOI_USERUI_EXPORTS) || defined(CONFIG_TOI_CORE_EXPORTS)
