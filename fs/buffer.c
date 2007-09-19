@@ -234,6 +234,7 @@ void thaw_bdev(struct block_device *bdev, struct super_block *sb)
 }
 EXPORT_SYMBOL(thaw_bdev);
 
+//#define DEBUG_FS_FREEZING
 /**
  * freeze_filesystems - lock all filesystems and force them into a consistent
  * state
@@ -249,10 +250,18 @@ void freeze_filesystems(void)
 	 * frozen in the right order (eg. loopback on ext3).
 	 */
 	list_for_each_entry_reverse(sb, &super_blocks, s_list) {
+#ifdef DEBUG_FS_FREEZING
+		printk("Considering %s.%s: (root %p, bdev %x)",
+			sb->s_type->name ? sb->s_type->name : "?",
+			sb->s_subtype ? sb->s_subtype : "", sb->s_root,
+			sb->s_bdev ? sb->s_bdev->bd_dev : 0);
+#endif
+
 		if (sb->s_type->fs_flags & FS_IS_FUSE &&
 		    sb->s_frozen == SB_UNFROZEN) {
 			sb->s_frozen = SB_FREEZE_TRANS;
 			sb->s_flags |= MS_FROZEN;
+			printk("Fuse filesystem done.\n");
 			continue;
 		}
 
@@ -260,11 +269,20 @@ void freeze_filesystems(void)
 		    (sb->s_frozen == SB_FREEZE_TRANS) ||
 		    (sb->s_flags & MS_RDONLY) ||
 		    (sb->s_flags & MS_FROZEN)) {
+#ifdef DEBUG_FS_FREEZING
+			printk("Nope.\n");
+#endif
 			continue;
 		}
 
+#ifdef DEBUG_FS_FREEZING
+		printk("Freezing %x... ", sb->s_bdev->bd_dev);
+#endif
 		freeze_bdev(sb->s_bdev);
 		sb->s_flags |= MS_FROZEN;
+#ifdef DEBUG_FS_FREEZING
+		printk("Done.\n");
+#endif
 	}
 
 	lockdep_on();

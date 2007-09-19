@@ -86,6 +86,7 @@ static void freeze_task(struct task_struct *p)
 		rmb();
 		if (!frozen(p)) {
 			set_freeze_flag(p);
+			pr_debug("Freeze process %s (%d).\n", p->comm, p->pid);
 			if (p->state == TASK_STOPPED)
 				force_sig_specific(SIGSTOP, p);
 			spin_lock_irqsave(&p->sighand->siglock, flags);
@@ -147,8 +148,10 @@ static int try_to_freeze_tasks(int freeze_user_space)
 			} else {
 				freeze_task(p);
 			}
-			if (!freezer_should_skip(p))
+			if (!freezer_should_skip(p)) {
+				pr_debug("Waiting for %s (%d).\n", p->comm, p->pid);
 				todo++;
+			}
 		} while_each_thread(g, p);
 		read_unlock(&tasklist_lock);
 		yield();			/* Yield is okay here */
@@ -172,7 +175,7 @@ static int try_to_freeze_tasks(int freeze_user_space)
 		do_each_thread(g, p) {
 			task_lock(p);
 			if (freezing(p) && !freezer_should_skip(p))
-				printk(KERN_ERR " %s\n", p->comm);
+				printk(KERN_ERR " %s (%d) failed to freeze.\n", p->comm, p->pid);
 			cancel_freezing(p);
 			task_unlock(p);
 		} while_each_thread(g, p);
