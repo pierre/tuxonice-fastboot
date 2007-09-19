@@ -55,7 +55,7 @@ static int ui_helper_changed; /* Used at resume-time so don't overwrite value
 /* Number of distinct progress amounts that userspace can display */
 static int progress_granularity = 30;
 
-DECLARE_WAIT_QUEUE_HEAD(userui_wait_for_key);
+static DECLARE_WAIT_QUEUE_HEAD(userui_wait_for_key);
 
 /**
  * ui_nl_set_state - Update toi_action based on a message from userui.
