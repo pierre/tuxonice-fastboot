@@ -1,5 +1,5 @@
 		   TuxOnIce 2.2 Internal Documentation.
-				Version 1
+			Updated to 18 September 2007
 
 1.  Introduction.
 
@@ -53,7 +53,8 @@
 
     a. Quiescing activity.
 
-    Safely quiescing the system is achieved using two methods.
+    Safely quiescing the system is achieved using three separate but related
+    aspects.
 
     First, we note that the vast majority of processes don't need to run during
     suspend. They can be 'frozen'. We therefore implement a refrigerator
@@ -66,33 +67,28 @@
     the place in their event loops where they drop locks and yield to other
     processes or sleep.
 
-    The second part of our method for quisescing the system involves freezing
-    the filesystems. We use the standard freeze_bdev and thaw_bdev functions to
-    ensure that all of the user's data is synced to disk before we begin to
-    write the image. This is particularly important with XFS, where without
-    bdev freezing, activity may still occur after we begin to write the image
-    (potentially causing in-memory and on-disk corruption later).
+    The task of freezing processes is complicated by the fact that there can be
+    interdependencies between processes. Freezing process A before process B may
+    mean that process B cannot be frozen, because it stops at waiting for
+    process A rather than in the refrigerator. This issue is seen where
+    userspace waits on freezeable kernel threads or fuse filesystem threads. To
+    address this issue, we implement the following algorithm for quiescing
+    activity:
 
-    Quiescing the system works most quickly and reliably when we add one more
-    element to the algorithm: separating the freezing of userspace processes
-    from the freezing of kernel space processes, and doing the filesystem freeze
-    in between. The filesystem freeze needs to be done while kernel threads such
-    as kjournald can still run.  At the same time, though, everything will be
-    less racy and run more quickly if we stop userspace submitting more I/O work
-    while we're trying to quiesce.
-
-    Quiescing the system is therefore done in three steps:
+	- Freeze filesystems (including fuse - userspace programs starting
+		new requests are immediately frozen; programs already running
+		requests complete their work before being frozen in the next
+		step)
 	- Freeze userspace
+	- Thaw filesystems (this is safe now that userspace is frozen and no
+		fuse requests are outstanding).
+	- Invoke sys_sync (noop on fuse).
 	- Freeze filesystems
 	- Freeze kernel threads
 
     If we need to free memory, we thaw kernel threads and filesystems, but not
     userspace. We can then free caches without worrying about deadlocks due to
     swap files being on frozen filesystems or such like.
-
-    One limitation of this is that FUSE filesystems are incompatible with
-    suspending to disk. They need to be unmounted prior to suspending, to avoid
-    potential deadlocks.
 
     b. Ensure enough memory & storage are available.
 
