@@ -338,7 +338,12 @@ static int submit(struct io_info *io_info)
 
 	atomic_inc(&toi_io_in_progress);
 
-	submit_bio(io_info->writing, bio);
+	if (unlikely(test_action_state(TOI_TEST_FILTER_SPEED))) {
+		/* Fake having done the hard work */
+		set_bit(BIO_UPTODATE, &bio->bi_flags);
+		toi_end_bio(bio, PAGE_SIZE, 0);
+	} else
+		submit_bio(io_info->writing | (1 << BIO_RW_SYNC), bio);
 
 	return 0;
 }
@@ -645,9 +650,6 @@ static int toi_bio_rw_page(int writing, struct page *page,
 {
 	struct toi_bdev_info *dev_info;
 
-	if (test_action_state(TOI_TEST_FILTER_SPEED))
-		return 0;
-		
 	if (go_next_page()) {
 		printk("Failed to advance a page in the extent data.\n");
 		return -ENODATA;
