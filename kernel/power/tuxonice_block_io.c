@@ -278,6 +278,8 @@ static int toi_end_bio(struct bio *bio, unsigned int bytes_done, int err)
 	struct io_info *io_info = bio->bi_private;
 	unsigned long flags;
 
+	BUG_ON(!test_bit(BIO_UPTODATE, &bio->bi_flags));
+
 	spin_lock_irqsave(&ioinfo_busy_lock, flags);
 	list_del_init(&io_info->list);
 	spin_unlock_irqrestore(&ioinfo_busy_lock, flags);
