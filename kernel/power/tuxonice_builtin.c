@@ -247,8 +247,10 @@ int toi_lowlevel_builtin(void)
 		printk(KERN_ERR "Error %d hibernating\n", error);
 
 	/* Restore control flow appears here */
-	if (!toi_in_hibernate)
+	if (!toi_in_hibernate) {
 		copyback_high();
+		set_toi_state(TOI_NOW_RESUMING);
+	}
 
 	restore_processor_state();
 

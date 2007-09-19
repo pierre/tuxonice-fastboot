@@ -582,13 +582,6 @@ Failed:
 	if (toi_activate_storage(1))
 		panic("Failed to reactivate our storage.");
 
-	if (temp_result || test_result_state(TOI_ABORTED)) {
-		if (did_copy)
-			goto abort_reloading_pagedir_two;
-		else
-			return 1;
-	}
-
 	/* Resume time? */
 	if (!toi_in_hibernate) {
 		copyback_post();
@@ -596,6 +589,13 @@ Failed:
 	}
 
 	/* Nope. Hibernating. So, see if we can save the image... */
+
+	if (temp_result || test_result_state(TOI_ABORTED)) {
+		if (did_copy)
+			goto abort_reloading_pagedir_two;
+		else
+			return 1;
+	}
 
 	toi_update_status(pagedir2.size,
 			pagedir1.size + pagedir2.size,

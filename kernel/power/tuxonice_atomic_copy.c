@@ -97,8 +97,6 @@ void copyback_post(void)
 		toi_io_time[loop/2][loop%2] =
 			toi_nosave_io_speed[loop/2][loop%2];
 
-	set_toi_state(TOI_NOW_RESUMING);
-
 	if (toi_activate_storage(1))
 		panic("Failed to reactivate our storage.");
 
