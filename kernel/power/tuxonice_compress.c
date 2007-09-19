@@ -84,8 +84,7 @@ static int toi_compress_crypto_prepare(void)
 
 	for_each_online_cpu(cpu) {
 		struct cpu_context *this = &per_cpu(contexts, cpu);
-		this->transform = crypto_alloc_comp(toi_compressor_name,
-				0, 0);
+		this->transform = crypto_alloc_comp(toi_compressor_name, 0, 0);
 		if (IS_ERR(this->transform)) {
 			printk("TuxOnIce: Failed to initialise the %s "
 					"compression transform.\n",
