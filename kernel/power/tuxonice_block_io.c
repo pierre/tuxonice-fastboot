@@ -236,7 +236,12 @@ static void toi_wait_on_readahead(int readahead_index)
 
 static int toi_prepare_readahead(int index)
 {
-	unsigned long new_page = toi_get_zeroed_page(12, TOI_ATOMIC_GFP);
+	unsigned long new_page;
+
+	if (toi_ra_pages[index])
+		return 0;
+
+	new_page = toi_get_zeroed_page(12, TOI_ATOMIC_GFP);
 
 	if(!new_page)
 		return -ENOMEM;
@@ -249,9 +254,10 @@ static int toi_prepare_readahead(int index)
  * Clean up structures used for readahead */
 static void toi_cleanup_readahead(int page)
 {
-	__free_page(toi_ra_pages[page]);
-	toi_ra_pages[page] = 0;
-	return;
+	if (toi_ra_pages[page]) {
+		__free_page(toi_ra_pages[page]);
+		toi_ra_pages[page] = 0;
+	}
 }
 
 /**
@@ -718,12 +724,8 @@ static int toi_rw_cleanup(int writing)
 	toi_finish_all_io();
 
 	if (!writing)
-		while (readahead_index != ra_submit_index) {
-			toi_cleanup_readahead(readahead_index);
-			readahead_index++;
-			if (readahead_index == max_outstanding_io)
-				readahead_index = 0;
-		}
+		for (i=0; i < max_outstanding_io; i++)
+			toi_cleanup_readahead(i);
 
 	current_stream = 0;
 
@@ -778,7 +780,6 @@ static int toi_bio_read_page_with_readahead(void)
 		if (last_result) {
 			printk("Begin read chunk for page %d returned %d.\n",
 				ra_submit_index, last_result);
-			toi_cleanup_readahead(ra_submit_index);
 			break;
 		}
 
@@ -796,8 +797,6 @@ wait:
 	virt = kmap_atomic(toi_ra_pages[readahead_index], KM_USER1);
 	memcpy(toi_writer_buffer, virt, PAGE_SIZE);
 	kunmap_atomic(virt, KM_USER1);
-
-	toi_cleanup_readahead(readahead_index);
 
 	readahead_index++;
 	if (readahead_index == max_outstanding_io)
