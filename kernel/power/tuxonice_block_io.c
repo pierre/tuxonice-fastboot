@@ -274,6 +274,7 @@ static void toi_cleanup_readahead(int page)
  */
 static int toi_end_bio(struct bio *bio, unsigned int bytes_done, int err)
 {
+	struct page *page = bio->bi_io_vec[0].bv_page;
 	struct io_info *io_info = bio->bi_private;
 	unsigned long flags;
 
@@ -284,6 +285,9 @@ static int toi_end_bio(struct bio *bio, unsigned int bytes_done, int err)
 	spin_lock_irqsave(&ioinfo_ready_lock, flags);
 	list_add_tail(&io_info->list, &ioinfo_ready_for_cleanup);
 	spin_unlock_irqrestore(&ioinfo_ready_lock, flags);
+
+	unlock_page(page);
+	bio_put(bio);
 
 	atomic_dec(&toi_io_in_progress);
 	atomic_inc(&toi_io_to_cleanup);
@@ -329,8 +333,9 @@ static int submit(struct io_info *io_info)
 		return -EFAULT;
 	}
 
-	if (io_info->writing)
-		bio_set_pages_dirty(bio);
+	io_info->bio_page->private = (unsigned long) io_info;
+	lock_page(io_info->bio_page);
+	bio_get(bio);
 
 	spin_lock_irqsave(&ioinfo_busy_lock, flags);
 	list_add_tail(&io_info->list, &ioinfo_busy);
