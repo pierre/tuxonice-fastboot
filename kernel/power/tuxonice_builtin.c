@@ -108,14 +108,6 @@ EXPORT_SYMBOL_GPL(hibernation_platform_enter);
 
 #ifdef CONFIG_TOI_CORE_EXPORTS
 EXPORT_SYMBOL_GPL(max_pfn);
-EXPORT_SYMBOL_GPL(free_dyn_pageflags);
-EXPORT_SYMBOL_GPL(clear_dynpageflag);
-EXPORT_SYMBOL_GPL(test_dynpageflag);
-EXPORT_SYMBOL_GPL(set_dynpageflag);
-EXPORT_SYMBOL_GPL(get_next_bit_on);
-EXPORT_SYMBOL_GPL(allocate_dyn_pageflags);
-EXPORT_SYMBOL_GPL(clear_dyn_pageflags);
-EXPORT_SYMBOL_GPL(dump_pagemap);
 
 #ifdef CONFIG_X86_64
 EXPORT_SYMBOL_GPL(restore_processor_state);
