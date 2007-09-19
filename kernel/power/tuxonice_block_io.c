@@ -166,19 +166,31 @@ static void toi_cleanup_some_completed_io(void)
 	spin_unlock_irqrestore(&ioinfo_ready_lock, flags);
 }
 
+static int reasons[7];
+static char *reason_name[7] = {
+	"readahead not ready",
+	"bio allocation",
+	"io_struct allocation",
+	"submit buffer",
+	"synchronous I/O",
+	"bio mutex when reading",
+	"bio mutex when writing"
+};
+
 /**
  * do_bio_wait: Wait for some TuxOnIce i/o to complete.
  *
  * Submit any I/O that's batched up (if we're not already doing
  * that, schedule and clean up whatever we can.
  */
-static void do_bio_wait(void)
+static void do_bio_wait(int reason)
 {
 	struct backing_dev_info *bdi;
 
 	submit_batched();
 
 	atomic_inc(&toi_bio_waits);
+	reasons[reason]++;
 
 	if (waiting_on) {
 		bdi = waiting_on->dev->bd_inode->i_mapping->backing_dev_info;
@@ -195,7 +207,7 @@ static void do_bio_wait(void)
 static void toi_finish_all_io(void)
 {
 	while (atomic_read(&outstanding_io))
-		do_bio_wait();
+		do_bio_wait(0);
 }
 
 /**
@@ -219,7 +231,7 @@ static int toi_readahead_ready(int readahead_index)
 static void toi_wait_on_readahead(int readahead_index)
 {
 	while (!toi_readahead_ready(readahead_index))
-		do_bio_wait();
+		do_bio_wait(0);
 }
 
 static int toi_prepare_readahead(int index)
@@ -290,7 +302,7 @@ static int submit(struct io_info *io_info)
 	while (!bio) {
 		bio = bio_alloc(GFP_ATOMIC,1);
 		if (!bio)
-			do_bio_wait();
+			do_bio_wait(1);
 	}
 
 	bio->bi_bdev = io_info->dev;
@@ -388,7 +400,7 @@ static struct io_info *get_io_info_struct(void)
 
 	do {
 		while (atomic_read(&outstanding_io) >= max_outstanding_io)
-			do_bio_wait();
+			do_bio_wait(2);
 
 		this = toi_kmalloc(1, sizeof(struct io_info), GFP_ATOMIC);
 	} while (!this);
@@ -436,7 +448,7 @@ static void toi_do_io(int writing, struct block_device *bdev, long block0,
 
 	if (io_info->readahead_index == -1) {
 		while (!(buffer_virt = toi_get_zeroed_page(13, TOI_ATOMIC_GFP)))
-			do_bio_wait();
+			do_bio_wait(3);
 
 		io_info->bio_page = virt_to_page(buffer_virt);
 	} else {
@@ -474,7 +486,7 @@ static void toi_do_io(int writing, struct block_device *bdev, long block0,
 	atomic_inc(&outstanding_io);
 
 	if (syncio)
-		do { do_bio_wait(); } while (waiting_on);
+		do { do_bio_wait(4); } while (waiting_on);
 }
 
 /**
@@ -675,6 +687,8 @@ static void toi_read_header_init(void)
  */
 static int toi_rw_cleanup(int writing)
 {
+	int i;
+
 	if (writing && toi_bio_rw_page(WRITE,
 			virt_to_page(toi_writer_buffer), -1))
 		return -EIO;
@@ -697,6 +711,13 @@ static int toi_rw_cleanup(int writing)
 
 	printk("Waited on I/O %d times.\n", atomic_read(&toi_bio_waits));
 	atomic_set(&toi_bio_waits, 0);
+	for (i = 0; i < 7; i++) {
+		if (!reasons[i])
+			continue;
+		printk("Waited for i/o due to %s %d times.\n", reason_name[i],
+				reasons[i]);
+		reasons[i] = 0;
+	}
 	return 0;
 }
 
@@ -831,7 +852,7 @@ static int toi_bio_read_page(unsigned long *pfn, struct page *buffer_page,
 	pr_index++;
 
 	while (!mutex_trylock(&toi_bio_mutex))
-		do_bio_wait();
+		do_bio_wait(5);
 
 	if (toi_rw_buffer(READ, (char *) pfn, sizeof(unsigned long)) ||
 	    toi_rw_buffer(READ, (char *) buf_size, sizeof(int)) ||
@@ -865,7 +886,7 @@ static int toi_bio_write_page(unsigned long pfn, struct page *buffer_page,
 	pr_index++;
 
 	while (!mutex_trylock(&toi_bio_mutex))
-		do_bio_wait();
+		do_bio_wait(6);
 
 	if (toi_rw_buffer(WRITE, (char *) &pfn, sizeof(unsigned long)) ||
 	    toi_rw_buffer(WRITE, (char *) &buf_size, sizeof(int)) ||
