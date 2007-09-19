@@ -54,10 +54,13 @@ static DEFINE_SPINLOCK(ioinfo_submit_lock);
 static LIST_HEAD(ioinfo_busy);
 static DEFINE_SPINLOCK(ioinfo_busy_lock);
 
-static struct io_info *waiting_on;
+static struct page *waiting_on;
 
 static atomic_t submit_batch;
+static atomic_t toi_io_in_progress;
+static atomic_t toi_io_to_cleanup;
 static int submit_batched(void);
+static DECLARE_WAIT_QUEUE_HEAD(num_in_progress_wait);
 
 /* [Max] number of I/O operations pending */
 static atomic_t outstanding_io;
@@ -136,14 +139,12 @@ static void toi_bio_cleanup_one(struct io_info *io_info)
 		spin_unlock_irqrestore(&toi_readahead_flags_lock, flags);
 	}
 
-	if (waiting_on == io_info)
-		waiting_on = NULL;
 	kfree(io_info);
-	atomic_dec(&outstanding_io);
+	atomic_dec(&toi_io_to_cleanup);
 }
 
 /**
- * toi_cleanup_some_completed_io: Cleanup completed TuxOnIce i/o.
+ * toi_cleanup_completed_io: Cleanup completed TuxOnIce i/o.
  *
  * Cleanup i/o that has been completed. In the end_bio routine (below), we only
  * move the associated io_info struct from the busy list to the
@@ -153,7 +154,7 @@ static void toi_bio_cleanup_one(struct io_info *io_info)
  * No locking is needed because we're under toi_bio_mutex. List items can be
  * added from the bio_end routine, but we're the only one removing them.
  */
-static void toi_cleanup_some_completed_io(int all)
+static void toi_cleanup_completed_io(int all)
 {
 	int num_cleaned = 0;
 	struct io_info *this, *next;
@@ -185,20 +186,16 @@ static char *reason_name[7] = {
  */
 static void do_bio_wait(int reason)
 {
-	struct backing_dev_info *bdi;
-
-	submit_batched();
-
-	atomic_inc(&toi_bio_waits);
 	reasons[reason]++;
 
 	if (waiting_on) {
-		bdi = waiting_on->dev->bd_inode->i_mapping->backing_dev_info;
-		blk_run_backing_dev(bdi, waiting_on->bio_page);
+		wait_on_page_locked(waiting_on);
+		toi_bio_cleanup_one((struct io_info *) waiting_on->private);
+		waiting_on = NULL;
+	} else {
+		io_schedule();
+		toi_cleanup_completed_io(0);
 	}
-
-	io_schedule();
-	toi_cleanup_some_completed_io(0);
 }
 
 /**
@@ -206,8 +203,10 @@ static void do_bio_wait(int reason)
  */
 static void toi_finish_all_io(void)
 {
-	while (atomic_read(&outstanding_io))
-		do_bio_wait(0);
+	submit_batched();
+	wait_event(num_in_progress_wait, !atomic_read(&toi_io_in_progress));
+	toi_cleanup_completed_io(1);
+	BUG_ON(atomic_read(&toi_io_to_cleanup));
 }
 
 /**
@@ -230,8 +229,9 @@ static int toi_readahead_ready(int readahead_index)
  */
 static void toi_wait_on_readahead(int readahead_index)
 {
-	while (!toi_readahead_ready(readahead_index))
-		do_bio_wait(0);
+	submit_batched();
+	waiting_on = toi_ra_pages[readahead_index];
+	do_bio_wait(0);
 }
 
 static int toi_prepare_readahead(int index)
@@ -278,6 +278,11 @@ static int toi_end_bio(struct bio *bio, unsigned int bytes_done, int err)
 	spin_lock_irqsave(&ioinfo_ready_lock, flags);
 	list_add_tail(&io_info->list, &ioinfo_ready_for_cleanup);
 	spin_unlock_irqrestore(&ioinfo_ready_lock, flags);
+
+	atomic_dec(&toi_io_in_progress);
+	atomic_inc(&toi_io_to_cleanup);
+
+	wake_up(&num_in_progress_wait);
 	return 0;
 }
 
@@ -324,6 +329,8 @@ static int submit(struct io_info *io_info)
 	spin_lock_irqsave(&ioinfo_busy_lock, flags);
 	list_add_tail(&io_info->list, &ioinfo_busy);
 	spin_unlock_irqrestore(&ioinfo_busy_lock, flags);
+
+	atomic_inc(&toi_io_in_progress);
 
 	submit_bio(io_info->writing, bio);
 
@@ -397,12 +404,23 @@ static void add_to_batch(struct io_info *io_info)
 static struct io_info *get_io_info_struct(void)
 {
 	struct io_info *this = NULL;
+	int first = 1;
+
+	wait_event(num_in_progress_wait,
+			atomic_read(&toi_io_in_progress) < max_outstanding_io);
 
 	do {
-		while (atomic_read(&outstanding_io) >= max_outstanding_io)
-			do_bio_wait(2);
-
 		this = toi_kmalloc(1, sizeof(struct io_info), GFP_ATOMIC);
+
+		if (this)
+			break;
+
+		if (first) {
+			submit_batched();
+			first = 0;
+		}
+
+		do_bio_wait(2);
 	} while (!this);
 
 	INIT_LIST_HEAD(&this->list);
@@ -435,10 +453,6 @@ static void toi_do_io(int writing, struct block_device *bdev, long block0,
 	unsigned long buffer_virt = 0;
 	char *to, *from;
 
-	/* Done before submitting to avoid races. */
-	if (syncio)
-		waiting_on = io_info;
-
 	/* Copy settings to the io_info struct */
 	io_info->writing = writing;
 	io_info->dev = bdev;
@@ -462,6 +476,10 @@ static void toi_do_io(int writing, struct block_device *bdev, long block0,
 
 		io_info->bio_page = page;
 	}
+
+	/* Done before submitting to avoid races. */
+	if (syncio)
+		waiting_on = io_info->bio_page;
 
 	/*
 	 * If writing, copy our data. The data is probably in lowmem, but we cannot be
