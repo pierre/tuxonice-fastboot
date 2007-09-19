@@ -1,9 +1,9 @@
-		Software Suspend 2.2 Internal Documentation.
+		   TuxOnIce 2.2 Internal Documentation.
 				Version 1
 
 1.  Introduction.
 
-    Software Suspend 2.2 is an addition to the Linux Kernel, designed to
+    TuxOnIce 2.2 is an addition to the Linux Kernel, designed to
     allow the user to quickly shutdown and quickly boot a computer, without
     needing to close documents or programs. It is equivalent to the
     hibernate facility in some laptops. This implementation, however,
@@ -145,9 +145,9 @@
     pagesets.
 
     Pageset2 contains the page cache - the pages on the active and inactive
-    lists. These pages aren't needed or modifed while Suspend2 is running, so
+    lists. These pages aren't needed or modifed while TuxOnIce is running, so
     they can be safely written without an atomic copy. They are therefore
-    saved first and reloaded last. While saving these pages, Suspend2 carefully
+    saved first and reloaded last. While saving these pages, TuxOnIce carefully
     ensures that the work of writing the pages doesn't make the image
     inconsistent.
 
@@ -158,9 +158,9 @@
     DRI is in use, video drivers may require significants amounts. Ideally we
     would be able to query drivers while preparing the image as to the amount of
     memory they will need. Unfortunately no such mechanism exists at the time of
-    writing. For this reason, Suspend2 allows the user to set an
+    writing. For this reason, TuxOnIce allows the user to set an
     'extra_pages_allowance', which is used to seek to ensure sufficient memory
-    is available for drivers at this point. Suspend2 also lets the user set this
+    is available for drivers at this point. TuxOnIce also lets the user set this
     value to 0. In this case, a test driver suspend is done while preparing the
     image, and the difference (plus a margin) used instead.
 
@@ -186,7 +186,7 @@
 
     e. Power down.
 
-    Powering down uses standard kernel routines. Suspend2 supports powering down
+    Powering down uses standard kernel routines. TuxOnIce supports powering down
     using the ACPI S3, S4 and S5 methods or the kernel's non-ACPI power-off.
     Supporting suspend to ram (S3) as a power off option might sound strange,
     but it allows the user to quickly get their system up and running again if
@@ -196,7 +196,7 @@
 
 4.  Data Structures.
 
-    Suspend2 uses three main structures to store its metadata and configuration
+    TuxOnIce uses three main structures to store its metadata and configuration
     information:
 
     a) Pageflags bitmaps.
@@ -214,14 +214,14 @@
     As mentioned above, using bitmaps also means that the amount of memory and
     storage required for recording the above information is constant. This
     greatly simplifies the work of preparing the image. In earlier versions of
-    Suspend2, extents were used to record which pages would be stored. In that
+    TuxOnIce, extents were used to record which pages would be stored. In that
     case, however, eating memory could result in greater fragmentation of the
     lists of pages, which in turn required more memory to store the extents and
     more storage in the image header. These could in turn require further
     freeing of memory, and another iteration. All of this complexity is removed
     by having bitmaps.
 
-    Bitmaps also make a lot of sense because Suspend2 only ever iterates
+    Bitmaps also make a lot of sense because TuxOnIce only ever iterates
     through the lists. There is therefore no cost to not being able to find the
     nth page in order 0 time. We only need to worry about the cost of finding
     the n+1th page, given the location of the nth page. Bitwise optimisations
@@ -231,7 +231,7 @@
 
     b) Extents for block data.
 
-    Suspend2 supports writing the image to multiple block devices. In the case
+    TuxOnIce supports writing the image to multiple block devices. In the case
     of swap, multiple partitions and/or files may be in use, and we happily use
     them all. This is accomplished as follows:
 
@@ -247,7 +247,7 @@
     Variations in block size are taken account of in transforming this data
     into the parameters for bio submission.
 
-    We can thus implement a layer of abstraction wherein the core of Suspend2
+    We can thus implement a layer of abstraction wherein the core of TuxOnIce
     doesn't have to worry about which device we're currently writing to or
     where in the device we are. It simply requests that the next page in the
     pageset or header be written, leaving the details to this lower layer.
@@ -347,7 +347,7 @@
         unsigned long offset;
     };
 
-    We can thus implement a layer of abstraction wherein the core of Suspend2
+    We can thus implement a layer of abstraction wherein the core of TuxOnIce
     doesn't have to worry about which device we're currently writing to or
     where in the device we are. It simply requests that the next page in the
     pageset or header be written, leaving the details to this layer, and
@@ -356,7 +356,7 @@
 
     c) Modules
 
-    One aim in designing Suspend2 was to make it flexible. We wanted to allow
+    One aim in designing TuxOnIce was to make it flexible. We wanted to allow
     for the implementation of different methods of transforming a page to be
     written to disk and different methods of getting the pages stored.
 
@@ -366,7 +366,7 @@
     had expressed interest in implementing image encryption, and alternative
     methods of storing the image.
 
-    In order to achieve this, Suspend2 was given a modular design.
+    In order to achieve this, TuxOnIce was given a modular design.
 
     A module is a single file which encapsulates the functionality needed
     to transform a pageset of data (encryption or compression, for example),
@@ -378,7 +378,7 @@
     The pipeline follows this pattern:
 
 		---------------------------------
-		|          Suspend2 Core        |
+		|          TuxOnIce Core        |
 		---------------------------------
 				|
 				|
@@ -444,13 +444,13 @@
 
     d) Sysfs data structures.
 
-    This brings us naturally to support for configuring Suspend2. We desired to
-    provide a way to make Suspend2 as flexible and configurable as possible.
+    This brings us naturally to support for configuring TuxOnIce. We desired to
+    provide a way to make TuxOnIce as flexible and configurable as possible.
     The user shouldn't have to reboot just because they want to now suspend to
     a file instead of a partition, for example.
 
-    To accomplish this, Suspend2 implements a very generic means whereby the
-    core and modules can register new sysfs entries. All Suspend2 entries use
+    To accomplish this, TuxOnIce implements a very generic means whereby the
+    core and modules can register new sysfs entries. All TuxOnIce entries use
     a single _store and _show routine, both of which are found in sysfs.c in
     the kernel/power directory. These routines handle the most common operations
     - getting and setting the values of bits, integers, longs, unsigned longs
@@ -460,7 +460,7 @@
     When combined with some simple macros, a new sysfs entry can then be defined
     in just a couple of lines:
 
-    { SUSPEND2_ATTR("progress_granularity", SYSFS_RW),
+    { TOI_ATTR("progress_granularity", SYSFS_RW),
       SYSFS_INT(&progress_granularity, 1, 2048)
     },
 
@@ -468,6 +468,6 @@
     allows the user to access an integer stored at &progress_granularity, giving
     it a value between 1 and 2048 inclusive.
 
-    Sysfs entries are registered under /sys/power/suspend2, and entries for
+    Sysfs entries are registered under /sys/power/tuxonice, and entries for
     modules are located in a subdirectory named after the module.
 

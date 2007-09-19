@@ -1,16 +1,16 @@
-	--- Suspend2, version 2.2 ---
+	--- TuxOnIce, version 2.2 ---
 
 1.  What is it?
 2.  Why would you want it?
 3.  What do you need to use it?
 4.  Why not just use the version already in the kernel?
 5.  How do you use it?
-6.  What do all those entries in /sys/power/suspend2 do?
+6.  What do all those entries in /sys/power/tuxonice do?
 7.  How do you get support?
 8.  I think I've found a bug. What should I do?
 9.  When will XXX be supported?
 10  How does it work?
-11. Who wrote Suspend2?
+11. Who wrote TuxOnIce?
 
 1. What is it?
 
@@ -23,17 +23,22 @@
    memory and you can carry on from where you were, just as if you'd never
    turned the computer off. Far less time to start up, no reopening
    applications and finding what directory you put that file in yesterday.
-   That's what Suspend2 does.
+   That's what TuxOnIce does.
 
-   Suspend2 has a long heritage. It began life as work by Gabor Kuti, who,
+   TuxOnIce has a long heritage. It began life as work by Gabor Kuti, who,
    with some help from Pavel Machek, got an early version going in 1999. The
    project was then taken over by Florent Chabaud while still in alpha version
    numbers. Nigel Cunningham came on the scene when Florent was unable to
    continue, moving the project into betas, then 1.0, 2.0 and so on up to
-   the present 2.2 series. Pavel Machek's swsusp code, which was merged around
-   2.5.17 retains the original name, and was essentially a fork of the beta
-   code until Rafael Wysocki came on the scene in 2005 and began to improve it
-   further.
+   the present series. During the 2.0 series, the name was contracted to
+   Suspend2 and the website suspend2.net created. Beginning around July 2007,
+   a transition to calling the software TuxOnIce was made, to seek to help
+   make it clear that TuxOnIce is more concerned with hibernation than suspend
+   to ram.
+
+   Pavel Machek's swsusp code, which was merged around 2.5.17 retains the
+   original name, and was essentially a fork of the beta code until Rafael
+   Wysocki came on the scene in 2005 and began to improve it further.
 
 2. Why would you want it?
 
@@ -47,15 +52,16 @@
 
    a. Kernel Support.
 
-   i) The Suspend2 patch.
+   i) The TuxOnIce patch.
    
-   Suspend2 is part of the Linux Kernel. This version is not part of Linus's
+   TuxOnIce is part of the Linux Kernel. This version is not part of Linus's
    2.6 tree at the moment, so you will need to download the kernel source and
    apply the latest patch. Having done that, enable the appropriate options in
    make [menu|x]config (under Power Management Options), compile and install your
-   kernel. Suspend2 works with SMP, Highmem, preemption, x86-32, PPC and x86_64.
+   kernel. TuxOnIce works with SMP, Highmem, preemption, fuse filesystems,
+   x86-32, PPC and x86_64.
 
-   Suspend2 patches are available from http://suspend2.net.
+   TuxOnIce patches are available from http://tuxonice.net.
 
    ii) Compression support.
 
@@ -63,9 +69,9 @@
    to select any Cryptoapi transforms that you want to use on your image from
    the Cryptoapi menu while configuring your kernel.
 
-   You can also tell Suspend to write it's image to an encrypted and/or
+   You can also tell TuxOnIce to write it's image to an encrypted and/or
    compressed filesystem/swap partition. In that case, you don't need to do
-   anything special for Suspend2 when it comes to kernel configuration.
+   anything special for TuxOnIce when it comes to kernel configuration.
 
    iii) Configuring other options.
 
@@ -80,25 +86,25 @@
 
    i) Swap.
 
-   Suspend2 can store the suspend image in your swap partition, a swap file or
+   TuxOnIce can store the suspend image in your swap partition, a swap file or
    a combination thereof. Whichever combination you choose, you will probably
    want to create enough swap space to store the largest image you could have,
    plus the space you'd normally use for swap. A good rule of thumb would be
-   to calculate the amount of swap you'd want without using Suspend2, and then
+   to calculate the amount of swap you'd want without using TuxOnIce, and then
    add the amount of memory you have. This swapspace can be arranged in any way
    you'd like. It can be in one partition or file, or spread over a number. The
    only requirement is that they be active when you start a suspend cycle.
    
-   There is one exception to this requirement. Suspend2 has the ability to turn
+   There is one exception to this requirement. TuxOnIce has the ability to turn
    on one swap file or partition at the start of suspending and turn it back off
    at the end. If you want to ensure you have enough memory to store a image
    when your memory is fully used, you might want to make one swap partition or
-   file for 'normal' use, and another for Suspend2 to activate & deactivate
+   file for 'normal' use, and another for TuxOnIce to activate & deactivate
    automatically. (Further details below).
 
    ii) Normal files.
 
-   Suspend2 includes a 'file allocator'. The file allocator can store your
+   TuxOnIce includes a 'file allocator'. The file allocator can store your
    image in a simple file. Since Linux has the concept of everything being a
    file, this is more powerful than it initially sounds. If, for example, you
    were to set up a network block device file, you could suspend to a network
@@ -112,23 +118,23 @@
    Most people will only want to suspend to a local file. To achieve that, do
    something along the lines of:
 
-   echo "Suspend2" > /suspend-file
+   echo "TuxOnIce" > /suspend-file
    dd if=/dev/zero bs=1M count=512 >> suspend-file
 
-   This will create a 512MB file called /suspend-file. To get Suspend2 to use
+   This will create a 512MB file called /suspend-file. To get TuxOnIce to use
    it:
 
-   echo /suspend-file > /sys/power/suspend2/file/target
+   echo /suspend-file > /sys/power/tuxonice/file/target
 
    Then
 
-   cat /sys/power/suspend2/resume
+   cat /sys/power/tuxonice/resume
 
    Put the results of this into your bootloader's configuration (see also step
    C, below:
 
    ---EXAMPLE-ONLY-DON'T-COPY-AND-PASTE---
-   # cat /sys/power/suspend2/resume
+   # cat /sys/power/tuxonice/resume
    file:/dev/hda2:0x1e001
    
    In this example, we would edit the append= line of our lilo.conf|menu.lst
@@ -138,32 +144,32 @@
    ---EXAMPLE-ONLY-DON'T-COPY-AND-PASTE---
  
    For those who are thinking 'Could I make the file sparse?', the answer is
-   'No!'. At the moment, there is no way for Suspend2 to fill in the holes in
+   'No!'. At the moment, there is no way for TuxOnIce to fill in the holes in
    a sparse file while suspending. In the longer term (post merge!), I'd like
    to change things so that the file could be dynamically resized as needed.
    Right now, however, that's not possible and not a priority.
 
    c. Bootloader configuration.
    
-   Using Suspend2 also requires that you add an extra parameter to 
+   Using TuxOnIce also requires that you add an extra parameter to 
    your lilo.conf or equivalent. Here's an example for a swap partition:
 
    append="resume=swap:/dev/hda1"
 
-   This would tell Suspend2 that /dev/hda1 is a swap partition you 
-   have. Suspend2 will use the swap signature of this partition as a
+   This would tell TuxOnIce that /dev/hda1 is a swap partition you 
+   have. TuxOnIce will use the swap signature of this partition as a
    pointer to your data when you suspend. This means that (in this example)
    /dev/hda1 doesn't need to be _the_ swap partition where all of your data
    is actually stored. It just needs to be a swap partition that has a
    valid signature.
 
-   You don't need to have a swap partition for this purpose. Suspend2
+   You don't need to have a swap partition for this purpose. TuxOnIce
    can also use a swap file, but usage is a little more complex. Having made
    your swap file, turn it on and do 
 
-   cat /sys/power/suspend2/swap/headerlocations
+   cat /sys/power/tuxonice/swap/headerlocations
 
-   (this assumes you've already compiled your kernel with Suspend2
+   (this assumes you've already compiled your kernel with TuxOnIce
    support and booted it). The results of the cat command will tell you
    what you need to put in lilo.conf:
 
@@ -173,11 +179,11 @@
    If the swapfile changes for any reason (it is moved to a different
    location, it is deleted and recreated, or the filesystem is
    defragmented) then you will have to check
-   /sys/power/suspend2/swap/headerlocations for a new resume_block value.
+   /sys/power/tuxonice/swap/headerlocations for a new resume_block value.
 
    Once you've compiled and installed the kernel and adjusted your bootloader
    configuration, you should only need to reboot for the most basic part
-   of Suspend2 to be ready.
+   of TuxOnIce to be ready.
 
    If you only compile in the swap allocator, or only compile in the file
    allocator, you don't need to add the "swap:" part of the resume=
@@ -186,7 +192,7 @@
    d. The hibernate script.
 
    Since the driver model in 2.6 kernels is still being developed, you may need
-   to do more, however. Users of Suspend2 usually start the process via a script
+   to do more, however. Users of TuxOnIce usually start the process via a script
    which prepares for the suspend, tells the kernel to do its stuff and then
    restore things afterwards. This script might involve:
 
@@ -200,7 +206,7 @@
    'chvt' to a text console releases the device and you can unload the
    module.
 
-   Check out the latest script (available on suspend2.net).
+   Check out the latest script (available on tuxonice.net).
    
 4. Why not just use the version already in the kernel?
 
@@ -228,7 +234,7 @@
 
    A suspend cycle can be started directly by doing:
 
-	echo > /sys/power/suspend2/do_resume
+	echo > /sys/power/tuxonice/do_resume
 
    In practice, though, you'll probably want to use the hibernate script
    to unload modules, configure the kernel the way you like it and so on.
@@ -240,7 +246,7 @@
    takes.
 
    If you're using the text or splash user interface modules, one neat feature
-   of Suspend2 that you might find useful is that you can press Escape at any
+   of TuxOnIce that you might find useful is that you can press Escape at any
    time during suspending, and the process will be aborted.
    
    Due to the way suspend works, this means you'll have your system back and
@@ -252,11 +258,11 @@
    the kernel command line will let you skip the resume step and recover your
    system.
 
-6. What do all those entries in /sys/power/suspend2 do?
+6. What do all those entries in /sys/power/tuxonice do?
 
-   /sys/power/suspend2 is the directory which contains files you can use to
-   tune and configure Suspend2 to your liking. The exact contents of
-   the directory will depend upon the version of Suspend2 you're
+   /sys/power/tuxonice is the directory which contains files you can use to
+   tune and configure TuxOnIce to your liking. The exact contents of
+   the directory will depend upon the version of TuxOnIce you're
    running and the options you selected at compile time. In the following
    descriptions, names in brackets refer to compile time options.
    (Note that they're all dependant upon you having selected CONFIG_SUSPEND2
@@ -305,7 +311,7 @@
 
    - do_suspend:
 
-   When anything is written to this file, the kernel side of Suspend2 will
+   When anything is written to this file, the kernel side of TuxOnIce will
    begin to attempt to write an image to disk and power down. You'll normally
    want to run the hibernate script instead, to get modules unloaded first.
 
@@ -320,10 +326,10 @@
 
    - extra_pages_allowance
 
-   When Suspend2 does its atomic copy, it calls the driver model suspend
+   When TuxOnIce does its atomic copy, it calls the driver model suspend
    and resume methods. If you have DRI enabled with a driver such as fglrx,
    this can result in the driver allocating a substantial amount of memory
-   for storing its state. Extra_pages_allowance tells suspend2 how much
+   for storing its state. Extra_pages_allowance tells tuxonice how much
    extra memory it should ensure is available for those allocations. If
    your attempts at suspending end with a message in dmesg indicating that
    insufficient extra pages were allowed, you need to increase this value.
@@ -336,7 +342,7 @@
 
    - freezer_test
 
-   This entry can be used to get Suspend2 to just test the freezer without
+   This entry can be used to get TuxOnIce to just test the freezer without
    actually doing a suspend cycle. It is useful for diagnosing freezing
    issues.
 
@@ -357,7 +363,7 @@
 
    The value returned by this file can be used by scripts and configuration
    tools to determine what entries should be looked for. The value is
-   incremented whenever an entry in /sys/power/suspend2 is obsoleted or 
+   incremented whenever an entry in /sys/power/tuxonice is obsoleted or 
    added.
 
    - last_result:
@@ -375,12 +381,12 @@
 
    - pause_between_steps (CONFIG_PM_DEBUG):
 
-   This option is used during debugging, to make Suspend2 pause between
+   This option is used during debugging, to make TuxOnIce pause between
    each step of the process. It is ignored when the nice display is on.
 
    - powerdown_method:
 
-   Used to select a method by which Suspend2 should powerdown after writing the
+   Used to select a method by which TuxOnIce should powerdown after writing the
    image. Currently:
 
    0: Don't use ACPI to power off.
@@ -420,7 +426,7 @@
 
    - reboot:
 
-   This option causes Suspend2 to reboot rather than powering down
+   This option causes TuxOnIce to reboot rather than powering down
    at the end of saving an image. It can be toggled during a cycle by pressing
    'R'.
 
@@ -437,11 +443,11 @@
    - swap/swapfilename:
 
    This entry is used to specify the swapfile or partition that
-   Suspend2 will attempt to swapon/swapoff automatically. Thus, if
+   TuxOnIce will attempt to swapon/swapoff automatically. Thus, if
    I normally use /dev/hda1 for swap, and want to use /dev/hda2 for specifically
    for my suspend image, I would
   
-   echo /dev/hda2 > /sys/power/suspend2/swap/swapfile
+   echo /dev/hda2 > /sys/power/tuxonice/swap/swapfile
 
    /dev/hda2 would then be automatically swapon'd and swapoff'd. Note that the
    swapon and swapoff occur while other processes are frozen (including kswapd)
@@ -478,7 +484,7 @@
    information is displayed. The console log level determines the level of
    detail, and this value determines what detail is displayed. This value is
    a bit vector, and the meaning of the bits can be found in the kernel tree
-   in include/linux/suspend2.h. It can be overridden using the kernel's
+   in include/linux/tuxonice.h. It can be overridden using the kernel's
    command line option suspend_dbg.
 
    - user_interface/default_console_level (CONFIG_PM_DEBUG):
@@ -512,19 +518,19 @@
 
 7. How do you get support?
 
-   Glad you asked. Suspend2 is being actively maintained and supported
+   Glad you asked. TuxOnIce is being actively maintained and supported
    by Nigel (the guy doing most of the kernel coding at the moment), Bernard
    (who maintains the hibernate script and userspace user interface components)
    and its users.
 
    Resources availble include HowTos, FAQs and a Wiki, all available via
-   suspend2.net.  You can find the mailing lists there.
+   tuxonice.net.  You can find the mailing lists there.
 
 8. I think I've found a bug. What should I do?
 
-   By far and a way, the most common problems people have with suspend2
+   By far and a way, the most common problems people have with TuxOnIce
    related to drivers not having adequate power management support. In this
-   case, it is not a bug with suspend2, but we can still help you. As we
+   case, it is not a bug with TuxOnIce, but we can still help you. As we
    mentioned above, such issues can usually be worked around by building the
    functionality as modules and unloading them while suspending. Please visit
    the Wiki for up-to-date lists of known issues and work arounds.
@@ -543,14 +549,14 @@
 
 9. When will XXX be supported?
 
-   If there's a feature missing from Suspend2 that you'd like, feel free to
+   If there's a feature missing from TuxOnIce that you'd like, feel free to
    ask. We try to be obliging, within reason.
 
    Patches are welcome. Please send to the list.
 
 10. How does it work?
 
-   Suspend2 does its work in a number of steps.
+   TuxOnIce does its work in a number of steps.
 
    a. Freezing system activity.
 
@@ -578,20 +584,20 @@
    b. Eating memory.
 
    For a successful suspend, you need to have enough disk space to store the
-   image and enough memory for the various limitations of Suspend2's
+   image and enough memory for the various limitations of TuxOnIce's
    algorithm. You can also specify a maximum image size. In order to attain
-   to those constraints, Suspend2 may 'eat' memory. If, after freezing
-   processes, the constraints aren't met, Suspend2 will thaw all the
+   to those constraints, TuxOnIce may 'eat' memory. If, after freezing
+   processes, the constraints aren't met, TuxOnIce will thaw all the
    other processes and begin to eat memory until its calculations indicate
    the constraints are met. It will then freeze processes again and recheck
    its calculations.
 
    c. Allocation of storage.
 
-   Next, Suspend2 allocates the storage that will be used to save
+   Next, TuxOnIce allocates the storage that will be used to save
    the image.
 
-   The core of Suspend2 knows nothing about how or where pages are stored. We
+   The core of TuxOnIce knows nothing about how or where pages are stored. We
    therefore request the active allocator (remember you might have compiled in
    more than one!) to allocate enough storage for our expect image size. If
    this request cannot be fulfilled, we eat more memory and try again. If it
@@ -605,7 +611,7 @@
 
    d. Write the first part of the image.
 
-   Suspend2 stores the image in two sets of pages called 'pagesets'.
+   TuxOnIce stores the image in two sets of pages called 'pagesets'.
    Pageset 2 contains pages on the active and inactive lists; essentially
    the page cache. Pageset 1 contains all other pages, including the kernel.
    We use two pagesets for one important reason: We need to make an atomic copy
@@ -622,13 +628,13 @@
 
    e. Suspending drivers and storing processor context.
 
-   Having written pageset2, Suspend2 calls the power management functions to
+   Having written pageset2, TuxOnIce calls the power management functions to
    notify drivers of the suspend, and saves the processor state in preparation
    for the atomic copy of memory we are about to make.
 
    f. Atomic copy.
 
-   At this stage, everything else but the Suspend2 code is halted. Processes
+   At this stage, everything else but the TuxOnIce code is halted. Processes
    are frozen or idling, drivers are quiesced and have stored (ideally and where
    necessary) their configuration in memory we are about to atomically copy.
    In our lowlevel architecture specific code, we have saved the CPU state.
@@ -668,20 +674,20 @@
    process, so there are no other processes to quiesce here). We then copy
    pageset 1 back to its original location in memory and restore the process
    context. We are now running with the original kernel. Next, we reload the
-   pageset 2 pages, free the memory and swap used by Suspend2, restore
+   pageset 2 pages, free the memory and swap used by TuxOnIce, restore
    the pageset header and restart processes. Sounds easy in comparison to
    suspending, doesn't it!
 
-   There is of course more to Suspend2 than this, but this explanation
+   There is of course more to TuxOnIce than this, but this explanation
    should be a good start. If there's interest, I'll write further
    documentation on range pages and the low level I/O.
 
-11. Who wrote Suspend2?
+11. Who wrote TuxOnIce?
 
    (Answer based on the writings of Florent Chabaud, credits in files and
    Nigel's limited knowledge; apologies to anyone missed out!)
 
-   The main developers of Suspend2 have been...
+   The main developers of TuxOnIce have been...
 
    Gabor Kuti
    Pavel Machek
@@ -690,7 +696,7 @@
    Nigel Cunningham
 
    Significant portions of swsusp, the code in the vanilla kernel which
-   Suspend2 enhances, have been worked on by Rafael Wysocki. Thanks should
+   TuxOnIce enhances, have been worked on by Rafael Wysocki. Thanks should
    also be expressed to him.
 
    The above mentioned developers have been aided in their efforts by a host
@@ -698,6 +704,6 @@
    fixes & suggestions. Of special note are the efforts of Michael Frank, who
    had his computers repetitively suspend and resume for literally tens of
    thousands of cycles and developed scripts to stress the system and test
-   Suspend2 far beyond the point most of us (Nigel included!) would consider
-   testing. His efforts have contributed as much to Suspend2 as any of the
+   TuxOnIce far beyond the point most of us (Nigel included!) would consider
+   testing. His efforts have contributed as much to TuxOnIce as any of the
    names above.
