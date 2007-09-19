@@ -265,8 +265,8 @@ static int toi_compress_read_page(unsigned long *index,
 
 static int toi_compress_print_debug_stats(char *buffer, int size)
 {
-	int pages_in = toi_compress_bytes_in >> PAGE_SHIFT, 
-	    pages_out = toi_compress_bytes_out >> PAGE_SHIFT;
+	unsigned long pages_in = toi_compress_bytes_in >> PAGE_SHIFT,
+		      pages_out = toi_compress_bytes_out >> PAGE_SHIFT;
 	int len;
 	
 	/* Output the compression ratio achieved. */
@@ -278,7 +278,7 @@ static int toi_compress_print_debug_stats(char *buffer, int size)
 
 	if (pages_in)
 		len+= snprintf_used(buffer+len, size - len,
-		  "  Compressed %ld bytes into %ld (%d percent compression).\n",
+		  "  Compressed %lu bytes into %lu (%d percent compression).\n",
 		  toi_compress_bytes_in,
 		  toi_compress_bytes_out,
 		  (pages_in - pages_out) * 100 / pages_in);
