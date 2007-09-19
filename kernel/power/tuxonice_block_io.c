@@ -86,7 +86,14 @@ static struct toi_bdev_info *toi_devinfo;
 
 int toi_header_bytes_used = 0;
 
+#ifdef CONFIG_SMP
 DEFINE_MUTEX(toi_bio_mutex);
+#define TAKE_BIO_MUTEX(reason) mutex_lock(&toi_bio_mutex)
+#define DROP_BIO_MUTEX() mutex_unlock(&toi_bio_mutex)
+#else
+#define TAKE_BIO_MUTEX(reason) do { } while(0)
+#define DROP_BIO_MUTEX(reason) do { } while(0)
+#endif
 
 static atomic_t toi_bio_waits;
 
@@ -851,8 +858,7 @@ static int toi_bio_read_page(unsigned long *pfn, struct page *buffer_page,
 
 	pr_index++;
 
-	while (!mutex_trylock(&toi_bio_mutex))
-		do_bio_wait(5);
+	TAKE_BIO_MUTEX(5);
 
 	if (toi_rw_buffer(READ, (char *) pfn, sizeof(unsigned long)) ||
 	    toi_rw_buffer(READ, (char *) buf_size, sizeof(int)) ||
@@ -862,7 +868,7 @@ static int toi_bio_read_page(unsigned long *pfn, struct page *buffer_page,
 	} else
 		PR_DEBUG("%d: PFN %ld, %d bytes.\n", pr_index, *pfn, *buf_size);
 
-	mutex_unlock(&toi_bio_mutex);
+	DROP_BIO_MUTEX();
 	kunmap(buffer_page);
 	return result;
 }
@@ -885,8 +891,7 @@ static int toi_bio_write_page(unsigned long pfn, struct page *buffer_page,
 
 	pr_index++;
 
-	while (!mutex_trylock(&toi_bio_mutex))
-		do_bio_wait(6);
+	TAKE_BIO_MUTEX(6);
 
 	if (toi_rw_buffer(WRITE, (char *) &pfn, sizeof(unsigned long)) ||
 	    toi_rw_buffer(WRITE, (char *) &buf_size, sizeof(int)) ||
@@ -896,7 +901,7 @@ static int toi_bio_write_page(unsigned long pfn, struct page *buffer_page,
 	PR_DEBUG("%d: Index %ld, %d bytes. Result %d.\n", pr_index, pfn,
 			buf_size, result);
 
-	mutex_unlock(&toi_bio_mutex);
+	DROP_BIO_MUTEX();
 	kunmap(buffer_page);
 	return result;
 }
