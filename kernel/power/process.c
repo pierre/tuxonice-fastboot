@@ -6,7 +6,7 @@
  */
 
 
-#define DEBUG
+#undef DEBUG
 
 #include <linux/interrupt.h>
 #include <linux/suspend.h>
