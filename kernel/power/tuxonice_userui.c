@@ -512,7 +512,6 @@ static void userui_cond_pause(int pause, char *message)
 	
 	while (last_key != 32 &&
 		ui_helper_data.pid != -1 &&
-		(!test_result_state(TOI_ABORTED)) &&
 		((test_action_state(TOI_PAUSE) && pause) || 
 		 (test_action_state(TOI_SINGLESTEP)))) {
 		if (!displayed_message) {
