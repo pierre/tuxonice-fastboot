@@ -97,8 +97,6 @@ DEFINE_MUTEX(toi_bio_mutex);
 #define DROP_BIO_MUTEX(reason) do { } while(0)
 #endif
 
-static atomic_t toi_bio_waits;
-
 /**
  * toi_bio_cleanup_one: Cleanup one bio.
  * @io_info : Struct io_info to be cleaned up.
@@ -722,8 +720,6 @@ static int toi_rw_cleanup(int writing)
 
 	current_stream = 0;
 
-	printk("Waited on I/O %d times.\n", atomic_read(&toi_bio_waits));
-	atomic_set(&toi_bio_waits, 0);
 	for (i = 0; i < 7; i++) {
 		if (!reasons[i])
 			continue;
