@@ -47,6 +47,8 @@ int toi_platform_prepare(void)
 
 static void __toi_power_down(int method)
 {
+	int error;
+
 	if (test_action_state(TOI_REBOOT)) {
 		toi_prepare_status(DONT_CLEAR_BAR, "Ready to reboot.");
 		kernel_restart(NULL);
@@ -58,7 +60,11 @@ static void __toi_power_down(int method)
 		case 0:
 			break;
 		case 3:
-			if (!suspend_devices_and_enter(PM_SUSPEND_MEM))
+			error = pm_notifier_call_chain(PM_SUSPEND_PREPARE);
+			if (!error)
+				error = suspend_devices_and_enter(PM_SUSPEND_MEM);
+			pm_notifier_call_chain(PM_POST_SUSPEND);
+			if (!error)
 				return;
 			break;
 		case 4:
