@@ -109,6 +109,10 @@ static void toi_bio_cleanup_one(struct io_info *io_info)
 	int readahead_index = io_info->readahead_index;
 	unsigned long flags;
 
+	spin_lock_irqsave(&ioinfo_ready_lock, flags);
+	list_del_init(&io_info->list);
+	spin_unlock_irqrestore(&ioinfo_ready_lock, flags);
+
 	if (!io_info->writing && readahead_index == -1) {
 		char *to = (char *) kmap(io_info->dest_page);
 		char *from = (char *) kmap(io_info->bio_page);
@@ -146,31 +150,20 @@ static void toi_bio_cleanup_one(struct io_info *io_info)
  * ready_for_cleanup list. Now (no longer in an interrupt context), we can we
  * can do the real work.
  *
- * This routine is designed so that multiple callers can be in here
- * simultaneously.
+ * No locking is needed because we're under toi_bio_mutex. List items can be
+ * added from the bio_end routine, but we're the only one removing them.
  */
-static void toi_cleanup_some_completed_io(void)
+static void toi_cleanup_some_completed_io(int all)
 {
 	int num_cleaned = 0;
-	unsigned long flags;
+	struct io_info *this, *next;
 
-	spin_lock_irqsave(&ioinfo_ready_lock, flags);
-	while(!list_empty(&ioinfo_ready_for_cleanup)) {
-		struct io_info *first = list_entry(
-				ioinfo_ready_for_cleanup.next,
-				struct io_info, list);
-
-		list_del_init(&first->list);
-
-		spin_unlock_irqrestore(&ioinfo_ready_lock, flags);
-		toi_bio_cleanup_one(first);
-		spin_lock_irqsave(&ioinfo_ready_lock, flags);
-
+	list_for_each_entry_safe(this, next, &ioinfo_ready_for_cleanup, list) {
+		toi_bio_cleanup_one(this);
 		num_cleaned++;
-		if (num_cleaned == submit_batch_size)
+		if (!all && num_cleaned == submit_batch_size)
 			break;
 	}
-	spin_unlock_irqrestore(&ioinfo_ready_lock, flags);
 }
 
 static int reasons[7];
@@ -205,7 +198,7 @@ static void do_bio_wait(int reason)
 	}
 
 	io_schedule();
-	toi_cleanup_some_completed_io();
+	toi_cleanup_some_completed_io(0);
 }
 
 /**
