@@ -48,15 +48,14 @@ struct io_info {
 static LIST_HEAD(ioinfo_ready_for_cleanup);
 static DEFINE_SPINLOCK(ioinfo_ready_lock);
 
-static LIST_HEAD(ioinfo_submit_batch);
-static DEFINE_SPINLOCK(ioinfo_submit_lock);
+static LIST_HEAD(ioinfo_batch_list);
 
 static LIST_HEAD(ioinfo_busy);
 static DEFINE_SPINLOCK(ioinfo_busy_lock);
 
 static struct page *waiting_on;
 
-static atomic_t submit_batch;
+static atomic_t toi_io_batched;
 static atomic_t toi_io_in_progress;
 static atomic_t toi_io_to_cleanup;
 static int submit_batched(void);
@@ -364,31 +363,22 @@ static int submit(struct io_info *io_info)
 static int submit_batched(void)
 {
 	static int running_already = 0;
-	struct io_info *first = NULL;
-	unsigned long flags;
+	struct io_info *this, *next;
 	int num_submitted = 0;
 	struct backing_dev_info *bdi = NULL;
 
-	if (running_already)
+	if (running_already || !atomic_read(&toi_io_batched))
 		return 0;
 
 	running_already = 1;
-	spin_lock_irqsave(&ioinfo_submit_lock, flags);
-	while(!list_empty(&ioinfo_submit_batch)) {
-		first = list_entry(ioinfo_submit_batch.next, struct io_info,
-				list);
-		if (!num_submitted)
-			bdi = first->dev->bd_inode->i_mapping->backing_dev_info;
-		list_del_init(&first->list);
-		atomic_dec(&submit_batch);
-		spin_unlock_irqrestore(&ioinfo_submit_lock, flags);
-		submit(first);
-		spin_lock_irqsave(&ioinfo_submit_lock, flags);
+	list_for_each_entry_safe(this, next, &ioinfo_batch_list, list) {
+		list_del_init(&this->list);
+		atomic_dec(&toi_io_batched);
+		submit(this);
 		num_submitted++;
 		if (num_submitted == submit_batch_size)
 			break;
 	}
-	spin_unlock_irqrestore(&ioinfo_submit_lock, flags);
 	running_already = 0;
 
 	if (bdi)
@@ -403,14 +393,8 @@ static int submit_batched(void)
  */
 static void add_to_batch(struct io_info *io_info)
 {
-	unsigned long flags;
-	int waiting;
-
-	/* Put our prepared I/O struct on the batch list. */
-	spin_lock_irqsave(&ioinfo_submit_lock, flags);
-	list_add_tail(&io_info->list, &ioinfo_submit_batch);
-	waiting = atomic_add_return(1, &submit_batch);
-	spin_unlock_irqrestore(&ioinfo_submit_lock, flags);
+	int waiting = atomic_add_return(1, &toi_io_batched);
+	list_add_tail(&io_info->list, &ioinfo_batch_list);
 
 	if (waiting >= submit_batch_size)
 		submit_batched();
