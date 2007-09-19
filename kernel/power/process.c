@@ -200,6 +200,7 @@ int freeze_processes(void)
 	if (error)
 		return error;
 
+	thaw_filesystems(FS_THAW_NORMAL);
 	sys_sync();
 	freezer_state = FREEZER_USERSPACE_FROZEN;
 	error = try_to_freeze_tasks(FREEZER_KERNEL_THREADS);
@@ -249,7 +250,7 @@ void thaw_processes(void)
 	schedule();
 	printk("done.\n");
 	printk("Restarting filesystems ...\n");
-	thaw_filesystems();
+	thaw_filesystems(FS_THAW_ALL);
 }
 
 void thaw_kernel_threads(void)

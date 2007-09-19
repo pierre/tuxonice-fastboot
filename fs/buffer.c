@@ -291,20 +291,29 @@ void freeze_filesystems(void)
 /**
  * thaw_filesystems - unlock all filesystems
  */
-void thaw_filesystems(void)
+void thaw_filesystems(int which)
 {
 	struct super_block *sb;
 
 	lockdep_off();
 
-	list_for_each_entry(sb, &super_blocks, s_list)
-		if (sb->s_flags & MS_FROZEN) {
-			if (sb->s_type->fs_flags & FS_IS_FUSE)
-				sb->s_frozen = SB_UNFROZEN;
-			else
-				thaw_bdev(sb->s_bdev, sb);
-			sb->s_flags &= ~MS_FROZEN;
+	list_for_each_entry(sb, &super_blocks, s_list) {
+		if (!(sb->s_flags & MS_FROZEN))
+			continue;
+	       
+		if (sb->s_type->fs_flags & FS_IS_FUSE) {
+			if (!(which & FS_THAW_FUSE))
+				continue;
+
+			sb->s_frozen = SB_UNFROZEN;
+		} else {
+			if (!(which & FS_THAW_NORMAL))
+				continue;
+
+			thaw_bdev(sb->s_bdev, sb);
 		}
+		sb->s_flags &= ~MS_FROZEN;
+	}
 
 	lockdep_on();
 }

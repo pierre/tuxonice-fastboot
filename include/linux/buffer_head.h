@@ -173,7 +173,10 @@ int fsync_bdev(struct block_device *);
 struct super_block *freeze_bdev(struct block_device *);
 void thaw_bdev(struct block_device *, struct super_block *);
 void freeze_filesystems(void);
-void thaw_filesystems(void);
+#define FS_THAW_FUSE 1
+#define FS_THAW_NORMAL 2
+#define FS_THAW_ALL (FS_THAW_FUSE | FS_THAW_NORMAL)
+void thaw_filesystems(int which);
 int fsync_super(struct super_block *);
 int fsync_no_super(struct block_device *);
 struct buffer_head *__find_get_block(struct block_device *bdev, sector_t block,
