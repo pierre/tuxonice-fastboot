@@ -64,7 +64,7 @@ static atomic_t outstanding_io;
 
 static int extra_page_forward = 0;
 
-static volatile unsigned long toi_readahead_flags[
+static unsigned long toi_readahead_flags[
 	DIV_ROUND_UP(MAX_OUTSTANDING_IO, BITS_PER_LONG)];
 static spinlock_t toi_readahead_flags_lock = SPIN_LOCK_UNLOCKED;
 static struct page *toi_ra_pages[MAX_OUTSTANDING_IO];
