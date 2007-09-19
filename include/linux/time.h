@@ -227,7 +227,4 @@ struct itimerval {
  */
 #define TIMER_ABSTIME			0x01
 
-extern void save_avenrun(void);
-extern void restore_avenrun(void);
-
 #endif

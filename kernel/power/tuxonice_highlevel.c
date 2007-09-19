@@ -348,8 +348,6 @@ static void do_cleanup(int get_debug_info)
 	set_highmem_size(pagedir1, 0);
 	set_highmem_size(pagedir2, 0);
 
-	restore_avenrun();
-
 	if (test_toi_state(TOI_NOTIFIERS_PREPARE)) {
 		pm_notifier_call_chain(PM_POST_HIBERNATION);
 		clear_toi_state(TOI_NOTIFIERS_PREPARE);
@@ -439,8 +437,6 @@ static int toi_init(void)
 	printk(KERN_INFO "Initiating a hibernation cycle.\n");
 
 	nr_hibernates++;
-
-	save_avenrun();
 
 	toi_io_time[0][0] = toi_io_time[0][1] =
 		toi_io_time[1][0] =	toi_io_time[1][1] = 0;
