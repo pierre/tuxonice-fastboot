@@ -506,7 +506,7 @@ static void toi_do_io(int writing, struct block_device *bdev, long block0,
 	atomic_inc(&outstanding_io);
 
 	if (syncio)
-		do { do_bio_wait(4); } while (waiting_on);
+		do_bio_wait(4);
 }
 
 /**
