@@ -64,7 +64,7 @@ static void __init handle_initrd(void)
 		}
 
 	if (!resume_attempted)
-		printk(KERN_ERR "Suspend2: No attempt was made to resume from "
+		printk(KERN_ERR "TuxOnIce: No attempt was made to resume from "
 				"any image that might exist.\n");
 	clear_toi_state(TOI_BOOT_TIME);
 
