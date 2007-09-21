@@ -801,6 +801,7 @@ static int toi_swap_read_header_init(void)
 		result = open_bdev(i, thisdevice, 1);
 		if (IS_ERR(result))
 			return PTR_ERR(result);
+		devinfo[i].bdev = bdevs_opened[i]->bdev;
 	}
 
 	toi_bio_ops.read_header_init();
