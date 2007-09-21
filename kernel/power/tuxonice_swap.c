@@ -78,11 +78,16 @@ struct bdev_opened
 
 /* 
  * Entry MAX_SWAPFILES is the resume block device, which may
- * not be a swap device enabled when we hibernate.
+ * be a swap device not enabled when we hibernate.
  * Entry MAX_SWAPFILES + 1 is the header block device, which
  * is needed before we find out which slot it occupies.
+ *
+ * We use a separate struct to devInfo so that we can track
+ * the bdevs we open, because if we need to abort resuming
+ * prior to the atomic restore, they need to be closed, but
+ * closing them after sucessfully resuming would be wrong.
  */
-static struct bdev_opened *bdev_info_list[MAX_SWAPFILES + 2];
+static struct bdev_opened *bdevs_opened[MAX_SWAPFILES + 2];
        
 /**
  * close_bdev: Close a swap bdev.
@@ -91,7 +96,7 @@ static struct bdev_opened *bdev_info_list[MAX_SWAPFILES + 2];
  */
 static void close_bdev(int i)
 {
-	struct bdev_opened *this = bdev_info_list[i];
+	struct bdev_opened *this = bdevs_opened[i];
 
 	if (!this)
 		return;
@@ -99,7 +104,7 @@ static void close_bdev(int i)
 	bd_release(this->bdev);
 	blkdev_put(this->bdev);
 	kfree(this);
-	bdev_info_list[i] = NULL;
+	bdevs_opened[i] = NULL;
 }
 
 /**
@@ -137,9 +142,9 @@ static struct block_device *open_bdev(int index, dev_t device, int display_errs)
 	struct bdev_opened *this;
 	struct block_device *bdev;
 
-	if (bdev_info_list[index]) {
-		if (bdev_info_list[index]->device == device)
-			return bdev_info_list[index]->bdev;
+	if (bdevs_opened[index]) {
+		if (bdevs_opened[index]->device == device)
+			return bdevs_opened[index]->bdev;
 	
 		close_bdev(index);
 	}
@@ -164,12 +169,9 @@ static struct block_device *open_bdev(int index, dev_t device, int display_errs)
 		return ERR_PTR(-ENOMEM);
 	}
 
-	bdev_info_list[index] = this;
+	bdevs_opened[index] = this;
 	this->device = device;
 	this->bdev = bdev;
-
-	if (index < MAX_SWAPFILES)
-		devinfo[index].bdev = bdev;
 
 	return bdev;
 }
