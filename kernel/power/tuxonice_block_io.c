@@ -134,6 +134,9 @@ static void toi_bio_cleanup_one(struct io_info *io_info)
 		spin_lock_irqsave(&toi_readahead_flags_lock, flags);
 		set_bit(bit, &toi_readahead_flags[index]);
 		spin_unlock_irqrestore(&toi_readahead_flags_lock, flags);
+
+		/* Ensure we don't try to clean this up twice */
+		toi_ra_pages[index]->private = 0;
 	}
 
 	kfree(io_info);
@@ -187,7 +190,8 @@ static void do_bio_wait(int reason)
 
 	if (waiting_on) {
 		wait_on_page_locked(waiting_on);
-		toi_bio_cleanup_one((struct io_info *) waiting_on->private);
+		if (waiting_on->private)
+			toi_bio_cleanup_one((struct io_info *) waiting_on->private);
 		waiting_on = NULL;
 	} else {
 		io_schedule();
