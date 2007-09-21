@@ -568,11 +568,13 @@ static int __toi_swap_allocate_storage(int main_space_requested,
 
 	for (i=0; i < MAX_SWAPFILES; i++) {
 		struct swap_info_struct *si = get_swap_info_struct(i);
-		if ((devinfo[i].bdev = si->bdev))
-			devinfo[i].dev_t = si->bdev->bd_dev;
+		to_add[i] = 0;
+		if (!si->bdev)
+			continue;
+		devinfo[i].bdev = si->bdev;
+		devinfo[i].dev_t = si->bdev->bd_dev;
 		devinfo[i].bmap_shift = 3;
 		devinfo[i].blocks_per_page = 1;
-		to_add[i] = 0;
 	}
 
 	for(i=0; i < pages_to_get; i++) {
