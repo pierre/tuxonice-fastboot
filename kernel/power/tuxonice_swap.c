@@ -116,7 +116,7 @@ static void close_bdevs(void)
 {
 	int i;
 
-	for (i = 0; i < MAX_SWAPFILES; i++)
+	for (i = 0; i < MAX_SWAPFILES + 2; i++)
 		close_bdev(i);
 
 	resume_block_device = header_block_device = NULL;
@@ -788,15 +788,11 @@ static int toi_swap_read_header_init(void)
 
 		if (thisdevice == resume_swap_dev_t) {
 			devinfo[i].bdev = resume_block_device;
-			bdev_info_list[i] = bdev_info_list[MAX_SWAPFILES];
-			bdev_info_list[MAX_SWAPFILES] = NULL;
 			continue;
 		}
 
 		if (thisdevice == header_dev_t) {
 			devinfo[i].bdev = header_block_device;
-			bdev_info_list[i] = bdev_info_list[MAX_SWAPFILES + 1];
-			bdev_info_list[MAX_SWAPFILES + 1] = NULL;
 			continue;
 		}
 
