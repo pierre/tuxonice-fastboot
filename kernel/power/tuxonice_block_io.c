@@ -136,7 +136,7 @@ static void toi_bio_cleanup_one(struct io_info *io_info)
 		spin_unlock_irqrestore(&toi_readahead_flags_lock, flags);
 
 		/* Ensure we don't try to clean this up twice */
-		toi_ra_pages[index]->private = 0;
+		toi_ra_pages[readahead_index]->private = 0;
 	}
 
 	kfree(io_info);
