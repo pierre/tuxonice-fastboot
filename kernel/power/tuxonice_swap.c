@@ -646,7 +646,7 @@ static int toi_swap_write_header_init(void)
 
 	toi_extent_state_goto_start(&toi_writer_posn);
 
-	toi_writer_buffer_posn = toi_header_bytes_used = 0;
+	toi_writer_buffer_posn = 0;
 
 	/* Info needed to bootstrap goes at the start of the header.
 	 * First we save the positions and devinfo, including the number
@@ -740,8 +740,6 @@ static int toi_swap_read_header_init(void)
 {
 	int i, result = 0;
 
-	toi_header_bytes_used = 0;
-
 	if (!header_dev_t) {
 		printk("read_header_init called when we haven't "
 				"verified there is an image!\n");
@@ -771,12 +769,10 @@ static int toi_swap_read_header_init(void)
 	memcpy(&toi_writer_posn_save, toi_writer_buffer, 3 * sizeof(struct extent_iterate_saved_state));
 
 	toi_writer_buffer_posn = 3 * sizeof(struct extent_iterate_saved_state);
-	toi_header_bytes_used += 3 * sizeof(struct extent_iterate_saved_state);
 
 	memcpy(&devinfo, toi_writer_buffer + toi_writer_buffer_posn, sizeof(devinfo));
 
 	toi_writer_buffer_posn += sizeof(devinfo);
-	toi_header_bytes_used += sizeof(devinfo);
 
 	/* Restore device info */
 	for (i = 0; i < MAX_SWAPFILES; i++) {

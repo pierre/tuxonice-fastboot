@@ -505,7 +505,7 @@ static int toi_file_write_header_init(void)
 {
 	toi_extent_state_goto_start(&toi_writer_posn);
 
-	toi_writer_buffer_posn = toi_header_bytes_used = 0;
+	toi_writer_buffer_posn = 0;
 
 	/* Info needed to bootstrap goes at the start of the header.
 	 * First we save the basic info needed for reading, including the number
@@ -623,8 +623,6 @@ static int toi_file_read_header_init(void)
 	toi_bio_ops.read_header_init();
 	toi_extent_state_goto_start(&toi_writer_posn);
 	toi_bio_ops.set_extra_page_forward();
-
-	toi_header_bytes_used = toi_writer_buffer_posn;
 
 	return toi_load_extent_chain(&block_chain);
 }

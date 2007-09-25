@@ -86,8 +86,6 @@ int toi_writer_buffer_posn;
 
 static struct toi_bdev_info *toi_devinfo;
 
-int toi_header_bytes_used = 0;
-
 #ifdef CONFIG_SMP
 DEFINE_MUTEX(toi_bio_mutex);
 #define TAKE_BIO_MUTEX(reason) mutex_lock(&toi_bio_mutex)
@@ -673,8 +671,6 @@ static int toi_bio_rw_page(int writing, struct page *page,
  */
 static int toi_rw_init(int writing, int stream_number)
 {
-	toi_header_bytes_used = 0;
-
 	toi_extent_state_restore(&toi_writer_posn,
 			&toi_writer_posn_save[stream_number]);
 
@@ -819,14 +815,12 @@ static int toi_rw_buffer(int writing, char *buffer, int buffer_size)
 		if (bytes_left <= capacity) {
 			memcpy(to, from, bytes_left);
 			toi_writer_buffer_posn += bytes_left;
-			toi_header_bytes_used += bytes_left;
 			return 0;
 		}
 
 		/* Complete this page and start a new one */
 		memcpy(to, from, capacity);
 		bytes_left -= capacity;
-		toi_header_bytes_used += capacity;
 
 		if (!writing) {
 			if (toi_bio_read_page_with_readahead())
@@ -1072,7 +1066,6 @@ EXPORT_SYMBOL_GPL(toi_writer_posn);
 EXPORT_SYMBOL_GPL(toi_writer_posn_save);
 EXPORT_SYMBOL_GPL(toi_writer_buffer);
 EXPORT_SYMBOL_GPL(toi_writer_buffer_posn);
-EXPORT_SYMBOL_GPL(toi_header_bytes_used);
 EXPORT_SYMBOL_GPL(toi_bio_ops);
 #endif
 #ifdef MODULE
