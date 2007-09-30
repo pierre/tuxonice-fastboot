@@ -316,7 +316,7 @@ static int submit(struct io_info *io_info)
 	unsigned long flags;
 
 	while (!bio) {
-		bio = bio_alloc(GFP_ATOMIC,1);
+		bio = bio_alloc(TOI_ATOMIC_GFP,1);
 		if (!bio)
 			do_bio_wait(1);
 	}
@@ -412,7 +412,7 @@ static struct io_info *get_io_info_struct(void)
 			atomic_read(&toi_io_in_progress) < max_outstanding_io);
 
 	do {
-		this = toi_kmalloc(1, sizeof(struct io_info), GFP_ATOMIC);
+		this = toi_kmalloc(1, sizeof(struct io_info), TOI_ATOMIC_GFP);
 
 		if (this)
 			break;

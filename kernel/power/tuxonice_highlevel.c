@@ -699,7 +699,7 @@ cleanup:
  */
 static int do_check_can_resume(void)
 {
-	char *buf = (char *) toi_get_zeroed_page(21, GFP_KERNEL);
+	char *buf = (char *) toi_get_zeroed_page(21, TOI_ATOMIC_GFP);
 	int result = 0;
 
 	if (!buf)
