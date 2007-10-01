@@ -45,6 +45,11 @@ struct io_info {
 	struct list_head list;
 };
 
+static struct page *bio_queue_head, *bio_queue_tail;
+static DEFINE_SPINLOCK(bio_queue_lock);
+static atomic_t toi_io_queue_length;
+static int toi_io_max_queue_length;
+
 static LIST_HEAD(ioinfo_ready_for_cleanup);
 static DEFINE_SPINLOCK(ioinfo_ready_lock);
 
@@ -85,6 +90,8 @@ char *toi_writer_buffer;
 int toi_writer_buffer_posn;
 
 static struct toi_bdev_info *toi_devinfo;
+
+DEFINE_MUTEX(toi_bio_queue_mutex);
 
 #ifdef CONFIG_SMP
 DEFINE_MUTEX(toi_bio_mutex);
@@ -165,15 +172,16 @@ static void toi_cleanup_completed_io(int all)
 	}
 }
 
-static int reasons[7];
-static char *reason_name[7] = {
+static int reasons[8];
+static char *reason_name[8] = {
 	"readahead not ready",
 	"bio allocation",
 	"io_struct allocation",
 	"submit buffer",
 	"synchronous I/O",
 	"bio mutex when reading",
-	"bio mutex when writing"
+	"bio mutex when writing",
+	"toi_bio_queue_page_write"
 };
 
 /**
@@ -795,6 +803,79 @@ wait:
 }
 
 /*
+ * toi_bio_queue_flush_pages
+ */
+
+static int toi_bio_queue_flush_pages(void)
+{
+	unsigned long flags;
+	int result = 0;
+
+	if (!mutex_trylock(&toi_bio_queue_mutex))
+		return 0;
+
+	spin_lock_irqsave(&bio_queue_lock, flags);
+	while (bio_queue_head) {
+		struct page *page = bio_queue_head;
+		bio_queue_head = (struct page *) page->private;
+		if (bio_queue_tail == page)
+			bio_queue_tail = NULL;
+		atomic_dec(&toi_io_queue_length);
+		spin_unlock_irqrestore(&bio_queue_lock, flags);
+		result = toi_bio_rw_page(WRITE, page, -1);
+		__free_page(page);
+		if (result)
+			goto out;
+		spin_lock_irqsave(&bio_queue_lock, flags);
+	}
+	spin_unlock_irqrestore(&bio_queue_lock, flags);
+out:
+	mutex_unlock(&toi_bio_queue_mutex);
+	return result;
+}
+
+/*
+ * toi_bio_queue_page_write
+ */
+static void toi_bio_queue_page_write(char **full_buffer)
+{
+	struct page *page = virt_to_page(*full_buffer);
+	unsigned long flags;
+	int new_length;
+
+	page->private = 0;
+
+	spin_lock_irqsave(&bio_queue_lock, flags);
+	if (!bio_queue_head)
+		bio_queue_head = page;
+	else
+		bio_queue_tail->private = (unsigned long) page;
+
+	bio_queue_tail = page;
+
+	atomic_inc(&toi_io_queue_length);
+
+	new_length = atomic_read(&toi_io_queue_length);
+
+	if (new_length > toi_io_max_queue_length)
+		toi_io_max_queue_length++;
+
+	spin_unlock_irqrestore(&bio_queue_lock, flags);
+
+	*full_buffer = NULL;
+
+	while (!*full_buffer) {
+		*full_buffer = (char *) toi_get_zeroed_page(99, TOI_ATOMIC_GFP);
+		if (!*full_buffer)
+			do_bio_wait(7);
+	}
+
+	/* Don't let queue length get away on us */
+	while (atomic_read(&toi_io_queue_length) > 10)
+		yield();
+}
+
+/*
  * toi_rw_buffer: Combine smaller buffers into PAGE_SIZE I/O.
  *
  * @writing: Bool - whether writing (or reading).
@@ -825,10 +906,8 @@ static int toi_rw_buffer(int writing, char *buffer, int buffer_size)
 		if (!writing) {
 			if (toi_bio_read_page_with_readahead())
 				return -EIO;
-		} else if (toi_bio_rw_page(WRITE,
-					virt_to_page(toi_writer_buffer),
-					-1))
-				return -EIO;
+		} else
+			toi_bio_queue_page_write(&toi_writer_buffer);
 
 		toi_writer_buffer_posn = 0;
 		toi_cond_pause(0, NULL);
@@ -900,6 +979,7 @@ static int toi_bio_write_page(unsigned long pfn, struct page *buffer_page,
 
 	DROP_BIO_MUTEX();
 	kunmap(buffer_page);
+	toi_bio_queue_flush_pages();
 	return result;
 }
 
@@ -916,6 +996,8 @@ static int toi_rw_header_chunk(int writing,
 		struct toi_module_ops *owner,
 		char *buffer, int buffer_size)
 {
+	int result;
+
 	if (owner) {
 		owner->header_used += buffer_size;
 		toi_message(TOI_HEADER, TOI_LOW, 1,
@@ -934,7 +1016,13 @@ static int toi_rw_header_chunk(int writing,
 		toi_message(TOI_HEADER, TOI_LOW, 1,
 			"Header: (No owner): %d bytes.\n", buffer_size);
 
-	return toi_rw_buffer(writing, buffer, buffer_size);
+	result = toi_rw_buffer(writing, buffer, buffer_size);
+	if (writing) {
+		int flush_result = toi_bio_queue_flush_pages();
+		if (!result)
+			result = flush_result;
+	}
+	return result;
 }
 
 /**
@@ -1007,6 +1095,8 @@ static void toi_bio_cleanup(int finishing_cycle)
 		free_page((unsigned long) toi_writer_buffer);
 		toi_writer_buffer = NULL;
 	}
+
+	atomic_set(&toi_io_queue_length, 0);
 }
 
 struct toi_bio_ops toi_bio_ops = {
