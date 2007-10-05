@@ -319,9 +319,9 @@ fastcall void __kprobes do_page_fault(struct pt_regs *regs,
 
 	si_code = SEGV_MAPERR;
 
-	/* During a Suspend2 atomic copy, with DEBUG_SLAB, we will
+	/* During a TuxOnIce atomic copy, with DEBUG_SLAB, we will
 	 * get page faults where slab has been unmapped. Map them
-	 * temporarily and set the variable that tells Suspend2 to
+	 * temporarily and set the variable that tells TuxOnIce to
 	 * unmap afterwards.
 	 */
 

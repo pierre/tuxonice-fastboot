@@ -432,7 +432,7 @@ config CRYPTO_LZF
 	default y
 	select CRYPTO_ALGAPI
 	help
-	  This is the LZF algorithm. It is especially useful for Suspend2,
+	  This is the LZF algorithm. It is especially useful for TuxOnIce,
 	  because it achieves good compression quickly.
 
 config CRYPTO_MICHAEL_MIC

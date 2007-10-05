@@ -1,13 +1,13 @@
 /* 
  * Cryptoapi LZF compression module.
  *
- * Copyright (c) 2004-2005 Nigel Cunningham <nigel@suspend2.net>
+ * Copyright (c) 2004-2005 Nigel Cunningham <nigel at tuxonice net>
  *
  * based on the deflate.c file:
  * 
  * Copyright (c) 2003 James Morris <jmorris@intercode.com.au>
  * 
- * and upon the LZF compression module donated to the Suspend2 project with
+ * and upon the LZF compression module donated to the TuxOnIce project with
  * the following copyright:
  *
  * This program is free software; you can redistribute it and/or modify it

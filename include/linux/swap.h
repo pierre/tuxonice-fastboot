@@ -372,7 +372,7 @@ static inline swp_entry_t get_swap_page(void)
 
 #endif /* CONFIG_SWAP */
 
-/* For Suspend2 - unlink LRU pages while saving separately */
+/* For TuxOnIce - unlink LRU pages while saving separately */
 void unlink_lru_lists(void);
 void relink_lru_lists(void);
 

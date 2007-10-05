@@ -1,7 +1,7 @@
 /*
  * kernel/power/tuxonice_block_io.c
  *
- * Copyright (C) 2004-2007 Nigel Cunningham (nigel at suspend2 net)
+ * Copyright (C) 2004-2007 Nigel Cunningham (nigel at tuxonice net)
  *
  * Distributed under GPLv2.
  *

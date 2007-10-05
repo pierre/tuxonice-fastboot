@@ -3589,13 +3589,6 @@ M:	sammy@sammy.net
 W:	http://sammy.net/sun3/
 S:	Maintained
 
-SUSPEND2
-P:	Nigel Cunningham
-M:	nigel@suspend2.net
-L:	suspend2-devel@suspend2.net
-W:	http://suspend2.net
-S:	Maintained
-
 SVGA HANDLING
 P:	Martin Mares
 M:	mj@ucw.cz
@@ -3726,6 +3719,13 @@ S:	Maintained
 TURBOCHANNEL SUBSYSTEM
 P:	Maciej W. Rozycki
 M:	macro@linux-mips.org
+S:	Maintained
+
+TUXONICE (ENHANCED HIBERNATION)
+P:	Nigel Cunningham
+M:	nigel@tuxonice.net
+L:	suspend2-devel@tuxonice.net
+W:	http://tuxonice.net
 S:	Maintained
 
 U14-34F SCSI DRIVER

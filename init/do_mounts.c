@@ -147,7 +147,7 @@ dev_t name_to_dev_t(char *name)
 #ifdef CONFIG_SYSFS
 	int mkdir_err = sys_mkdir("/sys", 0700);
 	/* 
-	 * When changing resume parameter for suspend2, sysfs may
+	 * When changing resume parameter for TuxOnIce, sysfs may
 	 * already be mounted. 
 	 */
 	mount_result = sys_mount("sysfs", "/sys", "sysfs", 0, NULL);
@@ -455,19 +455,6 @@ void __init prepare_namespace(void)
 			root_device_name += 5;
 	}
 
-	/* Suspend2:
-	 * By this point, suspend_early_init has been called to initialise our
-	 * sysfs interface. If modules are built in, they have registered (all
-	 * of the above via initcalls).
-	 * 
-	 * We have not yet looked to see if an image exists, however. If we
-	 * have an initrd, it is expected that the user will have set it up
-	 * to echo > /sys/power/suspend2/do_resume and thus initiate any
-	 * resume. If they don't do that, we do it immediately after the initrd
-	 * is finished (major issues if they mount filesystems rw from the
-	 * initrd! - they are warned. If there's no usable initrd, we do our
-	 * check next.
-	 */
 	if (initrd_load())
 		goto out;
 

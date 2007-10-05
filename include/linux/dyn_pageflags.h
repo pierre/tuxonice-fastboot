@@ -1,7 +1,7 @@
 /*
  * include/linux/dyn_pageflags.h
  *
- * Copyright (C) 2004-2007 Nigel Cunningham <nigel@suspend2.net>
+ * Copyright (C) 2004-2007 Nigel Cunningham <nigel at tuxonice net>
  *
  * This file is released under the GPLv2.
  *
