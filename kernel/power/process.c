@@ -242,6 +242,9 @@ void thaw_processes(void)
 	 */
 	freezer_state = FREEZER_OFF;
 
+	printk("Restarting filesystems ...\n");
+	thaw_filesystems(FS_THAW_ALL);
+
 	printk("Restarting tasks ... ");
 
 	if (old_state == FREEZER_FULLY_ON)
@@ -249,8 +252,6 @@ void thaw_processes(void)
 	thaw_tasks(FREEZER_USER_SPACE);
 	schedule();
 	printk("done.\n");
-	printk("Restarting filesystems ...\n");
-	thaw_filesystems(FS_THAW_ALL);
 }
 
 void thaw_kernel_threads(void)
