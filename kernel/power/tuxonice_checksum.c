@@ -102,6 +102,7 @@ static int toi_checksum_prepare(int starting_cycle)
 	return 0;
 }
 
+#if 0
 static int toi_print_task_if_using_page(struct task_struct *t, struct page *seeking)
 {
 	struct vm_area_struct *vma;
@@ -154,6 +155,9 @@ static void print_tasks_using_page(struct page *seeking)
 	}
 	read_unlock(&tasklist_lock);
 }
+#else
+static void print_tasks_using_page(struct page *seeking) { }
+#endif
 
 /* 
  * toi_checksum_print_debug_stats
