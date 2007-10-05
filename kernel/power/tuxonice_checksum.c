@@ -42,7 +42,7 @@ static unsigned long page_list;
 
 static int toi_num_resaved = 0;
 
-#if 1
+#if 0
 #define PRINTK(a, b...) do { } while(0)
 #else
 #define PRINTK(a, b...) do { printk(a, ##b); } while(0)
