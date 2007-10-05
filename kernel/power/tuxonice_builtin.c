@@ -174,7 +174,6 @@ EXPORT_SYMBOL_GPL(get_swap_info_struct);
 
 #ifdef CONFIG_TOI_FILE_EXPORTS
 /* TuxOnice file allocator specific support */
-EXPORT_SYMBOL_GPL(resume_file);
 EXPORT_SYMBOL_GPL(sys_unlink);
 EXPORT_SYMBOL_GPL(sys_mknod);
 #endif
@@ -187,6 +186,11 @@ EXPORT_SYMBOL_GPL(name_to_dev_t);
 
 #if defined(CONFIG_TOI_EXPORTS) || defined(CONFIG_TOI_CORE_EXPORTS)
 EXPORT_SYMBOL_GPL(snprintf_used);
+#endif
+
+#if defined(CONFIG_TOI_FILE_EXPORTS) || defined(CONFIG_TOI_SWAP_EXPORTS) || \
+	defined(CONFIG_TOI_CORE_EXPORTS)
+EXPORT_SYMBOL_GPL(resume_file);
 #endif
 struct toi_core_fns *toi_core_fns;
 EXPORT_SYMBOL_GPL(toi_core_fns);
