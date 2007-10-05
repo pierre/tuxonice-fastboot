@@ -31,6 +31,7 @@
 #include "tuxonice_extent.h"
 #include "tuxonice_sysfs.h"
 #include "tuxonice_builtin.h"
+#include "tuxonice_checksum.h"
 
 char alt_resume_param[256];
 
@@ -386,6 +387,7 @@ static int worker_rw_loop(void *data)
 		 */
 		if (io_write) {
 			struct page *page;
+			char *checksum_locn = NULL;
 
 			pfn = get_next_bit_on(&io_map, pfn);
 
@@ -416,7 +418,14 @@ static int worker_rw_loop(void *data)
 
 			my_io_index = io_finish_at - atomic_read(&io_count);
 
+			if (io_pageset == 2)
+				checksum_locn = tuxonice_get_next_checksum();
+
 			mutex_unlock(&io_mutex);
+
+			if (io_pageset == 2 &&
+			    tuxonice_calc_checksum(page, checksum_locn))
+					return 1;
 
 			result = first_filter->write_page(write_pfn, page,
 					PAGE_SIZE);

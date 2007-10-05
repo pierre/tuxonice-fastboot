@@ -188,7 +188,7 @@ int __toi_post_context_save(void)
 {
 	int old_ps1_size = pagedir1.size;
 	
-	calculate_check_checksums(1);
+	check_checksums();
 
 	free_checksum_pages();
 

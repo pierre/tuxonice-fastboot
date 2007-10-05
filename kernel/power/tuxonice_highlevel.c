@@ -551,8 +551,6 @@ static int __save_image(void)
 
 	toi_cond_pause(1, "About to write pagedir2.");
 
-	calculate_check_checksums(0);
-
 	temp_result = write_pageset(&pagedir2);
 
 	if (temp_result == -1 || test_result_state(TOI_ABORTED))

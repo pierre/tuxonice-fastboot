@@ -42,6 +42,9 @@ static unsigned long page_list;
 
 static int toi_num_resaved = 0;
 
+static unsigned long this_checksum = 0, next_page = 0;
+static int checksum_index = 0;
+
 #if 0
 #define PRINTK(a, b...) do { } while(0)
 #else
@@ -92,6 +95,9 @@ static int toi_checksum_prepare(int starting_cycle)
 
 	desc.tfm = toi_checksum_transform;
 	desc.flags = 0;
+
+	/* Reset index used for setting the checksums */
+	checksum_index = 0;
 
 	return 0;
 }
@@ -258,6 +264,9 @@ int allocate_checksum_pages(void)
 		PRINTK("Page %3d is at %lx and points to %lx.\n", pages_allocated, page_list, *((unsigned long *) page_list));
 	}
 
+	next_page = (unsigned long) page_list;
+	checksum_index = 0;
+
 	return 0;
 }
 
@@ -273,11 +282,45 @@ static void print_checksum(char *buf, int size)
 }
 #endif
 
+char * tuxonice_get_next_checksum(void)
+{
+	if (!toi_checksum_ops.enabled)
+		return NULL;
+
+	if (checksum_index % CHECKSUMS_PER_PAGE)
+		this_checksum += CHECKSUM_SIZE;
+	else {
+		this_checksum = next_page + sizeof(void *);
+		next_page = *((unsigned long *) next_page);
+	}
+
+	checksum_index++;
+
+	PRINTK("Checksum %d at %lu.\n", checksum_index, this_checksum);
+	return (char *) this_checksum;
+}
+
+int tuxonice_calc_checksum(struct page *page, char *checksum_locn)
+{
+	struct scatterlist sg[2];
+	char *pa;
+	int result;
+
+	if (!toi_checksum_ops.enabled)
+		return 0;
+
+	PRINTK("Storing checksum for page %p in %p.\n", page, checksum_locn);
+	pa = kmap_atomic(page, KM_USER0);
+	sg_set_buf(&sg[0], pa, PAGE_SIZE);
+	result = crypto_hash_digest(&desc, sg, PAGE_SIZE, checksum_locn);
+	kunmap_atomic(pa, KM_USER0);
+	return result;
+}
 /*
  * Calculate checksums
  */
 
-void calculate_check_checksums(int check)
+void check_checksums(void)
 {
 	int pfn, index = 0;
 	unsigned long next_page, this_checksum = 0;
@@ -289,39 +332,40 @@ void calculate_check_checksums(int check)
 
 	next_page = (unsigned long) page_list;
 
-	if (check)
-		toi_num_resaved = 0;
+	toi_num_resaved = 0;
 
 	BITMAP_FOR_EACH_SET(&pageset2_map, pfn) {
 		int ret;
+		char *pa;
+		struct page *page = pfn_to_page(pfn);
+
 		if (index % CHECKSUMS_PER_PAGE) {
 			this_checksum += CHECKSUM_SIZE;
 		} else {
 			this_checksum = next_page + sizeof(void *);
 			next_page = *((unsigned long *) next_page);
 		}
-		PRINTK("Put checksum for page %3d %p in %lx.\n", index, page_address(pfn_to_page(pfn)), this_checksum);
-		sg_set_buf(&sg[0], page_address(pfn_to_page(pfn)), PAGE_SIZE);
-		if (check) {
-			ret = crypto_hash_digest(&desc, sg, 
-					PAGE_SIZE, current_checksum);
-			if (memcmp(current_checksum, (char *) this_checksum, CHECKSUM_SIZE)) {
-				SetPageResave(pfn_to_page(pfn));
-				printk("Page %d changed. Saving in atomic copy."
-					"Processes using it:", pfn);
-				print_tasks_using_page(pfn_to_page(pfn));
-				printk("\n");
-				toi_num_resaved++;
-				if (test_action_state(TOI_ABORT_ON_RESAVE_NEEDED))
-					set_abort_result(TOI_RESAVE_NEEDED);
-			}
-		} else
-			ret = crypto_hash_digest(&desc, sg, 
-					PAGE_SIZE, (char *) this_checksum);
+		pa = kmap_atomic(page, KM_USER0);
+		sg_set_buf(&sg[0], pa, PAGE_SIZE);
+		ret= crypto_hash_digest(&desc, sg, PAGE_SIZE, current_checksum);
+		kunmap_atomic(pa, KM_USER0);
+
 		if (ret) {
 			printk("Digest failed. Returned %d.\n", ret);
 			return;
 		}
+
+		if (memcmp(current_checksum, (char *) this_checksum, CHECKSUM_SIZE)) {
+			SetPageResave(pfn_to_page(pfn));
+			printk("Page %d changed. Saving in atomic copy."
+				"Processes using it:", pfn);
+			print_tasks_using_page(pfn_to_page(pfn));
+			printk("\n");
+			toi_num_resaved++;
+			if (test_action_state(TOI_ABORT_ON_RESAVE_NEEDED))
+				set_abort_result(TOI_RESAVE_NEEDED);
+		}
+
 		index++;
 	}
 }
