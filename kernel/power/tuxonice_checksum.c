@@ -76,7 +76,7 @@ static void toi_checksum_cleanup(int ending_cycle)
  */
 static int toi_checksum_prepare(int starting_cycle)
 {
-	if (!starting_cycle || !toi_checksum_ops.enabled)
+	if (!(starting_cycle & SYSFS_HIBERNATE) || !toi_checksum_ops.enabled)
 		return 0;
 
 	if (!*toi_checksum_name) {
