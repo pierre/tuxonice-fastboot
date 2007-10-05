@@ -251,7 +251,7 @@ int allocate_checksum_pages(void)
 	if (!toi_checksum_ops.enabled)
 		return 0;
 
-	PRINTK("Need %d checksum pages for %ld pageset2 pages.\n", pages_needed, pagedir2.size);
+	PRINTK("Need %d checksum pages for %d pageset2 pages.\n", pages_needed, pagedir2.size);
 	while (pages_allocated < pages_needed) {
 		unsigned long *new_page =
 		  (unsigned long *) toi_get_zeroed_page(15, TOI_ATOMIC_GFP);
