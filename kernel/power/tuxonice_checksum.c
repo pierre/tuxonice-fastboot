@@ -46,9 +46,9 @@ static unsigned long this_checksum = 0, next_page = 0;
 static int checksum_index = 0;
 
 #if 0
-#define PRINTK(a, b...) do { } while(0)
-#else
 #define PRINTK(a, b...) do { printk(a, ##b); } while(0)
+#else
+#define PRINTK(a, b...) do { } while(0)
 #endif
 
 /* ---- Local buffer management ---- */
