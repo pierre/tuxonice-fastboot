@@ -359,9 +359,6 @@ static struct toi_module_ops toi_checksum_ops = {
 int toi_checksum_init(void)
 {
 	int result = toi_register_module(&toi_checksum_ops);
-
-	/* Disabled by default */
-	toi_checksum_ops.enabled = 0;
 	return result;
 }
 
