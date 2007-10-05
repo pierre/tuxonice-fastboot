@@ -29,9 +29,9 @@
 static struct toi_module_ops toi_checksum_ops;
 
 /* Constant at the mo, but I might allow tuning later */
-static char toi_checksum_name[32] = "md5";
+static char toi_checksum_name[32] = "md4";
 /* Bytes per checksum */
-#define CHECKSUM_SIZE (128 / 8)
+#define CHECKSUM_SIZE (16)
 
 #define CHECKSUMS_PER_PAGE ((PAGE_SIZE - sizeof(void *)) / CHECKSUM_SIZE)
 

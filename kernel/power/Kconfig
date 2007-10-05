@@ -313,7 +313,7 @@ menuconfig TOI_CORE
 		depends on TOI_CORE
 		select CRYPTO
 		select CRYPTO_ALGAPI
-		select CRYPTO_MD5
+		select CRYPTO_MD4
 		---help---
 		  Adds support for checksumming pageset2 pages, to ensure you really get an
 		  atomic copy. Since some filesystems (XFS especially) change metadata even
