@@ -314,10 +314,10 @@ int tuxonice_calc_checksum(struct page *page, char *checksum_locn)
 		return 0;
 
 	PRINTK("Storing checksum for page %p in %p.\n", page, checksum_locn);
-	pa = kmap_atomic(page, KM_USER0);
+	pa = kmap_atomic(page, KM_USER1);
 	sg_set_buf(&sg[0], pa, PAGE_SIZE);
 	result = crypto_hash_digest(&desc, sg, PAGE_SIZE, checksum_locn);
-	kunmap_atomic(pa, KM_USER0);
+	kunmap_atomic(pa, KM_USER1);
 	return result;
 }
 /*
