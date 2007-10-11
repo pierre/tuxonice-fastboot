@@ -19,6 +19,7 @@
 #include <linux/highmem.h>
 #include <linux/module.h>
 #include <linux/kthread.h>
+#include <linux/dyn_pageflags.h>
 #include <asm/tlbflush.h>
 
 #include "tuxonice.h"
@@ -42,6 +43,7 @@ static unsigned long pfn, other_pfn;
 static DEFINE_MUTEX(io_mutex);
 static DEFINE_PER_CPU(struct page *, last_sought);
 static DEFINE_PER_CPU(struct page *, last_high_page);
+static DEFINE_PER_CPU(char *, checksum_locn);
 static DEFINE_PER_CPU(struct pbe *, last_low_page);
 static atomic_t worker_thread_count;
 static atomic_t io_count;
@@ -387,7 +389,7 @@ static int worker_rw_loop(void *data)
 		 */
 		if (io_write) {
 			struct page *page;
-			char *checksum_locn = NULL;
+			char **my_checksum_locn = &__get_cpu_var(checksum_locn);
 
 			pfn = get_next_bit_on(&io_map, pfn);
 
@@ -419,12 +421,12 @@ static int worker_rw_loop(void *data)
 			my_io_index = io_finish_at - atomic_read(&io_count);
 
 			if (io_pageset == 2)
-				checksum_locn = tuxonice_get_next_checksum();
+				*my_checksum_locn = tuxonice_get_next_checksum();
 
 			mutex_unlock(&io_mutex);
 
 			if (io_pageset == 2 &&
-			    tuxonice_calc_checksum(page, checksum_locn))
+			    tuxonice_calc_checksum(page, *my_checksum_locn))
 					return 1;
 
 			result = first_filter->write_page(write_pfn, page,
@@ -594,12 +596,7 @@ static int do_rw_loop(int write, int finish_at, struct dyn_pageflags *pageflags,
 	}
 
 	/* Ensure all bits clear */
-	pfn = get_next_bit_on(&io_map, max_pfn + 1);
-
-	while (pfn < max_pfn + 1) {
-		clear_dynpageflag(&io_map, pfn_to_page(pfn));
-		pfn = get_next_bit_on(&io_map, pfn);
-	}
+	clear_dyn_pageflags(&io_map);
 
 	/* Set the bits for the pages to write */
 	pfn = get_next_bit_on(pageflags, max_pfn + 1);
@@ -641,8 +638,14 @@ static int do_rw_loop(int write, int finish_at, struct dyn_pageflags *pageflags,
 
 	if (io_write && test_result_state(TOI_ABORTED))
 		io_result = 1;
-	else /* All I/O done? */
-		BUG_ON(get_next_bit_on(&io_map, max_pfn + 1) != max_pfn + 1);
+	else { /* All I/O done? */
+		if(get_next_bit_on(&io_map, max_pfn + 1) != max_pfn + 1) {
+			printk("Finished I/O loop but still work to do?\n");
+			printk("Finish at = %d. io_count = %d.\n", finish_at,
+					atomic_read(&io_count));
+			BUG();
+		}
+	}
 
 	return io_result;
 }

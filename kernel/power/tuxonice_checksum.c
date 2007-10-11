@@ -35,8 +35,14 @@ static char toi_checksum_name[32] = "md4";
 
 #define CHECKSUMS_PER_PAGE ((PAGE_SIZE - sizeof(void *)) / CHECKSUM_SIZE)
 
-static struct crypto_hash *toi_checksum_transform;
-static struct hash_desc desc;
+struct cpu_context {
+	struct crypto_hash *transform;
+	struct hash_desc desc;
+	struct scatterlist sg[2];
+	char *buf;
+};
+
+static DEFINE_PER_CPU(struct cpu_context, contexts);
 static int pages_allocated;
 static unsigned long page_list;
 
@@ -44,12 +50,6 @@ static int toi_num_resaved = 0;
 
 static unsigned long this_checksum = 0, next_page = 0;
 static int checksum_index = 0;
-
-#if 0
-#define PRINTK(a, b...) do { printk(a, ##b); } while(0)
-#else
-#define PRINTK(a, b...) do { } while(0)
-#endif
 
 /* ---- Local buffer management ---- */
 
@@ -60,10 +60,22 @@ static int checksum_index = 0;
  */
 static void toi_checksum_cleanup(int ending_cycle)
 {
-	if (ending_cycle && toi_checksum_transform) {
-		crypto_free_hash(toi_checksum_transform);
-		toi_checksum_transform = NULL;
-		desc.tfm = NULL;
+	int cpu;
+
+	if (ending_cycle) {
+		for_each_online_cpu(cpu) {
+			struct cpu_context *this = &per_cpu(contexts, cpu);
+			if (this->transform) {
+				crypto_free_hash(this->transform);
+				this->transform = NULL;
+				this->desc.tfm = NULL;
+			}
+
+			if (this->buf) {
+				free_page((unsigned long) this->buf);
+				this->buf = NULL;
+			}
+		}
 	}
 }
 
@@ -76,6 +88,8 @@ static void toi_checksum_cleanup(int ending_cycle)
  */
 static int toi_checksum_prepare(int starting_cycle)
 {
+	int cpu;
+
 	if (!(starting_cycle & SYSFS_HIBERNATE) || !toi_checksum_ops.enabled)
 		return 0;
 
@@ -84,80 +98,30 @@ static int toi_checksum_prepare(int starting_cycle)
 		return 1;
 	}
 
-	toi_checksum_transform = crypto_alloc_hash(toi_checksum_name, 0, 0);
-	if (IS_ERR(toi_checksum_transform)) {
-		printk("TuxOnIce: Failed to initialise the %s checksum algorithm: %ld.\n",
-				toi_checksum_name,
-				(long) toi_checksum_transform);
-		toi_checksum_transform = NULL;
-		return 1;
+	for_each_online_cpu(cpu) {
+		struct cpu_context *this = &per_cpu(contexts, cpu);
+		struct page *page;
+
+		this->transform = crypto_alloc_hash(toi_checksum_name, 0, 0);
+		if (IS_ERR(this->transform)) {
+			printk("TuxOnIce: Failed to initialise the %s checksum"
+					" algorithm: %ld.\n",
+				toi_checksum_name, (long) this->transform);
+			this->transform = NULL;
+			return 1;
+		}
+
+		this->desc.tfm = this->transform;
+		this->desc.flags = 0;
+
+		page = alloc_pages(GFP_KERNEL, 0);
+		if (!page)
+			return 1;
+		this->buf = page_address(page);
+		sg_set_buf(&this->sg[0], this->buf, PAGE_SIZE);
 	}
-
-	desc.tfm = toi_checksum_transform;
-	desc.flags = 0;
-
-	/* Reset index used for setting the checksums */
-	checksum_index = 0;
-
 	return 0;
 }
-
-#if 0
-static int toi_print_task_if_using_page(struct task_struct *t, struct page *seeking)
-{
-	struct vm_area_struct *vma;
-	struct mm_struct *mm;
-	int result = 0;
-
-	mm = t->active_mm;
-
-	if (!mm || !mm->mmap) return 0;
-
-	/* Don't try to take the sem when processes are frozen, 
-	 * drivers are hibernated and irqs are disabled. We're
-	 * not racing with anything anyway.  */
-	if (!irqs_disabled())
-		down_read(&mm->mmap_sem);
-	
-	for (vma = mm->mmap; vma; vma = vma->vm_next) {
-		if (vma->vm_flags & VM_PFNMAP)
-			continue;
-		if (vma->vm_start) {
-			unsigned long posn;
-			for (posn = vma->vm_start; posn < vma->vm_end;
-					posn += PAGE_SIZE) {
-				struct page *page = 
-					follow_page(vma, posn, 0);
-				if (page == seeking) {
-					printk("%s(%d)", t->comm, t->pid);
-					result = 1;
-					goto out;
-				}
-			}
-		}
-	}
-
-out:
-	if (!irqs_disabled())
-		up_read(&mm->mmap_sem);
-
-	return result;
-}
-
-static void print_tasks_using_page(struct page *seeking)
-{
-	struct task_struct *p;
-
-	read_lock(&tasklist_lock);
-	for_each_process(p) {
-		if (toi_print_task_if_using_page(p, seeking))
-			printk(" ");
-	}
-	read_unlock(&tasklist_lock);
-}
-#else
-static void print_tasks_using_page(struct page *seeking) { }
-#endif
 
 /* 
  * toi_checksum_print_debug_stats
@@ -204,8 +168,7 @@ static int toi_checksum_save_config_info(char *buffer)
 	int total_len;
 	
 	*((unsigned int *) buffer) = namelen;
-	strncpy(buffer + sizeof(unsigned int), toi_checksum_name, 
-								namelen);
+	strncpy(buffer + sizeof(unsigned int), toi_checksum_name, namelen);
 	total_len = sizeof(unsigned int) + namelen;
 	return total_len;
 }
@@ -233,10 +196,8 @@ static void toi_checksum_load_config_info(char *buffer, int size)
 
 void free_checksum_pages(void)
 {
-	PRINTK("Freeing %d checksum pages.\n", pages_allocated);
 	while (pages_allocated) {
 		unsigned long next = *((unsigned long *) page_list);
-		PRINTK("Page %3d is at %lx and points to %lx.\n", pages_allocated, page_list, next);
 		ClearPageNosave(virt_to_page(page_list));
 		free_page((unsigned long) page_list);
 		page_list = next;
@@ -255,7 +216,6 @@ int allocate_checksum_pages(void)
 	if (!toi_checksum_ops.enabled)
 		return 0;
 
-	PRINTK("Need %d checksum pages for %d pageset2 pages.\n", pages_needed, pagedir2.size);
 	while (pages_allocated < pages_needed) {
 		unsigned long *new_page =
 		  (unsigned long *) toi_get_zeroed_page(15, TOI_ATOMIC_GFP);
@@ -265,7 +225,6 @@ int allocate_checksum_pages(void)
 		(*new_page) = page_list;
 		page_list = (unsigned long) new_page;
 		pages_allocated++;
-		PRINTK("Page %3d is at %lx and points to %lx.\n", pages_allocated, page_list, *((unsigned long *) page_list));
 	}
 
 	next_page = (unsigned long) page_list;
@@ -299,25 +258,23 @@ char * tuxonice_get_next_checksum(void)
 	}
 
 	checksum_index++;
-
-	PRINTK("Checksum %d at %lu.\n", checksum_index, this_checksum);
 	return (char *) this_checksum;
 }
 
 int tuxonice_calc_checksum(struct page *page, char *checksum_locn)
 {
-	struct scatterlist sg[2];
 	char *pa;
-	int result;
+	int result, cpu = smp_processor_id();
+	struct cpu_context *ctx = &per_cpu(contexts, cpu);
 
 	if (!toi_checksum_ops.enabled)
 		return 0;
 
-	PRINTK("Storing checksum for page %p in %p.\n", page, checksum_locn);
-	pa = kmap_atomic(page, KM_USER1);
-	sg_set_buf(&sg[0], pa, PAGE_SIZE);
-	result = crypto_hash_digest(&desc, sg, PAGE_SIZE, checksum_locn);
-	kunmap_atomic(pa, KM_USER1);
+	pa = kmap(page);
+	memcpy(ctx->buf, pa, PAGE_SIZE);
+	kunmap(page);
+	result = crypto_hash_digest(&ctx->desc, ctx->sg, PAGE_SIZE,
+						checksum_locn);
 	return result;
 }
 /*
@@ -326,10 +283,10 @@ int tuxonice_calc_checksum(struct page *page, char *checksum_locn)
 
 void check_checksums(void)
 {
-	int pfn, index = 0;
+	int pfn, index = 0, cpu = smp_processor_id();
 	unsigned long next_page, this_checksum = 0;
-	struct scatterlist sg[2];
 	char current_checksum[CHECKSUM_SIZE];
+	struct cpu_context *ctx = &per_cpu(contexts, cpu);
 
 	if (!toi_checksum_ops.enabled)
 		return;
@@ -349,22 +306,22 @@ void check_checksums(void)
 			this_checksum = next_page + sizeof(void *);
 			next_page = *((unsigned long *) next_page);
 		}
-		pa = kmap_atomic(page, KM_USER0);
-		sg_set_buf(&sg[0], pa, PAGE_SIZE);
-		ret= crypto_hash_digest(&desc, sg, PAGE_SIZE, current_checksum);
-		kunmap_atomic(pa, KM_USER0);
+
+		/* Done when IRQs disabled so must be atomic */
+		pa = kmap_atomic(page, KM_USER1);
+		memcpy(ctx->buf, pa, PAGE_SIZE);
+		kunmap_atomic(pa, KM_USER1);
+		ret= crypto_hash_digest(&ctx->desc, ctx->sg, PAGE_SIZE,
+							current_checksum);
 
 		if (ret) {
 			printk("Digest failed. Returned %d.\n", ret);
 			return;
 		}
 
-		if (memcmp(current_checksum, (char *) this_checksum, CHECKSUM_SIZE)) {
+		if (memcmp(current_checksum, (char *) this_checksum,
+							CHECKSUM_SIZE)) {
 			SetPageResave(pfn_to_page(pfn));
-			printk("Page %d changed. Saving in atomic copy."
-				"Processes using it:", pfn);
-			print_tasks_using_page(pfn_to_page(pfn));
-			printk("\n");
 			toi_num_resaved++;
 			if (test_action_state(TOI_ABORT_ON_RESAVE_NEEDED))
 				set_abort_result(TOI_RESAVE_NEEDED);

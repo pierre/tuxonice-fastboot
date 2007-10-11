@@ -571,7 +571,8 @@ static int __save_image(void)
 		goto Failed;
 
 	temp_result = toi_hibernate();
-	did_copy = 1;
+	if (!temp_result)
+		did_copy = 1;
 
 	/* We return here at resume time too! */
 	toi_end_atomic(ATOMIC_ALL_STEPS, toi_in_hibernate);
