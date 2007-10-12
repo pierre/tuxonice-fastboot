@@ -101,7 +101,6 @@ static void close_bdev(int i)
 	if (!this)
 		return;
 
-	bd_release(this->bdev);
 	blkdev_put(this->bdev);
 	kfree(this);
 	bdevs_opened[i] = NULL;
