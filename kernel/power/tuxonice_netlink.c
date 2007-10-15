@@ -228,11 +228,17 @@ static int toi_nl_gen_rcv_msg(struct user_helper_data *uhd,
 	return 0;
 }
 
-static void toi_user_rcv_skb(struct user_helper_data *uhd,
-				  struct sk_buff *skb)
+static void toi_user_rcv_skb(struct sk_buff *skb)
 {
 	int err;
 	struct nlmsghdr *nlh;
+	struct user_helper_data *uhd = uhd_list;
+
+	while (uhd && uhd->netlink_id != skb->sk->sk_protocol)
+		uhd= uhd->next;
+
+	if (!uhd)
+		return;
 
 	while (skb->len >= NLMSG_SPACE(0)) {
 		u32 rlen;
@@ -253,22 +259,6 @@ static void toi_user_rcv_skb(struct user_helper_data *uhd,
 	}
 }
 
-static void toi_netlink_input(struct sock *sk, int len)
-{
-	struct user_helper_data *uhd = uhd_list;
-
-	while (uhd && uhd->netlink_id != sk->sk_protocol)
-		uhd= uhd->next;
-
-	do {
-		struct sk_buff *skb;
-		while ((skb = skb_dequeue(&sk->sk_receive_queue)) != NULL) {
-			toi_user_rcv_skb(uhd, skb);
-			put_skb(uhd, skb);
-		}
-	} while (uhd->nl && uhd->nl->sk_receive_queue.qlen);
-}
-
 static int netlink_prepare(struct user_helper_data *uhd)
 {
 	toi_get_modules();
@@ -277,8 +267,8 @@ static int netlink_prepare(struct user_helper_data *uhd)
 	uhd_list = uhd;
 
 	uhd->sock_seq = 0x42c0ffee;
-	uhd->nl = netlink_kernel_create(uhd->netlink_id, 0,
-			toi_netlink_input, NULL, THIS_MODULE);
+	uhd->nl = netlink_kernel_create(&init_net, uhd->netlink_id, 0,
+			toi_user_rcv_skb, NULL, THIS_MODULE);
 	if (!uhd->nl) {
 		printk("Failed to allocate netlink socket for %s.\n",
 				uhd->name);

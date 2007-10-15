@@ -271,7 +271,6 @@ static void toi_cleanup_readahead(int page)
  * toi_end_bio: bio completion function.
  *
  * @bio: bio that has completed.
- * @bytes_done: Number of bytes written/read.
  * @err: Error value. Yes, like end_swap_bio_read, we ignore it.
  *
  * Function called by block driver from interrupt context when I/O is completed.
@@ -279,7 +278,7 @@ static void toi_cleanup_readahead(int page)
  * the fs/buffer.c version, but we want to mark the page as done in our own
  * structures too.
  */
-static int toi_end_bio(struct bio *bio, unsigned int bytes_done, int err)
+static void toi_end_bio(struct bio *bio, int err)
 {
 	struct page *page = bio->bi_io_vec[0].bv_page;
 	struct io_info *io_info = bio->bi_private;
@@ -302,7 +301,6 @@ static int toi_end_bio(struct bio *bio, unsigned int bytes_done, int err)
 	atomic_inc(&toi_io_to_cleanup);
 
 	wake_up(&num_in_progress_wait);
-	return 0;
 }
 
 /**
@@ -355,7 +353,7 @@ static int submit(struct io_info *io_info)
 	if (unlikely(test_action_state(TOI_TEST_FILTER_SPEED))) {
 		/* Fake having done the hard work */
 		set_bit(BIO_UPTODATE, &bio->bi_flags);
-		toi_end_bio(bio, PAGE_SIZE, 0);
+		toi_end_bio(bio, 0);
 	} else
 		submit_bio(io_info->writing | (1 << BIO_RW_SYNC), bio);
 
