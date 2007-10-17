@@ -542,10 +542,10 @@ static void display_stats(int always, int sub_extra_pd1_allow)
  */
 static void generate_free_page_map(void) 
 {
-	int order, loop, cpu;
-	struct page *page;
+	int order, pfn, cpu, t;
 	unsigned long flags, i;
 	struct zone *zone;
+	struct list_head *curr;
 
 	for_each_zone(zone) {
 		if (!populated_zone(zone))
@@ -557,11 +557,16 @@ static void generate_free_page_map(void)
 			ClearPageNosaveFree(pfn_to_page(
 						zone->zone_start_pfn + i));
 	
-		for (order = MAX_ORDER - 1; order >= 0; --order)
-			list_for_each_entry(page,
-					&zone->free_area[order].free_list, lru)
-				for(loop=0; loop < (1 << order); loop++)
-					SetPageNosaveFree(page+loop);
+		for_each_migratetype_order(order, t) {
+			list_for_each(curr,
+					&zone->free_area[order].free_list[t]) {
+				unsigned long i;
+
+				pfn = page_to_pfn(list_entry(curr, struct page, lru));
+				for (i = 0; i < (1UL << order); i++)
+					SetPageNosaveFree(pfn_to_page(pfn + i));
+			}
+		}
 
 		
 		for_each_online_cpu(cpu) {

@@ -26,14 +26,13 @@
 #include <linux/uaccess.h>
 #include <linux/kdebug.h>
 #include <linux/suspend.h>
+#include <linux/kprobes.h>
 
 #include <asm/system.h>
 #include <asm/desc.h>
 #include <asm/segment.h>
 
 extern void die(const char *,struct pt_regs *,long);
-
-static ATOMIC_NOTIFIER_HEAD(notify_page_fault_chain);
 
 int toi_faulted = 0;
 EXPORT_SYMBOL(toi_faulted);
@@ -45,24 +44,27 @@ int register_page_fault_notifier(struct notifier_block *nb)
 }
 EXPORT_SYMBOL_GPL(register_page_fault_notifier);
 
-int unregister_page_fault_notifier(struct notifier_block *nb)
+#ifdef CONFIG_KPROBES
+static inline int notify_page_fault(struct pt_regs *regs)
 {
-	return atomic_notifier_chain_unregister(&notify_page_fault_chain, nb);
-}
-EXPORT_SYMBOL_GPL(unregister_page_fault_notifier);
+	int ret = 0;
 
-static inline int notify_page_fault(struct pt_regs *regs, long err)
-{
-	struct die_args args = {
-		.regs = regs,
-		.str = "page fault",
-		.err = err,
-		.trapnr = 14,
-		.signr = SIGSEGV
-	};
-	return atomic_notifier_call_chain(&notify_page_fault_chain,
-	                                  DIE_PAGE_FAULT, &args);
+	/* kprobe_running() needs smp_processor_id() */
+	if (!user_mode_vm(regs)) {
+		preempt_disable();
+		if (kprobe_running() && kprobe_fault_handler(regs, 14))
+			ret = 1;
+		preempt_enable();
+	}
+
+	return ret;
 }
+#else
+static inline int notify_page_fault(struct pt_regs *regs)
+{
+	return 0;
+}
+#endif
 
 /*
  * Return EIP plus the CS segment base.  The segment limit is also
@@ -351,7 +353,7 @@ fastcall void __kprobes do_page_fault(struct pt_regs *regs,
 	if (unlikely(address >= TASK_SIZE)) {
 		if (!(error_code & 0x0000000d) && vmalloc_fault(address) >= 0)
 			return;
-		if (notify_page_fault(regs, error_code) == NOTIFY_STOP)
+		if (notify_page_fault(regs))
 			return;
 		/*
 		 * Don't take the mm semaphore here. If we fixup a prefetch
@@ -360,7 +362,7 @@ fastcall void __kprobes do_page_fault(struct pt_regs *regs,
 		goto bad_area_nosemaphore;
 	}
 
-	if (notify_page_fault(regs, error_code) == NOTIFY_STOP)
+	if (notify_page_fault(regs))
 		return;
 
 	/* It's safe to allow irq's after cr2 has been saved and the vmalloc
@@ -618,7 +620,7 @@ out_of_memory:
 	}
 	printk("VM: killing process %s\n", tsk->comm);
 	if (error_code & 4)
-		do_exit(SIGKILL);
+		do_group_exit(SIGKILL);
 	goto no_context;
 
 do_sigbus:
