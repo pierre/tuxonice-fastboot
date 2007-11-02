@@ -40,7 +40,7 @@ struct io_info {
 	struct bio *sys_struct;
 	sector_t first_block;
 	struct page *bio_page, *dest_page;
-	int writing, readahead_index;
+	int writing, readahead_index, cleaned;
 	struct block_device *dev;
 	struct list_head list;
 };
@@ -114,9 +114,8 @@ static void toi_bio_cleanup_one(struct io_info *io_info)
 	int readahead_index = io_info->readahead_index;
 	unsigned long flags;
 
-	spin_lock_irqsave(&ioinfo_ready_lock, flags);
-	list_del_init(&io_info->list);
-	spin_unlock_irqrestore(&ioinfo_ready_lock, flags);
+	BUG_ON(io_info->cleaned);
+	io_info->cleaned = 1;
 
 	if (!io_info->writing && readahead_index == -1) {
 		char *to = (char *) kmap(io_info->dest_page);
@@ -131,7 +130,6 @@ static void toi_bio_cleanup_one(struct io_info *io_info)
 		__free_page(io_info->bio_page);
 
 	bio_put(io_info->sys_struct);
-	io_info->sys_struct = NULL;
 
 	if (readahead_index > -1) {
 		int index = readahead_index/BITS_PER_LONG;
@@ -163,16 +161,27 @@ static void toi_cleanup_completed_io(int all)
 {
 	int num_cleaned = 0;
 	struct io_info *this, *next;
+	unsigned long flags;
 
+	spin_lock_irqsave(&ioinfo_ready_lock, flags);
 	list_for_each_entry_safe(this, next, &ioinfo_ready_for_cleanup, list) {
+		list_del_init(&this->list);
+
+		if (waiting_on == this->bio_page)
+			waiting_on = NULL;
+
+		spin_unlock_irqrestore(&ioinfo_ready_lock, flags);
 		toi_bio_cleanup_one(this);
+		spin_lock_irqsave(&ioinfo_ready_lock, flags);
+
 		num_cleaned++;
 		if (!all && num_cleaned == submit_batch_size)
 			break;
 	}
+	spin_unlock_irqrestore(&ioinfo_ready_lock, flags);
 }
 
-static int reasons[8];
+static atomic_t reasons[8];
 static char *reason_name[8] = {
 	"readahead not ready",
 	"bio allocation",
@@ -192,14 +201,28 @@ static char *reason_name[8] = {
  */
 static void do_bio_wait(int reason)
 {
-	reasons[reason]++;
+	unsigned long flags;
+	struct io_info *mine = NULL;
+	struct page *was_waiting_on = waiting_on;
 
-	if (waiting_on) {
-		wait_on_page_locked(waiting_on);
-		if (waiting_on->private)
-			toi_bio_cleanup_one((struct io_info *) waiting_on->private);
-		waiting_on = NULL;
+	/* On SMP, waiting_on can be reset, so we make a copy */
+	if (was_waiting_on) {
+		if (PageLocked(was_waiting_on)) {
+			wait_on_page_bit(was_waiting_on, PG_locked);
+			atomic_inc(&reasons[reason]);
+		}
+		spin_lock_irqsave(&ioinfo_ready_lock, flags);
+		if (waiting_on) {
+			mine = (struct io_info *) waiting_on->private;
+			list_del_init(&mine->list);
+			waiting_on = NULL;
+		}
+		spin_unlock_irqrestore(&ioinfo_ready_lock, flags);
+		if (mine)
+			toi_bio_cleanup_one(mine);
 	} else {
+		atomic_inc(&reasons[reason]);
+
 		io_schedule();
 		toi_cleanup_completed_io(0);
 	}
@@ -238,7 +261,8 @@ static void toi_wait_on_readahead(int readahead_index)
 {
 	submit_batched();
 	waiting_on = toi_ra_pages[readahead_index];
-	do_bio_wait(0);
+	if (!toi_readahead_ready(readahead_index))
+		do_bio_wait(0);
 }
 
 static int toi_prepare_readahead(int index)
@@ -431,6 +455,7 @@ static struct io_info *get_io_info_struct(void)
 		do_bio_wait(2);
 	} while (!this);
 
+	memset(this, 0, sizeof(struct io_info));
 	INIT_LIST_HEAD(&this->list);
 	return this;
 }
@@ -727,11 +752,11 @@ static int toi_rw_cleanup(int writing)
 	current_stream = 0;
 
 	for (i = 0; i < 7; i++) {
-		if (!reasons[i])
+		if (!atomic_read(&reasons[i]))
 			continue;
 		printk("Waited for i/o due to %s %d times.\n", reason_name[i],
-				reasons[i]);
-		reasons[i] = 0;
+				atomic_read(&reasons[i]));
+		atomic_set(&reasons[i], 0);
 	}
 	return 0;
 }
