@@ -334,11 +334,8 @@ int toi_initialise_modules(int starting_cycle)
 			toi_message(TOI_MEMORY, TOI_MEDIUM, 1,
 				"Initialising module %s.\n",
 				this_module->name);
-			if ((result = this_module->initialise(starting_cycle))) {
-				printk("%s didn't initialise okay.\n",
-						this_module->name);
+			if ((result = this_module->initialise(starting_cycle)))
 				return result;
-			}
 		}
 	}
 

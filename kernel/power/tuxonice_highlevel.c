@@ -155,10 +155,8 @@ int toi_start_anything(int toi_or_resume)
 		goto out_err;
 	}
 
-	if (toi_initialise_modules(toi_or_resume)) {
-		printk("TuxOnIce: Initialise modules failed!\n");
+	if (toi_initialise_modules(toi_or_resume))
 		goto out_err;
-	}
 
 	if (toi_or_resume) {
 		block_dump_save = block_dump;

@@ -120,11 +120,8 @@ static int toi_compress_init(int toi_or_resume)
 
 	next_driver = toi_get_next_filter(&toi_compression_ops);
 
-	if (!next_driver) {
-		printk("Compression Driver: Argh! Nothing follows me in"
-				" the pipeline!\n");
+	if (!next_driver)
 		return -ECHILD;
-	}
 
 	toi_compress_prepare_result = toi_compress_crypto_prepare();
 
