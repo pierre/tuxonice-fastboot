@@ -42,10 +42,12 @@ OPTIONS
 
   trans=name	select an alternative transport.  Valid options are
   		currently:
- 			unix - specifying a named pipe mount point
- 			tcp  - specifying a normal TCP/IP connection
- 			fd   - used passed file descriptors for connection
+			unix 	- specifying a named pipe mount point
+			tcp	- specifying a normal TCP/IP connection
+			fd   	- used passed file descriptors for connection
                                 (see rfdno and wfdno)
+			virtio	- connect to the next virtio channel available
+				(from lguest or KVM with trans_virtio module)
 
   uname=name	user name to attempt mount as on the remote server.  The
   		server may override or ignore this value.  Certain user
@@ -54,7 +56,7 @@ OPTIONS
   aname=name	aname specifies the file tree to access when the server is
   		offering several exported file systems.
 
-  cache=mode	specifies a cacheing policy.  By default, no caches are used.
+  cache=mode	specifies a caching policy.  By default, no caches are used.
 			loose = no attempts are made at consistency,
                                 intended for exclusive, read-only mounts
 

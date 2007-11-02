@@ -49,7 +49,7 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 		/* Intel-defined (#2) */
 		"pni", NULL, NULL, "monitor", "ds_cpl", "vmx", "smx", "est",
 		"tm2", "ssse3", "cid", NULL, NULL, "cx16", "xtpr", NULL,
-		NULL, NULL, "dca", NULL, NULL, NULL, NULL, "popcnt",
+		NULL, NULL, "dca", "sse4_1", "sse4_2", NULL, NULL, "popcnt",
 		NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 
 		/* VIA/Cyrix/Centaur-defined */
@@ -59,10 +59,10 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 		NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 
 		/* AMD-defined (#2) */
-		"lahf_lm", "cmp_legacy", "svm", "extapic", "cr8_legacy",
-		"altmovcr8", "abm", "sse4a",
-		"misalignsse", "3dnowprefetch",
-		"osvw", "ibs", NULL, NULL, NULL, NULL,
+		"lahf_lm", "cmp_legacy", "svm", "extapic",
+		"cr8_legacy", "abm", "sse4a", "misalignsse",
+		"3dnowprefetch", "osvw", "ibs", "sse5",
+		"skinit", "wdt", NULL, NULL,
 		NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 		NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL,
 
@@ -85,12 +85,13 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 		/* nothing */
 	};
 	struct cpuinfo_x86 *c = v;
-	int i, n = c - cpu_data;
+	int i, n = 0;
 	int fpu_exception;
 
 #ifdef CONFIG_SMP
 	if (!cpu_online(n))
 		return 0;
+	n = c->cpu_index;
 #endif
 	seq_printf(m, "processor\t: %d\n"
 		"vendor_id\t: %s\n"
@@ -175,11 +176,15 @@ static int show_cpuinfo(struct seq_file *m, void *v)
 
 static void *c_start(struct seq_file *m, loff_t *pos)
 {
-	return *pos < NR_CPUS ? cpu_data + *pos : NULL;
+	if (*pos == 0)	/* just in case, cpu 0 is not the first */
+		*pos = first_cpu(cpu_possible_map);
+	if ((*pos) < NR_CPUS && cpu_possible(*pos))
+		return &cpu_data(*pos);
+	return NULL;
 }
 static void *c_next(struct seq_file *m, void *v, loff_t *pos)
 {
-	++*pos;
+	*pos = next_cpu(*pos, cpu_possible_map);
 	return c_start(m, pos);
 }
 static void c_stop(struct seq_file *m, void *v)

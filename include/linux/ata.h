@@ -178,8 +178,9 @@ enum {
 	ATA_CMD_PACKET		= 0xA0,
 	ATA_CMD_VERIFY		= 0x40,
 	ATA_CMD_VERIFY_EXT	= 0x42,
- 	ATA_CMD_STANDBYNOW1	= 0xE0,
- 	ATA_CMD_IDLEIMMEDIATE	= 0xE1,
+	ATA_CMD_STANDBYNOW1	= 0xE0,
+	ATA_CMD_IDLEIMMEDIATE	= 0xE1,
+	ATA_CMD_SLEEP		= 0xE6,
 	ATA_CMD_INIT_DEV_PARAMS	= 0x91,
 	ATA_CMD_READ_NATIVE_MAX	= 0xF8,
 	ATA_CMD_READ_NATIVE_MAX_EXT = 0x27,
@@ -235,6 +236,7 @@ enum {
 
 	/* SETFEATURE Sector counts for SATA features */
 	SATA_AN			= 0x05,  /* Asynchronous Notification */
+	SATA_DIPM		= 0x03,  /* Device Initiated Power Management */
 
 	/* ATAPI stuff */
 	ATAPI_PKT_DMA		= (1 << 0),
@@ -377,6 +379,26 @@ struct ata_taskfile {
 
 #define ata_id_cdb_intr(id)	(((id)[0] & 0x60) == 0x20)
 
+static inline bool ata_id_has_hipm(const u16 *id)
+{
+	u16 val = id[76];
+
+	if (val == 0 || val == 0xffff)
+		return false;
+
+	return val & (1 << 9);
+}
+
+static inline bool ata_id_has_dipm(const u16 *id)
+{
+	u16 val = id[78];
+
+	if (val == 0 || val == 0xffff)
+		return false;
+
+	return val & (1 << 3);
+}
+
 static inline int ata_id_has_fua(const u16 *id)
 {
 	if ((id[84] & 0xC000) != 0x4000)
@@ -458,7 +480,7 @@ static inline int ata_id_wcache_enabled(const u16 *id)
  *		ATA-3 introduces word 80 and accurate reporting
  *
  *	The practical impact of this is that ata_id_major_version cannot
- *	reliably report on drives below ATA3. 
+ *	reliably report on drives below ATA3.
  */
 
 static inline unsigned int ata_id_major_version(const u16 *id)

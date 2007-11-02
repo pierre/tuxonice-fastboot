@@ -272,8 +272,7 @@ static struct scsi_host_template *the_template = NULL;
 #define	HOSTNO		instance->host_no
 #define	H_NO(cmd)	(cmd)->device->host->host_no
 
-#define SGADDR(buffer) (void *)(((unsigned long)page_address((buffer)->page)) + \
-			(buffer)->offset)
+#define SGADDR(buffer) (void *)(((unsigned long)sg_virt(((buffer)))))
 
 #ifdef SUPPORT_TAGS
 
@@ -1596,7 +1595,7 @@ static int NCR5380_select(struct Scsi_Host *instance, struct scsi_cmnd *cmd,
      * IO while SEL is true. But again, there are some disks out the in the
      * world that do that nevertheless. (Somebody claimed that this announces
      * reselection capability of the target.) So we better skip that test and
-     * only wait for BSY... (Famous german words: Der Klügere gibt nach :-)
+     * only wait for BSY... (Famous german words: Der KlÃ¼gere gibt nach :-)
      */
 
     while (time_before(jiffies, timeout) && !(NCR5380_read(STATUS_REG) & 

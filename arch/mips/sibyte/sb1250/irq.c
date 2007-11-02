@@ -250,27 +250,6 @@ static struct irqaction sb1250_dummy_action = {
 	.dev_id  = 0
 };
 
-int sb1250_steal_irq(int irq)
-{
-	struct irq_desc *desc = irq_desc + irq;
-	unsigned long flags;
-	int retval = 0;
-
-	if (irq >= SB1250_NR_IRQS)
-		return -EINVAL;
-
-	spin_lock_irqsave(&desc->lock, flags);
-	/* Don't allow sharing at all for these */
-	if (desc->action != NULL)
-		retval = -EBUSY;
-	else {
-		desc->action = &sb1250_dummy_action;
-		desc->depth = 0;
-	}
-	spin_unlock_irqrestore(&desc->lock, flags);
-	return 0;
-}
-
 /*
  *  arch_init_irq is called early in the boot sequence from init/main.c via
  *  init_IRQ.  It is responsible for setting up the interrupt mapper and
@@ -342,8 +321,6 @@ void __init arch_init_irq(void)
 	__raw_writeq(tmp, IOADDR(A_IMR_REGISTER(0, R_IMR_INTERRUPT_MASK)));
 	__raw_writeq(tmp, IOADDR(A_IMR_REGISTER(1, R_IMR_INTERRUPT_MASK)));
 
-	sb1250_steal_irq(K_INT_MBOX_0);
-
 	/*
 	 * Note that the timer interrupts are also mapped, but this is
 	 * done in sb1250_time_init().  Also, the profiling driver
@@ -367,7 +344,6 @@ void __init arch_init_irq(void)
 		__raw_writeq(M_DUART_IMR_BRK,
 			     IOADDR(A_DUART_IMRREG(kgdb_port)));
 
-		sb1250_steal_irq(kgdb_irq);
 		__raw_writeq(IMR_IP6_VAL,
 			     IOADDR(A_IMR_REGISTER(0,
 						   R_IMR_INTERRUPT_MAP_BASE) +
@@ -400,43 +376,27 @@ static void sb1250_kgdb_interrupt(void)
 
 #endif 	/* CONFIG_KGDB */
 
-static inline void sb1250_timer_interrupt(void)
-{
-	int cpu = smp_processor_id();
-	int irq = K_INT_TIMER_0 + cpu;
-
-	irq_enter();
-	kstat_this_cpu.irqs[irq]++;
-
-	write_seqlock(&xtime_lock);
-
-	/* ACK interrupt */
-	____raw_writeq(M_SCD_TIMER_ENABLE | M_SCD_TIMER_MODE_CONTINUOUS,
-		       IOADDR(A_SCD_TIMER_REGISTER(cpu, R_SCD_TIMER_CFG)));
-
-	/*
-	 * call the generic timer interrupt handling
-	 */
-	do_timer(1);
-
-	write_sequnlock(&xtime_lock);
-
-	/*
-	 * In UP mode, we call local_timer_interrupt() to do profiling
-	 * and process accouting.
-	 *
-	 * In SMP mode, local_timer_interrupt() is invoked by appropriate
-	 * low-level local timer interrupt handler.
-	 */
-	local_timer_interrupt(irq);
-
-	irq_exit();
-}
-
 extern void sb1250_mailbox_interrupt(void);
+
+static inline void dispatch_ip2(void)
+{
+	unsigned int cpu = smp_processor_id();
+	unsigned long long mask;
+
+	/*
+	 * Default...we've hit an IP[2] interrupt, which means we've got to
+	 * check the 1250 interrupt registers to figure out what to do.  Need
+	 * to detect which CPU we're on, now that smp_affinity is supported.
+	 */
+	mask = __raw_readq(IOADDR(A_IMR_REGISTER(cpu,
+				  R_IMR_INTERRUPT_STATUS_BASE)));
+	if (mask)
+		do_IRQ(fls64(mask) - 1);
+}
 
 asmlinkage void plat_irq_dispatch(void)
 {
+	unsigned int cpu = smp_processor_id();
 	unsigned int pending;
 
 	/*
@@ -454,7 +414,7 @@ asmlinkage void plat_irq_dispatch(void)
 	if (pending & CAUSEF_IP7) /* CPU performance counter interrupt */
 		do_IRQ(MIPS_CPU_IRQ_BASE + 7);
 	else if (pending & CAUSEF_IP4)
-		sb1250_timer_interrupt();
+		do_IRQ(K_INT_TIMER_0 + cpu); 	/* sb1250_timer_interrupt() */
 
 #ifdef CONFIG_SMP
 	else if (pending & CAUSEF_IP3)
@@ -466,21 +426,8 @@ asmlinkage void plat_irq_dispatch(void)
 		sb1250_kgdb_interrupt();
 #endif
 
-	else if (pending & CAUSEF_IP2) {
-		unsigned long long mask;
-
-		/*
-		 * Default...we've hit an IP[2] interrupt, which means we've
-		 * got to check the 1250 interrupt registers to figure out what
-		 * to do.  Need to detect which CPU we're on, now that
-		 * smp_affinity is supported.
-		 */
-		mask = __raw_readq(IOADDR(A_IMR_REGISTER(smp_processor_id(),
-		                              R_IMR_INTERRUPT_STATUS_BASE)));
-		if (mask)
-			do_IRQ(fls64(mask) - 1);
-		else
-			spurious_interrupt();
-	} else
+	else if (pending & CAUSEF_IP2)
+		dispatch_ip2();
+	else
 		spurious_interrupt();
 }

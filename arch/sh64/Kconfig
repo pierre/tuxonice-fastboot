@@ -1,6 +1,6 @@
 #
 # For a description of the syntax of this configuration file,
-# see Documentation/kbuild/config-language.txt.
+# see Documentation/kbuild/kconfig-language.txt.
 #
 
 mainmenu "Linux/SH64 Kernel Configuration"
@@ -284,7 +284,7 @@ source "drivers/Kconfig"
 
 source "fs/Kconfig"
 
-source "arch/sh64/oprofile/Kconfig"
+source "kernel/Kconfig.instrumentation"
 
 source "arch/sh64/Kconfig.debug"
 

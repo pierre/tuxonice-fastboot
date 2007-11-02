@@ -51,6 +51,13 @@ struct resource code_resource = {
 	.flags	= IORESOURCE_BUSY | IORESOURCE_MEM
 };
 
+struct resource bss_resource = {
+	.name	= "Kernel bss",
+	.start	= 0,
+	.end	= 0,
+	.flags	= IORESOURCE_BUSY | IORESOURCE_MEM
+};
+
 static struct resource system_rom_resource = {
 	.name	= "System ROM",
 	.start	= 0xf0000,
@@ -254,7 +261,9 @@ static void __init probe_roms(void)
  * and also for regions reported as reserved by the e820.
  */
 static void __init
-legacy_init_iomem_resources(struct resource *code_resource, struct resource *data_resource)
+legacy_init_iomem_resources(struct resource *code_resource,
+			    struct resource *data_resource,
+			    struct resource *bss_resource)
 {
 	int i;
 
@@ -287,8 +296,10 @@ legacy_init_iomem_resources(struct resource *code_resource, struct resource *dat
 			 */
 			request_resource(res, code_resource);
 			request_resource(res, data_resource);
+			request_resource(res, bss_resource);
 #ifdef CONFIG_KEXEC
-			request_resource(res, &crashk_res);
+			if (crashk_res.start != crashk_res.end)
+				request_resource(res, &crashk_res);
 #endif
 		}
 	}
@@ -306,9 +317,11 @@ static int __init request_standard_resources(void)
 
 	printk("Setting up standard PCI resources\n");
 	if (efi_enabled)
-		efi_initialize_iomem_resources(&code_resource, &data_resource);
+		efi_initialize_iomem_resources(&code_resource,
+				&data_resource, &bss_resource);
 	else
-		legacy_init_iomem_resources(&code_resource, &data_resource);
+		legacy_init_iomem_resources(&code_resource,
+				&data_resource, &bss_resource);
 
 	/* EFI systems may still have VGA */
 	request_resource(&iomem_resource, &video_ram_resource);
@@ -705,7 +718,7 @@ void __init e820_register_memory(void)
 	int i;
 
 	/*
-	 * Search for the bigest gap in the low 32 bits of the e820
+	 * Search for the biggest gap in the low 32 bits of the e820
 	 * memory space.
 	 */
 	last = 0x100000000ull;

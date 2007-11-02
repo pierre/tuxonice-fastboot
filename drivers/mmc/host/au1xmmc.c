@@ -40,13 +40,13 @@
 #include <linux/mm.h>
 #include <linux/interrupt.h>
 #include <linux/dma-mapping.h>
+#include <linux/scatterlist.h>
 
 #include <linux/mmc/host.h>
 #include <asm/io.h>
 #include <asm/mach-au1x00/au1000.h>
 #include <asm/mach-au1x00/au1xxx_dbdma.h>
 #include <asm/mach-au1x00/au1100_mmc.h>
-#include <asm/scatterlist.h>
 
 #include <au1xxx.h>
 #include "au1xmmc.h"
@@ -212,12 +212,12 @@ static int au1xmmc_send_command(struct au1xmmc_host *host, int wait,
 	}
 
 	if (data) {
-		if (flags & MMC_DATA_READ) {
+		if (data->flags & MMC_DATA_READ) {
 			if (data->blocks > 1)
 				mmccmd |= SD_CMD_CT_4;
 			else
 				mmccmd |= SD_CMD_CT_2;
-		} else if (flags & MMC_DATA_WRITE) {
+		} else if (data->flags & MMC_DATA_WRITE) {
 			if (data->blocks > 1)
 				mmccmd |= SD_CMD_CT_3;
 			else
@@ -340,7 +340,7 @@ static void au1xmmc_send_pio(struct au1xmmc_host *host)
 
 	/* This is the pointer to the data buffer */
 	sg = &data->sg[host->pio.index];
-	sg_ptr = page_address(sg->page) + sg->offset + host->pio.offset;
+	sg_ptr = sg_virt(sg) + host->pio.offset;
 
 	/* This is the space left inside the buffer */
 	sg_len = data->sg[host->pio.index].length - host->pio.offset;
@@ -400,7 +400,7 @@ static void au1xmmc_receive_pio(struct au1xmmc_host *host)
 
 	if (host->pio.index < host->dma.len) {
 		sg = &data->sg[host->pio.index];
-		sg_ptr = page_address(sg->page) + sg->offset + host->pio.offset;
+		sg_ptr = sg_virt(sg) + host->pio.offset;
 
 		/* This is the space left inside the buffer */
 		sg_len = sg_dma_len(&data->sg[host->pio.index]) - host->pio.offset;
@@ -613,14 +613,11 @@ au1xmmc_prepare_data(struct au1xmmc_host *host, struct mmc_data *data)
 
     			if (host->flags & HOST_F_XMIT){
       				ret = au1xxx_dbdma_put_source_flags(channel,
-					(void *) (page_address(sg->page) +
-						  sg->offset),
-					len, flags);
+					(void *) sg_virt(sg), len, flags);
 			}
     			else {
       				ret = au1xxx_dbdma_put_dest_flags(channel,
-					(void *) (page_address(sg->page) +
-						  sg->offset),
+					(void *) sg_virt(sg),
 					len, flags);
 			}
 

@@ -40,7 +40,7 @@
 
 struct pglist_data *node_data[MAX_NUMNODES] __read_mostly;
 EXPORT_SYMBOL(node_data);
-bootmem_data_t node0_bdata;
+static bootmem_data_t node0_bdata;
 
 /*
  * numa interface - we expect the numa architecture specific code to have
@@ -273,7 +273,7 @@ unsigned long __init setup_memory(void)
 	 * When mapping a NUMA machine we allocate the node_mem_map arrays
 	 * from node local memory.  They are then mapped directly into KVA
 	 * between zone normal and vmalloc space.  Calculate the size of
-	 * this space and use it to adjust the boundry between ZONE_NORMAL
+	 * this space and use it to adjust the boundary between ZONE_NORMAL
 	 * and ZONE_HIGHMEM.
 	 */
 	find_max_pfn();
@@ -404,7 +404,7 @@ void __init set_highmem_pages_init(int bad_ppro)
 }
 
 #ifdef CONFIG_MEMORY_HOTPLUG
-int paddr_to_nid(u64 addr)
+static int paddr_to_nid(u64 addr)
 {
 	int nid;
 	unsigned long pfn = PFN_DOWN(addr);

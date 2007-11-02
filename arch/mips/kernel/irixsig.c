@@ -24,8 +24,12 @@
 
 #define _BLOCKABLE (~(_S(SIGKILL) | _S(SIGSTOP)))
 
+#define _IRIX_NSIG		128
+#define _IRIX_NSIG_BPW		BITS_PER_LONG
+#define _IRIX_NSIG_WORDS	(_IRIX_NSIG / _IRIX_NSIG_BPW)
+
 typedef struct {
-	unsigned long sig[4];
+	unsigned long sig[_IRIX_NSIG_WORDS];
 } irix_sigset_t;
 
 struct sigctx_irix5 {
@@ -527,7 +531,7 @@ asmlinkage int irix_sigpoll_sys(unsigned long __user *set,
 
 		expire = schedule_timeout_interruptible(expire);
 
-		for (i=0; i<=4; i++)
+		for (i=0; i < _IRIX_NSIG_WORDS; i++)
 			tmp |= (current->pending.signal.sig[i] & kset.sig[i]);
 
 		if (tmp)
@@ -609,7 +613,7 @@ repeat:
 		p = list_entry(_p, struct task_struct, sibling);
 		if ((type == IRIX_P_PID) && p->pid != pid)
 			continue;
-		if ((type == IRIX_P_PGID) && process_group(p) != pid)
+		if ((type == IRIX_P_PGID) && task_pgrp_nr(p) != pid)
 			continue;
 		if ((p->exit_signal != SIGCHLD))
 			continue;

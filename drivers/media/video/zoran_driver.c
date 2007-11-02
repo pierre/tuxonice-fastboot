@@ -60,7 +60,6 @@
 
 #include <linux/spinlock.h>
 #define     MAP_NR(x)       virt_to_page(x)
-#define     ZORAN_HARDWARE  VID_HARDWARE_ZR36067
 #define     ZORAN_VID_TYPE  ( \
 				VID_TYPE_CAPTURE | \
 				VID_TYPE_OVERLAY | \
@@ -1285,7 +1284,7 @@ zoran_open (struct inode *inode,
 	}
 
 	dprintk(1, KERN_INFO "%s: zoran_open(%s, pid=[%d]), users(-)=%d\n",
-		ZR_DEVNAME(zr), current->comm, current->pid, zr->user);
+		ZR_DEVNAME(zr), current->comm, task_pid_nr(current), zr->user);
 
 	/* now, create the open()-specific file_ops struct */
 	fh = kzalloc(sizeof(struct zoran_fh), GFP_KERNEL);
@@ -1358,7 +1357,7 @@ zoran_close (struct inode *inode,
 	struct zoran *zr = fh->zr;
 
 	dprintk(1, KERN_INFO "%s: zoran_close(%s, pid=[%d]), users(+)=%d\n",
-		ZR_DEVNAME(zr), current->comm, current->pid, zr->user);
+		ZR_DEVNAME(zr), current->comm, task_pid_nr(current), zr->user);
 
 	/* kernel locks (fs/device.c), so don't do that ourselves
 	 * (prevents deadlocks) */
@@ -4659,7 +4658,6 @@ struct video_device zoran_template __devinitdata = {
 #ifdef CONFIG_VIDEO_V4L2
 	.type2 = ZORAN_V4L2_VID_FLAGS,
 #endif
-	.hardware = ZORAN_HARDWARE,
 	.fops = &zoran_fops,
 	.release = &zoran_vdev_release,
 	.minor = -1

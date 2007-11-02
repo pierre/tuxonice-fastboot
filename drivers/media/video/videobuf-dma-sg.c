@@ -27,6 +27,7 @@
 #include <linux/pci.h>
 #include <linux/vmalloc.h>
 #include <linux/pagemap.h>
+#include <linux/scatterlist.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
 
@@ -60,13 +61,13 @@ videobuf_vmalloc_to_sg(unsigned char *virt, int nr_pages)
 	sglist = kcalloc(nr_pages, sizeof(struct scatterlist), GFP_KERNEL);
 	if (NULL == sglist)
 		return NULL;
+	sg_init_table(sglist, nr_pages);
 	for (i = 0; i < nr_pages; i++, virt += PAGE_SIZE) {
 		pg = vmalloc_to_page(virt);
 		if (NULL == pg)
 			goto err;
 		BUG_ON(PageHighMem(pg));
-		sglist[i].page   = pg;
-		sglist[i].length = PAGE_SIZE;
+		sg_set_page(&sglist[i], pg, PAGE_SIZE, 0);
 	}
 	return sglist;
 
@@ -86,22 +87,20 @@ videobuf_pages_to_sg(struct page **pages, int nr_pages, int offset)
 	sglist = kcalloc(nr_pages, sizeof(*sglist), GFP_KERNEL);
 	if (NULL == sglist)
 		return NULL;
+	sg_init_table(sglist, nr_pages);
 
 	if (NULL == pages[0])
 		goto nopage;
 	if (PageHighMem(pages[0]))
 		/* DMA to highmem pages might not work */
 		goto highmem;
-	sglist[0].page   = pages[0];
-	sglist[0].offset = offset;
-	sglist[0].length = PAGE_SIZE - offset;
+	sg_set_page(&sglist[0], pages[0], PAGE_SIZE - offset, offset);
 	for (i = 1; i < nr_pages; i++) {
 		if (NULL == pages[i])
 			goto nopage;
 		if (PageHighMem(pages[i]))
 			goto highmem;
-		sglist[i].page   = pages[i];
-		sglist[i].length = PAGE_SIZE;
+		sg_set_page(&sglist[i], pages[i], PAGE_SIZE, 0);
 	}
 	return sglist;
 

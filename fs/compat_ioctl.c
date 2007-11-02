@@ -322,7 +322,7 @@ static int dev_ifname32(unsigned int fd, unsigned int cmd, unsigned long arg)
 	int err;
 
 	uifr = compat_alloc_user_space(sizeof(struct ifreq));
-	if (copy_in_user(uifr, compat_ptr(arg), sizeof(struct ifreq32)));
+	if (copy_in_user(uifr, compat_ptr(arg), sizeof(struct ifreq32)))
 		return -EFAULT;
 
 	err = sys_ioctl(fd, SIOCGIFNAME, (unsigned long)uifr);
@@ -3001,7 +3001,7 @@ static int __init init_sys32_ioctl(void)
 	int i;
 
 	for (i = 0; i < ARRAY_SIZE(ioctl_start); i++) {
-		if (ioctl_start[i].next != 0) {
+		if (ioctl_start[i].next) {
 			printk("ioctl translation %d bad\n",i);
 			return -1;
 		}

@@ -28,7 +28,7 @@ static char lid_state_file[256], wake_alarm_dir[256];
 static struct file *lid_file, *alarm_file, *epoch_file;
 int post_wake_state = -1;
 
-extern struct hibernation_ops *hibernation_ops;
+extern struct platform_hibernation_ops *hibernation_ops;
 
 int toi_platform_prepare(void)
 {

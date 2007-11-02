@@ -29,7 +29,7 @@
 #include <net/ip.h>
 #include <net/xfrm.h>
 #include <net/esp.h>
-#include <asm/scatterlist.h>
+#include <linux/scatterlist.h>
 #include <linux/crypto.h>
 #include <linux/kernel.h>
 #include <linux/pfkeyv2.h>
@@ -109,7 +109,11 @@ static int esp6_output(struct xfrm_state *x, struct sk_buff *skb)
 			if (!sg)
 				goto unlock;
 		}
-		skb_to_sgvec(skb, sg, esph->enc_data+esp->conf.ivlen-skb->data, clen);
+		sg_init_table(sg, nfrags);
+		skb_to_sgvec(skb, sg,
+			     esph->enc_data +
+			     esp->conf.ivlen -
+			     skb->data, clen);
 		err = crypto_blkcipher_encrypt(&desc, sg, sg, clen);
 		if (unlikely(sg != &esp->sgbuf[0]))
 			kfree(sg);
@@ -205,7 +209,10 @@ static int esp6_input(struct xfrm_state *x, struct sk_buff *skb)
 				goto out;
 			}
 		}
-		skb_to_sgvec(skb, sg, sizeof(*esph) + esp->conf.ivlen, elen);
+		sg_init_table(sg, nfrags);
+		skb_to_sgvec(skb, sg,
+			     sizeof(*esph) + esp->conf.ivlen,
+			     elen);
 		ret = crypto_blkcipher_decrypt(&desc, sg, sg, elen);
 		if (unlikely(sg != &esp->sgbuf[0]))
 			kfree(sg);
@@ -354,8 +361,16 @@ static int esp6_init_state(struct xfrm_state *x)
 				    (x->ealg->alg_key_len + 7) / 8))
 		goto error;
 	x->props.header_len = sizeof(struct ip_esp_hdr) + esp->conf.ivlen;
-	if (x->props.mode == XFRM_MODE_TUNNEL)
+	switch (x->props.mode) {
+	case XFRM_MODE_BEET:
+	case XFRM_MODE_TRANSPORT:
+		break;
+	case XFRM_MODE_TUNNEL:
 		x->props.header_len += sizeof(struct ipv6hdr);
+		break;
+	default:
+		goto error;
+	}
 	x->data = esp;
 	return 0;
 

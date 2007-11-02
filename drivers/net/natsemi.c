@@ -864,6 +864,7 @@ static int __devinit natsemi_probe1 (struct pci_dev *pdev,
 
 	np = netdev_priv(dev);
 	netif_napi_add(dev, &np->napi, natsemi_poll, 64);
+	np->dev = dev;
 
 	np->pci_dev = pdev;
 	pci_set_drvdata(pdev, dev);
@@ -996,7 +997,7 @@ static int __devinit natsemi_probe1 (struct pci_dev *pdev,
    a delay.  Note that pre-2.0.34 kernels had a cache-alignment bug that
    made udelay() unreliable.
    The old method of using an ISA access as a delay, __SLOW_DOWN_IO__, is
-   depricated.
+   deprecated.
 */
 #define eeprom_delay(ee_addr)	readl(ee_addr)
 

@@ -13,10 +13,9 @@
 #include <linux/highmem.h>
 #include <linux/pci.h>
 #include <linux/dma-mapping.h>
+#include <linux/scatterlist.h>
 
 #include <linux/mmc/host.h>
-
-#include <asm/scatterlist.h>
 
 #include "sdhci.h"
 
@@ -231,7 +230,7 @@ static void sdhci_deactivate_led(struct sdhci_host *host)
 
 static inline char* sdhci_sg_to_buffer(struct sdhci_host* host)
 {
-	return page_address(host->cur_sg->page) + host->cur_sg->offset;
+	return sg_virt(host->cur_sg);
 }
 
 static inline int sdhci_next_sg(struct sdhci_host* host)

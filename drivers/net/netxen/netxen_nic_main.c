@@ -53,9 +53,6 @@ static char netxen_nic_driver_string[] = "NetXen Network Driver version "
 #define NETXEN_ADAPTER_UP_MAGIC 777
 #define NETXEN_NIC_PEG_TUNE 0
 
-#define DMA_32BIT_MASK	0x00000000ffffffffULL
-#define DMA_35BIT_MASK	0x00000007ffffffffULL
-
 /* Local functions to NetXen NIC driver */
 static int __devinit netxen_nic_probe(struct pci_dev *pdev,
 				      const struct pci_device_id *ent);
@@ -1271,16 +1268,9 @@ netxen_handle_int(struct netxen_adapter *adapter, struct net_device *netdev)
  */
 irqreturn_t netxen_intr(int irq, void *data)
 {
-	struct netxen_adapter *adapter;
-	struct net_device *netdev;
+	struct netxen_adapter *adapter = data;
+	struct net_device *netdev = adapter->netdev;
 	u32 our_int = 0;
-
-	if (unlikely(!irq)) {
-		return IRQ_NONE;	/* Not our interrupt */
-	}
-
-	adapter = (struct netxen_adapter *)data;
-	netdev  = adapter->netdev;
 
 	if (!(adapter->flags & NETXEN_NIC_MSI_ENABLED)) {
 		our_int = readl(NETXEN_CRB_NORMALIZE(adapter, CRB_INT_VECTOR));

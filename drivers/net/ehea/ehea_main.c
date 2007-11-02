@@ -33,6 +33,9 @@
 #include <linux/if.h>
 #include <linux/list.h>
 #include <linux/if_ether.h>
+#include <linux/notifier.h>
+#include <linux/reboot.h>
+
 #include <net/ip.h>
 
 #include "ehea.h"
@@ -2329,7 +2332,7 @@ static void port_napi_disable(struct ehea_port *port)
 {
 	int i;
 
-	for (i = 0; i < port->num_def_qps; i++)
+	for (i = 0; i < port->num_def_qps + port->num_add_tx_qps; i++)
 		napi_disable(&port->port_res[i].napi);
 }
 
@@ -2337,7 +2340,7 @@ static void port_napi_enable(struct ehea_port *port)
 {
 	int i;
 
-	for (i = 0; i < port->num_def_qps; i++)
+	for (i = 0; i < port->num_def_qps + port->num_add_tx_qps; i++)
 		napi_enable(&port->port_res[i].napi);
 }
 
@@ -2373,8 +2376,6 @@ static int ehea_down(struct net_device *dev)
 	ehea_drop_multicast_list(dev);
 	ehea_free_interrupts(dev);
 
-	port_napi_disable(port);
-
 	port->state = EHEA_PORT_DOWN;
 
 	ret = ehea_clean_all_portres(port);
@@ -2396,6 +2397,7 @@ static int ehea_stop(struct net_device *dev)
 	flush_scheduled_work();
 	down(&port->port_lock);
 	netif_stop_queue(dev);
+	port_napi_disable(port);
 	ret = ehea_down(dev);
 	up(&port->port_lock);
 	return ret;
@@ -3218,7 +3220,7 @@ static int __devinit ehea_probe_adapter(struct of_device *dev,
 	/* get adapter properties */
 	ret = ehea_sense_adapter_attr(adapter);
 	if (ret) {
-		dev_err(&dev->dev, "sense_adapter_attr failed: %d", ret);
+		dev_err(&dev->dev, "sense_adapter_attr failed: %d\n", ret);
 		goto out_free_ad;
 	}
 
@@ -3226,7 +3228,7 @@ static int __devinit ehea_probe_adapter(struct of_device *dev,
 				      EHEA_NEQ, EHEA_MAX_ENTRIES_EQ, 1);
 	if (!adapter->neq) {
 		ret = -EIO;
-		dev_err(&dev->dev, "NEQ creation failed");
+		dev_err(&dev->dev, "NEQ creation failed\n");
 		goto out_free_ad;
 	}
 
@@ -3237,7 +3239,7 @@ static int __devinit ehea_probe_adapter(struct of_device *dev,
 				  ehea_interrupt_neq, IRQF_DISABLED,
 				  "ehea_neq", adapter);
 	if (ret) {
-		dev_err(&dev->dev, "requesting NEQ IRQ failed");
+		dev_err(&dev->dev, "requesting NEQ IRQ failed\n");
 		goto out_kill_eq;
 	}
 
@@ -3247,7 +3249,7 @@ static int __devinit ehea_probe_adapter(struct of_device *dev,
 
 	ret = ehea_setup_ports(adapter);
 	if (ret) {
-		dev_err(&dev->dev, "setup_ports failed");
+		dev_err(&dev->dev, "setup_ports failed\n");
 		goto out_rem_dev_sysfs;
 	}
 
@@ -3295,6 +3297,20 @@ static int __devexit ehea_remove(struct of_device *dev)
 
 	return 0;
 }
+
+static int ehea_reboot_notifier(struct notifier_block *nb,
+				unsigned long action, void *unused)
+{
+	if (action == SYS_RESTART) {
+		ehea_info("Reboot: freeing all eHEA resources");
+		ibmebus_unregister_driver(&ehea_driver);
+	}
+	return NOTIFY_DONE;
+}
+
+static struct notifier_block ehea_reboot_nb = {
+        .notifier_call = ehea_reboot_notifier,
+};
 
 static int check_module_parm(void)
 {
@@ -3352,6 +3368,8 @@ int __init ehea_module_init(void)
 	if (ret)
 		goto out;
 
+	register_reboot_notifier(&ehea_reboot_nb);
+
 	ret = ibmebus_register_driver(&ehea_driver);
 	if (ret) {
 		ehea_error("failed registering eHEA device driver on ebus");
@@ -3363,6 +3381,7 @@ int __init ehea_module_init(void)
 	if (ret) {
 		ehea_error("failed to register capabilities attribute, ret=%d",
 			   ret);
+		unregister_reboot_notifier(&ehea_reboot_nb);
 		ibmebus_unregister_driver(&ehea_driver);
 		goto out;
 	}
@@ -3376,6 +3395,7 @@ static void __exit ehea_module_exit(void)
 	flush_scheduled_work();
 	driver_remove_file(&ehea_driver.driver, &driver_attr_capabilities);
 	ibmebus_unregister_driver(&ehea_driver);
+	unregister_reboot_notifier(&ehea_reboot_nb);
 	ehea_destroy_busmap();
 }
 

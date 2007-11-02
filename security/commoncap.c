@@ -23,6 +23,26 @@
 #include <linux/xattr.h>
 #include <linux/hugetlb.h>
 #include <linux/mount.h>
+#include <linux/sched.h>
+
+#ifdef CONFIG_SECURITY_FILE_CAPABILITIES
+/*
+ * Because of the reduced scope of CAP_SETPCAP when filesystem
+ * capabilities are in effect, it is safe to allow this capability to
+ * be available in the default configuration.
+ */
+# define CAP_INIT_BSET  CAP_FULL_SET
+#else /* ie. ndef CONFIG_SECURITY_FILE_CAPABILITIES */
+# define CAP_INIT_BSET  CAP_INIT_EFF_SET
+#endif /* def CONFIG_SECURITY_FILE_CAPABILITIES */
+
+kernel_cap_t cap_bset = CAP_INIT_BSET;    /* systemwide capability bound */
+EXPORT_SYMBOL(cap_bset);
+
+/* Global security state */
+
+unsigned securebits = SECUREBITS_DEFAULT; /* systemwide security settings */
+EXPORT_SYMBOL(securebits);
 
 int cap_netlink_send(struct sock *sk, struct sk_buff *skb)
 {
@@ -73,14 +93,44 @@ int cap_capget (struct task_struct *target, kernel_cap_t *effective,
 	return 0;
 }
 
+#ifdef CONFIG_SECURITY_FILE_CAPABILITIES
+
+static inline int cap_block_setpcap(struct task_struct *target)
+{
+	/*
+	 * No support for remote process capability manipulation with
+	 * filesystem capability support.
+	 */
+	return (target != current);
+}
+
+static inline int cap_inh_is_capped(void)
+{
+	/*
+	 * return 1 if changes to the inheritable set are limited
+	 * to the old permitted set.
+	 */
+	return !cap_capable(current, CAP_SETPCAP);
+}
+
+#else /* ie., ndef CONFIG_SECURITY_FILE_CAPABILITIES */
+
+static inline int cap_block_setpcap(struct task_struct *t) { return 0; }
+static inline int cap_inh_is_capped(void) { return 1; }
+
+#endif /* def CONFIG_SECURITY_FILE_CAPABILITIES */
+
 int cap_capset_check (struct task_struct *target, kernel_cap_t *effective,
 		      kernel_cap_t *inheritable, kernel_cap_t *permitted)
 {
-	/* Derived from kernel/capability.c:sys_capset. */
-	/* verify restrictions on target's new Inheritable set */
-	if (!cap_issubset (*inheritable,
-			   cap_combine (target->cap_inheritable,
-					current->cap_permitted))) {
+	if (cap_block_setpcap(target)) {
+		return -EPERM;
+	}
+	if (cap_inh_is_capped()
+	    && !cap_issubset(*inheritable,
+			     cap_combine(target->cap_inheritable,
+					 current->cap_permitted))) {
+		/* incapable of using this inheritable set */
 		return -EPERM;
 	}
 
@@ -140,7 +190,8 @@ int cap_inode_killpriv(struct dentry *dentry)
 	return inode->i_op->removexattr(dentry, XATTR_NAME_CAPS);
 }
 
-static inline int cap_from_disk(__le32 *caps, struct linux_binprm *bprm,
+static inline int cap_from_disk(struct vfs_cap_data *caps,
+				struct linux_binprm *bprm,
 				int size)
 {
 	__u32 magic_etc;
@@ -148,7 +199,7 @@ static inline int cap_from_disk(__le32 *caps, struct linux_binprm *bprm,
 	if (size != XATTR_CAPS_SZ)
 		return -EINVAL;
 
-	magic_etc = le32_to_cpu(caps[0]);
+	magic_etc = le32_to_cpu(caps->magic_etc);
 
 	switch ((magic_etc & VFS_CAP_REVISION_MASK)) {
 	case VFS_CAP_REVISION:
@@ -156,8 +207,8 @@ static inline int cap_from_disk(__le32 *caps, struct linux_binprm *bprm,
 			bprm->cap_effective = true;
 		else
 			bprm->cap_effective = false;
-		bprm->cap_permitted = to_cap_t( le32_to_cpu(caps[1]) );
-		bprm->cap_inheritable = to_cap_t( le32_to_cpu(caps[2]) );
+		bprm->cap_permitted = to_cap_t(le32_to_cpu(caps->permitted));
+		bprm->cap_inheritable = to_cap_t(le32_to_cpu(caps->inheritable));
 		return 0;
 	default:
 		return -EINVAL;
@@ -169,7 +220,7 @@ static int get_file_caps(struct linux_binprm *bprm)
 {
 	struct dentry *dentry;
 	int rc = 0;
-	__le32 v1caps[XATTR_CAPS_SZ];
+	struct vfs_cap_data incaps;
 	struct inode *inode;
 
 	if (bprm->file->f_vfsmnt->mnt_flags & MNT_NOSUID) {
@@ -182,8 +233,14 @@ static int get_file_caps(struct linux_binprm *bprm)
 	if (!inode->i_op || !inode->i_op->getxattr)
 		goto out;
 
-	rc = inode->i_op->getxattr(dentry, XATTR_NAME_CAPS, &v1caps,
-							XATTR_CAPS_SZ);
+	rc = inode->i_op->getxattr(dentry, XATTR_NAME_CAPS, NULL, 0);
+	if (rc > 0) {
+		if (rc == XATTR_CAPS_SZ)
+			rc = inode->i_op->getxattr(dentry, XATTR_NAME_CAPS,
+						&incaps, XATTR_CAPS_SZ);
+		else
+			rc = -EINVAL;
+	}
 	if (rc == -ENODATA || rc == -EOPNOTSUPP) {
 		/* no data, that's ok */
 		rc = 0;
@@ -192,7 +249,7 @@ static int get_file_caps(struct linux_binprm *bprm)
 	if (rc < 0)
 		goto out;
 
-	rc = cap_from_disk(v1caps, bprm, rc);
+	rc = cap_from_disk(&incaps, bprm, rc);
 	if (rc)
 		printk(KERN_NOTICE "%s: cap_from_disk returned %d for %s\n",
 			__FUNCTION__, rc, bprm->filename);
@@ -285,7 +342,7 @@ void cap_bprm_apply_creds (struct linux_binprm *bprm, int unsafe)
 	/* For init, we want to retain the capabilities set
 	 * in the init_task struct. Thus we skip the usual
 	 * capability rules */
-	if (!is_init(current)) {
+	if (!is_global_init(current)) {
 		current->cap_permitted = new_permitted;
 		current->cap_effective = bprm->cap_effective ?
 				new_permitted : 0;

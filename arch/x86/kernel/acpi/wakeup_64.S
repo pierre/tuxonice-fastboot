@@ -4,6 +4,7 @@
 #include <asm/pgtable.h>
 #include <asm/page.h>
 #include <asm/msr.h>
+#include <asm/asm-offsets.h>
 
 # Copyright 2003 Pavel Machek <pavel@suse.cz>, distribute under GPLv2
 #
@@ -41,7 +42,6 @@ wakeup_code:
 
 # Running in *copy* of this code, somewhere in low 1MB.
 
-	movb	$0xa1, %al	;  outb %al, $0x80
 	cli
 	cld
 	# setup data segment
@@ -65,11 +65,6 @@ wakeup_code:
 	cmpl	$0x12345678, %eax
 	jne	bogus_real_magic
 
-  	call	verify_cpu			# Verify the cpu supports long
-						# mode
-	testl	%eax, %eax
-	jnz	no_longmode
-
 	testl	$1, realmode_flags - wakeup_code
 	jz	1f
 	lcall   $0xc000,$3
@@ -84,12 +79,6 @@ wakeup_code:
 	call	mode_set
 1:
 
- 	movw	$0xb800, %ax
-	movw	%ax,%fs
-	movw	$0x0e00 + 'L', %fs:(0x10)
-
-	movb	$0xa2, %al	;  outb %al, $0x80
-	
 	mov	%ds, %ax			# Find 32bit wakeup_code addr
 	movzx   %ax, %esi			# (Convert %ds:gdt to a liner ptr)
 	shll    $4, %esi
@@ -117,13 +106,9 @@ wakeup_32_vector:
 	.code32
 wakeup_32:
 # Running in this code, but at low address; paging is not yet turned on.
-	movb	$0xa5, %al	;  outb %al, $0x80
 
 	movl	$__KERNEL_DS, %eax
 	movl	%eax, %ds
-
-	movw	$0x0e00 + 'i', %ds:(0xb8012)
-	movb	$0xa8, %al	;  outb %al, $0x80;
 
 	/*
 	 * Prepare for entering 64bits mode
@@ -200,16 +185,11 @@ wakeup_long64:
 	 */
 	lgdt	cpu_gdt_descr
 
-	movw	$0x0e00 + 'n', %ds:(0xb8014)
-	movb	$0xa9, %al	;  outb %al, $0x80
-
 	movq    saved_magic, %rax
 	movq    $0x123456789abcdef0, %rdx
 	cmpq    %rdx, %rax
 	jne     bogus_64_magic
 
-	movw	$0x0e00 + 'u', %ds:(0xb8016)
-	
 	nop
 	nop
 	movw	$__KERNEL_DS, %ax
@@ -220,13 +200,11 @@ wakeup_long64:
 	movw	%ax, %gs
 	movq	saved_rsp, %rsp
 
-	movw	$0x0e00 + 'x', %ds:(0xb8018)
 	movq	saved_rbx, %rbx
 	movq	saved_rdi, %rdi
 	movq	saved_rsi, %rsi
 	movq	saved_rbp, %rbp
 
-	movw	$0x0e00 + '!', %ds:(0xb801a)
 	movq	saved_rip, %rax
 	jmp	*%rax
 
@@ -256,21 +234,12 @@ realmode_flags:	.quad 0
 
 .code16
 bogus_real_magic:
-	movb	$0xba,%al	;  outb %al,$0x80
 	jmp bogus_real_magic
 
 .code64
 bogus_64_magic:
-	movb	$0xb3,%al	;  outb %al,$0x80
 	jmp bogus_64_magic
 
-.code16
-no_longmode:
-	movb    $0xbc,%al       ;  outb %al,$0x80
-	jmp no_longmode
-
-#include "../verify_cpu_64.S"
-	
 /* This code uses an extended set of video mode numbers. These include:
  * Aliases for standard modes
  *	NORMAL_VGA (-1)
@@ -374,31 +343,32 @@ do_suspend_lowlevel:
 	xorl	%eax, %eax
 	call	save_processor_state
 
-	movq %rsp, saved_context_esp(%rip)
-	movq %rax, saved_context_eax(%rip)
-	movq %rbx, saved_context_ebx(%rip)
-	movq %rcx, saved_context_ecx(%rip)
-	movq %rdx, saved_context_edx(%rip)
-	movq %rbp, saved_context_ebp(%rip)
-	movq %rsi, saved_context_esi(%rip)
-	movq %rdi, saved_context_edi(%rip)
-	movq %r8,  saved_context_r08(%rip)
-	movq %r9,  saved_context_r09(%rip)
-	movq %r10, saved_context_r10(%rip)
-	movq %r11, saved_context_r11(%rip)
-	movq %r12, saved_context_r12(%rip)
-	movq %r13, saved_context_r13(%rip)
-	movq %r14, saved_context_r14(%rip)
-	movq %r15, saved_context_r15(%rip)
-	pushfq ; popq saved_context_eflags(%rip)
+	movq	$saved_context, %rax
+	movq	%rsp, pt_regs_rsp(%rax)
+	movq	%rbp, pt_regs_rbp(%rax)
+	movq	%rsi, pt_regs_rsi(%rax)
+	movq	%rdi, pt_regs_rdi(%rax)
+	movq	%rbx, pt_regs_rbx(%rax)
+	movq	%rcx, pt_regs_rcx(%rax)
+	movq	%rdx, pt_regs_rdx(%rax)
+	movq	%r8, pt_regs_r8(%rax)
+	movq	%r9, pt_regs_r9(%rax)
+	movq	%r10, pt_regs_r10(%rax)
+	movq	%r11, pt_regs_r11(%rax)
+	movq	%r12, pt_regs_r12(%rax)
+	movq	%r13, pt_regs_r13(%rax)
+	movq	%r14, pt_regs_r14(%rax)
+	movq	%r15, pt_regs_r15(%rax)
+	pushfq
+	popq	pt_regs_eflags(%rax)
 
 	movq	$.L97, saved_rip(%rip)
 
-	movq %rsp,saved_rsp
-	movq %rbp,saved_rbp
-	movq %rbx,saved_rbx
-	movq %rdi,saved_rdi
-	movq %rsi,saved_rsi
+	movq	%rsp, saved_rsp
+	movq	%rbp, saved_rbp
+	movq	%rbx, saved_rbx
+	movq	%rdi, saved_rdi
+	movq	%rsi, saved_rsi
 
 	addq	$8, %rsp
 	movl	$3, %edi
@@ -409,32 +379,35 @@ do_suspend_lowlevel:
 .L99:
 	.align 4
 	movl	$24, %eax
-	movw %ax, %ds
-	movq	saved_context+58(%rip), %rax
-	movq %rax, %cr4
-	movq	saved_context+50(%rip), %rax
-	movq %rax, %cr3
-	movq	saved_context+42(%rip), %rax
-	movq %rax, %cr2
-	movq	saved_context+34(%rip), %rax
-	movq %rax, %cr0
-	pushq saved_context_eflags(%rip) ; popfq
-	movq saved_context_esp(%rip), %rsp
-	movq saved_context_ebp(%rip), %rbp
-	movq saved_context_eax(%rip), %rax
-	movq saved_context_ebx(%rip), %rbx
-	movq saved_context_ecx(%rip), %rcx
-	movq saved_context_edx(%rip), %rdx
-	movq saved_context_esi(%rip), %rsi
-	movq saved_context_edi(%rip), %rdi
-	movq saved_context_r08(%rip), %r8
-	movq saved_context_r09(%rip), %r9
-	movq saved_context_r10(%rip), %r10
-	movq saved_context_r11(%rip), %r11
-	movq saved_context_r12(%rip), %r12
-	movq saved_context_r13(%rip), %r13
-	movq saved_context_r14(%rip), %r14
-	movq saved_context_r15(%rip), %r15
+	movw	%ax, %ds
+
+	/* We don't restore %rax, it must be 0 anyway */
+	movq	$saved_context, %rax
+	movq	saved_context_cr4(%rax), %rbx
+	movq	%rbx, %cr4
+	movq	saved_context_cr3(%rax), %rbx
+	movq	%rbx, %cr3
+	movq	saved_context_cr2(%rax), %rbx
+	movq	%rbx, %cr2
+	movq	saved_context_cr0(%rax), %rbx
+	movq	%rbx, %cr0
+	pushq	pt_regs_eflags(%rax)
+	popfq
+	movq	pt_regs_rsp(%rax), %rsp
+	movq	pt_regs_rbp(%rax), %rbp
+	movq	pt_regs_rsi(%rax), %rsi
+	movq	pt_regs_rdi(%rax), %rdi
+	movq	pt_regs_rbx(%rax), %rbx
+	movq	pt_regs_rcx(%rax), %rcx
+	movq	pt_regs_rdx(%rax), %rdx
+	movq	pt_regs_r8(%rax), %r8
+	movq	pt_regs_r9(%rax), %r9
+	movq	pt_regs_r10(%rax), %r10
+	movq	pt_regs_r11(%rax), %r11
+	movq	pt_regs_r12(%rax), %r12
+	movq	pt_regs_r13(%rax), %r13
+	movq	pt_regs_r14(%rax), %r14
+	movq	pt_regs_r15(%rax), %r15
 
 	xorl	%eax, %eax
 	addq	$8, %rsp

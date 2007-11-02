@@ -477,10 +477,9 @@ static void merge_contiguous_buffers(Scsi_Cmnd *cmd)
 
 	for (endaddr = virt_to_phys(cmd->SCp.ptr + cmd->SCp.this_residual - 1) + 1;
 	     cmd->SCp.buffers_residual &&
-	     virt_to_phys(page_address(cmd->SCp.buffer[1].page) +
-			  cmd->SCp.buffer[1].offset) == endaddr;) {
+	     virt_to_phys(sg_virt(&cmd->SCp.buffer[1])) == endaddr;) {
 		MER_PRINTK("VTOP(%p) == %08lx -> merging\n",
-			   page_address(cmd->SCp.buffer[1].page), endaddr);
+			   page_address(sg_page(&cmd->SCp.buffer[1])), endaddr);
 #if (NDEBUG & NDEBUG_MERGING)
 		++cnt;
 #endif
@@ -515,8 +514,7 @@ static inline void initialize_SCp(Scsi_Cmnd *cmd)
 	if (cmd->use_sg) {
 		cmd->SCp.buffer = (struct scatterlist *)cmd->request_buffer;
 		cmd->SCp.buffers_residual = cmd->use_sg - 1;
-		cmd->SCp.ptr = (char *)page_address(cmd->SCp.buffer->page) +
-			       cmd->SCp.buffer->offset;
+		cmd->SCp.ptr = sg_virt(cmd->SCp.buffer);
 		cmd->SCp.this_residual = cmd->SCp.buffer->length;
 		/* ++roman: Try to merge some scatter-buffers if they are at
 		 * contiguous physical addresses.
@@ -2054,8 +2052,7 @@ static void NCR5380_information_transfer(struct Scsi_Host *instance)
 					++cmd->SCp.buffer;
 					--cmd->SCp.buffers_residual;
 					cmd->SCp.this_residual = cmd->SCp.buffer->length;
-					cmd->SCp.ptr = page_address(cmd->SCp.buffer->page) +
-						   cmd->SCp.buffer->offset;
+					cmd->SCp.ptr = sg_virt(cmd->SCp.buffer);
 					/* ++roman: Try to merge some scatter-buffers if
 					 * they are at contiguous physical addresses.
 					 */

@@ -5,7 +5,7 @@
 
 #include <linux/mm.h> /* need struct page */
 
-#include <asm/scatterlist.h>
+#include <linux/scatterlist.h>
 
 /*
  * DMA-consistent mapping functions.  These allocate/free a region of
@@ -274,8 +274,8 @@ dma_map_sg(struct device *dev, struct scatterlist *sg, int nents,
 	for (i = 0; i < nents; i++, sg++) {
 		char *virt;
 
-		sg->dma_address = page_to_dma(dev, sg->page) + sg->offset;
-		virt = page_address(sg->page) + sg->offset;
+		sg->dma_address = page_to_dma(dev, sg_page(sg)) + sg->offset;
+		virt = sg_virt(sg);
 
 		if (!arch_is_coherent())
 			dma_cache_maint(virt, sg->length, dir);
@@ -371,7 +371,7 @@ dma_sync_sg_for_cpu(struct device *dev, struct scatterlist *sg, int nents,
 	int i;
 
 	for (i = 0; i < nents; i++, sg++) {
-		char *virt = page_address(sg->page) + sg->offset;
+		char *virt = sg_virt(sg);
 		if (!arch_is_coherent())
 			dma_cache_maint(virt, sg->length, dir);
 	}
@@ -384,7 +384,7 @@ dma_sync_sg_for_device(struct device *dev, struct scatterlist *sg, int nents,
 	int i;
 
 	for (i = 0; i < nents; i++, sg++) {
-		char *virt = page_address(sg->page) + sg->offset;
+		char *virt = sg_virt(sg);
 		if (!arch_is_coherent())
 			dma_cache_maint(virt, sg->length, dir);
 	}
@@ -401,7 +401,7 @@ extern void dma_sync_sg_for_device(struct device*, struct scatterlist*, int, enu
  *
  * On the SA-1111, a bug limits DMA to only certain regions of RAM.
  * On the IXP425, the PCI inbound window is 64MB (256MB total RAM)
- * On some ADI engineering sytems, PCI inbound window is 32MB (12MB total RAM)
+ * On some ADI engineering systems, PCI inbound window is 32MB (12MB total RAM)
  *
  * The following are helper functions used by the dmabounce subystem
  *

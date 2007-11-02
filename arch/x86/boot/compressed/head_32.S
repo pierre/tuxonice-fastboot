@@ -27,12 +27,18 @@
 #include <asm/segment.h>
 #include <asm/page.h>
 #include <asm/boot.h>
+#include <asm/asm-offsets.h>
 
 .section ".text.head","ax",@progbits
 	.globl startup_32
 
 startup_32:
 	cld
+	/* test KEEP_SEGMENTS flag to see if the bootloader is asking
+	 * us to not reload segments */
+	testb $(1<<6), BP_loadflags(%esi)
+	jnz 1f
+
 	cli
 	movl $(__BOOT_DS),%eax
 	movl %eax,%ds
@@ -40,6 +46,7 @@ startup_32:
 	movl %eax,%fs
 	movl %eax,%gs
 	movl %eax,%ss
+1:
 
 /* Calculate the delta between where we were compiled to run
  * at and where we were actually loaded at.  This can only be done

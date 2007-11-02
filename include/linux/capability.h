@@ -56,10 +56,8 @@ typedef struct __user_cap_data_struct {
 
 struct vfs_cap_data {
 	__u32 magic_etc;  /* Little endian */
-	struct {
-		__u32 permitted;    /* Little endian */
-		__u32 inheritable;  /* Little endian */
-	} data[1];
+	__u32 permitted;    /* Little endian */
+	__u32 inheritable;  /* Little endian */
 };
 
 #ifdef __KERNEL__
@@ -310,10 +308,6 @@ typedef __u32 kernel_cap_t;
 #define CAP_SETFCAP	     31
 
 #ifdef __KERNEL__
-/*
- * Bounding set
- */
-extern kernel_cap_t cap_bset;
 
 /*
  * Internal kernel functions only

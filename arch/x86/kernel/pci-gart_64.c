@@ -30,17 +30,17 @@
 #include <asm/mtrr.h>
 #include <asm/pgtable.h>
 #include <asm/proto.h>
-#include <asm/iommu.h>
+#include <asm/gart.h>
 #include <asm/cacheflush.h>
 #include <asm/swiotlb.h>
 #include <asm/dma.h>
 #include <asm/k8.h>
 
-unsigned long iommu_bus_base;	/* GART remapping area (physical) */
+static unsigned long iommu_bus_base;	/* GART remapping area (physical) */
 static unsigned long iommu_size; 	/* size of remapping area bytes */
 static unsigned long iommu_pages;	/* .. and in pages */
 
-u32 *iommu_gatt_base; 		/* Remapping table */
+static u32 *iommu_gatt_base; 		/* Remapping table */
 
 /* If this is disabled the IOMMU will use an optimized flushing strategy
    of only flushing when an mapping is reused. With it true the GART is flushed 
@@ -135,8 +135,8 @@ static void flush_gart(void)
 /* Debugging aid for drivers that don't free their IOMMU tables */
 static void **iommu_leak_tab; 
 static int leak_trace;
-int iommu_leak_pages = 20; 
-void dump_leak(void)
+static int iommu_leak_pages = 20;
+static void dump_leak(void)
 {
 	int i;
 	static int dump; 
@@ -302,7 +302,7 @@ static int dma_map_sg_nonforce(struct device *dev, struct scatterlist *sg,
 #endif
 
 	for_each_sg(sg, s, nents, i) {
-		unsigned long addr = page_to_phys(s->page) + s->offset; 
+		unsigned long addr = sg_phys(s);
 		if (nonforced_iommu(dev, addr, s->length)) { 
 			addr = dma_map_area(dev, addr, s->length, dir);
 			if (addr == bad_dma_address) { 
@@ -338,7 +338,6 @@ static int __dma_map_cont(struct scatterlist *start, int nelems,
 		
 		BUG_ON(s != start && s->offset);
 		if (s == start) {
-			*sout = *s; 
 			sout->dma_address = iommu_bus_base;
 			sout->dma_address += iommu_page*PAGE_SIZE + s->offset;
 			sout->dma_length = s->length;
@@ -365,7 +364,7 @@ static inline int dma_map_cont(struct scatterlist *start, int nelems,
 {
 	if (!need) {
 		BUG_ON(nelems != 1);
-		*sout = *start;
+		sout->dma_address = start->dma_address;
 		sout->dma_length = start->length;
 		return 0;
 	}
@@ -397,7 +396,7 @@ static int gart_map_sg(struct device *dev, struct scatterlist *sg, int nents,
 	start_sg = sgmap = sg;
 	ps = NULL; /* shut up gcc */
 	for_each_sg(sg, s, nents, i) {
-		dma_addr_t addr = page_to_phys(s->page) + s->offset;
+		dma_addr_t addr = sg_phys(s);
 		s->dma_address = addr;
 		BUG_ON(s->length == 0); 
 
@@ -436,7 +435,7 @@ static int gart_map_sg(struct device *dev, struct scatterlist *sg, int nents,
 
 error:
 	flush_gart();
-	gart_unmap_sg(dev, sg, nents, dir);
+	gart_unmap_sg(dev, sg, out, dir);
 	/* When it was forced or merged try again in a dumb way */
 	if (force_iommu || iommu_merge) {
 		out = dma_map_sg_nonforce(dev, sg, nents, dir);
@@ -628,12 +627,12 @@ void __init gart_iommu_init(void)
 		return;
 
 	/* Did we detect a different HW IOMMU? */
-	if (iommu_detected && !iommu_aperture)
+	if (iommu_detected && !gart_iommu_aperture)
 		return;
 
 	if (no_iommu ||
 	    (!force_iommu && end_pfn <= MAX_DMA32_PFN) ||
-	    !iommu_aperture ||
+	    !gart_iommu_aperture ||
 	    (no_agp && init_k8_gatt(&info) < 0)) {
 		if (end_pfn > MAX_DMA32_PFN) {
 			printk(KERN_ERR "WARNING more than 4GB of memory "
@@ -734,9 +733,9 @@ void __init gart_parse_options(char *p)
 		fix_aperture = 0;
 	/* duplicated from pci-dma.c */
 	if (!strncmp(p,"force",5))
-		iommu_aperture_allowed = 1;
+		gart_iommu_aperture_allowed = 1;
 	if (!strncmp(p,"allowed",7))
-		iommu_aperture_allowed = 1;
+		gart_iommu_aperture_allowed = 1;
 	if (!strncmp(p, "memaper", 7)) {
 		fallback_aper_force = 1;
 		p += 7;

@@ -6,7 +6,7 @@
  *
  * Alexey Kuznetsov  <kuznet@ms2.inr.ac.ru>
  * Ben Greear <greearb@candelatech.com>
- * Jens Låås <jens.laas@data.slu.se>
+ * Jens LÃ¥Ã¥s <jens.laas@data.slu.se>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -161,7 +161,7 @@
 #endif
 #include <asm/byteorder.h>
 #include <linux/rcupdate.h>
-#include <asm/bitops.h>
+#include <linux/bitops.h>
 #include <asm/io.h>
 #include <asm/dma.h>
 #include <asm/uaccess.h>
@@ -2454,7 +2454,7 @@ static int pktgen_output_ipsec(struct sk_buff *skb, struct pktgen_dev *pkt_dev)
 	spin_lock(&x->lock);
 	iph = ip_hdr(skb);
 
-	err = x->mode->output(x, skb);
+	err = x->outer_mode->output(x, skb);
 	if (err)
 		goto error;
 	err = x->type->output(x, skb);
@@ -2603,8 +2603,7 @@ static struct sk_buff *fill_packet_ipv4(struct net_device *odev,
 	skb->network_header = skb->tail;
 	skb->transport_header = skb->network_header + sizeof(struct iphdr);
 	skb_put(skb, sizeof(struct iphdr) + sizeof(struct udphdr));
-	skb->queue_mapping = pkt_dev->cur_queue_map;
-
+	skb_set_queue_mapping(skb, pkt_dev->cur_queue_map);
 	iph = ip_hdr(skb);
 	udph = udp_hdr(skb);
 
@@ -2941,8 +2940,7 @@ static struct sk_buff *fill_packet_ipv6(struct net_device *odev,
 	skb->network_header = skb->tail;
 	skb->transport_header = skb->network_header + sizeof(struct ipv6hdr);
 	skb_put(skb, sizeof(struct ipv6hdr) + sizeof(struct udphdr));
-	skb->queue_mapping = pkt_dev->cur_queue_map;
-
+	skb_set_queue_mapping(skb, pkt_dev->cur_queue_map);
 	iph = ipv6_hdr(skb);
 	udph = udp_hdr(skb);
 
@@ -3385,7 +3383,7 @@ static __inline__ void pktgen_xmit(struct pktgen_dev *pkt_dev)
 
 	if ((netif_queue_stopped(odev) ||
 	     (pkt_dev->skb &&
-	      netif_subqueue_stopped(odev, pkt_dev->skb->queue_mapping))) ||
+	      netif_subqueue_stopped(odev, pkt_dev->skb))) ||
 	    need_resched()) {
 		idle_start = getCurUs();
 
@@ -3402,7 +3400,7 @@ static __inline__ void pktgen_xmit(struct pktgen_dev *pkt_dev)
 		pkt_dev->idle_acc += getCurUs() - idle_start;
 
 		if (netif_queue_stopped(odev) ||
-		    netif_subqueue_stopped(odev, pkt_dev->skb->queue_mapping)) {
+		    netif_subqueue_stopped(odev, pkt_dev->skb)) {
 			pkt_dev->next_tx_us = getCurUs();	/* TODO */
 			pkt_dev->next_tx_ns = 0;
 			goto out;	/* Try the next interface */
@@ -3431,7 +3429,7 @@ static __inline__ void pktgen_xmit(struct pktgen_dev *pkt_dev)
 
 	netif_tx_lock_bh(odev);
 	if (!netif_queue_stopped(odev) &&
-	    !netif_subqueue_stopped(odev, pkt_dev->skb->queue_mapping)) {
+	    !netif_subqueue_stopped(odev, pkt_dev->skb)) {
 
 		atomic_inc(&(pkt_dev->skb->users));
 	      retry_now:
@@ -3514,7 +3512,7 @@ static int pktgen_thread_worker(void *arg)
 
 	init_waitqueue_head(&t->queue);
 
-	pr_debug("pktgen: starting pktgen/%d:  pid=%d\n", cpu, current->pid);
+	pr_debug("pktgen: starting pktgen/%d:  pid=%d\n", cpu, task_pid_nr(current));
 
 	set_current_state(TASK_INTERRUPTIBLE);
 

@@ -131,7 +131,6 @@ EXPORT_SYMBOL_GPL(shrink_one_zone);
 EXPORT_SYMBOL_GPL(saveable_page);
 EXPORT_SYMBOL_GPL(swsusp_arch_suspend);
 EXPORT_SYMBOL_GPL(swsusp_arch_resume);
-EXPORT_SYMBOL_GPL(pm_ops);
 EXPORT_SYMBOL_GPL(pm_prepare_console);
 EXPORT_SYMBOL_GPL(follow_page);
 EXPORT_SYMBOL_GPL(machine_halt);

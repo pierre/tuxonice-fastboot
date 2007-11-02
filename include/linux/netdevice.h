@@ -390,7 +390,7 @@ static inline void napi_complete(struct napi_struct *n)
 static inline void napi_disable(struct napi_struct *n)
 {
 	while (test_and_set_bit(NAPI_STATE_SCHED, &n->state))
-		msleep_interruptible(1);
+		msleep(1);
 }
 
 /**
@@ -406,6 +406,24 @@ static inline void napi_enable(struct napi_struct *n)
 	smp_mb__before_clear_bit();
 	clear_bit(NAPI_STATE_SCHED, &n->state);
 }
+
+#ifdef CONFIG_SMP
+/**
+ *	napi_synchronize - wait until NAPI is not running
+ *	@n: napi context
+ *
+ * Wait until NAPI is done being scheduled on this context.
+ * Waits till any outstanding processing completes but
+ * does not disable future activations.
+ */
+static inline void napi_synchronize(const struct napi_struct *n)
+{
+	while (test_bit(NAPI_STATE_SCHED, &n->state))
+		msleep(1);
+}
+#else
+# define napi_synchronize(n)	barrier()
+#endif
 
 /*
  *	The DEVICE structure.
@@ -651,6 +669,8 @@ struct net_device
 #define HAVE_SET_MAC_ADDR  		 
 	int			(*set_mac_address)(struct net_device *dev,
 						   void *addr);
+#define HAVE_VALIDATE_ADDR
+	int			(*validate_addr)(struct net_device *dev);
 #define HAVE_PRIVATE_IOCTL
 	int			(*do_ioctl)(struct net_device *dev,
 					    struct ifreq *ifr, int cmd);
@@ -719,6 +739,16 @@ static inline void *netdev_priv(const struct net_device *dev)
  */
 #define SET_NETDEV_DEV(net, pdev)	((net)->dev.parent = (pdev))
 
+/**
+ *	netif_napi_add - initialize a napi context
+ *	@dev:  network device
+ *	@napi: napi context
+ *	@poll: polling function
+ *	@weight: default weight
+ *
+ * netif_napi_add() must be used to initialize a napi context prior to calling
+ * *any* of the other napi related functions.
+ */
 static inline void netif_napi_add(struct net_device *dev,
 				  struct napi_struct *napi,
 				  int (*poll)(struct napi_struct *, int),
@@ -816,7 +846,7 @@ static inline int dev_hard_header(struct sk_buff *skb, struct net_device *dev,
 				  const void *daddr, const void *saddr,
 				  unsigned len)
 {
-	if (!dev->header_ops)
+	if (!dev->header_ops || !dev->header_ops->create)
 		return 0;
 
 	return dev->header_ops->create(skb, dev, type, daddr, saddr, len);
@@ -827,7 +857,7 @@ static inline int dev_parse_header(const struct sk_buff *skb,
 {
 	const struct net_device *dev = skb->dev;
 
-	if (!dev->header_ops->parse)
+	if (!dev->header_ops || !dev->header_ops->parse)
 		return 0;
 	return dev->header_ops->parse(skb, haddr);
 }
@@ -978,7 +1008,7 @@ static inline void netif_stop_subqueue(struct net_device *dev, u16 queue_index)
  *
  * Check individual transmit queue of a device with multiple transmit queues.
  */
-static inline int netif_subqueue_stopped(const struct net_device *dev,
+static inline int __netif_subqueue_stopped(const struct net_device *dev,
 					 u16 queue_index)
 {
 #ifdef CONFIG_NETDEVICES_MULTIQUEUE
@@ -989,6 +1019,11 @@ static inline int netif_subqueue_stopped(const struct net_device *dev,
 #endif
 }
 
+static inline int netif_subqueue_stopped(const struct net_device *dev,
+					 struct sk_buff *skb)
+{
+	return __netif_subqueue_stopped(dev, skb_get_queue_mapping(skb));
+}
 
 /**
  *	netif_wake_subqueue - allow sending packets on subqueue

@@ -2374,18 +2374,18 @@ static void gdth_copy_internal_data(gdth_ha_str *ha, Scsi_Cmnd *scp,
             if (cpsum+cpnow > cpcount) 
                 cpnow = cpcount - cpsum;
             cpsum += cpnow;
-            if (!sl->page) {
+            if (!sg_page(sl)) {
                 printk("GDT-HA %d: invalid sc/gt element in gdth_copy_internal_data()\n",
                        ha->hanum);
                 return;
             }
             local_irq_save(flags);
-            address = kmap_atomic(sl->page, KM_BIO_SRC_IRQ) + sl->offset;
+            address = kmap_atomic(sg_page(sl), KM_BIO_SRC_IRQ) + sl->offset;
             if (to_buffer)
                 memcpy(buffer, address, cpnow);
             else
                 memcpy(address, buffer, cpnow);
-            flush_dcache_page(sl->page);
+            flush_dcache_page(sg_page(sl));
             kunmap_atomic(address, KM_BIO_SRC_IRQ);
             local_irq_restore(flags);
             if (cpsum == cpcount)
@@ -4734,7 +4734,7 @@ static struct scsi_host_template gdth_template = {
 };
 
 #ifdef CONFIG_ISA
-static int gdth_isa_probe_one(ulong32 isa_bios)
+static int __init gdth_isa_probe_one(ulong32 isa_bios)
 {
 	struct Scsi_Host *shp;
 	gdth_ha_str *ha;
@@ -4862,7 +4862,7 @@ static int gdth_isa_probe_one(ulong32 isa_bios)
 #endif /* CONFIG_ISA */
 
 #ifdef CONFIG_EISA
-static int gdth_eisa_probe_one(ushort eisa_slot)
+static int __init gdth_eisa_probe_one(ushort eisa_slot)
 {
 	struct Scsi_Host *shp;
 	gdth_ha_str *ha;
@@ -4991,7 +4991,7 @@ static int gdth_eisa_probe_one(ushort eisa_slot)
 #endif /* CONFIG_EISA */
 
 #ifdef CONFIG_PCI
-static int gdth_pci_probe_one(gdth_pci_str *pcistr, int ctr)
+static int __init gdth_pci_probe_one(gdth_pci_str *pcistr, int ctr)
 {
 	struct Scsi_Host *shp;
 	gdth_ha_str *ha;

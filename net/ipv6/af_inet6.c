@@ -162,7 +162,7 @@ lookup_protocol:
 	BUG_TRAP(answer_prot->slab != NULL);
 
 	err = -ENOBUFS;
-	sk = sk_alloc(net, PF_INET6, GFP_KERNEL, answer_prot, 1);
+	sk = sk_alloc(net, PF_INET6, GFP_KERNEL, answer_prot);
 	if (sk == NULL)
 		goto out;
 
@@ -747,6 +747,7 @@ static void cleanup_ipv6_mibs(void)
 {
 	snmp_mib_free((void **)ipv6_statistics);
 	snmp_mib_free((void **)icmpv6_statistics);
+	snmp_mib_free((void **)icmpv6msg_statistics);
 	snmp_mib_free((void **)udp_stats_in6);
 	snmp_mib_free((void **)udplite_stats_in6);
 }

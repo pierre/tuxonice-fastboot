@@ -198,12 +198,10 @@ int acpi_bus_set_power(acpi_handle handle, int state)
 		return -ENODEV;
 	}
 	/*
-	 * Get device's current power state if it's unknown
-	 * This means device power state isn't initialized or previous setting failed
+	 * Get device's current power state
 	 */
-	if ((device->power.state == ACPI_STATE_UNKNOWN) || device->flags.force_power_state)
-		acpi_bus_get_power(device->handle, &device->power.state);
-	if ((state == device->power.state) && !device->flags.force_power_state) {
+	acpi_bus_get_power(device->handle, &device->power.state);
+	if (state == device->power.state) {
 		ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Device is already at D%d\n",
 				  state));
 		return 0;
@@ -286,14 +284,10 @@ DECLARE_WAIT_QUEUE_HEAD(acpi_bus_event_queue);
 
 extern int event_is_open;
 
-int acpi_bus_generate_proc_event(struct acpi_device *device, u8 type, int data)
+int acpi_bus_generate_proc_event4(const char *device_class, const char *bus_id, u8 type, int data)
 {
-	struct acpi_bus_event *event = NULL;
+	struct acpi_bus_event *event;
 	unsigned long flags = 0;
-
-
-	if (!device)
-		return -EINVAL;
 
 	/* drop event on the floor if no one's listening */
 	if (!event_is_open)
@@ -303,8 +297,8 @@ int acpi_bus_generate_proc_event(struct acpi_device *device, u8 type, int data)
 	if (!event)
 		return -ENOMEM;
 
-	strcpy(event->device_class, device->pnp.device_class);
-	strcpy(event->bus_id, device->pnp.bus_id);
+	strcpy(event->device_class, device_class);
+	strcpy(event->bus_id, bus_id);
 	event->type = type;
 	event->data = data;
 
@@ -315,6 +309,17 @@ int acpi_bus_generate_proc_event(struct acpi_device *device, u8 type, int data)
 	wake_up_interruptible(&acpi_bus_event_queue);
 
 	return 0;
+
+}
+
+EXPORT_SYMBOL_GPL(acpi_bus_generate_proc_event4);
+
+int acpi_bus_generate_proc_event(struct acpi_device *device, u8 type, int data)
+{
+	if (!device)
+		return -EINVAL;
+	return acpi_bus_generate_proc_event4(device->pnp.device_class,
+					     device->pnp.bus_id, type, data);
 }
 
 EXPORT_SYMBOL(acpi_bus_generate_proc_event);

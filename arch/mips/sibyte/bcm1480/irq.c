@@ -280,27 +280,6 @@ static struct irqaction bcm1480_dummy_action = {
 	.dev_id  = 0
 };
 
-int bcm1480_steal_irq(int irq)
-{
-	struct irq_desc *desc = irq_desc + irq;
-	unsigned long flags;
-	int retval = 0;
-
-	if (irq >= BCM1480_NR_IRQS)
-		return -EINVAL;
-
-	spin_lock_irqsave(&desc->lock, flags);
-	/* Don't allow sharing at all for these */
-	if (desc->action != NULL)
-		retval = -EBUSY;
-	else {
-		desc->action = &bcm1480_dummy_action;
-		desc->depth = 0;
-	}
-	spin_unlock_irqrestore(&desc->lock, flags);
-	return 0;
-}
-
 /*
  *  init_IRQ is called early in the boot sequence from init/main.c.  It
  *  is responsible for setting up the interrupt mapper and installing the
@@ -386,8 +365,6 @@ void __init arch_init_irq(void)
 		__raw_writeq(tmp, IOADDR(A_BCM1480_IMR_REGISTER(cpu, R_BCM1480_IMR_INTERRUPT_MASK_L)));
 	}
 
-	bcm1480_steal_irq(K_BCM1480_INT_MBOX_0_0);
-
 	/*
 	 * Note that the timer interrupts are also mapped, but this is
 	 * done in bcm1480_time_init().  Also, the profiling driver
@@ -411,7 +388,6 @@ void __init arch_init_irq(void)
 		/* QQQ FIXME */
 		__raw_writeq(M_DUART_IMR_BRK, IO_SPACE_BASE + A_DUART_IMRREG(kgdb_port));
 
-		bcm1480_steal_irq(kgdb_irq);
 		__raw_writeq(IMR_IP6_VAL,
 			     IO_SPACE_BASE + A_BCM1480_IMR_REGISTER(0, R_BCM1480_IMR_INTERRUPT_MAP_BASE_H) +
 			     (kgdb_irq<<3));
@@ -452,6 +428,43 @@ static void bcm1480_kgdb_interrupt(void)
 
 extern void bcm1480_mailbox_interrupt(void);
 
+static inline void dispatch_ip4(void)
+{
+	int cpu = smp_processor_id();
+	int irq = K_BCM1480_INT_TIMER_0 + cpu;
+
+	/* Reset the timer */
+	__raw_writeq(M_SCD_TIMER_ENABLE|M_SCD_TIMER_MODE_CONTINUOUS,
+	            IOADDR(A_SCD_TIMER_REGISTER(cpu, R_SCD_TIMER_CFG)));
+
+	do_IRQ(irq);
+}
+
+static inline void dispatch_ip2(void)
+{
+	unsigned long long mask_h, mask_l;
+	unsigned int cpu = smp_processor_id();
+	unsigned long base;
+
+	/*
+	 * Default...we've hit an IP[2] interrupt, which means we've got to
+	 * check the 1480 interrupt registers to figure out what to do.  Need
+	 * to detect which CPU we're on, now that smp_affinity is supported.
+	 */
+	base = A_BCM1480_IMR_MAPPER(cpu);
+	mask_h = __raw_readq(
+		IOADDR(base + R_BCM1480_IMR_INTERRUPT_STATUS_BASE_H));
+	mask_l = __raw_readq(
+		IOADDR(base + R_BCM1480_IMR_INTERRUPT_STATUS_BASE_L));
+
+	if (mask_h) {
+		if (mask_h ^ 1)
+			do_IRQ(fls64(mask_h) - 1);
+		else if (mask_l)
+			do_IRQ(63 + fls64(mask_l));
+	}
+}
+
 asmlinkage void plat_irq_dispatch(void)
 {
 	unsigned int pending;
@@ -469,17 +482,8 @@ asmlinkage void plat_irq_dispatch(void)
 	else
 #endif
 
-	if (pending & CAUSEF_IP4) {
-		int cpu = smp_processor_id();
-		int irq = K_BCM1480_INT_TIMER_0 + cpu;
-
-		/* Reset the timer */
-		__raw_writeq(M_SCD_TIMER_ENABLE|M_SCD_TIMER_MODE_CONTINUOUS,
-		            IOADDR(A_SCD_TIMER_REGISTER(cpu, R_SCD_TIMER_CFG)));
-
-		do_IRQ(irq);
-	}
-
+	if (pending & CAUSEF_IP4)
+		dispatch_ip4();
 #ifdef CONFIG_SMP
 	else if (pending & CAUSEF_IP3)
 		bcm1480_mailbox_interrupt();
@@ -490,27 +494,6 @@ asmlinkage void plat_irq_dispatch(void)
 		bcm1480_kgdb_interrupt();		/* KGDB (uart 1) */
 #endif
 
-	else if (pending & CAUSEF_IP2) {
-		unsigned long long mask_h, mask_l;
-		unsigned long base;
-
-		/*
-		 * Default...we've hit an IP[2] interrupt, which means we've
-		 * got to check the 1480 interrupt registers to figure out what
-		 * to do.  Need to detect which CPU we're on, now that
-		 * smp_affinity is supported.
-		 */
-		base = A_BCM1480_IMR_MAPPER(smp_processor_id());
-		mask_h = __raw_readq(
-			IOADDR(base + R_BCM1480_IMR_INTERRUPT_STATUS_BASE_H));
-		mask_l = __raw_readq(
-			IOADDR(base + R_BCM1480_IMR_INTERRUPT_STATUS_BASE_L));
-
-		if (mask_h) {
-			if (mask_h ^ 1)
-				do_IRQ(fls64(mask_h) - 1);
-			else
-				do_IRQ(63 + fls64(mask_l));
-		}
-	}
+	else if (pending & CAUSEF_IP2)
+		dispatch_ip2();
 }

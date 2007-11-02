@@ -279,13 +279,13 @@ int virt_to_scatterlist(const void *addr, int size, struct scatterlist *sg,
 	int offset;
 	int remainder_of_page;
 
+	sg_init_table(sg, sg_size);
+
 	while (size > 0 && i < sg_size) {
 		pg = virt_to_page(addr);
 		offset = offset_in_page(addr);
-		if (sg) {
-			sg[i].page = pg;
-			sg[i].offset = offset;
-		}
+		if (sg)
+			sg_set_page(&sg[i], pg, 0, offset);
 		remainder_of_page = PAGE_CACHE_SIZE - offset;
 		if (size >= remainder_of_page) {
 			if (sg)
@@ -713,12 +713,11 @@ ecryptfs_encrypt_page_offset(struct ecryptfs_crypt_stat *crypt_stat,
 {
 	struct scatterlist src_sg, dst_sg;
 
-	src_sg.page = src_page;
-	src_sg.offset = src_offset;
-	src_sg.length = size;
-	dst_sg.page = dst_page;
-	dst_sg.offset = dst_offset;
-	dst_sg.length = size;
+	sg_init_table(&src_sg, 1);
+	sg_init_table(&dst_sg, 1);
+
+	sg_set_page(&src_sg, src_page, size, src_offset);
+	sg_set_page(&dst_sg, dst_page, size, dst_offset);
 	return encrypt_scatterlist(crypt_stat, &dst_sg, &src_sg, size, iv);
 }
 
@@ -742,12 +741,12 @@ ecryptfs_decrypt_page_offset(struct ecryptfs_crypt_stat *crypt_stat,
 {
 	struct scatterlist src_sg, dst_sg;
 
-	src_sg.page = src_page;
-	src_sg.offset = src_offset;
-	src_sg.length = size;
-	dst_sg.page = dst_page;
-	dst_sg.offset = dst_offset;
-	dst_sg.length = size;
+	sg_init_table(&src_sg, 1);
+	sg_set_page(&src_sg, src_page, size, src_offset);
+
+	sg_init_table(&dst_sg, 1);
+	sg_set_page(&dst_sg, dst_page, size, dst_offset);
+
 	return decrypt_scatterlist(crypt_stat, &dst_sg, &src_sg, size, iv);
 }
 
