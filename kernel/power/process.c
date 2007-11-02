@@ -192,16 +192,17 @@ int freeze_processes(void)
 {
 	int error;
 
-	printk("Stopping filesystems.\n");
-	freeze_filesystems();
+	printk("Stopping fuse filesystems.\n");
+	freeze_filesystems(FS_FREEZER_FUSE);
 	freezer_state = FREEZER_FILESYSTEMS_FROZEN;
 	printk("Stopping tasks ... ");
 	error = try_to_freeze_tasks(FREEZER_USER_SPACE);
 	if (error)
 		return error;
 
-	thaw_filesystems(FS_THAW_NORMAL);
 	sys_sync();
+	printk("Stopping normal filesystems.\n");
+	freeze_filesystems(FS_FREEZER_NORMAL);
 	freezer_state = FREEZER_USERSPACE_FROZEN;
 	error = try_to_freeze_tasks(FREEZER_KERNEL_THREADS);
 	if (error)
@@ -242,8 +243,8 @@ void thaw_processes(void)
 	 */
 	freezer_state = FREEZER_OFF;
 
-	printk("Restarting filesystems ...\n");
-	thaw_filesystems(FS_THAW_ALL);
+	printk("Restarting all filesystems ...\n");
+	thaw_filesystems(FS_FREEZER_ALL);
 
 	printk("Restarting tasks ... ");
 
@@ -257,6 +258,8 @@ void thaw_processes(void)
 void thaw_kernel_threads(void)
 {
 	freezer_state = FREEZER_USERSPACE_FROZEN;
+	printk("Restarting normal filesystems.\n");
+	thaw_filesystems(FS_FREEZER_NORMAL);
 	thaw_tasks(FREEZER_KERNEL_THREADS);
 }
 

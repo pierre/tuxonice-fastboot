@@ -252,7 +252,7 @@ EXPORT_SYMBOL(thaw_bdev);
  * freeze_filesystems - lock all filesystems and force them into a consistent
  * state
  */
-void freeze_filesystems(void)
+void freeze_filesystems(int which)
 {
 	struct super_block *sb;
 
@@ -271,7 +271,8 @@ void freeze_filesystems(void)
 #endif
 
 		if (sb->s_type->fs_flags & FS_IS_FUSE &&
-		    sb->s_frozen == SB_UNFROZEN) {
+		    sb->s_frozen == SB_UNFROZEN &&
+		    which & FS_FREEZER_FUSE) {
 			sb->s_frozen = SB_FREEZE_TRANS;
 			sb->s_flags |= MS_FROZEN;
 			printk("Fuse filesystem done.\n");
@@ -281,7 +282,8 @@ void freeze_filesystems(void)
 		if (!sb->s_root || !sb->s_bdev ||
 		    (sb->s_frozen == SB_FREEZE_TRANS) ||
 		    (sb->s_flags & MS_RDONLY) ||
-		    (sb->s_flags & MS_FROZEN)) {
+		    (sb->s_flags & MS_FROZEN) ||
+		    !(which & FS_FREEZER_NORMAL)) {
 #ifdef DEBUG_FS_FREEZING
 			printk("Nope.\n");
 #endif
@@ -315,12 +317,12 @@ void thaw_filesystems(int which)
 			continue;
 	       
 		if (sb->s_type->fs_flags & FS_IS_FUSE) {
-			if (!(which & FS_THAW_FUSE))
+			if (!(which & FS_FREEZER_FUSE))
 				continue;
 
 			sb->s_frozen = SB_UNFROZEN;
 		} else {
-			if (!(which & FS_THAW_NORMAL))
+			if (!(which & FS_FREEZER_NORMAL))
 				continue;
 
 			thaw_bdev(sb->s_bdev, sb);
