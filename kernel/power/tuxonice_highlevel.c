@@ -85,6 +85,7 @@
 #include "tuxonice_cluster.h"
 #include "tuxonice_builtin.h"
 #include "tuxonice_atomic_copy.h"
+#include "tuxonice_alloc.h"
 
 /*! Pageset metadata. */
 struct pagedir pagedir2 = {2};
@@ -119,6 +120,7 @@ void toi_finish_anything(int toi_or_resume)
 	if (toi_or_resume) {
 		block_dump = block_dump_save;
 		set_cpus_allowed(current, CPU_MASK_ALL);
+		toi_alloc_print_debug_stats();
 	}
 }
 
@@ -372,7 +374,7 @@ static void do_cleanup(int get_debug_info)
 		 * its level mangling. */
 		for (i = 0; i < 3; i++)
 			printk("%s", buffer + (1023 * i));
-		free_page((unsigned long) buffer);
+		toi_free_page(20, (unsigned long) buffer);
 	}
 
 	if (!test_action_state(TOI_LATE_CPU_HOTPLUG))
@@ -708,7 +710,7 @@ static int do_check_can_resume(void)
 	if (buf[0] == '1')
 		result = 1;
 
-	free_page((unsigned long) buf);
+	toi_free_page(21, (unsigned long) buf);
 	return result;
 }
 
@@ -998,6 +1000,7 @@ out:
 
 	if (sys_power_disk)
 		toi_finish_anything(SYSFS_HIBERNATING);
+
 	return result;
 }
 
@@ -1039,10 +1042,6 @@ static struct toi_sysfs_data sysfs_params[] = {
 
 	{ TOI_ATTR("last_result", SYSFS_RW),
 	  SYSFS_UL(&toi_result, 0, 0, 0)
-	},
-
-	{ TOI_ATTR("failure_test", SYSFS_RW),
-	  SYSFS_INT(&toi_fail_num, 0, 99, 0)
 	},
 
 	{ TOI_ATTR("no_multithreaded_io", SYSFS_RW),
@@ -1132,6 +1131,8 @@ static __init int core_load(void)
 
 	toi_core_fns = &my_fns;
 
+	if (toi_alloc_init())
+		return 1;
 	if (toi_checksum_init())
 		return 1;
 	if (toi_cluster_init())
@@ -1155,6 +1156,7 @@ static __exit void core_unload(void)
 	int i,
 	    numfiles = sizeof(sysfs_params) / sizeof(struct toi_sysfs_data);
 
+	toi_alloc_exit();
 	toi_poweroff_exit();
 	toi_ui_exit();
 	toi_checksum_exit();

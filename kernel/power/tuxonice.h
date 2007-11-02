@@ -183,31 +183,4 @@ static inline int load_direct(struct page *page)
 }
 
 extern int pre_resume_freeze(void);
-
-#define TOI_WAIT_GFP (GFP_KERNEL | __GFP_NOWARN)
-#define TOI_ATOMIC_GFP (GFP_ATOMIC | __GFP_NOWARN)
-
-#ifdef CONFIG_PM_DEBUG
-extern int toi_fail_num;
-#define toi_kmalloc(FAIL, SIZE, FLAGS) \
-	((FAIL == toi_fail_num) ? (toi_fail_num = 0, NULL) : \
-		kmalloc(SIZE, FLAGS))
-
-#define toi_get_free_pages(FAIL, FLAGS, ORDER) \
-	((FAIL == toi_fail_num) ? (toi_fail_num = 0, 0) : \
-		__get_free_pages(FLAGS, ORDER))
-
-#define toi_get_free_page(FAIL, FLAGS) \
-	((FAIL == toi_fail_num) ? (toi_fail_num = 0, 0) : \
-		__get_free_page(FLAGS))
-
-#define toi_get_zeroed_page(FAIL, FLAGS) \
-	((FAIL == toi_fail_num) ? (toi_fail_num = 0, 0) : \
-		get_zeroed_page(FLAGS))
-#else
-#define toi_kmalloc(FAIL, SIZE, FLAGS) (kmalloc(SIZE, FLAGS))
-#define toi_get_free_pages(FAIL, FLAGS, ORDER) (__get_free_pages(FLAGS, ORDER))
-#define toi_get_free_page(FAIL, FLAGS) (__get_free_page(FLAGS))
-#define toi_get_zeroed_page(FAIL, FLAGS) (get_zeroed_page(FLAGS))
-#endif
 #endif

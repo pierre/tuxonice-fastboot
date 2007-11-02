@@ -25,6 +25,7 @@
 #include "tuxonice_checksum.h"
 #include "tuxonice_builtin.h"
 #include "tuxonice_atomic_copy.h"
+#include "tuxonice_alloc.h"
 
 int extra_pd1_pages_used;
 
@@ -53,9 +54,9 @@ static void free_pbe_list(struct pbe **list, int highmem)
 			if (!free_pbe)
 				break;
 			if (highmem)
-				__free_page(free_pbe->address);
+				toi__free_page(29, free_pbe->address);
 			else
-				free_page((unsigned long) free_pbe->address);
+				toi_free_page(29, (unsigned long) free_pbe->address);
 			free_pbe = free_pbe->next;
 		}
 

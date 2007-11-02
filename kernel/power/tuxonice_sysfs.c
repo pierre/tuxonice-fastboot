@@ -18,6 +18,7 @@
 #include "tuxonice_sysfs.h"
 #include "tuxonice.h"
 #include "tuxonice_storage.h"
+#include "tuxonice_alloc.h"
 
 static int toi_sysfs_initialised = 0;
 

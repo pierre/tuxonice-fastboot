@@ -13,6 +13,7 @@
 #include <linux/suspend.h>
 #include "tuxonice_modules.h"
 #include "tuxonice_extent.h"
+#include "tuxonice_alloc.h"
 #include "tuxonice_ui.h"
 #include "tuxonice.h"
 
@@ -45,7 +46,7 @@ void toi_put_extent_chain(struct extent_chain *chain)
 
 	while(this) {
 		struct extent *next = this->next;
-		kfree(this);
+		toi_kfree(2, this);
 		chain->num_extents--;
 		this = next;
 	}
@@ -85,7 +86,7 @@ int toi_add_to_extent_chain(struct extent_chain *chain,
 			start_at->maximum = start_at->next->maximum;
 			start_at->next = start_at->next->next;
 			chain->num_extents--;
-			kfree(to_free);
+			toi_kfree(2, to_free);
 		}
 
 		chain->last_touched = start_at;

@@ -33,6 +33,7 @@
 #include "tuxonice_sysfs.h"
 #include "tuxonice_builtin.h"
 #include "tuxonice_checksum.h"
+#include "tuxonice_alloc.h"
 
 char alt_resume_param[256];
 
@@ -372,7 +373,7 @@ static int worker_rw_loop(void *data)
 	unsigned long orig_pfn, write_pfn;
 	int result, my_io_index = 0;
 	struct toi_module_ops *first_filter = toi_get_next_filter(NULL);
-	struct page *buffer = alloc_page(TOI_ATOMIC_GFP);
+	struct page *buffer = toi_alloc_page(28, TOI_ATOMIC_GFP);
 
 	atomic_inc(&worker_thread_count);
 
@@ -541,7 +542,7 @@ static int worker_rw_loop(void *data)
 	atomic_dec(&worker_thread_count);
 	mutex_unlock(&io_mutex);
 
-	__free_pages(buffer, 0);
+	toi__free_page(28, buffer);
 
 	return 0;
 }
@@ -561,6 +562,7 @@ void start_other_threads(void)
 			continue;
 		}
 		kthread_bind(p, cpu);
+		p->flags |= PF_MEMALLOC;
 		wake_up_process(p);
 	}
 }
@@ -833,7 +835,7 @@ static int write_module_configs(void)
 			(char *) &toi_module_header,
 			sizeof(toi_module_header));
 
-	free_page((unsigned long) buffer);
+	toi_free_page(22, (unsigned long) buffer);
 	return 0;
 }
 
@@ -961,7 +963,7 @@ static int read_module_configs(void)
 
 	}
 
-	free_page((unsigned long) buffer);
+	toi_free_page(23, (unsigned long) buffer);
 	return 0;
 }
 
@@ -998,7 +1000,7 @@ int write_image_header(void)
 	toiActiveAllocator->rw_header_chunk(WRITE, NULL,
 			header_buffer, sizeof(struct toi_header));
 
-	free_page((unsigned long) header_buffer);
+	toi_free_page(24, (unsigned long) header_buffer);
 
 	/* Write module configurations */
 	if ((ret = write_module_configs())) {
@@ -1246,7 +1248,7 @@ static int __read_pageset1(void)
 		toiActiveAllocator->mark_resume_attempted(1);
 
 out:
-	free_page((unsigned long) header_buffer);
+	toi_free_page(25, (unsigned long) header_buffer);
 	return result;
 
 out_reset_console:

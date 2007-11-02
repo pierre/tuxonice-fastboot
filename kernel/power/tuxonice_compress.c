@@ -21,6 +21,7 @@
 #include "tuxonice_sysfs.h"
 #include "tuxonice_io.h"
 #include "tuxonice_ui.h"
+#include "tuxonice_alloc.h"
 
 static int toi_expected_compression = 0;
 
@@ -62,7 +63,7 @@ static void toi_compress_cleanup(int toi_or_resume)
 		}
 
 		if (this->page_buffer)
-			free_page((unsigned long) this->page_buffer);
+			toi_free_page(16, (unsigned long) this->page_buffer);
 
 		this->page_buffer = NULL;
 	}

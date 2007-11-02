@@ -25,6 +25,7 @@
 #include "tuxonice_pageflags.h"
 #include "tuxonice_checksum.h"
 #include "tuxonice_pagedir.h"
+#include "tuxonice_alloc.h"
 
 static struct toi_module_ops toi_checksum_ops;
 
@@ -72,7 +73,7 @@ static void toi_checksum_cleanup(int ending_cycle)
 			}
 
 			if (this->buf) {
-				free_page((unsigned long) this->buf);
+				toi_free_page(27, (unsigned long) this->buf);
 				this->buf = NULL;
 			}
 		}
@@ -80,13 +81,13 @@ static void toi_checksum_cleanup(int ending_cycle)
 }
 
 /* 
- * toi_crypto_prepare
+ * toi_crypto_initialise
  *
  * Prepare to do some work by allocating buffers and transforms.
  * Returns: Int: Zero. Even if we can't set up checksum, we still
  * seek to hibernate.
  */
-static int toi_checksum_prepare(int starting_cycle)
+static int toi_checksum_initialise(int starting_cycle)
 {
 	int cpu;
 
@@ -114,7 +115,7 @@ static int toi_checksum_prepare(int starting_cycle)
 		this->desc.tfm = this->transform;
 		this->desc.flags = 0;
 
-		page = alloc_pages(GFP_KERNEL, 0);
+		page = toi_alloc_page(27, GFP_KERNEL);
 		if (!page)
 			return 1;
 		this->buf = page_address(page);
@@ -199,7 +200,7 @@ void free_checksum_pages(void)
 	while (pages_allocated) {
 		unsigned long next = *((unsigned long *) page_list);
 		ClearPageNosave(virt_to_page(page_list));
-		free_page((unsigned long) page_list);
+		toi_free_page(15, (unsigned long) page_list);
 		page_list = next;
 		pages_allocated--;
 	}
@@ -349,7 +350,7 @@ static struct toi_module_ops toi_checksum_ops = {
 	.name			= "checksumming",
 	.directory		= "checksum",
 	.module			= THIS_MODULE,
-	.initialise		= toi_checksum_prepare,
+	.initialise		= toi_checksum_initialise,
 	.cleanup		= toi_checksum_cleanup,
 	.print_debug_info	= toi_checksum_print_debug_stats,
 	.save_config_info	= toi_checksum_save_config_info,

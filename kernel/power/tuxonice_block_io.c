@@ -21,6 +21,7 @@
 #include "tuxonice_prepare_image.h"
 #include "tuxonice_block_io.h"
 #include "tuxonice_ui.h"
+#include "tuxonice_alloc.h"
 
 static int pr_index;
 
@@ -127,7 +128,7 @@ static void toi_bio_cleanup_one(struct io_info *io_info)
 
 	put_page(io_info->bio_page);
 	if (io_info->writing || readahead_index == -1)
-		__free_page(io_info->bio_page);
+		toi__free_page(13, io_info->bio_page);
 
 	bio_put(io_info->sys_struct);
 
@@ -142,7 +143,7 @@ static void toi_bio_cleanup_one(struct io_info *io_info)
 		toi_ra_pages[readahead_index]->private = 0;
 	}
 
-	kfree(io_info);
+	toi_kfree(1, io_info);
 	atomic_dec(&toi_io_to_cleanup);
 }
 
@@ -286,7 +287,7 @@ static int toi_prepare_readahead(int index)
 static void toi_cleanup_readahead(int page)
 {
 	if (toi_ra_pages[page]) {
-		__free_page(toi_ra_pages[page]);
+		toi__free_page(12, toi_ra_pages[page]);
 		toi_ra_pages[page] = 0;
 	}
 }
@@ -726,6 +727,9 @@ static void toi_read_header_init(void)
 	readahead_index = ra_submit_index = -1;
 }
 
+static int toi_bio_queue_flush_pages(void);
+static void toi_bio_queue_page_write(char **full_buffer);
+
 /**
  * toi_rw_cleanup: Cleanup after i/o.
  *
@@ -735,9 +739,10 @@ static int toi_rw_cleanup(int writing)
 {
 	int i;
 
-	if (writing && toi_bio_rw_page(WRITE,
-			virt_to_page(toi_writer_buffer), -1))
-		return -EIO;
+	if (writing && toi_writer_buffer_posn) {
+		toi_bio_queue_page_write(&toi_writer_buffer);
+		toi_bio_queue_flush_pages();
+	}
 
 	if (writing && current_stream == 2)
 		toi_extent_state_save(&toi_writer_posn,
@@ -846,7 +851,7 @@ static int toi_bio_queue_flush_pages(void)
 		atomic_dec(&toi_io_queue_length);
 		spin_unlock_irqrestore(&bio_queue_lock, flags);
 		result = toi_bio_rw_page(WRITE, page, -1);
-		__free_page(page);
+		toi__free_page(11, page);
 		if (result)
 			goto out;
 		spin_lock_irqsave(&bio_queue_lock, flags);
@@ -888,7 +893,7 @@ static void toi_bio_queue_page_write(char **full_buffer)
 	*full_buffer = NULL;
 
 	while (!*full_buffer) {
-		*full_buffer = (char *) toi_get_zeroed_page(99, TOI_ATOMIC_GFP);
+		*full_buffer = (char *) toi_get_zeroed_page(11, TOI_ATOMIC_GFP);
 		if (!*full_buffer)
 			do_bio_wait(7);
 	}
@@ -1115,7 +1120,7 @@ static int toi_bio_initialise(int starting_cycle)
 static void toi_bio_cleanup(int finishing_cycle)
 {
 	if (toi_writer_buffer) {
-		free_page((unsigned long) toi_writer_buffer);
+		toi_free_page(14, (unsigned long) toi_writer_buffer);
 		toi_writer_buffer = NULL;
 	}
 

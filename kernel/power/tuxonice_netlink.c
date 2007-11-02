@@ -13,6 +13,7 @@
 #include "tuxonice_netlink.h"
 #include "tuxonice.h"
 #include "tuxonice_modules.h"
+#include "tuxonice_alloc.h"
 
 struct user_helper_data *uhd_list = NULL;
 
@@ -344,10 +345,10 @@ static int toi_launch_userspace_program(char *command, int channel_no)
 		int i;
 		for (i = 0; i < arg; i++)
 			if (argv[i] && argv[i] != channel)
-				kfree(argv[i]);
+				toi_kfree(5, argv[i]);
 	}
 
-	kfree(channel);
+	toi_kfree(4, channel);
 
 	return retval;
 }

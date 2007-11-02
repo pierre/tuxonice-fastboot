@@ -27,6 +27,7 @@
 #include "tuxonice.h"
 #include "power.h"
 #include "tuxonice_builtin.h"
+#include "tuxonice_alloc.h"
 
 static int ptoi_pfn;
 
@@ -86,7 +87,7 @@ struct page * ___toi_get_nonconflicting_page(int can_be_highmem)
 	}
 
 	do {
-		page = alloc_pages(flags, 0);
+		page = toi_alloc_page(29, flags);
 		if (!page) {
 			printk("Failed to get nonconflicting page.\n");
 			return 0;
@@ -173,7 +174,7 @@ int toi_get_pageset1_load_addresses(void)
 	 */
 
 	do {
-		page = alloc_pages(flags, 0);
+		page = toi_alloc_page(30, flags);
 		if (page)
 			SetPagePageset1Copy(page);
 	} while (page);

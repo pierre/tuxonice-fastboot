@@ -49,6 +49,7 @@
 #include "tuxonice_io.h"
 #include "tuxonice_storage.h"
 #include "tuxonice_block_io.h"
+#include "tuxonice_alloc.h"
 
 static struct toi_module_ops toi_fileops;
 
@@ -686,7 +687,7 @@ static int toi_file_signature_op(int op)
 
 out:
 	toi_bio_ops.finish_all_io();
-	free_page((unsigned long) cur);
+	toi_free_page(17, (unsigned long) cur);
 	return result;
 }
 
@@ -776,9 +777,9 @@ static void toi_file_set_resume_param(void)
 
 	if (!buffer || !buffer2) {
 		if (buffer)
-			free_page((unsigned long) buffer);
+			toi_free_page(18, (unsigned long) buffer);
 		if (buffer2)
-			free_page((unsigned long) buffer2);
+			toi_free_page(19, (unsigned long) buffer2);
 		printk("TuxOnIce: Failed to allocate memory while setting "
 				"resume= parameter.\n");
 		return;
@@ -800,8 +801,8 @@ static void toi_file_set_resume_param(void)
 			
 	sprintf(resume_file, "file:%s", buffer);
 
-	free_page((unsigned long) buffer);
-	free_page((unsigned long) buffer2);
+	toi_free_page(18, (unsigned long) buffer);
+	toi_free_page(19, (unsigned long) buffer2);
 
 	toi_attempt_to_parse_resume_device(1);
 }

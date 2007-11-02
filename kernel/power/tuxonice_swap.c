@@ -23,6 +23,7 @@
 #include "tuxonice_ui.h"
 #include "tuxonice_extent.h"
 #include "tuxonice_block_io.h"
+#include "tuxonice_alloc.h"
 
 static struct toi_module_ops toi_swapops;
 
@@ -102,7 +103,7 @@ static void close_bdev(int i)
 		return;
 
 	blkdev_put(this->bdev);
-	kfree(this);
+	toi_kfree(8, this);
 	bdevs_opened[i] = NULL;
 }
 
@@ -824,7 +825,7 @@ static int toi_swap_remove_image(void)
 	int result = 0;
 	char newsig[11];
 	
-	cur.address = toi_get_zeroed_page(27, TOI_ATOMIC_GFP);
+	cur.address = toi_get_zeroed_page(31, TOI_ATOMIC_GFP);
 	if (!cur.address) {
 		printk("Unable to allocate a page for restoring the swap signature.\n");
 		return -ENOMEM;
@@ -863,7 +864,7 @@ static int toi_swap_remove_image(void)
 			virt_to_page(cur.pointer));
 out:
 	toi_bio_ops.finish_all_io();
-	free_page(cur.address);
+	toi_free_page(31, cur.address);
 	return 0;
 }
 

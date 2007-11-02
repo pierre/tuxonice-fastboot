@@ -37,6 +37,7 @@
 #include "tuxonice.h"
 #include "tuxonice_checksum.h"
 #include "tuxonice_sysfs.h"
+#include "tuxonice_alloc.h"
 
 static int num_nosave = 0;
 static int header_space_allocated = 0;
@@ -62,7 +63,7 @@ void free_attention_list(void)
 	while (attention_list) {
 		last = attention_list;
 		attention_list = attention_list->next;
-		kfree(last);
+		toi_kfree(6, last);
 	}
 }
 
@@ -253,7 +254,7 @@ void toi_free_extra_pagedir_memory(void)
 			ClearPageNosave(this->page + i);
 
 		__free_pages(this->page, this->order);
-		kfree(this);
+		toi_kfree(7, this);
 	}
 
 	extra_pages_allocated = 0;
@@ -299,7 +300,7 @@ static int toi_allocate_extra_pagedir_memory(int extra_pages_needed)
 		}
 
 		if (!virt) {
-			kfree(extras_entry);
+			toi_kfree(7, extras_entry);
 			return extra_pages_allocated;
 		}
 
