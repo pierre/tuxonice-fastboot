@@ -338,6 +338,13 @@ menuconfig TOI_CORE
 		  more indicate a number of seconds (up to 255) to wait before doing the
 		  default.
 
+	config	TOI_PAGEFLAGS_TEST
+		tristate "Test pageflags"
+		default N
+		depends on TOI_CORE
+		help
+		  Test pageflags.
+
 config TOI_USERUI_EXPORTS
 	bool
 	depends on TOI_USERUI=m
