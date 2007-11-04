@@ -795,8 +795,16 @@ static int toi_bio_read_page_with_readahead(void)
 	}
 
 	do {
-		if (toi_prepare_readahead(ra_submit_index))
-			break;
+		if (toi_prepare_readahead(ra_submit_index)) {
+			/* We are supposed to have enough memory. */
+			printk("Failed to get readahead buffer page %d.\n", ra_submit_index);
+			toi_alloc_print_debug_stats();
+			toi_message(TOI_ANY_SECTION, TOI_LOW, 1,
+				" - Free memory is %d.\n",
+				real_nr_free_pages(all_zones_mask));
+
+			BUG();
+		}
 
 		last_result = toi_bio_rw_page(READ,
 			toi_ra_pages[ra_submit_index],

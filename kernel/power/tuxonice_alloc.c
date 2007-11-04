@@ -157,6 +157,7 @@ void toi_alloc_print_debug_stats(void)
 				atomic_read(&toi_fail_count[i]),
 				toi_alloc_desc[i]);
 }
+EXPORT_SYMBOL_GPL(toi_alloc_print_debug_stats);
 
 static int toi_alloc_initialise(int starting_cycle)
 {
