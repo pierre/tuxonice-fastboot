@@ -261,10 +261,10 @@ static int toi_readahead_ready(int readahead_index)
  */
 static void toi_wait_on_readahead(int readahead_index)
 {
-	submit_batched();
-	waiting_on = toi_ra_pages[readahead_index];
-	if (!toi_readahead_ready(readahead_index))
+	if (!toi_readahead_ready(readahead_index)) {
+		waiting_on = toi_ra_pages[readahead_index];
 		do_bio_wait(0);
+	}
 }
 
 static int toi_prepare_readahead(int index)
