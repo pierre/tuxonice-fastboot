@@ -460,7 +460,10 @@ static int any_to_free(int use_image_size_limit)
 	int storage_limit = max_t(int, 0,
 			main_storage_needed(1, 1) - storage_available);
 
-	return max(user_limit, storage_limit);
+	int ram_limit = MIN_FREE_RAM + toi_memory_for_modules() -
+		real_nr_free_low_pages() + 2 * extra_pd1_pages_allowance;
+
+	return max(max(user_limit, storage_limit), ram_limit);
 }
 
 /* amount_needed
