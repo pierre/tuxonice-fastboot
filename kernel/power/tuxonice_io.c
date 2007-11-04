@@ -1278,19 +1278,11 @@ int read_pageset1(void)
 
 	error = __read_pageset1();
 
-	switch (error) {
-		case 0:
-		case -ENODATA:
-		case -EINVAL:	/* non fatal error */
-			break;
-		default:
-			if (test_result_state(TOI_ABORTED))
-				break;
-
-			abort_hibernate(TOI_IMAGE_ERROR,
-					"TuxOnIce: Error %d resuming\n",
-					error);
-	}
+	if (error && error != -ENODATA && error != -EINVAL &&
+					!test_result_state(TOI_ABORTED))
+		abort_hibernate(TOI_IMAGE_ERROR,
+			"TuxOnIce: Error %d resuming\n", error);
+	
 	return error;
 }
 
