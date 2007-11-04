@@ -37,13 +37,6 @@ extern void die(const char *,struct pt_regs *,long);
 int toi_faulted = 0;
 EXPORT_SYMBOL(toi_faulted);
 
-int register_page_fault_notifier(struct notifier_block *nb)
-{
-	vmalloc_sync_all();
-	return atomic_notifier_chain_register(&notify_page_fault_chain, nb);
-}
-EXPORT_SYMBOL_GPL(register_page_fault_notifier);
-
 #ifdef CONFIG_KPROBES
 static inline int notify_page_fault(struct pt_regs *regs)
 {
