@@ -20,6 +20,7 @@ extern unsigned long toi_get_free_pages(int fail_num, gfp_t mask,
 extern unsigned long toi_get_zeroed_page(int fail_num, gfp_t mask);
 extern void toi_free_page(int fail_num, unsigned long buf);
 extern void toi__free_page(int fail_num, struct page *page);
+extern void toi_free_pages(int fail_num, struct page *page, int order);
 extern struct page *toi_alloc_page(int fail_num, gfp_t mask);
 extern int toi_alloc_init(void);
 extern void toi_alloc_exit(void);

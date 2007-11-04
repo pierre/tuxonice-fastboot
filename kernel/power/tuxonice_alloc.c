@@ -133,6 +133,14 @@ void toi__free_page(int fail_num, struct page *page)
 	__free_page(page);
 }
 
+void toi_free_pages(int fail_num, struct page *page, int order)
+{
+	if (page)
+		atomic_inc(&toi_free_count[fail_num]);
+
+	__free_pages(page, order);
+}
+
 void toi_alloc_print_debug_stats(void)
 {
 	int i;

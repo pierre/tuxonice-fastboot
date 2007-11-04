@@ -253,7 +253,7 @@ void toi_free_extra_pagedir_memory(void)
 		for (i = 0; i < (1 << this->order); i++)
 			ClearPageNosave(this->page + i);
 
-		__free_pages(this->page, this->order);
+		toi_free_pages(9, this->page, this->order);
 		toi_kfree(7, this);
 	}
 
