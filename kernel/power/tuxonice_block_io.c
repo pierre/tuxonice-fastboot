@@ -182,8 +182,9 @@ static void toi_cleanup_completed_io(int all)
 	spin_unlock_irqrestore(&ioinfo_ready_lock, flags);
 }
 
-static atomic_t reasons[8];
-static char *reason_name[8] = {
+#define NUM_REASONS 8
+static atomic_t reasons[NUM_REASONS];
+static char *reason_name[NUM_REASONS] = {
 	"readahead not ready",
 	"bio allocation",
 	"io_struct allocation",
@@ -757,7 +758,7 @@ static int toi_rw_cleanup(int writing)
 
 	current_stream = 0;
 
-	for (i = 0; i < 7; i++) {
+	for (i = 0; i < NUM_REASONS; i++) {
 		if (!atomic_read(&reasons[i]))
 			continue;
 		printk("Waited for i/o due to %s %d times.\n", reason_name[i],
