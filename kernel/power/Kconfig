@@ -276,23 +276,64 @@ menuconfig TOI_CORE
 		  the swap and file allocators are compiled in, the swap allocator will be
 		  used by default.
 
-	config TOI_CLUSTER
+	menuconfig TOI_CLUSTER
 		tristate "Cluster support"
 		default n
-		depends on TOI_CORE && NET && BROKEN
+		depends on TOI_CORE && NET
 		---help---
 		  Support for linking multiple machines in a cluster so that they suspend
 		  and resume together.
 
-	config TOI_DEFAULT_CLUSTER_MASTER
-		string "Default cluster master address/port"
+	config TOI_DEFAULT_CLUSTER_INTERFACE
+		string "Default cluster interface"
 		depends on TOI_CLUSTER
 		---help---
-		  If this machine will be the master, simply enter a port on which to
-		  listen for slaves.
-		  If this machine will be a slave, enter the ip address and port on
-		  which the master listens with a colon separating them.
+		  The default interface on which to communicate with other nodes in
+		  the cluster.
+		  
 		  If no value is set here, cluster support will be disabled by default.
+
+	config TOI_DEFAULT_CLUSTER_KEY
+		string "Default cluster key"
+		default "Default"
+		depends on TOI_CLUSTER
+		---help---
+		  The default key used by this node. All nodes in the same cluster
+		  have the same key. Multiple clusters may coexist on the same lan
+		  by using different values for this key.
+
+	config TOI_CLUSTER_IMAGE_TIMEOUT
+		int "Timeout when checking for image"
+		default 15
+		depends on TOI_CLUSTER
+		---help---
+		  Timeout (seconds) before continuing to boot when waiting to see
+		  whether other nodes might have an image. Set to -1 to wait
+		  indefinitely. In WAIT_UNTIL_NODES is non zero, we might continue
+		  booting sooner than this timeout.
+
+	config TOI_CLUSTER_WAIT_UNTIL_NODES
+		int "Nodes without image before continuing"
+		default 0
+		depends on TOI_CLUSTER
+		---help---
+		  When booting and no image is found, we wait to see if other nodes
+		  have an image before continuing to boot. This value lets us
+		  continue after seeing a certain number of nodes without an image,
+		  instead of continuing to wait for the timeout. Set to 0 to only
+		  use the timeout.
+
+	config TOI_DEFAULT_CLUSTER_PRE_HIBERNATE
+		string "Default pre-hibernate script"
+		depends on TOI_CLUSTER
+		---help---
+		  The default script to be called when starting to hibernate.
+
+	config TOI_DEFAULT_CLUSTER_POST_HIBERNATE
+		string "Default post-hibernate script"
+		depends on TOI_CLUSTER
+		---help---
+		  The default script to be called after resuming from hibernation.
 
 	config TOI_CHECKSUM
 		bool "Checksum pageset2"
