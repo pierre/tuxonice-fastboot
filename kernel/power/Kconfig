@@ -271,12 +271,10 @@ menuconfig TOI_CORE
 		  requiring you to echo 0 > /sys/power/tuxonice/replace_swsusp if you want
 		  to use the vanilla kernel functionality. Note that your initrd/ramfs will
 		  need to do this before trying to resume, too.
-		  With overriding swsusp enabled, TuxOnIce will use both the resume= and
-		  noresume commandline options _and_ the resume= and noresume ones (for
-		  compatibility). resume= takes precedence over resume=. Echoing disk 
-		  to /sys/power/state will start a TuxOnIce cycle. If resume= doesn't
-		  specify an allocator and both the swap and file allocators are compiled in,
-		  the swap allocator will be used by default.
+		  With overriding swsusp enabled, echoing disk  to /sys/power/state will
+		  start a TuxOnIce cycle. If resume= doesn't specify an allocator and both
+		  the swap and file allocators are compiled in, the swap allocator will be
+		  used by default.
 
 	config TOI_CLUSTER
 		tristate "Cluster support"
