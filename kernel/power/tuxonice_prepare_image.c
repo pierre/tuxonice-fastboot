@@ -451,17 +451,25 @@ static int current_image_size(void)
 	return pagedir1.size + pagedir2.size + header_space_allocated;
 }
 
+static int storage_still_required(void)
+{
+	return max_t(int, 0, main_storage_needed(1, 1) - storage_available);
+}
+
+static int ram_still_required(void)
+{
+	return max_t(int, 0, MIN_FREE_RAM + toi_memory_for_modules() -
+		real_nr_free_low_pages() + 2 * extra_pd1_pages_allowance);
+}
+
 static int any_to_free(int use_image_size_limit)
 {
 	int user_limit = (use_image_size_limit && image_size_limit > 0) ?
 		max_t(int, 0, current_image_size() - (image_size_limit << 8))
 		: 0;
 
-	int storage_limit = max_t(int, 0,
-			main_storage_needed(1, 1) - storage_available);
-
-	int ram_limit = MIN_FREE_RAM + toi_memory_for_modules() -
-		real_nr_free_low_pages() + 2 * extra_pd1_pages_allowance;
+	int storage_limit = storage_still_required(),
+	    ram_limit = ram_still_required();
 
 	return max(max(user_limit, storage_limit), ram_limit);
 }
@@ -495,6 +503,57 @@ static int image_not_ready(int use_image_size_limit)
 	return ((amount_needed(use_image_size_limit) > 0) ||
 		header_space_allocated < header_storage_needed() ||
 		 main_storage_allocated < main_storage_needed(1, 1));
+}
+
+static void display_failure_reason(int tries_exceeded)
+{
+	int storage_required = storage_still_required(),
+	    ram_required = ram_still_required(),
+	    high_ps1 = highpages_ps1_to_free(),
+	    low_ps1 = lowpages_ps1_to_free();
+
+	printk("Failed to prepare the image because...\n");
+
+	if (!storage_available) {
+		printk("- You need some storage available to be able to "
+				"hibernate.\n");
+		return;
+	}
+
+	if (tries_exceeded)
+		printk("- The maximum number of iterations was reached without "
+				" successfully preparing the image.\n");
+
+	if (header_space_allocated < header_storage_needed())
+		printk("- Insufficient header storage allocated. Need %d, "
+				"have %d.\n", header_storage_needed(),
+				header_space_allocated);
+
+	if (storage_required)
+		printk(" - We need at least %d pages of storage (ignoring the "
+				"header), but only have %d.\n",
+				main_storage_needed(1, 1),
+				main_storage_allocated);
+
+	if (ram_required) {
+		printk(" - We need %d more free pages of low memory.\n",
+				ram_required);
+		printk("     Minimum free     : %8d\n", MIN_FREE_RAM);
+		printk("   + Reqd. by modules : %8d\n",
+				toi_memory_for_modules());
+		printk("   - Currently free   : %8d\n",
+				real_nr_free_low_pages());
+		printk("   + 2 * extra allow  : %8d\n",
+				2 * extra_pd1_pages_allowance);
+		printk("                      : ========\n");
+		printk("     Still needed     : %8d\n", ram_required);
+	}
+
+	if (high_ps1)
+		printk("- We need to free %d highmem pageset 1 pages.\n", high_ps1);
+
+	if (low_ps1)
+		printk(" - We need to free %d lowmem pageset 1 pages.\n", low_ps1);
 }
 
 static void display_stats(int always, int sub_extra_pd1_allow)
@@ -931,7 +990,7 @@ int toi_prepare_image(void)
 	storage_available = toiActiveAllocator->storage_available();
 
 	if (!storage_available) {
-		printk(KERN_ERR "You need some storage available to be able to hibernate.\n");
+		display_failure_reason(0);
 		set_abort_result(TOI_NOSTORAGE_AVAILABLE);
 		return 1;
 	}
@@ -962,6 +1021,7 @@ int toi_prepare_image(void)
 	if (!test_result_state(TOI_ABORTED)) {
 		if (result) {
 			display_stats(1, 0);
+			display_failure_reason(tries > MAX_TRIES);
 			abort_hibernate(TOI_UNABLE_TO_PREPARE_IMAGE,
 				"Unable to successfully prepare the image.\n");
 		} else {
