@@ -373,6 +373,11 @@ menuconfig TOI_CORE
 		help
 		  Test pageflags.
 
+config TOI_PAGEFLAGS_EXPORTS
+	bool
+	depends on TOI_PAGEFLAGS_TEST=m
+	default y
+
 config TOI_USERUI_EXPORTS
 	bool
 	depends on TOI_USERUI=m

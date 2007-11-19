@@ -107,8 +107,6 @@ EXPORT_SYMBOL_GPL(hibernation_ops);
 EXPORT_SYMBOL_GPL(hibernation_platform_enter);
 
 #ifdef CONFIG_TOI_CORE_EXPORTS
-EXPORT_SYMBOL_GPL(max_pfn);
-
 #ifdef CONFIG_X86_64
 EXPORT_SYMBOL_GPL(restore_processor_state);
 EXPORT_SYMBOL_GPL(save_processor_state);
@@ -181,10 +179,6 @@ EXPORT_SYMBOL_GPL(sys_mknod);
 #if defined(CONFIG_TOI_FILE_EXPORTS) || defined(CONFIG_TOI_SWAP_EXPORTS)
 EXPORT_SYMBOL_GPL(bio_set_pages_dirty);
 EXPORT_SYMBOL_GPL(name_to_dev_t);
-#endif
-
-#if defined(CONFIG_TOI_EXPORTS) || defined(CONFIG_TOI_CORE_EXPORTS)
-EXPORT_SYMBOL_GPL(snprintf_used);
 #endif
 
 #if defined(CONFIG_TOI_FILE_EXPORTS) || defined(CONFIG_TOI_SWAP_EXPORTS) || \
@@ -303,6 +297,14 @@ EXPORT_SYMBOL_GPL(toi_nosave_state2);
 EXPORT_SYMBOL_GPL(toi_nosave_state3);
 EXPORT_SYMBOL_GPL(toi_nosave_io_speed);
 EXPORT_SYMBOL_GPL(toi_nosave_commandline);
+#endif
+
+#if defined(CONFIG_TOI_CORE_EXPORTS) || defined(CONFIG_TOI_PAGEFLAGS_EXPORTS)
+EXPORT_SYMBOL_GPL(max_pfn);
+#endif
+
+#if defined(CONFIG_TOI_EXPORTS) || defined(CONFIG_TOI_CORE_EXPORTS)
+EXPORT_SYMBOL_GPL(snprintf_used);
 #endif
 
 static int __init toi_wait_setup(char *str)
