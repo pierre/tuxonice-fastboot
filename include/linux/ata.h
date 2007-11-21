@@ -43,6 +43,7 @@ enum {
 	ATA_MAX_SECTORS_128	= 128,
 	ATA_MAX_SECTORS		= 256,
 	ATA_MAX_SECTORS_LBA48	= 65535,/* TODO: 65536? */
+	ATA_MAX_SECTORS_TAPE	= 65535,
 
 	ATA_ID_WORDS		= 256,
 	ATA_ID_SERNO		= 10,
@@ -424,6 +425,8 @@ static inline int ata_id_has_lba48(const u16 *id)
 {
 	if ((id[83] & 0xC000) != 0x4000)
 		return 0;
+	if (!ata_id_u64(id, 100))
+		return 0;
 	return id[83] & (1 << 10);
 }
 
@@ -534,6 +537,15 @@ static inline int ata_drive_40wire(const u16 *dev_id)
 	return 1;
 }
 
+static inline int ata_drive_40wire_relaxed(const u16 *dev_id)
+{
+	if (ata_id_is_sata(dev_id))
+		return 0;	/* SATA */
+	if ((dev_id[93] & 0x2000) == 0x2000)
+		return 0;	/* 80 wire */
+	return 1;
+}
+
 static inline int atapi_cdb_len(const u16 *dev_id)
 {
 	u16 tmp = dev_id[0] & 0x3;
@@ -542,6 +554,11 @@ static inline int atapi_cdb_len(const u16 *dev_id)
 	case 1:		return 16;
 	default:	return -1;
 	}
+}
+
+static inline int atapi_command_packet_set(const u16 *dev_id)
+{
+	return (dev_id[0] >> 8) & 0x1f;
 }
 
 static inline int is_atapi_taskfile(const struct ata_taskfile *tf)

@@ -1143,22 +1143,9 @@ EXPORT_SYMBOL(blk_queue_start_tag);
 void blk_queue_invalidate_tags(struct request_queue *q)
 {
 	struct list_head *tmp, *n;
-	struct request *rq;
 
-	list_for_each_safe(tmp, n, &q->tag_busy_list) {
-		rq = list_entry_rq(tmp);
-
-		if (rq->tag == -1) {
-			printk(KERN_ERR
-			       "%s: bad tag found on list\n", __FUNCTION__);
-			list_del_init(&rq->queuelist);
-			rq->cmd_flags &= ~REQ_QUEUED;
-		} else
-			blk_queue_end_tag(q, rq);
-
-		rq->cmd_flags &= ~REQ_STARTED;
-		__elv_add_request(q, rq, ELEVATOR_INSERT_BACK, 0);
-	}
+	list_for_each_safe(tmp, n, &q->tag_busy_list)
+		blk_requeue_request(q, list_entry_rq(tmp));
 }
 
 EXPORT_SYMBOL(blk_queue_invalidate_tags);
@@ -1369,7 +1356,7 @@ new_segment:
 	} /* segments in rq */
 
 	if (sg)
-		__sg_mark_end(sg);
+		sg_mark_end(sg);
 
 	return nsegs;
 }
@@ -1634,15 +1621,7 @@ static void blk_backing_dev_unplug(struct backing_dev_info *bdi,
 {
 	struct request_queue *q = bdi->unplug_io_data;
 
-	/*
-	 * devices don't necessarily have an ->unplug_fn defined
-	 */
-	if (q->unplug_fn) {
-		blk_add_trace_pdu_int(q, BLK_TA_UNPLUG_IO, NULL,
-					q->rq.count[READ] + q->rq.count[WRITE]);
-
-		q->unplug_fn(q);
-	}
+	blk_unplug(q);
 }
 
 static void blk_unplug_work(struct work_struct *work)
@@ -1665,6 +1644,20 @@ static void blk_unplug_timeout(unsigned long data)
 
 	kblockd_schedule_work(&q->unplug_work);
 }
+
+void blk_unplug(struct request_queue *q)
+{
+	/*
+	 * devices don't necessarily have an ->unplug_fn defined
+	 */
+	if (q->unplug_fn) {
+		blk_add_trace_pdu_int(q, BLK_TA_UNPLUG_IO, NULL,
+					q->rq.count[READ] + q->rq.count[WRITE]);
+
+		q->unplug_fn(q);
+	}
+}
+EXPORT_SYMBOL(blk_unplug);
 
 /**
  * blk_start_queue - restart a previously stopped queue
@@ -3221,6 +3214,7 @@ static inline void __generic_make_request(struct bio *bio)
 	sector_t old_sector;
 	int ret, nr_sectors = bio_sectors(bio);
 	dev_t old_dev;
+	int err = -EIO;
 
 	might_sleep();
 
@@ -3248,7 +3242,7 @@ static inline void __generic_make_request(struct bio *bio)
 				bdevname(bio->bi_bdev, b),
 				(long long) bio->bi_sector);
 end_io:
-			bio_endio(bio, -EIO);
+			bio_endio(bio, err);
 			break;
 		}
 
@@ -3283,6 +3277,10 @@ end_io:
 
 		if (bio_check_eod(bio, nr_sectors))
 			goto end_io;
+		if (bio_empty_barrier(bio) && !q->prepare_flush_fn) {
+			err = -EOPNOTSUPP;
+			goto end_io;
+		}
 
 		ret = q->make_request_fn(q, bio);
 	} while (ret);
