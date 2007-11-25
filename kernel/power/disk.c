@@ -47,7 +47,7 @@ enum {
 
 static int hibernation_mode = HIBERNATION_SHUTDOWN;
 
-struct platform_hibernation_ops *hibernation_ops;
+static struct platform_hibernation_ops *hibernation_ops;
 
 /**
  * hibernation_set_ops - set the global hibernate operations
@@ -77,7 +77,7 @@ void hibernation_set_ops(struct platform_hibernation_ops *ops)
  *	hibernation
  */
 
-static int platform_start(int platform_mode)
+int platform_start(int platform_mode)
 {
 	return (platform_mode && hibernation_ops) ?
 		hibernation_ops->start() : 0;
@@ -88,7 +88,7 @@ static int platform_start(int platform_mode)
  *	platform driver if so configured and return an error code if it fails
  */
 
-static int platform_pre_snapshot(int platform_mode)
+int platform_pre_snapshot(int platform_mode)
 {
 	return (platform_mode && hibernation_ops) ?
 		hibernation_ops->pre_snapshot() : 0;
@@ -99,7 +99,7 @@ static int platform_pre_snapshot(int platform_mode)
  *	of operation using the platform driver (called with interrupts disabled)
  */
 
-static void platform_leave(int platform_mode)
+void platform_leave(int platform_mode)
 {
 	if (platform_mode && hibernation_ops)
 		hibernation_ops->leave();
@@ -110,7 +110,7 @@ static void platform_leave(int platform_mode)
  *	using the platform driver (must be called after platform_prepare())
  */
 
-static void platform_finish(int platform_mode)
+void platform_finish(int platform_mode)
 {
 	if (platform_mode && hibernation_ops)
 		hibernation_ops->finish();
@@ -122,7 +122,7 @@ static void platform_finish(int platform_mode)
  *	called, platform_restore_cleanup() must be called.
  */
 
-static int platform_pre_restore(int platform_mode)
+int platform_pre_restore(int platform_mode)
 {
 	return (platform_mode && hibernation_ops) ?
 		hibernation_ops->pre_restore() : 0;
@@ -135,7 +135,7 @@ static int platform_pre_restore(int platform_mode)
  *	regardless of the result of platform_pre_restore().
  */
 
-static void platform_restore_cleanup(int platform_mode)
+void platform_restore_cleanup(int platform_mode)
 {
 	if (platform_mode && hibernation_ops)
 		hibernation_ops->restore_cleanup();

@@ -29,6 +29,7 @@
 #include "tuxonice_pagedir.h"
 #include "tuxonice_modules.h"
 #include "tuxonice_builtin.h"
+#include "tuxonice_power_off.h"
 
 /*
  * Highmem related functions (x86 only).
@@ -102,9 +103,17 @@ static void copyback_high(void)
 void copyback_high(void) { }
 #endif
 
-extern struct hibernation_ops *hibernation_ops;
-EXPORT_SYMBOL_GPL(hibernation_ops);
 EXPORT_SYMBOL_GPL(hibernation_platform_enter);
+EXPORT_SYMBOL_GPL(platform_start);
+EXPORT_SYMBOL_GPL(platform_pre_snapshot);
+EXPORT_SYMBOL_GPL(platform_leave);
+EXPORT_SYMBOL_GPL(platform_finish);
+EXPORT_SYMBOL_GPL(platform_pre_restore);
+EXPORT_SYMBOL_GPL(platform_restore_cleanup);
+
+EXPORT_SYMBOL_GPL(arch_hibernation_header_save);
+EXPORT_SYMBOL_GPL(arch_hibernation_header_restore);
+EXPORT_SYMBOL_GPL(init_swsusp_header);
 
 #ifdef CONFIG_TOI_CORE_EXPORTS
 #ifdef CONFIG_X86_64

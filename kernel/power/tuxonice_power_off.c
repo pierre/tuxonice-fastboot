@@ -28,14 +28,6 @@ static char lid_state_file[256], wake_alarm_dir[256];
 static struct file *lid_file, *alarm_file, *epoch_file;
 int post_wake_state = -1;
 
-extern struct platform_hibernation_ops *hibernation_ops;
-
-int toi_platform_prepare(void)
-{
-	return (toi_poweroff_method == 4 && hibernation_ops) ?
-		hibernation_ops->prepare() : 0;
-}
-
 /*
  * __toi_power_down
  * Functionality   : Powers down or reboots the computer once the image
@@ -84,12 +76,6 @@ static void __toi_power_down(int method)
 	toi_prepare_status(DONT_CLEAR_BAR, "Powerdown failed.");
 	while (1)
 		cpu_relax();
-}
-
-void toi_platform_finish(void)
-{
-	if (toi_poweroff_method == 4 && hibernation_ops)
-		hibernation_ops->finish();
 }
 
 #define CLOSE_FILE(file) \

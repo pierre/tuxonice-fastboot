@@ -1260,14 +1260,14 @@ asmlinkage int swsusp_save(void)
 }
 
 #ifndef CONFIG_ARCH_HIBERNATION_HEADER
-static int init_header_complete(struct swsusp_info *info)
+int init_swsusp_header_complete(struct swsusp_info *info)
 {
 	memcpy(&info->uts, init_utsname(), sizeof(struct new_utsname));
 	info->version_code = LINUX_VERSION_CODE;
 	return 0;
 }
 
-static char *check_image_kernel(struct swsusp_info *info)
+char *check_swsusp_image_kernel(struct swsusp_info *info)
 {
 	if (info->version_code != LINUX_VERSION_CODE)
 		return "kernel version";
@@ -1283,7 +1283,7 @@ static char *check_image_kernel(struct swsusp_info *info)
 }
 #endif /* CONFIG_ARCH_HIBERNATION_HEADER */
 
-static int init_header(struct swsusp_info *info)
+int init_swsusp_header(struct swsusp_info *info)
 {
 	memset(info, 0, sizeof(struct swsusp_info));
 	info->num_physpages = num_physpages;
@@ -1291,7 +1291,7 @@ static int init_header(struct swsusp_info *info)
 	info->pages = nr_copy_pages + nr_meta_pages + 1;
 	info->size = info->pages;
 	info->size <<= PAGE_SHIFT;
-	return init_header_complete(info);
+	return init_swsusp_header_complete(info);
 }
 
 /**
@@ -1347,7 +1347,7 @@ int snapshot_read_next(struct snapshot_handle *handle, size_t count)
 	if (!handle->offset) {
 		int error;
 
-		error = init_header((struct swsusp_info *)buffer);
+		error = init_swsusp_header((struct swsusp_info *)buffer);
 		if (error)
 			return error;
 		handle->buffer = buffer;
@@ -1444,7 +1444,7 @@ static int check_header(struct swsusp_info *info)
 {
 	char *reason;
 
-	reason = check_image_kernel(info);
+	reason = check_swsusp_image_kernel(info);
 	if (!reason && info->num_physpages != num_physpages)
 		reason = "memory size";
 	if (reason) {

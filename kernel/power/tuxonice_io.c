@@ -34,7 +34,6 @@
 #include "tuxonice_builtin.h"
 #include "tuxonice_checksum.h"
 #include "tuxonice_alloc.h"
-
 char alt_resume_param[256];
 
 /* Variables shared between threads and updated under the mutex */
@@ -192,16 +191,14 @@ static void noresume_reset_modules(void)
  * Arguments:	struct toi_header: Header data structure to be filled.
  */
 
-static void fill_toi_header(struct toi_header *sh)
+static int fill_toi_header(struct toi_header *sh)
 {
-	int i;
+	int i, error;
 	
-	memset((char *)sh, 0, sizeof(*sh));
+	error = init_swsusp_header((struct swsusp_info *) sh);
+	if (error)
+		return error;
 
-	sh->version_code = LINUX_VERSION_CODE;
-	sh->num_physpages = num_physpages;
-	memcpy(&sh->uts, init_utsname(), sizeof(struct new_utsname));
-	sh->page_size = PAGE_SIZE;
 	sh->pagedir = pagedir1;
 	sh->pageset_2_size = pagedir2.size;
 	sh->param0 = toi_result;
@@ -211,6 +208,7 @@ static void fill_toi_header(struct toi_header *sh)
 	sh->root_fs = current->fs->rootmnt->mnt_sb->s_dev;
 	for (i = 0; i < 4; i++)
 		sh->io_time[i/2][i%2] = toi_io_time[i/2][i%2];
+	return 0;
 }
 
 /*
@@ -996,7 +994,11 @@ int write_image_header(void)
 	}
 
 	/* Write hibernate header */
-	fill_toi_header((struct toi_header *) header_buffer);
+	if (fill_toi_header((struct toi_header *) header_buffer)) {
+		abort_hibernate(TOI_OUT_OF_MEMORY,
+			"Failure to fill header information!");
+		goto write_image_header_abort;
+	}
 	toiActiveAllocator->rw_header_chunk(WRITE, NULL,
 			header_buffer, sizeof(struct toi_header));
 
@@ -1043,26 +1045,10 @@ write_image_header_abort_no_cleanup:
  */
 static char *sanity_check(struct toi_header *sh)
 {
-	if (sh->version_code != LINUX_VERSION_CODE)
-		return "Incorrect kernel version.";
-	
-	if (sh->num_physpages != num_physpages)
-		return "Incorrect memory size.";
+	char *reason = check_swsusp_image_kernel((struct swsusp_info *) sh);
 
-	if (strncmp(sh->uts.sysname, init_utsname()->sysname, 65))
-		return "Incorrect system type.";
-
-	if (strncmp(sh->uts.release, init_utsname()->release, 65))
-		return "Incorrect release.";
-
-	if (strncmp(sh->uts.version, init_utsname()->version, 65))
-		return "Right kernel version but wrong build number.";
-
-	if (strncmp(sh->uts.machine, init_utsname()->machine, 65))
-		return "Incorrect machine type.";
-
-	if (sh->page_size != PAGE_SIZE)
-		return "Incorrect PAGE_SIZE.";
+	if (reason)
+		return reason;
 
 	if (!test_action_state(TOI_IGNORE_ROOTFS)) {
 		const struct super_block *sb;

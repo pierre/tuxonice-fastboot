@@ -2,6 +2,9 @@
  * Copyright (C) 2004-2007 Nigel Cunningham (nigel at tuxonice net)
  */
 
+#ifndef KERNEL_POWER_POWER_H
+#define KERNEL_POWER_POWER_H
+
 #include <linux/suspend.h>
 #include <linux/utsname.h>
 #include "tuxonice.h"
@@ -25,17 +28,20 @@ struct swsusp_info {
 extern int arch_hibernation_header_save(void *addr, unsigned int max_size);
 extern int arch_hibernation_header_restore(void *addr);
 
-static inline int init_header_complete(struct swsusp_info *info)
+static inline int init_swsusp_header_complete(struct swsusp_info *info)
 {
 	return arch_hibernation_header_save(info, MAX_ARCH_HEADER_SIZE);
 }
 
-static inline char *check_image_kernel(struct swsusp_info *info)
+static inline char *check_swsusp_image_kernel(struct swsusp_info *info)
 {
 	return arch_hibernation_header_restore(info) ?
 			"architecture specific data" : NULL;
 }
+#else
+extern char *check_swsusp_image_kernel(struct swsusp_info *info);
 #endif /* CONFIG_ARCH_HIBERNATION_HEADER */
+extern int init_swsusp_header(struct swsusp_info *info);
 
 extern char resume_file[256];
 /*
@@ -229,3 +235,4 @@ static inline void *saveable_highmem_page(unsigned long pfn) { return NULL; }
 #endif
 
 #define PBES_PER_PAGE (PAGE_SIZE / sizeof(struct pbe))
+#endif

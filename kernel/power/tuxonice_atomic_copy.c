@@ -294,7 +294,7 @@ int toi_go_atomic(pm_message_t state, int suspend_time)
 	if (test_action_state(TOI_PM_PREPARE_CONSOLE))
 		pm_prepare_console();
 
-	if (suspend_time && toi_platform_prepare()) {
+	if (suspend_time && toi_platform_start()) {
 		set_abort_result(TOI_PLATFORM_PREP_FAILED);
 		toi_end_atomic(ATOMIC_STEP_RESTORE_CONSOLE, suspend_time);
 		return 1;
@@ -308,8 +308,20 @@ int toi_go_atomic(pm_message_t state, int suspend_time)
 		return 1;
 	}
 
+	if (suspend_time && toi_platform_pre_snapshot()) {
+		set_abort_result(TOI_PRE_SNAPSHOT_FAILED);
+		toi_end_atomic(ATOMIC_STEP_RESUME_CONSOLE, suspend_time);
+		return 1;
+	}
+
+	if (!suspend_time && toi_platform_pre_restore()) {
+		set_abort_result(TOI_PRE_RESTORE_FAILED);
+		toi_end_atomic(ATOMIC_STEP_RESUME_CONSOLE, suspend_time);
+		return 1;
+	}
+
 	if (test_action_state(TOI_LATE_CPU_HOTPLUG)) {
-		toi_prepare_status(DONT_CLEAR_BAR,	"Disable nonboot cpus.");
+		toi_prepare_status(DONT_CLEAR_BAR, "Disable nonboot cpus.");
 		if (disable_nonboot_cpus()) {
 			set_abort_result(TOI_CPU_HOTPLUG_FAILED);
 			toi_end_atomic(ATOMIC_STEP_DEVICE_RESUME,
@@ -346,6 +358,8 @@ void toi_end_atomic(int stage, int suspend_time)
 {
 	switch (stage) {
 		case ATOMIC_ALL_STEPS:
+			if (!suspend_time)
+				toi_platform_leave();
 			device_power_up();
 		case ATOMIC_STEP_IRQS:
 			local_irq_enable();

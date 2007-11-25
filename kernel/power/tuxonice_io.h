@@ -11,14 +11,24 @@
 
 #include <linux/utsname.h>
 #include "tuxonice_pagedir.h"
+#include "power.h"
 
 /* Non-module data saved in our image header */
 struct toi_header {
+	/* 
+	 * Mirror struct swsusp_info, but without
+	 * the page aligned attribute
+	 */
+	struct new_utsname uts;
 	u32 version_code;
 	unsigned long num_physpages;
+	int cpus;
+	unsigned long image_pages;
+	unsigned long pages;
+	unsigned long size;
+
+	/* Our own data */
 	unsigned long orig_mem_free;
-	struct new_utsname uts;
-	int num_cpus;
 	int page_size;
 	int pageset_2_size;
 	int param0;
