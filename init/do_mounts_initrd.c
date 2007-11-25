@@ -56,12 +56,18 @@ static void __init handle_initrd(void)
 	sys_mount(".", "/", NULL, MS_MOVE, NULL);
 	sys_chroot(".");
 
+	/*
+	 * In case that a resume from disk is carreid out by linuxrc or one of
+	 * its children, we need to tell the freezer not to wait for us
+	 */
+	current->flags |= PF_FREEZER_SKIP;
+
 	pid = kernel_thread(do_linuxrc, "/linuxrc", SIGCHLD);
 	if (pid > 0)
-		while (pid != sys_wait4(-1, NULL, 0, NULL)) {
-			try_to_freeze();
+		while (pid != sys_wait4(-1, NULL, 0, NULL))
 			yield();
-		}
+
+	current->flags &= ~PF_FREEZER_SKIP;
 
 	if (!resume_attempted)
 		printk(KERN_ERR "TuxOnIce: No attempt was made to resume from "
