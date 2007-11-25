@@ -1023,7 +1023,6 @@ int write_image_header(void)
 	if (test_result_state(TOI_ABORTED))
 		goto write_image_header_abort_no_cleanup;
 
-	toi_message(TOI_IO, TOI_VERBOSE, 1, "|\n");
 	toi_update_status(total, total, NULL);
 
 	return 0;
