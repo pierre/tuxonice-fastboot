@@ -872,10 +872,10 @@ int do_toi_step(int step)
 				printk("Nothing to resume from.\n");
 				goto out;
 			}
-			if (!do_load_atomic_copy()) {
-				printk("Failed to load image.\n");
+			if (!do_load_atomic_copy())
 				toi_atomic_restore();
-			}
+
+			printk("Failed to load image.\n");
 out:
 			prepare_restore_load_alt_image(0);
 			save_restore_alt_param(RESTORE, NOQUIET);
