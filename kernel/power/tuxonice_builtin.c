@@ -162,8 +162,8 @@ int toi_wait = CONFIG_TOI_DEFAULT_WAIT;
 
 #ifdef CONFIG_TOI_USERUI_EXPORTS
 EXPORT_SYMBOL_GPL(kmsg_redirect);
-EXPORT_SYMBOL_GPL(toi_wait);
 #endif
+EXPORT_SYMBOL_GPL(toi_wait);
 
 #if defined(CONFIG_TOI_USERUI_EXPORTS) || defined(CONFIG_TOI_CORE_EXPORTS)
 EXPORT_SYMBOL_GPL(console_printk);
