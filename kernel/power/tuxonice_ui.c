@@ -24,17 +24,7 @@
 
 #define __KERNEL_SYSCALLS__
 
-#include <linux/suspend.h>
-#include <linux/freezer.h>
-#include <linux/console.h>
-#include <linux/ctype.h>
-#include <linux/tty.h>
-#include <linux/vt_kern.h>
-#include <linux/module.h>
 #include <linux/reboot.h>
-#include <linux/kmod.h>
-#include <linux/security.h>
-#include <linux/syscalls.h>
  
 #include "tuxonice_sysfs.h"
 #include "tuxonice_modules.h"
@@ -62,67 +52,10 @@ int toi_default_console_level = 0;
  */
 static char toi_wait_for_keypress(int timeout)
 {
-	int fd, this_timeout = 255;
-	char key = '\0';
-	struct termios t, t_backup;
+	if (toi_current_ui && toi_current_ui->wait_for_key(timeout))
+		return ' ';
 
-	if (toi_current_ui && toi_current_ui->wait_for_key(timeout)) {
-		key = ' ';
-		goto out;
-	}
-	
-	/* We should be guaranteed /dev/console exists after populate_rootfs() in
-	 * init/main.c
-	 */
-	if ((fd = sys_open("/dev/console", O_RDONLY, 0)) < 0) {
-		printk("Couldn't open /dev/console.\n");
-		goto out;
-	}
-
-	if (sys_ioctl(fd, TCGETS, (long)&t) < 0)
-		goto out_close;
-
-	memcpy(&t_backup, &t, sizeof(t));
-
-	t.c_lflag &= ~(ISIG|ICANON|ECHO);
-	t.c_cc[VMIN] = 0;
-
-new_timeout:
-	if (timeout > 0) {
-		this_timeout = timeout < 26 ? timeout : 25;
-		timeout -= this_timeout;
-		this_timeout *= 10;
-	}
-
-	t.c_cc[VTIME] = this_timeout;
-
-	if (sys_ioctl(fd, TCSETS, (long)&t) < 0)
-		goto out_restore;
-
-	while (1) {
-		if (sys_read(fd, &key, 1) <= 0) {
-			if (timeout)
-				goto new_timeout;
-			key = '\0';
-			break;
-		}
-		key = tolower(key);
-		if (test_toi_state(TOI_SANITY_CHECK_PROMPT)) {
-			if (key == 'c') {
-				set_toi_state(TOI_CONTINUE_REQ);
-				break;
-			} else if (key == ' ')
-				break;
-		} else
-			break;
-	}
-
-out_restore:
-	sys_ioctl(fd, TCSETS, (long)&t_backup);
-out_close:
-	sys_close(fd);
-out:
-	return key;
+	return toi_wait_for_keypress_dev_console(timeout);
 }
 
 /* toi_early_boot_message()

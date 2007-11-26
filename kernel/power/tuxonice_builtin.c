@@ -18,6 +18,7 @@
 #include <linux/crypto.h>
 #include <linux/cpu.h>
 #include <linux/dyn_pageflags.h>
+#include <linux/ctype.h>
 #include "tuxonice_io.h"
 #include "tuxonice.h"
 #include "tuxonice_extent.h"
@@ -103,6 +104,67 @@ static void copyback_high(void)
 void copyback_high(void) { }
 #endif
 
+char toi_wait_for_keypress_dev_console(int timeout)
+{
+	int fd, this_timeout = 255;
+	char key = '\0';
+	struct termios t, t_backup;
+
+	/* We should be guaranteed /dev/console exists after populate_rootfs() in
+	 * init/main.c
+	 */
+	if ((fd = sys_open("/dev/console", O_RDONLY, 0)) < 0) {
+		printk("Couldn't open /dev/console.\n");
+		return key;
+	}
+
+	if (sys_ioctl(fd, TCGETS, (long)&t) < 0)
+		goto out_close;
+
+	memcpy(&t_backup, &t, sizeof(t));
+
+	t.c_lflag &= ~(ISIG|ICANON|ECHO);
+	t.c_cc[VMIN] = 0;
+
+new_timeout:
+	if (timeout > 0) {
+		this_timeout = timeout < 26 ? timeout : 25;
+		timeout -= this_timeout;
+		this_timeout *= 10;
+	}
+
+	t.c_cc[VTIME] = this_timeout;
+
+	if (sys_ioctl(fd, TCSETS, (long)&t) < 0)
+		goto out_restore;
+
+	while (1) {
+		if (sys_read(fd, &key, 1) <= 0) {
+			if (timeout)
+				goto new_timeout;
+			key = '\0';
+			break;
+		}
+		key = tolower(key);
+		if (test_toi_state(TOI_SANITY_CHECK_PROMPT)) {
+			if (key == 'c') {
+				set_toi_state(TOI_CONTINUE_REQ);
+				break;
+			} else if (key == ' ')
+				break;
+		} else
+			break;
+	}
+
+out_restore:
+	sys_ioctl(fd, TCSETS, (long)&t_backup);
+out_close:
+	sys_close(fd);
+
+	return key;
+}
+
+EXPORT_SYMBOL_GPL(toi_wait_for_keypress_dev_console);
 EXPORT_SYMBOL_GPL(hibernation_platform_enter);
 EXPORT_SYMBOL_GPL(platform_start);
 EXPORT_SYMBOL_GPL(platform_pre_snapshot);
