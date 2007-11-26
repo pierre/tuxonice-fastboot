@@ -23,9 +23,9 @@
  * through hibernating and resuming, keeping us in step with other nodes. Nodes
  * are identified by their hw address.
  *
- * On startup, the node sends CLUSTER_HELLO on the configured interface's
+ * On startup, the node sends CLUSTER_PING on the configured interface's
  * broadcast address, port $toi_cluster_port (see below) and begins to listen
- * for other broadcast messages. CLUSTER_HELLO messages are repeated at
+ * for other broadcast messages. CLUSTER_PING messages are repeated at
  * intervals of 5 minutes, with a random offset to spread traffic out.
  *
  * A hibernation cycle is initiated from any node via
@@ -37,24 +37,24 @@
  * their work (or timeout) before progressing to the next step.
  *
  * Request/state  Action before reply	Possible reply	Next state
- * REQ_HIBERNATE  capable, pre-script	ACK_HIBERNATE	NODE_PREP
- * 					NACK_HIBERNATE	INIT_0
+ * HIBERNATE	  capable, pre-script	HIBERNATE|ACK	NODE_PREP
+ * 					HIBERNATE|NACK	INIT_0
  *
- * NODE_PREP	  prepare_image		ACK_PREP	IMAGE_WRITE
- *		 			NACK_PREP	INIT_0
+ * PREP		  prepare_image		PREP|ACK	IMAGE_WRITE
+ *		 			PREP|NACK	INIT_0
  * 					ABORT		RUNNING
  *
- * IMAGE_WRITE	  write image		ACK_IO		power off
+ * IO		  write image		IO|ACK		power off
  * 					ABORT		POST_RESUME
  *
- * (Boot time)	  check for image	ACK_IMAGE	RESUME_PREP
+ * (Boot time)	  check for image	IMAGE|ACK	RESUME_PREP
  * 					(Note 1)
- * 					NACK_IMAGE	(Note 2)
+ * 					IMAGE|NACK	(Note 2)
  *
- * RESUME_PREP	  prepare read image	ACK_PREP	IMAGE_READ
- * 					NACK_PREP	(As NACK_IMAGE)
+ * PREP		  prepare read image	PREP|ACK	IMAGE_READ
+ * 					PREP|NACK	(As NACK_IMAGE)
  *
- * IMAGE_READ	  read image		ACK_READ	POST_RESUME
+ * IO		  read image		IO|ACK		POST_RESUME
  *
  * POST_RESUME	  thaw, post-script			RUNNING
  *
@@ -97,6 +97,7 @@
 
 #include <linux/suspend.h>
 #include <linux/module.h>
+#include <linux/moduleparam.h>
 #include <linux/if.h>
 #include <linux/rtnetlink.h>
 #include <linux/netdevice.h>
@@ -104,6 +105,8 @@
 #include <linux/udp.h>
 #include <linux/in.h>
 #include <linux/if_arp.h>
+#include <linux/kthread.h>
+#include <linux/wait.h>
 #include <net/ip.h>
 
 #include "tuxonice.h"
@@ -111,48 +114,98 @@
 #include "tuxonice_sysfs.h"
 #include "tuxonice_io.h"
 
+#if 1
+#define PRINTK(a, b...) do { printk(a, ##b); } while(0)
+#else
+#define PRINTK(a, b...) do { } while(0)
+#endif
+
+static int loopback_mode = 0;
+static int num_local_nodes = 1;
+#define MAX_LOCAL_NODES 8
+#define SADDR (loopback_mode ? b->sid : h->saddr)
+
 #define MYNAME "TuxOnIce Clustering"
 
-enum {
-	OFFLINE,
-	RUNNING,
-	PREPARATION,
-	DOING_IO
+enum cluster_message {
+	MSG_ACK = 1,
+	MSG_NACK = 2,
+	MSG_PING = 4,
+	MSG_ABORT = 8,
+	MSG_BYE = 16,
+	MSG_HIBERNATE = 32,
+	MSG_IMAGE = 64,
+	MSG_IO = 128,
+	MSG_RUNNING = 256
 };
 
-enum {
-	MSG_PING,
-	MSG_PONG,
-	MSG_ABORT,
-	MSG_BYE,
-	MSG_REQ_HIBERNATE,
-	MSG_HIBERNATE_ACK,
-	MSG_HIBERNATE_NACK,
-	MSG_PREP_ACK,
-	MSG_PREP_NACK,
-	MSG_IO_ACK,
-	MSG_IO_NACK
+static char *str_message(int message)
+{
+	switch (message) {
+		case 4:
+			return "Ping";
+		case 8:
+			return "Abort";
+		case 9:
+			return "Abort acked";
+		case 10:
+			return "Abort nacked";
+		case 16:
+			return "Bye";
+		case 17:
+			return "Bye acked";
+		case 18:
+			return "Bye nacked";
+		case 32:
+			return "Hibernate request";
+		case 33:
+			return "Hibernate ack";
+		case 34:
+			return "Hibernate nack";
+		case 64:
+			return "Image exists?";
+		case 65:
+			return "Image does exist";
+		case 66:
+			return "No image here";
+		case 128:
+			return "I/O";
+		case 129:
+			return "I/O okay";
+		case 130:
+			return "I/O failed";
+		case 256:
+			return "Running";
+		default:
+			printk("Unrecognised message %d.\n", message);
+			return "Unrecognised message (see dmesg)";
+	}
+}
+
+#define MSG_ACK_MASK (MSG_ACK | MSG_NACK)
+#define MSG_STATE_MASK (~MSG_ACK_MASK)
+
+struct node_info {
+	struct list_head member_list;
+	wait_queue_head_t member_events;
+	spinlock_t member_list_lock;
+	spinlock_t receive_lock;
+	int peer_count, ignored_peer_count;
+	struct toi_sysfs_data sysfs_data;
+	enum cluster_message current_message;
 };
+
+struct node_info node_array[MAX_LOCAL_NODES];
 
 struct cluster_member {
-	char *ip;
-	int state;
-	unsigned long *last_message;
+	__be32 addr;
+	enum cluster_message message;
+	struct list_head list;
+	int ignore;
 };
 
-static struct cluster_member *member_list;
-
-/* Key used to allow multiple clusters on the same lan */
-static char toi_cluster_key[32] = CONFIG_TOI_DEFAULT_CLUSTER_KEY;
-static char pre_hibernate_script[255] = CONFIG_TOI_DEFAULT_CLUSTER_PRE_HIBERNATE;
-static char post_hibernate_script[255] = CONFIG_TOI_DEFAULT_CLUSTER_POST_HIBERNATE;
-
-static int toi_cluster_state = RUNNING;
-
-static char toi_cluster_iface[IFNAMSIZ] = CONFIG_TOI_DEFAULT_CLUSTER_INTERFACE;
 #define toi_cluster_port_send 3501
 #define toi_cluster_port_recv 3502
-static DEFINE_SPINLOCK(toi_recv_lock);
 
 static struct net_device *net_dev;
 static struct toi_module_ops toi_cluster_ops;
@@ -160,7 +213,7 @@ static struct toi_module_ops toi_cluster_ops;
 static int toi_recv(struct sk_buff *skb, struct net_device *dev,
 		struct packet_type *pt, struct net_device *orig_dev);
 
-static struct packet_type toi_cluster_packet_type __initdata = {
+static struct packet_type toi_cluster_packet_type = {
 	.type =	__constant_htons(ETH_P_IP),
 	.func =	toi_recv,
 };
@@ -174,8 +227,144 @@ struct toi_pkt {		/* BOOTP packet format */
 	__be16 secs;		/* Seconds since we started */
 	__be16 flags;		/* Just what it says */
 	u8 hw_addr[16];		/* Sender's HW address */
-	u8 message;		/* Message */
+	u16 message;		/* Message */
+	unsigned long sid;	/* Source ID for loopback testing */
 };
+
+static char toi_cluster_iface[IFNAMSIZ] = CONFIG_TOI_DEFAULT_CLUSTER_INTERFACE;
+
+static int added_pack;
+
+static int others_have_image, num_others;
+
+/* Key used to allow multiple clusters on the same lan */
+static char toi_cluster_key[32] = CONFIG_TOI_DEFAULT_CLUSTER_KEY;
+static char pre_hibernate_script[255] = CONFIG_TOI_DEFAULT_CLUSTER_PRE_HIBERNATE;
+static char post_hibernate_script[255] = CONFIG_TOI_DEFAULT_CLUSTER_POST_HIBERNATE;
+
+/*				List of cluster members				*/
+static unsigned long continue_delay = 5 * HZ;
+static unsigned long cluster_message_timeout = 3 * HZ;
+
+/* 		=== Membership list === 	*/
+
+static void print_member_info(int index)
+{
+	struct cluster_member *this;
+
+	printk("==> Dumping node %d.\n", index);
+
+	list_for_each_entry(this, &node_array[index].member_list, list)
+		printk("%d.%d.%d.%d last message %s. %s\n",
+				NIPQUAD(this->addr),
+				str_message(this->message),
+				this->ignore ? "(Ignored)" : "");
+	printk("== Done ==\n");
+}
+
+static struct cluster_member *__find_member(int index,__be32 addr)
+{
+	struct cluster_member *this;
+
+	list_for_each_entry(this, &node_array[index].member_list, list) {
+		if (this->addr != addr)
+			continue;
+
+		return this;
+	}
+
+	return NULL;
+}
+
+static void set_ignore(int index, __be32 addr, struct cluster_member *this)
+{
+	if (this->ignore) {
+		PRINTK("Node %d already ignoring %d.%d.%d.%d.\n",
+				index, NIPQUAD(addr));
+		return;
+	}
+
+	PRINTK("Node %d sees node %d.%d.%d.%d now being ignored.\n",
+				index, NIPQUAD(addr));
+	this->ignore = 1;
+	node_array[index].ignored_peer_count++;
+}
+
+static int __add_update_member(int index, __be32 addr, int message)
+{
+	struct cluster_member *this;
+
+	this = __find_member(index, addr);
+	if (this) {
+		if (this->message != message) {
+			this->message = message;
+			if ((message & MSG_NACK) &&
+			    (message & (MSG_HIBERNATE | MSG_IMAGE | MSG_IO)))
+				set_ignore(index, addr, this);
+			PRINTK("Node %d sees node %d.%d.%d.%d now sending %s.\n",
+					index, NIPQUAD(addr), str_message(message));
+			wake_up(&node_array[index].member_events);
+		}
+		return 0;
+	}
+
+	this = (struct cluster_member *) kmalloc(sizeof(struct cluster_member),
+			GFP_KERNEL);
+
+	if (!this)
+		return -1;
+
+	this->addr = addr;
+	this->message = message;
+	this->ignore = 0;
+	INIT_LIST_HEAD(&this->list);
+
+	node_array[index].peer_count++;
+
+	PRINTK("Node %d sees node %d.%d.%d.%d sending %s.\n", index, NIPQUAD(addr), str_message(message));
+
+	if ((message & MSG_NACK) &&
+	    (message & (MSG_HIBERNATE | MSG_IMAGE | MSG_IO)))
+		set_ignore(index, addr, this);
+	list_add_tail(&this->list, &node_array[index].member_list);
+	return 1;
+}
+
+static int add_update_member(int index,__be32 addr, int message)
+{
+	int result;
+	unsigned long flags;
+	spin_lock_irqsave(&node_array[index].member_list_lock, flags);
+	result = __add_update_member(index, addr, message);
+	spin_unlock_irqrestore(&node_array[index].member_list_lock, flags);
+
+	print_member_info(index);
+
+	wake_up(&node_array[index].member_events);
+
+	return result;
+}
+
+static void del_member(int index,__be32 addr)
+{
+	struct cluster_member *this;
+	unsigned long flags;
+
+	spin_lock_irqsave(&node_array[index].member_list_lock, flags);
+	this = __find_member(index, addr);
+
+	if (this) {
+		list_del_init(&this->list);
+		kfree(this);
+		node_array[index].peer_count--;
+	}
+
+	spin_unlock_irqrestore(&node_array[index].member_list_lock, flags);
+}
+
+/* 		=== Message transmission ===	*/
+
+static void toi_send_if(int message, unsigned long my_id);
 
 /*
  *  Process received TOI packet.
@@ -185,7 +374,8 @@ static int toi_recv(struct sk_buff *skb, struct net_device *dev,
 {
 	struct toi_pkt *b;
 	struct iphdr *h;
-	int len;
+	int len, result, index;
+	unsigned long addr, message, ack;
 
 	/* Perform verifications before taking the lock.  */
 	if (skb->pkt_type == PACKET_OTHERHOST)
@@ -238,41 +428,75 @@ static int toi_recv(struct sk_buff *skb, struct net_device *dev,
 	b = (struct toi_pkt *)skb_network_header(skb);
 	h = &b->iph;
 
-	/* One message at a time, please. */
-	spin_lock(&toi_recv_lock);
+	addr = SADDR;
+	PRINTK(">>> Message %s received from " NIPQUAD_FMT ".\n", str_message(b->message), NIPQUAD(addr));
 
-	switch (b->message) {
-		case MSG_PING:
-			break;
-		case MSG_PONG:
-			break;
-		case MSG_ABORT:
-			break;
-		case MSG_BYE:
-			break;
-		case MSG_REQ_HIBERNATE:
-			break;
-		case MSG_HIBERNATE_ACK:
-			break;
-		case MSG_HIBERNATE_NACK:
-			break;
-		case MSG_PREP_ACK:
-			break;
-		case MSG_PREP_NACK:
-			break;
-		case MSG_IO_ACK:
-			break;
-		case MSG_IO_NACK:
-			break;
-		default:
-			if (net_ratelimit())
-				printk(KERN_ERR "Unrecognised TuxOnIce cluster"
-					" message %d from %s.\n",
-					b->message, b->hw_addr);
-	};
+	message = b->message & MSG_STATE_MASK;
+	ack = b->message & MSG_ACK_MASK;
 
+	for (index = 0; index < num_local_nodes; index++) {
+		int new_message = node_array[index].current_message,
+		    old_message = new_message;
+
+		if (index == SADDR || !old_message) {
+			PRINTK("Ignoring node %d (offline or self).\n", index);
+			continue;
+		}
+
+		/* One message at a time, please. */
+		spin_lock(&node_array[index].receive_lock);
+
+		result = add_update_member(index, SADDR, b->message);
+		if (result == -1) {
+			printk("Failed to add new cluster member "
+					NIPQUAD_FMT ".\n",
+					NIPQUAD(addr));
+			goto drop_unlock;
+		}
+
+		switch (b->message & MSG_STATE_MASK) {
+			case MSG_PING:
+				break;
+			case MSG_ABORT:
+				break;
+			case MSG_BYE:
+				break;
+			case MSG_HIBERNATE:
+				/* Can I hibernate? */
+				new_message = MSG_HIBERNATE |
+					((index & 1) ? MSG_NACK : MSG_ACK);
+				break;
+			case MSG_IMAGE:
+				/* Can I resume? */
+				new_message = MSG_IMAGE |
+					((index & 1) ? MSG_NACK : MSG_ACK);
+				if (new_message != old_message)
+					printk("Setting whether I can resume to %d.\n",
+							new_message);
+				break;
+			case MSG_IO:
+				new_message = MSG_IO | MSG_ACK;
+				break;
+			case MSG_RUNNING:
+				break;
+			default:
+				if (net_ratelimit())
+					printk(KERN_ERR "Unrecognised TuxOnIce cluster"
+						" message %d from " NIPQUAD_FMT ".\n",
+						b->message, NIPQUAD(addr));
+		};
+
+		if (old_message != new_message) {
+			node_array[index].current_message = new_message;
+			printk(">>> Sending new message for node %d.\n", index);
+			toi_send_if(new_message, index);
+		} else if (!ack) {
+			printk(">>> Resending message for node %d.\n", index);
+			toi_send_if(new_message, index);
+		}
 drop_unlock:
-	spin_unlock(&toi_recv_lock);
+		spin_unlock(&node_array[index].receive_lock);
+	};
 
 drop:
 	/* Throw the packet out. */
@@ -284,7 +508,7 @@ drop:
 /*
  *  Send cluster message to single interface.
  */
-static void toi_send_if(int message)
+static void toi_send_if(int message, unsigned long my_id)
 {
 	struct sk_buff *skb;
 	struct toi_pkt *b;
@@ -317,19 +541,10 @@ static void toi_send_if(int message)
 	b->udph.len = htons(sizeof(struct toi_pkt) - sizeof(struct iphdr));
 	/* UDP checksum not calculated -- explicitly allowed in BOOTP RFC */
 
-	/* Construct DHCP/BOOTP header */
+	/* Construct message */
 	b->message = message;
-	if (net_dev->type < 256) /* check for false types */
-		b->htype = net_dev->type;
-	else if (net_dev->type == ARPHRD_IEEE802_TR) /* fix for token ring */
-		b->htype = ARPHRD_IEEE802;
-	else if (net_dev->type == ARPHRD_FDDI)
-		b->htype = ARPHRD_ETHER;
-	else {
-		printk("Unknown ARP type 0x%04x for device %s\n",
-				net_dev->type, net_dev->name);
-		b->htype = net_dev->type; /* can cause undefined behavior */
-	}
+	b->sid = my_id;
+	b->htype = net_dev->type; /* can cause undefined behavior */
 	b->hlen = net_dev->addr_len;
 	memcpy(b->hw_addr, net_dev->dev_addr, net_dev->addr_len);
 	b->secs = htons(3); /* 3 seconds */
@@ -343,6 +558,157 @@ static void toi_send_if(int message)
 			dev_queue_xmit(skb) < 0)
 		printk("E");
 }
+
+/*	=========================================		*/
+
+/*			kTOICluster			*/
+
+static atomic_t num_cluster_threads;
+static DECLARE_WAIT_QUEUE_HEAD(clusterd_events);
+
+static int kTOICluster(void *data)
+{
+	unsigned long my_id;
+
+	my_id = atomic_add_return(1, &num_cluster_threads) - 1;
+	node_array[my_id].current_message = (unsigned long) data;
+
+	PRINTK("kTOICluster daemon %lu starting.\n", my_id);
+
+	current->flags |= PF_NOFREEZE;
+
+	while (node_array[my_id].current_message) {
+		toi_send_if(node_array[my_id].current_message, my_id);
+		sleep_on_timeout(&clusterd_events,
+				cluster_message_timeout);
+		PRINTK("Link state %lu is %d.\n", my_id, node_array[my_id].current_message);
+	}
+
+	toi_send_if(MSG_BYE, my_id);
+	atomic_dec(&num_cluster_threads);
+	wake_up(&clusterd_events);
+
+	PRINTK("kTOICluster daemon %lu exiting.\n", my_id);
+	__set_current_state(TASK_RUNNING);
+	return 0;
+}
+
+static void kill_clusterd(void)
+{
+	int i;
+
+	for (i = 0; i < num_local_nodes; i++) {
+		if (node_array[i].current_message) {
+			PRINTK("Seeking to kill clusterd %d.\n", i);
+			node_array[i].current_message = 0;
+		}
+	}
+	wait_event(clusterd_events,
+			!atomic_read(&num_cluster_threads));
+	PRINTK("All cluster daemons have exited.\n");
+}
+
+static int peers_not_in_message(int index, int message, int precise)
+{
+	struct cluster_member *this;
+	unsigned long flags;
+	int result = 0;
+
+	spin_lock_irqsave(&node_array[index].member_list_lock, flags);
+	list_for_each_entry(this, &node_array[index].member_list, list) {
+		if (this->ignore)
+			continue;
+
+		PRINTK("Peer %d.%d.%d.%d sending %s. "
+			"Seeking %s.\n",
+			NIPQUAD(this->addr),
+			str_message(this->message), str_message(message));
+		if ((precise ? this->message : this->message & MSG_STATE_MASK) !=
+				message)
+			result++;
+	}
+	spin_unlock_irqrestore(&node_array[index].member_list_lock, flags);
+	PRINTK("%d peers in sought message.\n", result);
+	return result;
+}
+
+static void reset_ignored(int index)
+{
+	struct cluster_member *this;
+	unsigned long flags;
+
+	spin_lock_irqsave(&node_array[index].member_list_lock, flags);
+	list_for_each_entry(this, &node_array[index].member_list, list)
+		this->ignore = 0;
+	node_array[index].ignored_peer_count = 0;
+	spin_unlock_irqrestore(&node_array[index].member_list_lock, flags);
+}
+
+static int peers_in_message(int index, int message, int precise)
+{
+	return node_array[index].peer_count - node_array[index].ignored_peer_count -
+		peers_not_in_message(index, message, precise);
+}
+
+static int time_to_continue(int index, unsigned long start, int message)
+{
+	int first = peers_not_in_message(index, message, 0);
+	int second = peers_in_message(index, message, 1);
+
+	PRINTK("First part returns %d, second returns %d.\n", first, second);
+
+	if (!first && !second) {
+		PRINTK("All peers answered message %d.\n",
+			message);
+		return 1;
+	}
+
+	if (time_after(jiffies, start + continue_delay)) {
+		PRINTK("Timeout reached.\n");
+		return 1;
+	}
+
+	PRINTK("Not time to continue yet (%lu < %lu).\n", jiffies, start + continue_delay);
+	return 0;
+}
+
+void toi_initiate_cluster_hibernate(void)
+{
+	int result;
+	unsigned long start;
+
+	if ((result = do_toi_step(STEP_HIBERNATE_PREPARE_IMAGE)))
+		return;
+
+	toi_send_if(MSG_HIBERNATE, 0);
+
+	start = jiffies;
+	wait_event(node_array[0].member_events,
+			time_to_continue(0, start, MSG_HIBERNATE));
+
+	if (test_action_state(TOI_FREEZER_TEST)) {
+		toi_send_if(MSG_ABORT, 0);
+
+		start = jiffies;
+		wait_event(node_array[0].member_events,
+			time_to_continue(0, start, MSG_RUNNING));
+
+		do_toi_step(STEP_QUIET_CLEANUP);
+		return;
+	}
+
+	toi_send_if(MSG_IO, 0);
+
+	if ((result = do_toi_step(STEP_HIBERNATE_SAVE_IMAGE))) {
+		return;
+	}
+
+	/* This code runs at resume time too! */
+	if (toi_in_hibernate)
+		result = do_toi_step(STEP_HIBERNATE_POWERDOWN);
+}
+
+EXPORT_SYMBOL_GPL(toi_initiate_cluster_hibernate);
 
 /* toi_cluster_print_debug_stats
  *
@@ -409,7 +775,74 @@ static void toi_cluster_load_config_info(char *buffer, int size)
 
 static void cluster_startup(void)
 {
-	int num_machines_with_image = 0;
+	int have_image = do_check_can_resume(), i;
+	unsigned long start = jiffies, initial_message;
+	struct task_struct *p;
+
+	initial_message = MSG_IMAGE;
+
+	have_image = 1;
+
+	for (i = 0; i < num_local_nodes; i++) {
+		PRINTK("Starting ktoiclusterd %d.\n", i);
+		p = kthread_create(kTOICluster, (void *) initial_message,
+				"ktoiclusterd/%d", i);
+		if (IS_ERR(p)) {
+			printk("Failed to start ktoiclusterd.\n");
+			return;
+		}
+
+		wake_up_process(p);
+	}
+
+	/* Wait for delay or someone else sending first message */
+	wait_event(node_array[0].member_events, time_to_continue(0, start,
+				MSG_IMAGE));
+
+	others_have_image = peers_in_message(0, MSG_IMAGE | MSG_ACK, 1);
+
+	printk("Continuing. I %shave an image. Peers with image: %d.\n",
+		have_image ? "" : "don't ", others_have_image);
+
+	if (have_image) {
+		int result;
+
+		/* Start to resume */
+		printk("  === Starting to resume ===  \n");
+		node_array[0].current_message = MSG_IO;
+		toi_send_if(MSG_IO, 0);
+
+		//result = do_toi_step(STEP_RESUME_LOAD_PS1);
+		result = 0;
+
+		if (!result) {
+			/*
+			 * Atomic restore - we'll come back in the hibernation
+			 * path.
+			 */
+
+			//result = do_toi_step(STEP_RESUME_DO_RESTORE);
+			result = 0;
+
+			//do_toi_step(STEP_QUIET_CLEANUP);
+		} 
+
+		node_array[0].current_message |= MSG_NACK;
+
+		/* For debugging - disable for real life? */
+		wait_event(node_array[0].member_events,
+				time_to_continue(0, start, MSG_IO));
+	}
+
+	if (others_have_image) {
+		/* Wait for them to resume */
+		printk("Waiting for other nodes to resume.\n");
+		start = jiffies;
+		wait_event(node_array[0].member_events, time_to_continue(0, start,
+				MSG_RUNNING));
+		if (peers_not_in_message(0, MSG_RUNNING, 0))
+			printk("Timed out while waiting for other nodes to resume.\n");
+	}
 
 	/* Find out whether an image exists here. Send ACK_IMAGE or NACK_IMAGE
 	 * as appropriate.
@@ -430,6 +863,8 @@ static void cluster_startup(void)
 	 *   and do post-resume. (The section after the atomic restore is done
 	 *   via the code for hibernating).
 	 */
+
+	node_array[0].current_message = MSG_RUNNING;
 }
 
 /* toi_cluster_open_iface
@@ -444,7 +879,7 @@ static int toi_cluster_open_iface(void)
 	rtnl_lock();
 
 	for_each_netdev(dev) {
-		if (dev == &loopback_dev ||
+		if (/* dev == &loopback_dev || */
 		    strcmp(dev->name, toi_cluster_iface))
 			continue;
 
@@ -452,18 +887,23 @@ static int toi_cluster_open_iface(void)
 		break;
 	}
 
+	rtnl_unlock();
+
 	if (!net_dev) {
 		printk(KERN_ERR MYNAME ": Device %s not found.\n",
 				toi_cluster_iface);
 		return -ENODEV;
 	}
 
-	rtnl_unlock();
-
 	dev_add_pack(&toi_cluster_packet_type);
-	toi_cluster_state = RUNNING;
+	added_pack = 1;
 
-	/* Send our Hello message */
+	loopback_mode = (net_dev == &loopback_dev);
+	num_local_nodes = loopback_mode ? 8 : 1;
+
+	PRINTK("Loopback mode is %s. Number of local nodes is %d.\n",
+			loopback_mode ? "on" : "off", num_local_nodes);
+
 	cluster_startup();
 	return 0;
 }
@@ -475,9 +915,27 @@ static int toi_cluster_open_iface(void)
 
 static int toi_cluster_close_iface(void)
 {
-	dev_remove_pack(&toi_cluster_packet_type);
-	toi_cluster_state = OFFLINE;
+	kill_clusterd();
+	if (added_pack) {
+		dev_remove_pack(&toi_cluster_packet_type);
+		added_pack = 0;
+	}
 	return 0;
+}
+
+static void write_side_effect(void)
+{
+	if (toi_cluster_ops.enabled) {
+		toi_cluster_open_iface();
+		set_toi_state(TOI_CLUSTER_MODE);
+	} else {
+		toi_cluster_close_iface();
+		clear_toi_state(TOI_CLUSTER_MODE);
+	}
+}
+
+static void node_write_side_effect(void)
+{
 }
 
 /*
@@ -485,13 +943,14 @@ static int toi_cluster_close_iface(void)
  */
 static struct toi_sysfs_data sysfs_params[] = {
 	{
-		TOI_ATTR("master", SYSFS_RW),
+		TOI_ATTR("interface", SYSFS_RW),
 		SYSFS_STRING(toi_cluster_iface, IFNAMSIZ, 0)
 	},
 
 	{
 		TOI_ATTR("enabled", SYSFS_RW),
-		SYSFS_INT(&toi_cluster_ops.enabled, 0, 1, 0)
+		SYSFS_INT(&toi_cluster_ops.enabled, 0, 1, 0),
+		.write_side_effect = write_side_effect,
 	},
 
 	{
@@ -507,6 +966,11 @@ static struct toi_sysfs_data sysfs_params[] = {
 	{
 		TOI_ATTR("post-hibernate-script", SYSFS_RW),
 		SYSFS_STRING(post_hibernate_script, 256, 0)
+	},
+
+	{
+		TOI_ATTR("continue_delay", SYSFS_RW),
+		SYSFS_UL(&continue_delay, HZ / 2, 60 * HZ, 0)
 	}
 };
 
@@ -541,7 +1005,29 @@ static struct toi_module_ops toi_cluster_ops = {
 
 INIT int toi_cluster_init(void)
 {
-	int temp = toi_register_module(&toi_cluster_ops);
+	int temp = toi_register_module(&toi_cluster_ops), i;
+	struct kobject *kobj = toi_cluster_ops.dir_kobj;
+
+	for (i = 0; i < MAX_LOCAL_NODES; i++) {
+		node_array[i].current_message = 0;
+		INIT_LIST_HEAD(&node_array[i].member_list);
+		init_waitqueue_head(&node_array[i].member_events);
+		spin_lock_init(&node_array[i].member_list_lock);
+		spin_lock_init(&node_array[i].receive_lock);
+
+		/* Set up sysfs entry */
+		node_array[i].sysfs_data.attr.name = kmalloc(8, GFP_KERNEL);
+		sprintf((char *) node_array[i].sysfs_data.attr.name, "node_%d", i);
+		node_array[i].sysfs_data.attr.mode = SYSFS_RW;
+		node_array[i].sysfs_data.type = TOI_SYSFS_DATA_INTEGER;
+		node_array[i].sysfs_data.flags = 0;
+		node_array[i].sysfs_data.data.integer.variable = &node_array[i].current_message;
+		node_array[i].sysfs_data.data.integer.minimum = 0;
+		node_array[i].sysfs_data.data.integer.maximum = INT_MAX;
+		node_array[i].sysfs_data.write_side_effect =
+			node_write_side_effect;
+		toi_register_sysfs_file(kobj, &node_array[i].sysfs_data);
+	}
 
 	toi_cluster_ops.enabled = (strlen(toi_cluster_iface) > 0);
 
@@ -553,6 +1039,12 @@ INIT int toi_cluster_init(void)
 
 EXIT void toi_cluster_exit(void)
 {
+	int i;
+	toi_cluster_close_iface();
+
+	for (i = 0; i < MAX_LOCAL_NODES; i++)
+		toi_unregister_sysfs_file(toi_cluster_ops.dir_kobj,
+				&node_array[i].sysfs_data);
 	toi_unregister_module(&toi_cluster_ops);
 }
 

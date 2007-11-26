@@ -696,7 +696,7 @@ cleanup:
  * image_exists sysfs entry, and just look to see whether the
  * first character in the resulting buffer is a '1'.
  */
-static int do_check_can_resume(void)
+int do_check_can_resume(void)
 {
 	char *buf = (char *) toi_get_zeroed_page(21, TOI_ATOMIC_GFP);
 	int result = 0;
@@ -880,10 +880,18 @@ out:
 			prepare_restore_load_alt_image(0);
 			save_restore_alt_param(RESTORE, NOQUIET);
 			break;
+		case STEP_CLEANUP:
+			do_cleanup(1);
+			break;
+		case STEP_QUIET_CLEANUP:
+			do_cleanup(0);
+			break;
 	}
 
 	return 0;
 }
+
+EXPORT_SYMBOL_GPL(do_toi_step);
 
 /* -- Functions for kickstarting a hibernate or resume --- */
 
@@ -980,6 +988,11 @@ int _toi_try_hibernate(int have_pmsem)
 	}
 
 	current->flags |= PF_MEMALLOC;
+
+	if (test_toi_state(TOI_CLUSTER_MODE)) {
+		toi_initiate_cluster_hibernate();
+		goto out;
+	}
 
 	if ((result = do_toi_step(STEP_HIBERNATE_PREPARE_IMAGE)))
 		goto out;
@@ -1181,4 +1194,5 @@ late_initcall(core_load);
 #ifdef CONFIG_TOI_EXPORTS
 EXPORT_SYMBOL_GPL(pagedir2);
 EXPORT_SYMBOL_GPL(toi_fail_num);
+EXPORT_SYMBOL_GPL(do_check_can_resume);
 #endif

@@ -20,7 +20,7 @@
 #include <asm/setup.h>
 #include "tuxonice_pageflags.h"
 
-#define TOI_CORE_VERSION "3.0-rc2"
+#define TOI_CORE_VERSION "3.0-rc3"
 
 /*		 == Action states == 		*/
 
@@ -130,6 +130,8 @@ enum {
 	STEP_RESUME_READ_PS2,
 	STEP_RESUME_GO,
 	STEP_RESUME_ALT_IMAGE,
+	STEP_CLEANUP,
+	STEP_QUIET_CLEANUP
 };
 
 /*		== TuxOnIce states ==
@@ -185,4 +187,6 @@ static inline int load_direct(struct page *page)
 }
 
 extern int pre_resume_freeze(void);
+extern int do_check_can_resume(void);
+extern int do_toi_step(int step);
 #endif

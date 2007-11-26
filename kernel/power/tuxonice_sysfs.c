@@ -277,6 +277,8 @@ int toi_register_sysfs_file(
 	return result;
 }
 
+EXPORT_SYMBOL_GPL(toi_register_sysfs_file);
+
 /* toi_unregister_sysfs_file
  *
  * Helper for removing unwanted /sys/power/tuxonice entries.
@@ -287,6 +289,7 @@ void toi_unregister_sysfs_file(struct kobject *kobj,
 {
 	sysfs_remove_file(kobj, &toi_sysfs_data->attr);
 }
+EXPORT_SYMBOL_GPL(toi_unregister_sysfs_file);
 
 void toi_cleanup_sysfs(void)
 {
