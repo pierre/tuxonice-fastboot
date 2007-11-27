@@ -39,12 +39,10 @@
 #include "tuxonice_sysfs.h"
 #include "tuxonice_alloc.h"
 
-static int num_nosave = 0;
-static int header_space_allocated = 0;
-static int main_storage_allocated = 0;
-static int storage_available = 0;
+static int num_nosave, header_space_allocated, main_storage_allocated,
+	   storage_available;
 int extra_pd1_pages_allowance = MIN_EXTRA_PAGES_ALLOWANCE;
-int image_size_limit = 0;
+int image_size_limit;
 
 struct attention_list {
 	struct task_struct *task;
