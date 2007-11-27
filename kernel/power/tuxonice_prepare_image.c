@@ -839,8 +839,6 @@ static void update_image(void)
 	if (freeze_processes())
 		set_abort_result(TOI_FREEZING_FAILED);
 
-	allocate_checksum_pages();
-
 	toi_recalculate_image_contents(0);
 }
 
@@ -1039,7 +1037,7 @@ int toi_prepare_image(void)
 		}
 	}
 
-	return result;
+	return allocate_checksum_pages();
 }
 
 #ifdef CONFIG_TOI_EXPORTS

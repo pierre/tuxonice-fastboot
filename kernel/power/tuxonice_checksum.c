@@ -52,6 +52,11 @@ static int toi_num_resaved = 0;
 static unsigned long this_checksum = 0, next_page = 0;
 static int checksum_index = 0;
 
+static inline int checksum_pages_needed(void)
+{
+	return DIV_ROUND_UP(pagedir2.size, CHECKSUMS_PER_PAGE);
+}
+
 /* ---- Local buffer management ---- */
 
 /* 
@@ -148,6 +153,12 @@ static int toi_checksum_print_debug_stats(char *buffer, int size)
 	return len;
 }
 
+static int toi_checksum_memory_needed(void)
+{
+	return toi_checksum_ops.enabled ?
+		checksum_pages_needed() << PAGE_SHIFT : 0;
+}
+
 static int toi_checksum_storage_needed(void)
 {
 	if (toi_checksum_ops.enabled)
@@ -212,7 +223,7 @@ void free_checksum_pages(void)
 
 int allocate_checksum_pages(void)
 {
-	int pages_needed = DIV_ROUND_UP(pagedir2.size, CHECKSUMS_PER_PAGE);
+	int pages_needed = checksum_pages_needed();
 
 	if (!toi_checksum_ops.enabled)
 		return 0;
@@ -220,8 +231,10 @@ int allocate_checksum_pages(void)
 	while (pages_allocated < pages_needed) {
 		unsigned long *new_page =
 		  (unsigned long *) toi_get_zeroed_page(15, TOI_ATOMIC_GFP);
-		if (!new_page)
+		if (!new_page) {
+			printk("Unable to allocate checksum pages.\n");
 			return -ENOMEM;
+		}
 		SetPageNosave(virt_to_page(new_page));
 		(*new_page) = page_list;
 		page_list = (unsigned long) new_page;
@@ -355,6 +368,7 @@ static struct toi_module_ops toi_checksum_ops = {
 	.print_debug_info	= toi_checksum_print_debug_stats,
 	.save_config_info	= toi_checksum_save_config_info,
 	.load_config_info	= toi_checksum_load_config_info,
+	.memory_needed		= toi_checksum_memory_needed,
 	.storage_needed		= toi_checksum_storage_needed,
 
 	.sysfs_data		= sysfs_params,
