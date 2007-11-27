@@ -173,8 +173,10 @@ EXPORT_SYMBOL_GPL(platform_finish);
 EXPORT_SYMBOL_GPL(platform_pre_restore);
 EXPORT_SYMBOL_GPL(platform_restore_cleanup);
 
+#ifdef CONFIG_ARCH_HIBERNATION_HEADER
 EXPORT_SYMBOL_GPL(arch_hibernation_header_save);
 EXPORT_SYMBOL_GPL(arch_hibernation_header_restore);
+#endif
 EXPORT_SYMBOL_GPL(init_swsusp_header);
 
 #ifdef CONFIG_TOI_CORE_EXPORTS

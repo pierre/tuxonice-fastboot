@@ -1281,6 +1281,7 @@ char *check_swsusp_image_kernel(struct swsusp_info *info)
 		return "machine";
 	return NULL;
 }
+EXPORT_SYMBOL_GPL(check_swsusp_image_kernel);
 #endif /* CONFIG_ARCH_HIBERNATION_HEADER */
 
 int init_swsusp_header(struct swsusp_info *info)
