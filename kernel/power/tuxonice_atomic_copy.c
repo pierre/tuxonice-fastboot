@@ -291,6 +291,8 @@ Failed:
 
 int toi_go_atomic(pm_message_t state, int suspend_time)
 {
+	toi_prepare_status(DONT_CLEAR_BAR, "Going atomic.");
+
 	if (test_action_state(TOI_PM_PREPARE_CONSOLE))
 		pm_prepare_console();
 
@@ -321,7 +323,6 @@ int toi_go_atomic(pm_message_t state, int suspend_time)
 	}
 
 	if (test_action_state(TOI_LATE_CPU_HOTPLUG)) {
-		toi_prepare_status(DONT_CLEAR_BAR, "Disable nonboot cpus.");
 		if (disable_nonboot_cpus()) {
 			set_abort_result(TOI_CPU_HOTPLUG_FAILED);
 			toi_end_atomic(ATOMIC_STEP_DEVICE_RESUME,
@@ -374,5 +375,7 @@ void toi_end_atomic(int stage, int suspend_time)
 		case ATOMIC_STEP_RESTORE_CONSOLE:
 			if (test_action_state(TOI_PM_PREPARE_CONSOLE))
 				pm_restore_console();
+	
+	toi_prepare_status(DONT_CLEAR_BAR, "Post atomic.");
 	}
 }
