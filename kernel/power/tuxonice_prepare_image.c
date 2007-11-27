@@ -1035,7 +1035,7 @@ int toi_prepare_image(void)
 		}
 	}
 
-	return allocate_checksum_pages();
+	return result ? result : allocate_checksum_pages();
 }
 
 #ifdef CONFIG_TOI_EXPORTS
