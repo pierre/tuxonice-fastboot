@@ -524,16 +524,20 @@ static void display_failure_reason(int tries_exceeded)
 		printk("- The maximum number of iterations was reached without "
 				" successfully preparing the image.\n");
 
-	if (header_space_allocated < header_storage_needed())
+	if (header_space_allocated < header_storage_needed()) {
 		printk("- Insufficient header storage allocated. Need %d, "
 				"have %d.\n", header_storage_needed(),
 				header_space_allocated);
+		set_abort_result(TOI_INSUFFICIENT_STORAGE);
+	}
 
-	if (storage_required)
+	if (storage_required) {
 		printk(" - We need at least %d pages of storage (ignoring the "
 				"header), but only have %d.\n",
 				main_storage_needed(1, 1),
 				main_storage_allocated);
+		set_abort_result(TOI_INSUFFICIENT_STORAGE);
+	}
 
 	if (ram_required) {
 		printk(" - We need %d more free pages of low memory.\n",
@@ -547,13 +551,18 @@ static void display_failure_reason(int tries_exceeded)
 				2 * extra_pd1_pages_allowance);
 		printk("                      : ========\n");
 		printk("     Still needed     : %8d\n", ram_required);
+		set_abort_result(TOI_UNABLE_TO_FREE_ENOUGH_MEMORY);
 	}
 
-	if (high_ps1)
+	if (high_ps1) {
 		printk("- We need to free %d highmem pageset 1 pages.\n", high_ps1);
+		set_abort_result(TOI_UNABLE_TO_FREE_ENOUGH_MEMORY);
+	}
 
-	if (low_ps1)
+	if (low_ps1) {
 		printk(" - We need to free %d lowmem pageset 1 pages.\n", low_ps1);
+		set_abort_result(TOI_UNABLE_TO_FREE_ENOUGH_MEMORY);
+	}
 }
 
 static void display_stats(int always, int sub_extra_pd1_allow)
