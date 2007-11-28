@@ -31,11 +31,13 @@ static int pr_index;
 #define PR_DEBUG(a, b...) do { } while(0)
 #endif
 
-#define MAX_OUTSTANDING_IO 2048
+#define MAX_OUTSTANDING_IO 16384
+#define MAX_READAHEAD 2048
 #define SUBMIT_BATCH_SIZE 128
 
 static int max_outstanding_io = MAX_OUTSTANDING_IO;
 static int submit_batch_size = SUBMIT_BATCH_SIZE;
+static int max_readahead = MAX_READAHEAD;
 
 struct io_info {
 	struct bio *sys_struct;
@@ -73,9 +75,9 @@ static atomic_t outstanding_io;
 static int extra_page_forward = 0;
 
 static unsigned long toi_readahead_flags[
-	DIV_ROUND_UP(MAX_OUTSTANDING_IO, BITS_PER_LONG)];
+	DIV_ROUND_UP(MAX_READAHEAD, BITS_PER_LONG)];
 static spinlock_t toi_readahead_flags_lock = SPIN_LOCK_UNLOCKED;
-static struct page *toi_ra_pages[MAX_OUTSTANDING_IO];
+static struct page *toi_ra_pages[MAX_READAHEAD];
 static int readahead_index, ra_submit_index;
 
 static int current_stream;
@@ -753,7 +755,7 @@ static int toi_rw_cleanup(int writing)
 	toi_finish_all_io();
 
 	if (!writing)
-		for (i=0; i < max_outstanding_io; i++)
+		for (i=0; i < max_readahead; i++)
 			toi_cleanup_readahead(i);
 
 	current_stream = 0;
@@ -820,7 +822,7 @@ static int toi_bio_read_page_with_readahead(void)
 
 		ra_submit_index++;
 
-		if (ra_submit_index == max_outstanding_io)
+		if (ra_submit_index == max_readahead)
 			ra_submit_index = 0;
 
 	} while((!last_result) && (ra_submit_index != readahead_index) &&
@@ -834,7 +836,7 @@ wait:
 	kunmap_atomic(virt, KM_USER1);
 
 	readahead_index++;
-	if (readahead_index == max_outstanding_io)
+	if (readahead_index == max_readahead)
 		readahead_index = 0;
 
 	return 0;
@@ -1080,7 +1082,7 @@ static int write_header_chunk_finish(void)
  */
 static int toi_bio_storage_needed(void)
 {
-	return 2 * sizeof(int);
+	return 3 * sizeof(int);
 }
 
 /**
@@ -1093,7 +1095,8 @@ static int toi_bio_save_config_info(char *buf)
 	int *ints = (int *) buf;
 	ints[0] = max_outstanding_io;
 	ints[1] = submit_batch_size;
-	return 2 * sizeof(int);
+	ints[2] = max_readahead;
+	return 3 * sizeof(int);
 }
 
 /**
@@ -1107,6 +1110,7 @@ static void toi_bio_load_config_info(char *buf, int size)
 	int *ints = (int *) buf;
 	max_outstanding_io  = ints[0];
 	submit_batch_size = ints[1];
+	max_readahead = ints[2];
 }
 
 /**
@@ -1154,7 +1158,11 @@ struct toi_bio_ops toi_bio_ops = {
 
 static struct toi_sysfs_data sysfs_params[] = {
 	{ TOI_ATTR("max_outstanding_io", SYSFS_RW),
-	  SYSFS_INT(&max_outstanding_io, 16, MAX_OUTSTANDING_IO, 0),
+	  SYSFS_INT(&max_outstanding_io, 1, MAX_OUTSTANDING_IO, 0),
+	},
+
+	{ TOI_ATTR("max_readahead", SYSFS_RW),
+	  SYSFS_INT(&max_readahead, 1, MAX_READAHEAD, 0),
 	},
 
 	{ TOI_ATTR("submit_batch_size", SYSFS_RW),
