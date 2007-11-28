@@ -45,6 +45,7 @@ enum {
 	TOI_NO_MULTITHREADED_IO,
 	TOI_NO_DIRECT_LOAD,
 	TOI_LATE_CPU_HOTPLUG,
+	TOI_GET_MAX_MEM_ALLOCD
 };
 
 extern unsigned long toi_action;
