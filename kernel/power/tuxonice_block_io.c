@@ -33,10 +33,9 @@ static int pr_index;
 
 #define MAX_OUTSTANDING_IO 16384
 #define MAX_READAHEAD 2048
-#define SUBMIT_BATCH_SIZE 128
+#define CLEANUP_BATCH_SIZE 16
 
 static int max_outstanding_io = MAX_OUTSTANDING_IO;
-static int submit_batch_size = SUBMIT_BATCH_SIZE;
 static int max_readahead = MAX_READAHEAD;
 
 struct io_info {
@@ -56,17 +55,13 @@ static int toi_io_max_queue_length;
 static LIST_HEAD(ioinfo_ready_for_cleanup);
 static DEFINE_SPINLOCK(ioinfo_ready_lock);
 
-static LIST_HEAD(ioinfo_batch_list);
-
 static LIST_HEAD(ioinfo_busy);
 static DEFINE_SPINLOCK(ioinfo_busy_lock);
 
 static struct page *waiting_on;
 
-static atomic_t toi_io_batched;
 static atomic_t toi_io_in_progress;
 static atomic_t toi_io_to_cleanup;
-static int submit_batched(void);
 static DECLARE_WAIT_QUEUE_HEAD(num_in_progress_wait);
 
 /* [Max] number of I/O operations pending */
@@ -178,7 +173,7 @@ static void toi_cleanup_completed_io(int all)
 		spin_lock_irqsave(&ioinfo_ready_lock, flags);
 
 		num_cleaned++;
-		if (!all && num_cleaned == submit_batch_size)
+		if (!all && num_cleaned == CLEANUP_BATCH_SIZE)
 			break;
 	}
 	spin_unlock_irqrestore(&ioinfo_ready_lock, flags);
@@ -211,7 +206,6 @@ static void do_bio_wait(int reason)
 
 	/* On SMP, waiting_on can be reset, so we make a copy */
 	if (was_waiting_on) {
-		do { } while (submit_batched());
 		if (PageLocked(was_waiting_on)) {
 			wait_on_page_bit(was_waiting_on, PG_locked);
 			atomic_inc(&reasons[reason]);
@@ -238,7 +232,6 @@ static void do_bio_wait(int reason)
  */
 static void toi_finish_all_io(void)
 {
-	submit_batched();
 	wait_event(num_in_progress_wait, !atomic_read(&toi_io_in_progress));
 	toi_cleanup_completed_io(1);
 	BUG_ON(atomic_read(&toi_io_to_cleanup));
@@ -390,52 +383,6 @@ static int submit(struct io_info *io_info)
 }
 
 /**
- * submit_batched: Submit a batch of bios we've been saving up.
- *
- * Submit a batch. The submit function can wait on I/O, so we have
- * simple locking to avoid infinite recursion.
- */
-static int submit_batched(void)
-{
-	static int running_already = 0;
-	struct io_info *this, *next;
-	int num_submitted = 0;
-	struct backing_dev_info *bdi = NULL;
-
-	if (running_already || !atomic_read(&toi_io_batched))
-		return 0;
-
-	running_already = 1;
-	list_for_each_entry_safe(this, next, &ioinfo_batch_list, list) {
-		list_del_init(&this->list);
-		atomic_dec(&toi_io_batched);
-		submit(this);
-		num_submitted++;
-		if (num_submitted == submit_batch_size)
-			break;
-	}
-	running_already = 0;
-
-	if (bdi)
-		blk_run_backing_dev(bdi, NULL);
-	return num_submitted;
-}
-
-/**
- * add_to_batch: Add a page of i/o to our batch for later submission.
- *
- * @io_info: Data structure describing a page of I/O to be done.
- */
-static void add_to_batch(struct io_info *io_info)
-{
-	int waiting = atomic_add_return(1, &toi_io_batched);
-	list_add_tail(&io_info->list, &ioinfo_batch_list);
-
-	if (waiting >= submit_batch_size)
-		submit_batched();
-}
-
-/**
  * get_io_info_struct: Allocate a struct for recording info on i/o submitted.
  */
 static struct io_info *get_io_info_struct(void)
@@ -443,8 +390,7 @@ static struct io_info *get_io_info_struct(void)
 	struct io_info *this = NULL;
 
 	if ((atomic_read(&toi_io_to_cleanup) +
-	       atomic_read(&toi_io_in_progress) + atomic_read(&toi_io_batched)) >= max_outstanding_io) {
-		submit_batched();
+	       atomic_read(&toi_io_in_progress)) >= max_outstanding_io) {
 		wait_event(num_in_progress_wait,
 			atomic_read(&toi_io_in_progress) < max_outstanding_io);
 
@@ -534,10 +480,7 @@ static void toi_do_io(int writing, struct block_device *bdev, long block0,
 	/* Submit the page */
 	get_page(io_info->bio_page);
 
-	if (syncio)
-	 	submit(io_info);
-	else
-		add_to_batch(io_info);
+	submit(io_info);
 
 	atomic_inc(&outstanding_io);
 
@@ -1082,7 +1025,7 @@ static int write_header_chunk_finish(void)
  */
 static int toi_bio_storage_needed(void)
 {
-	return 3 * sizeof(int);
+	return 2 * sizeof(int);
 }
 
 /**
@@ -1094,9 +1037,8 @@ static int toi_bio_save_config_info(char *buf)
 {
 	int *ints = (int *) buf;
 	ints[0] = max_outstanding_io;
-	ints[1] = submit_batch_size;
-	ints[2] = max_readahead;
-	return 3 * sizeof(int);
+	ints[1] = max_readahead;
+	return 2 * sizeof(int);
 }
 
 /**
@@ -1109,8 +1051,7 @@ static void toi_bio_load_config_info(char *buf, int size)
 {
 	int *ints = (int *) buf;
 	max_outstanding_io  = ints[0];
-	submit_batch_size = ints[1];
-	max_readahead = ints[2];
+	max_readahead = ints[1];
 }
 
 /**
@@ -1164,10 +1105,6 @@ static struct toi_sysfs_data sysfs_params[] = {
 	{ TOI_ATTR("max_readahead", SYSFS_RW),
 	  SYSFS_INT(&max_readahead, 1, MAX_READAHEAD, 0),
 	},
-
-	{ TOI_ATTR("submit_batch_size", SYSFS_RW),
-	  SYSFS_INT(&submit_batch_size, 16, SUBMIT_BATCH_SIZE, 0),
-	}
 };
 
 static struct toi_module_ops toi_blockwriter_ops =
