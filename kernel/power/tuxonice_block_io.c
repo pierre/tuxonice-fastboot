@@ -439,21 +439,21 @@ static void add_to_batch(struct io_info *io_info)
 static struct io_info *get_io_info_struct(void)
 {
 	struct io_info *this = NULL;
-	int first = 1;
 
-	wait_event(num_in_progress_wait,
+	if ((atomic_read(&toi_io_to_cleanup) +
+	       atomic_read(&toi_io_in_progress) + atomic_read(&toi_io_batched)) >= max_outstanding_io) {
+		submit_batched();
+		wait_event(num_in_progress_wait,
 			atomic_read(&toi_io_in_progress) < max_outstanding_io);
+
+		toi_cleanup_completed_io(1);
+	}
 
 	do {
 		this = toi_kmalloc(1, sizeof(struct io_info), TOI_ATOMIC_GFP);
 
 		if (this)
 			break;
-
-		if (first) {
-			submit_batched();
-			first = 0;
-		}
 
 		do_bio_wait(2);
 	} while (!this);
