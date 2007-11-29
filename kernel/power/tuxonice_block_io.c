@@ -158,11 +158,13 @@ static void toi_bio_cleanup_one(struct io_info *io_info)
 static void toi_cleanup_completed_io(int all)
 {
 	int num_cleaned = 0;
-	struct io_info *this, *next;
+	struct io_info *this;
 	unsigned long flags;
 
 	spin_lock_irqsave(&ioinfo_ready_lock, flags);
-	list_for_each_entry_safe(this, next, &ioinfo_ready_for_cleanup, list) {
+	while (!list_empty(&ioinfo_ready_for_cleanup)) {
+		this = list_first_entry(&ioinfo_ready_for_cleanup,
+				struct io_info, list);
 		list_del_init(&this->list);
 
 		if (waiting_on == this->bio_page)
