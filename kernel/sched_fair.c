@@ -22,7 +22,7 @@
 
 /*
  * Targeted preemption latency for CPU-bound tasks:
- * (default: 20ms * ilog(ncpus), units: nanoseconds)
+ * (default: 20ms * (1 + ilog(ncpus)), units: nanoseconds)
  *
  * NOTE: this latency value is not the same as the concept of
  * 'timeslice length' - timeslices in CFS are of variable length
@@ -36,14 +36,14 @@ unsigned int sysctl_sched_latency = 20000000ULL;
 
 /*
  * Minimal preemption granularity for CPU-bound tasks:
- * (default: 1 msec * ilog(ncpus), units: nanoseconds)
+ * (default: 4 msec * (1 + ilog(ncpus)), units: nanoseconds)
  */
-unsigned int sysctl_sched_min_granularity = 1000000ULL;
+unsigned int sysctl_sched_min_granularity = 4000000ULL;
 
 /*
  * is kept at sysctl_sched_latency / sysctl_sched_min_granularity
  */
-static unsigned int sched_nr_latency = 20;
+static unsigned int sched_nr_latency = 5;
 
 /*
  * After fork, child runs first. (default) If set to 0 then
@@ -61,7 +61,7 @@ unsigned int __read_mostly sysctl_sched_compat_yield;
 
 /*
  * SCHED_BATCH wake-up granularity.
- * (default: 10 msec * ilog(ncpus), units: nanoseconds)
+ * (default: 10 msec * (1 + ilog(ncpus)), units: nanoseconds)
  *
  * This option delays the preemption effects of decoupled workloads
  * and reduces their over-scheduling. Synchronous workloads will still
@@ -71,7 +71,7 @@ unsigned int sysctl_sched_batch_wakeup_granularity = 10000000UL;
 
 /*
  * SCHED_OTHER wake-up granularity.
- * (default: 10 msec * ilog(ncpus), units: nanoseconds)
+ * (default: 10 msec * (1 + ilog(ncpus)), units: nanoseconds)
  *
  * This option delays the preemption effects of decoupled workloads
  * and reduces their over-scheduling. Synchronous workloads will still
@@ -351,6 +351,12 @@ static void update_curr(struct cfs_rq *cfs_rq)
 
 	__update_curr(cfs_rq, curr, delta_exec);
 	curr->exec_start = now;
+
+	if (entity_is_task(curr)) {
+		struct task_struct *curtask = task_of(curr);
+
+		cpuacct_charge(curtask, delta_exec);
+	}
 }
 
 static inline void
@@ -793,8 +799,9 @@ static void dequeue_task_fair(struct rq *rq, struct task_struct *p, int sleep)
  */
 static void yield_task_fair(struct rq *rq)
 {
-	struct cfs_rq *cfs_rq = task_cfs_rq(rq->curr);
-	struct sched_entity *rightmost, *se = &rq->curr->se;
+	struct task_struct *curr = rq->curr;
+	struct cfs_rq *cfs_rq = task_cfs_rq(curr);
+	struct sched_entity *rightmost, *se = &curr->se;
 
 	/*
 	 * Are we the only task in the tree?
@@ -802,7 +809,7 @@ static void yield_task_fair(struct rq *rq)
 	if (unlikely(cfs_rq->nr_running == 1))
 		return;
 
-	if (likely(!sysctl_sched_compat_yield)) {
+	if (likely(!sysctl_sched_compat_yield) && curr->policy != SCHED_BATCH) {
 		__update_rq_clock(rq);
 		/*
 		 * Update run-time statistics of the 'current'.
