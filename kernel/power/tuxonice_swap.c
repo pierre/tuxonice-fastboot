@@ -165,7 +165,7 @@ static struct block_device *open_bdev(int index, dev_t device, int display_errs)
 	if (!this) {
 		printk(KERN_WARNING "TuxOnIce: Failed to allocate memory for "
 				"opening a bdev.");
-		close_bdev(index);
+		blkdev_put(bdev);
 		return ERR_PTR(-ENOMEM);
 	}
 
