@@ -235,6 +235,7 @@ static struct toi_module_ops toi_alloc_ops = {
 	.name					= "allocation debugging",
 	.directory				= "alloc",
 	.module					= THIS_MODULE,
+	.early					= 1,
 	.initialise				= toi_alloc_initialise,
 
 	.sysfs_data		= sysfs_params,

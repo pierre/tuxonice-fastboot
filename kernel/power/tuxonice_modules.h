@@ -47,7 +47,7 @@ struct toi_module_ops {
 	char *shared_directory;
 	struct kobject *dir_kobj;
 	struct module *module;
-	int enabled;
+	int enabled, early;
 	struct list_head module_list;
 
 	/* List of filters or allocators */
@@ -157,7 +157,11 @@ extern int toi_print_module_debug_info(char *buffer, int buffer_size);
 extern int toi_register_module(struct toi_module_ops *module);
 extern void toi_unregister_module(struct toi_module_ops *module);
 
-extern int toi_initialise_modules(int starting_cycle);
+extern int toi_initialise_modules(int starting_cycle, int early);
+#define toi_initialise_modules_early(starting) \
+	toi_initialise_modules(starting, 1)
+#define toi_initialise_modules_late(starting) \
+	toi_initialise_modules(starting, 0)
 extern void toi_cleanup_modules(int finishing_cycle);
 
 extern void toi_print_modules(void);

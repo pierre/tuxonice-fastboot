@@ -320,7 +320,7 @@ void toi_move_module_tail(struct toi_module_ops *module)
  *
  * Get ready to do some work!
  */
-int toi_initialise_modules(int starting_cycle)
+int toi_initialise_modules(int starting_cycle, int early)
 {
 	struct toi_module_ops *this_module;
 	int result;
@@ -329,6 +329,8 @@ int toi_initialise_modules(int starting_cycle)
 		this_module->header_requested = 0;
 		this_module->header_used = 0;
 		if (!this_module->enabled)
+			continue;
+		if (this_module->early != early)
 			continue;
 		if (this_module->initialise) {
 			toi_message(TOI_MEMORY, TOI_MEDIUM, 1,

@@ -109,15 +109,15 @@ int do_toi_step(int step);
  * call cleanup routines, drop module references and restore process fs and
  * cpus allowed masks, together with the global block_dump variable's value.
  */
-void toi_finish_anything(int toi_or_resume)
+void toi_finish_anything(int hibernate_or_resume)
 {
 	if (!atomic_dec_and_test(&actions_running))
 		return;
 
-	toi_cleanup_modules(toi_or_resume);
+	toi_cleanup_modules(hibernate_or_resume);
 	toi_put_modules();
 	set_fs(oldfs);
-	if (toi_or_resume) {
+	if (hibernate_or_resume) {
 		block_dump = block_dump_save;
 		set_cpus_allowed(current, CPU_MASK_ALL);
 		toi_alloc_print_debug_stats();
@@ -133,10 +133,10 @@ void toi_finish_anything(int toi_or_resume)
  * kernel segment, recheck resume= if no active allocator is set, initialise
  * modules, save and reset block_dump and ensure we're running on CPU0.
  */
-int toi_start_anything(int toi_or_resume)
+int toi_start_anything(int hibernate_or_resume)
 {
 	if (atomic_add_return(1, &actions_running) != 1) {
-		if (toi_or_resume) {
+		if (hibernate_or_resume) {
 			printk("Can't start a cycle when actions are "
 					"already running.\n");
 			atomic_dec(&actions_running);
@@ -148,30 +148,35 @@ int toi_start_anything(int toi_or_resume)
 	oldfs = get_fs();
 	set_fs(KERNEL_DS);
 
-	/* Be quiet if we're not trying to hibernate or resume */
-	if (!toiActiveAllocator)
-		toi_attempt_to_parse_resume_device(!toi_or_resume);
+	if (hibernate_or_resume)
+		toi_print_modules();
 
 	if (toi_get_modules()) {
 		printk("TuxOnIce: Get modules failed!\n");
 		goto out_err;
 	}
 
-	if (toi_initialise_modules(toi_or_resume))
-		goto out_err;
-
-	if (toi_or_resume) {
+	if (hibernate_or_resume) {
 		block_dump_save = block_dump;
 		block_dump = 0;
 		set_cpus_allowed(current, CPU_MASK_CPU0);
 	}
 
+	if (toi_initialise_modules_early(hibernate_or_resume))
+		goto out_err;
+
+	if (!toiActiveAllocator)
+		toi_attempt_to_parse_resume_device(!hibernate_or_resume);
+
+	if (toi_initialise_modules_late(hibernate_or_resume))
+		goto out_err;
+
 	return 0;
 
 out_err:
-	if (toi_or_resume)
+	if (hibernate_or_resume)
 		block_dump_save = block_dump;
-	toi_finish_anything(toi_or_resume);
+	toi_finish_anything(hibernate_or_resume);
 	return -EBUSY;
 }
 
@@ -433,7 +438,6 @@ static int toi_init(void)
 
 	toi_result = 0;
 
-	toi_print_modules();
 	printk(KERN_INFO "Initiating a hibernation cycle.\n");
 
 	nr_hibernates++;
@@ -905,8 +909,6 @@ void __toi_try_resume(void)
 {
 	set_toi_state(TOI_TRYING_TO_RESUME);
 	resume_attempted = 1;
-
-	toi_print_modules();
 
 	current->flags |= PF_MEMALLOC;
 
