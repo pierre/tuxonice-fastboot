@@ -298,6 +298,8 @@ void toi_try_resume(void)
 {
 	if (toi_core_fns)
 		toi_core_fns->try_resume();
+	else
+		printk("TuxOnIce core not loaded yet.\n");
 }
 
 int toi_lowlevel_builtin(void)
