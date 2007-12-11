@@ -391,7 +391,7 @@ static struct io_info *get_io_info_struct(void)
 {
 	struct io_info *this = NULL;
 
-	if ((atomic_read(&toi_io_to_cleanup) +
+	if (max_outstanding_io && (atomic_read(&toi_io_to_cleanup) +
 	       atomic_read(&toi_io_in_progress)) >= max_outstanding_io) {
 		wait_event(num_in_progress_wait,
 			atomic_read(&toi_io_in_progress) < max_outstanding_io);
@@ -532,7 +532,8 @@ static int toi_bio_print_debug_stats(char *buffer, int size)
  */
 static int toi_bio_memory_needed(void)
 {
-	return (max_outstanding_io * (PAGE_SIZE + sizeof(struct request) +
+	return (max(max_outstanding_io, max_readahead) *
+			(PAGE_SIZE + sizeof(struct request) +
 				sizeof(struct bio) + sizeof(struct io_info)));
 }
 
@@ -1117,7 +1118,7 @@ struct toi_bio_ops toi_bio_ops = {
 
 static struct toi_sysfs_data sysfs_params[] = {
 	{ TOI_ATTR("max_outstanding_io", SYSFS_RW),
-	  SYSFS_INT(&max_outstanding_io, 1, MAX_OUTSTANDING_IO, 0),
+	  SYSFS_INT(&max_outstanding_io, 0, MAX_OUTSTANDING_IO, 0),
 	},
 
 	{ TOI_ATTR("max_readahead", SYSFS_RW),
