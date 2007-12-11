@@ -1290,6 +1290,11 @@ static char *get_have_image_data(void)
 	    toiActiveAllocator->rw_header_chunk(READ, NULL,
 			output_buffer, sizeof(struct toi_header))) {
 		sprintf(output_buffer, "0\n");
+		/* 
+		 * From an initrd/ramfs, catting have_image and
+		 * getting a result of 0 is sufficient.
+		 */
+		clear_toi_state(TOI_BOOT_TIME);
 		goto out;
 	}
 
