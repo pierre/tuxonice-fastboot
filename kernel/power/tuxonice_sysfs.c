@@ -226,12 +226,13 @@ void remove_toi_sysdir(struct kobject *kobj)
 
 	kobject_unregister(kobj);
 
-	kfree(kobj);
+	toi_kfree(34, kobj);
 }
 
 struct kobject *make_toi_sysdir(char *name)
 {
-	struct kobject *kobj = kzalloc(sizeof(struct kobject), GFP_KERNEL);
+	struct kobject *kobj = toi_kzalloc(34, sizeof(struct kobject),
+			GFP_KERNEL);
 	int err;
 
 	if(!kobj) {
@@ -242,7 +243,7 @@ struct kobject *make_toi_sysdir(char *name)
 	err = kobject_set_name(kobj, "%s", name);
 
 	if (err) {
-		kfree(kobj);
+		toi_kfree(34, kobj);
 		return NULL;
 	}
 
@@ -251,7 +252,7 @@ struct kobject *make_toi_sysdir(char *name)
 	err = kobject_register(kobj);
 
 	if (err)
-		kfree(kobj);
+		toi_kfree(34, kobj);
 
 	return err ? NULL : kobj;
 }

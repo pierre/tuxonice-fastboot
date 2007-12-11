@@ -302,7 +302,7 @@ static int toi_launch_userspace_program(char *command, int channel_no)
 			"PATH=/sbin:/usr/sbin:/bin:/usr/bin",
 			NULL };
 	static char *argv[] = { NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL };
-	char *channel = toi_kmalloc(4, 6, GFP_KERNEL);
+	char *channel = toi_kzalloc(4, 6, GFP_KERNEL);
 	int arg = 0, size;
 	char test_read[255];
 	char *orig_posn = command;
@@ -322,7 +322,7 @@ static int toi_launch_userspace_program(char *command, int channel_no)
 		size = strlen(test_read);
 		if (!(size))
 			break;
-		argv[arg] = toi_kmalloc(5, size + 1, TOI_ATOMIC_GFP);
+		argv[arg] = toi_kzalloc(5, size + 1, TOI_ATOMIC_GFP);
 		strcpy(argv[arg], test_read);
 		orig_posn += size + 1;
 		*test_read = 0;

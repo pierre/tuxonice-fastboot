@@ -13,7 +13,7 @@
 #include "tuxonice_modules.h"
 #include "tuxonice_sysfs.h"
 
-#define TOI_ALLOC_PATHS 33
+#define TOI_ALLOC_PATHS 37
 
 DEFINE_MUTEX(toi_alloc_mutex);
 
@@ -58,7 +58,11 @@ static char *toi_alloc_desc[TOI_ALLOC_PATHS] = {
 	"get nonconflicting page",
 	"ps1 load addresses", /* 30 */
 	"remove swap image",
-	"swap image exists"
+	"swap image exists",
+	"swap parse sig location",
+	"sysfs kobj",
+	"swap mark resume attempted buffer", /* 35 */
+	"cluster member"
 };
 
 #define MIGHT_FAIL(FAIL_NUM, FAIL_VAL) \
@@ -104,12 +108,12 @@ static void free_update_stats(int fail_num)
 	}
 }
 
-void *toi_kmalloc(int fail_num, size_t size, gfp_t flags)
+void *toi_kzalloc(int fail_num, size_t size, gfp_t flags)
 {
 	void *result;
 
 	MIGHT_FAIL(fail_num, NULL);
-	result = kmalloc(size, flags);
+	result = kzalloc(size, flags);
 	alloc_update_stats(fail_num, result);
 	return result;
 }
@@ -249,7 +253,7 @@ void toi_alloc_exit(void)
 
 
 #ifdef CONFIG_TOI_EXPORTS
-EXPORT_SYMBOL_GPL(toi_kmalloc);
+EXPORT_SYMBOL_GPL(toi_kzalloc);
 EXPORT_SYMBOL_GPL(toi_get_free_pages);
 EXPORT_SYMBOL_GPL(toi_get_zeroed_page);
 EXPORT_SYMBOL_GPL(toi_kfree);

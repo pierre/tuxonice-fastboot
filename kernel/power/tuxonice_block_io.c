@@ -400,7 +400,7 @@ static struct io_info *get_io_info_struct(void)
 	}
 
 	do {
-		this = toi_kmalloc(1, sizeof(struct io_info), TOI_ATOMIC_GFP);
+		this = toi_kzalloc(1, sizeof(struct io_info), TOI_ATOMIC_GFP);
 
 		if (this)
 			break;

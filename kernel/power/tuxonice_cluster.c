@@ -308,8 +308,8 @@ static int __add_update_member(int index, __be32 addr, int message)
 		return 0;
 	}
 
-	this = (struct cluster_member *) kmalloc(sizeof(struct cluster_member),
-			GFP_KERNEL);
+	this = (struct cluster_member *) toi_kzalloc(36,
+			sizeof(struct cluster_member), GFP_KERNEL);
 
 	if (!this)
 		return -1;
@@ -355,7 +355,7 @@ static void del_member(int index,__be32 addr)
 
 	if (this) {
 		list_del_init(&this->list);
-		kfree(this);
+		toi_kfree(36, this);
 		node_array[index].peer_count--;
 	}
 
@@ -1016,7 +1016,7 @@ INIT int toi_cluster_init(void)
 		spin_lock_init(&node_array[i].receive_lock);
 
 		/* Set up sysfs entry */
-		node_array[i].sysfs_data.attr.name = kmalloc(8, GFP_KERNEL);
+		node_array[i].sysfs_data.attr.name = toi_kzalloc(8, GFP_KERNEL);
 		sprintf((char *) node_array[i].sysfs_data.attr.name, "node_%d", i);
 		node_array[i].sysfs_data.attr.mode = SYSFS_RW;
 		node_array[i].sysfs_data.type = TOI_SYSFS_DATA_INTEGER;

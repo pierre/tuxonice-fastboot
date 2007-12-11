@@ -11,7 +11,7 @@
 #define TOI_ATOMIC_GFP (GFP_ATOMIC | __GFP_NOWARN)
 
 #ifdef CONFIG_PM_DEBUG
-extern void *toi_kmalloc(int fail_num, size_t size, gfp_t flags);
+extern void *toi_kzalloc(int fail_num, size_t size, gfp_t flags);
 extern void toi_kfree(int fail_num, const void *arg);
 
 extern unsigned long toi_get_free_pages(int fail_num, gfp_t mask,
@@ -29,7 +29,7 @@ extern void toi_alloc_print_debug_stats(void);
 
 #else /* CONFIG_PM_DEBUG */
 
-#define toi_kmalloc(FAIL, SIZE, FLAGS) (kmalloc(SIZE, FLAGS))
+#define toi_kzalloc(FAIL, SIZE, FLAGS) (kzalloc(SIZE, FLAGS))
 #define toi_kfree(FAIL, ALLOCN) (kfree(ALLOCN))
 
 #define toi_get_free_pages(FAIL, FLAGS, ORDER) __get_free_pages(FLAGS, ORDER)

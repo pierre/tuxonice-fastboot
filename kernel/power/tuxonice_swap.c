@@ -161,7 +161,7 @@ static struct block_device *open_bdev(int index, dev_t device, int display_errs)
 		return ERR_PTR(-EINVAL);
 	}
 
-	this = toi_kmalloc(8, sizeof(struct bdev_opened), GFP_KERNEL);
+	this = toi_kzalloc(8, sizeof(struct bdev_opened), GFP_KERNEL);
 	if (!this) {
 		printk(KERN_WARNING "TuxOnIce: Failed to allocate memory for "
 				"opening a bdev.");
