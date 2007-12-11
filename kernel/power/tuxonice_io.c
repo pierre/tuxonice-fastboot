@@ -869,7 +869,7 @@ static int read_module_configs(void)
 			sizeof(toi_module_header));
 	if (result) {
 		printk("Failed to read the next module header.\n");
-		free_page((unsigned long) buffer);
+		toi_free_page(23, (unsigned long) buffer);
 		return -EINVAL;
 	}
 
@@ -892,7 +892,7 @@ static int read_module_configs(void)
 					toi_module_header.name);
 				if (!(test_toi_state(TOI_CONTINUE_REQ))) {
 					toiActiveAllocator->remove_image();
-					free_page((unsigned long) buffer);
+					toi_free_page(23, (unsigned long) buffer);
 					return -EINVAL;
 				}
 			} else
@@ -910,7 +910,7 @@ static int read_module_configs(void)
 			printk("Failed to read the length of the module %s's"
 					" configuration data.\n",
 					toi_module_header.name);
-			free_page((unsigned long) buffer);
+			toi_free_page(23, (unsigned long) buffer);
 			return -EINVAL;
 		}
 
@@ -955,7 +955,7 @@ static int read_module_configs(void)
 
 		if (result) {
 			printk("Failed to read the next module header.\n");
-			free_page((unsigned long) buffer);
+			toi_free_page(23, (unsigned long) buffer);
 			return -EINVAL;
 		}
 
@@ -1362,7 +1362,7 @@ int image_exists_read(const char *page, int count)
 		result = get_have_image_data();
 		if (result) {
 			len = sprintf((char *) page, "%s",  result);
-			free_page((unsigned long) result);
+			toi_free_page(26, (unsigned long) result);
 		}
 	}
 

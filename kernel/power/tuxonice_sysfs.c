@@ -174,7 +174,7 @@ static ssize_t toi_attr_store(struct kobject *kobj, struct attribute *attr,
 
 	/* Free temporary buffers */
 	if (assigned_temp_buffer) {
-		free_page((unsigned long) sysfs_data->data.string.variable);
+		toi_free_page(31, (unsigned long) sysfs_data->data.string.variable);
 		sysfs_data->data.string.variable = NULL;
 	}
 

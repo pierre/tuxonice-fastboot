@@ -47,7 +47,7 @@ void free_conflicting_pages(void)
 	while (first_conflicting_page) {
 		struct page *next = *((struct page **) kmap(first_conflicting_page));
 		kunmap(first_conflicting_page);
-		__free_page(first_conflicting_page);
+		toi__free_page(29, first_conflicting_page);
 		first_conflicting_page = next;
 	}
 }
@@ -192,7 +192,7 @@ int toi_get_pageset1_load_addresses(void)
 		if (PagePageset1(page)) {
 			if (test_action_state(TOI_NO_DIRECT_LOAD)) {
 				ClearPagePageset1Copy(page);
-				__free_page(page);
+				toi__free_page(30, page);
 				continue;
 			} else {
 				if (is_high)
@@ -240,7 +240,7 @@ int toi_get_pageset1_load_addresses(void)
 		if ((is_high && high_to_free) ||
 		    (!is_high && low_to_free)) {
 			ClearPagePageset1Copy(page);
-			__free_page(page);
+			toi__free_page(30, page);
 			if (is_high)
 				high_to_free--;
 			else
@@ -309,7 +309,7 @@ int toi_get_pageset1_load_addresses(void)
 	if (last_high_pbe_page != high_pbe_page) {
 		if (last_high_pbe_page)
 			kunmap(last_high_pbe_page);
-		__free_page(high_pbe_page);
+		toi__free_page(29, high_pbe_page);
 	}
 
 	free_conflicting_pages();

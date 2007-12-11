@@ -959,7 +959,7 @@ static int toi_swap_image_exists(void)
 		return 0;
 	}
 
-	diskpage.address = toi_get_zeroed_page(33, TOI_ATOMIC_GFP);
+	diskpage.address = toi_get_zeroed_page(32, TOI_ATOMIC_GFP);
 
 	toi_bio_ops.bdev_page_io(READ, resume_block_device,
 			resume_firstblock,
@@ -967,7 +967,7 @@ static int toi_swap_image_exists(void)
 	toi_bio_ops.finish_all_io();
 
 	signature_found = parse_signature(diskpage.pointer->swh.magic.magic, 0);
-	toi_free_page(33, diskpage.address);
+	toi_free_page(32, diskpage.address);
 
 	if (signature_found < 2) {
 		printk("TuxOnIce: Normal swapspace found.\n");
@@ -1007,7 +1007,7 @@ static void toi_swap_mark_resume_attempted(int mark)
 		return;
 	}
 	
-	diskpage.address = toi_get_zeroed_page(29, TOI_ATOMIC_GFP);
+	diskpage.address = toi_get_zeroed_page(35, TOI_ATOMIC_GFP);
 
 	toi_bio_ops.bdev_page_io(READ, resume_block_device,
 			resume_firstblock,
@@ -1027,7 +1027,7 @@ static void toi_swap_mark_resume_attempted(int mark)
 			resume_firstblock,
 			virt_to_page(diskpage.ptr));
 	toi_bio_ops.finish_all_io();
-	free_page(diskpage.address);
+	toi_free_page(35, diskpage.address);
 	return;
 }
 
@@ -1099,7 +1099,7 @@ static int toi_swap_parse_sig_location(char *commandline,
 	if (temp_result)
 		return -EINVAL;
 
-	diskpage.address = toi_get_zeroed_page(30, TOI_ATOMIC_GFP);
+	diskpage.address = toi_get_zeroed_page(33, TOI_ATOMIC_GFP);
 	if (!diskpage.address) {
 		printk(KERN_ERR "TuxOnIce: SwapAllocator: Failed to allocate "
 					"a diskpage for I/O.\n");
@@ -1125,7 +1125,7 @@ static int toi_swap_parse_sig_location(char *commandline,
 		if (!quiet)
 			printk(KERN_ERR "TuxOnIce: SwapAllocator: No swap "
 				"signature found at %s.\n", devstart);
-	free_page((unsigned long) diskpage.address);
+	toi_free_page(33, (unsigned long) diskpage.address);
 	return result;
 
 }
@@ -1188,7 +1188,7 @@ static int header_locations_read_sysfs(const char *page, int count)
 		len = sprintf(output, "You need to turn on swap partitions "
 				"before examining this file.\n");
 
-	free_page((unsigned long) path_page);
+	toi_free_page(10, (unsigned long) path_page);
 	return len;
 }
 

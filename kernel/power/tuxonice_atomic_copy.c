@@ -69,7 +69,7 @@ static void free_pbe_list(struct pbe **list, int highmem)
 				next_page = free_pbe;
 		}
 
-		__free_page(page);
+		toi__free_page(29, page);
 		*list = (struct pbe *) next_page;
 	};
 }
