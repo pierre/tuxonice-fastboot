@@ -959,7 +959,7 @@ static int toi_swap_image_exists(void)
 		return 0;
 	}
 
-	diskpage.address = toi_get_zeroed_page(28, TOI_ATOMIC_GFP);
+	diskpage.address = toi_get_zeroed_page(33, TOI_ATOMIC_GFP);
 
 	toi_bio_ops.bdev_page_io(READ, resume_block_device,
 			resume_firstblock,
@@ -967,7 +967,7 @@ static int toi_swap_image_exists(void)
 	toi_bio_ops.finish_all_io();
 
 	signature_found = parse_signature(diskpage.pointer->swh.magic.magic, 0);
-	free_page(diskpage.address);
+	toi_free_page(33, diskpage.address);
 
 	if (signature_found < 2) {
 		printk("TuxOnIce: Normal swapspace found.\n");

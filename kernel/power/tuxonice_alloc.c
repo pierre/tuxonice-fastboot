@@ -13,7 +13,7 @@
 #include "tuxonice_modules.h"
 #include "tuxonice_sysfs.h"
 
-#define TOI_ALLOC_PATHS 32
+#define TOI_ALLOC_PATHS 33
 
 DEFINE_MUTEX(toi_alloc_mutex);
 
@@ -57,7 +57,8 @@ static char *toi_alloc_desc[TOI_ALLOC_PATHS] = {
 	"worker rw loop",
 	"get nonconflicting page",
 	"ps1 load addresses", /* 30 */
-	"remove swap image"
+	"remove swap image",
+	"swap image exists"
 };
 
 #define MIGHT_FAIL(FAIL_NUM, FAIL_VAL) \
