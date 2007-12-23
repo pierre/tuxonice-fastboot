@@ -35,8 +35,8 @@ static int pr_index;
 #define MAX_READAHEAD 2048
 #define CLEANUP_BATCH_SIZE 16
 
-static int max_outstanding_io = MAX_OUTSTANDING_IO;
-static int max_readahead = MAX_READAHEAD;
+static int max_outstanding_io = 2048;
+static int max_readahead = 2048;
 
 struct io_info {
 	struct bio *sys_struct;
