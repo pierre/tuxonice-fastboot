@@ -465,12 +465,12 @@ int software_resume(void)
 	resume_attempted = 1;
 
 #ifdef CONFIG_TOI
-	/* 
+	/*
 	 * We can't know (until an image header - if any - is loaded), whether
 	 * we did override swsusp. We therefore ensure that both are tried.
 	 */
 	if (test_action_state(TOI_REPLACE_SWSUSP))
-		printk("Replacing swsusp.\n");
+		printk(KERN_INFO "Replacing swsusp.\n");
 		toi_try_resume();
 #endif
 

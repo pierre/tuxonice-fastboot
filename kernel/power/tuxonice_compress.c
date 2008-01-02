@@ -23,7 +23,7 @@
 #include "tuxonice_ui.h"
 #include "tuxonice_alloc.h"
 
-static int toi_expected_compression = 0;
+static int toi_expected_compression;
 
 static struct toi_module_ops toi_compression_ops;
 static struct toi_module_ops *next_driver;
@@ -33,7 +33,7 @@ static char toi_compressor_name[32] = "lzf";
 static DEFINE_MUTEX(stats_lock);
 
 struct cpu_context {
-	u8 * page_buffer;
+	u8 *page_buffer;
 	struct crypto_comp *transform;
 	unsigned int len;
 	char *buffer_start;
@@ -43,7 +43,7 @@ static DEFINE_PER_CPU(struct cpu_context, contexts);
 
 static int toi_compress_prepare_result;
 
-/* 
+/*
  * toi_compress_cleanup
  *
  * Frees memory allocated for our labours.
@@ -69,7 +69,7 @@ static void toi_compress_cleanup(int toi_or_resume)
 	}
 }
 
-/* 
+/*
  * toi_crypto_prepare
  *
  * Prepare to do some work by allocating buffers and transforms.
@@ -79,7 +79,8 @@ static int toi_compress_crypto_prepare(void)
 	int cpu;
 
 	if (!*toi_compressor_name) {
-		printk("TuxOnIce: Compression enabled but no compressor name set.\n");
+		printk(KERN_INFO "TuxOnIce: Compression enabled but no "
+				"compressor name set.\n");
 		return 1;
 	}
 
@@ -87,8 +88,8 @@ static int toi_compress_crypto_prepare(void)
 		struct cpu_context *this = &per_cpu(contexts, cpu);
 		this->transform = crypto_alloc_comp(toi_compressor_name, 0, 0);
 		if (IS_ERR(this->transform)) {
-			printk("TuxOnIce: Failed to initialise the %s "
-					"compression transform.\n",
+			printk(KERN_INFO "TuxOnIce: Failed to initialise the "
+					"%s compression transform.\n",
 					toi_compressor_name);
 			this->transform = NULL;
 			return 1;
@@ -96,7 +97,7 @@ static int toi_compress_crypto_prepare(void)
 
 		this->page_buffer =
 			(char *) toi_get_zeroed_page(16, TOI_ATOMIC_GFP);
-	
+
 		if (!this->page_buffer) {
 			printk(KERN_ERR
 			  "Failed to allocate a page buffer for TuxOnIce "
@@ -146,12 +147,12 @@ int toi_compress_rw_init(int rw, int stream_number)
 	return 0;
 }
 
-/* 
+/*
  * toi_compress_write_page()
  *
  * Compress a page of data, buffering output and passing on filled
  * pages to the next module in the pipeline.
- * 
+ *
  * Buffer_page:	Pointer to a buffer of size PAGE_SIZE, containing
  * data to be compressed.
  *
@@ -164,7 +165,7 @@ static int toi_compress_write_page(unsigned long index,
 {
 	int ret, cpu = smp_processor_id();
 	struct cpu_context *ctx = &per_cpu(contexts, cpu);
-	
+
 	if (!ctx->transform)
 		return next_driver->write_page(index, buffer_page, buf_size);
 
@@ -175,14 +176,14 @@ static int toi_compress_write_page(unsigned long index,
 	ret = crypto_comp_compress(ctx->transform,
 			ctx->buffer_start, buf_size,
 			ctx->page_buffer, &ctx->len);
-	
+
 	kunmap(buffer_page);
 
 	if (ret) {
-		printk("Compression failed.\n");
+		printk(KERN_INFO "Compression failed.\n");
 		goto failure;
 	}
-	
+
 	mutex_lock(&stats_lock);
 	toi_compress_bytes_in += buf_size;
 	toi_compress_bytes_out += ctx->len;
@@ -199,7 +200,7 @@ failure:
 	return ret;
 }
 
-/* 
+/*
  * toi_compress_read_page()
  * @buffer_page: struct page *. Pointer to a buffer of size PAGE_SIZE.
  *
@@ -210,7 +211,7 @@ failure:
 static int toi_compress_read_page(unsigned long *index,
 		struct page *buffer_page, unsigned int *buf_size)
 {
-	int ret, cpu = smp_processor_id(); 
+	int ret, cpu = smp_processor_id();
 	unsigned int len;
 	unsigned int outlen = PAGE_SIZE;
 	char *buffer_start;
@@ -219,7 +220,7 @@ static int toi_compress_read_page(unsigned long *index,
 	if (!ctx->transform)
 		return next_driver->read_page(index, buffer_page, buf_size);
 
-	/* 
+	/*
 	 * All our reads must be synchronous - we can't decompress
 	 * data that hasn't been read yet.
 	 */
@@ -252,7 +253,7 @@ static int toi_compress_read_page(unsigned long *index,
 	return ret;
 }
 
-/* 
+/*
  * toi_compress_print_debug_stats
  * @buffer: Pointer to a buffer into which the debug info will be printed.
  * @size: Size of the buffer.
@@ -266,7 +267,7 @@ static int toi_compress_print_debug_stats(char *buffer, int size)
 	unsigned long pages_in = toi_compress_bytes_in >> PAGE_SHIFT,
 		      pages_out = toi_compress_bytes_out >> PAGE_SHIFT;
 	int len;
-	
+
 	/* Output the compression ratio achieved. */
 	if (*toi_compressor_name)
 		len = snprintf_used(buffer, size, "- Compressor is '%s'.\n",
@@ -275,7 +276,7 @@ static int toi_compress_print_debug_stats(char *buffer, int size)
 		len = snprintf_used(buffer, size, "- Compressor is not set.\n");
 
 	if (pages_in)
-		len+= snprintf_used(buffer+len, size - len,
+		len += snprintf_used(buffer+len, size - len,
 		  "  Compressed %lu bytes into %lu (%d percent compression).\n",
 		  toi_compress_bytes_in,
 		  toi_compress_bytes_out,
@@ -283,7 +284,7 @@ static int toi_compress_print_debug_stats(char *buffer, int size)
 	return len;
 }
 
-/* 
+/*
  * toi_compress_compression_memory_needed
  *
  * Tell the caller how much memory we need to operate during hibernate/resume.
@@ -300,7 +301,7 @@ static int toi_compress_storage_needed(void)
 	return 4 * sizeof(unsigned long) + strlen(toi_compressor_name) + 1;
 }
 
-/* 
+/*
  * toi_compress_save_config_info
  * @buffer: Pointer to a buffer of size PAGE_SIZE.
  *
@@ -311,14 +312,14 @@ static int toi_compress_save_config_info(char *buffer)
 {
 	int namelen = strlen(toi_compressor_name) + 1;
 	int total_len;
-	
+
 	*((unsigned long *) buffer) = toi_compress_bytes_in;
 	*((unsigned long *) (buffer + 1 * sizeof(unsigned long))) =
 		toi_compress_bytes_out;
 	*((unsigned long *) (buffer + 2 * sizeof(unsigned long))) =
 		toi_expected_compression;
 	*((unsigned long *) (buffer + 3 * sizeof(unsigned long))) = namelen;
-	strncpy(buffer + 4 * sizeof(unsigned long), toi_compressor_name, 
+	strncpy(buffer + 4 * sizeof(unsigned long), toi_compressor_name,
 								namelen);
 	total_len = 4 * sizeof(unsigned long) + namelen;
 	return total_len;
@@ -334,9 +335,10 @@ static int toi_compress_save_config_info(char *buffer)
 static void toi_compress_load_config_info(char *buffer, int size)
 {
 	int namelen;
-	
+
 	toi_compress_bytes_in = *((unsigned long *) buffer);
-	toi_compress_bytes_out = *((unsigned long *) (buffer + 1 * sizeof(unsigned long)));
+	toi_compress_bytes_out = *((unsigned long *) (buffer + 1 *
+				sizeof(unsigned long)));
 	toi_expected_compression = *((unsigned long *) (buffer + 2 *
 				sizeof(unsigned long)));
 	namelen = *((unsigned long *) (buffer + 3 * sizeof(unsigned long)));
@@ -345,9 +347,9 @@ static void toi_compress_load_config_info(char *buffer, int size)
 	return;
 }
 
-/* 
+/*
  * toi_expected_compression_ratio
- * 
+ *
  * Description:	Returns the expected ratio between data passed into this module
  * 		and the amount of data output when writing.
  * Returns:	100 if the module is disabled. Otherwise the value set by the
@@ -398,14 +400,15 @@ static struct toi_module_ops toi_compression_ops = {
 	.load_config_info	= toi_compress_load_config_info,
 	.storage_needed		= toi_compress_storage_needed,
 	.expected_compression	= toi_compress_expected_ratio,
-	
+
 	.rw_init		= toi_compress_rw_init,
 
 	.write_page		= toi_compress_write_page,
 	.read_page		= toi_compress_read_page,
 
 	.sysfs_data		= sysfs_params,
-	.num_sysfs_entries	= sizeof(sysfs_params) / sizeof(struct toi_sysfs_data),
+	.num_sysfs_entries	= sizeof(sysfs_params) /
+		sizeof(struct toi_sysfs_data),
 };
 
 /* ---- Registration ---- */

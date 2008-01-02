@@ -47,10 +47,10 @@ static DEFINE_PER_CPU(struct cpu_context, contexts);
 static int pages_allocated;
 static unsigned long page_list;
 
-static int toi_num_resaved = 0;
+static int toi_num_resaved;
 
-static unsigned long this_checksum = 0, next_page = 0;
-static int checksum_index = 0;
+static unsigned long this_checksum, next_page;
+static int checksum_index;
 
 static inline int checksum_pages_needed(void)
 {
@@ -59,7 +59,7 @@ static inline int checksum_pages_needed(void)
 
 /* ---- Local buffer management ---- */
 
-/* 
+/*
  * toi_checksum_cleanup
  *
  * Frees memory allocated for our labours.
@@ -85,7 +85,7 @@ static void toi_checksum_cleanup(int ending_cycle)
 	}
 }
 
-/* 
+/*
  * toi_crypto_initialise
  *
  * Prepare to do some work by allocating buffers and transforms.
@@ -100,7 +100,7 @@ static int toi_checksum_initialise(int starting_cycle)
 		return 0;
 
 	if (!*toi_checksum_name) {
-		printk("TuxOnIce: No checksum algorithm name set.\n");
+		printk(KERN_INFO "TuxOnIce: No checksum algorithm name set.\n");
 		return 1;
 	}
 
@@ -110,8 +110,8 @@ static int toi_checksum_initialise(int starting_cycle)
 
 		this->transform = crypto_alloc_hash(toi_checksum_name, 0, 0);
 		if (IS_ERR(this->transform)) {
-			printk("TuxOnIce: Failed to initialise the %s checksum"
-					" algorithm: %ld.\n",
+			printk(KERN_INFO "TuxOnIce: Failed to initialise the "
+				"%s checksum algorithm: %ld.\n",
 				toi_checksum_name, (long) this->transform);
 			this->transform = NULL;
 			return 1;
@@ -129,7 +129,7 @@ static int toi_checksum_initialise(int starting_cycle)
 	return 0;
 }
 
-/* 
+/*
  * toi_checksum_print_debug_stats
  * @buffer: Pointer to a buffer into which the debug info will be printed.
  * @size: Size of the buffer.
@@ -145,10 +145,10 @@ static int toi_checksum_print_debug_stats(char *buffer, int size)
 	if (!toi_checksum_ops.enabled)
 		return snprintf_used(buffer, size,
 			"- Checksumming disabled.\n");
-	
+
 	len = snprintf_used(buffer, size, "- Checksum method is '%s'.\n",
 			toi_checksum_name);
-	len+= snprintf_used(buffer + len, size - len,
+	len += snprintf_used(buffer + len, size - len,
 		"  %d pages resaved in atomic copy.\n", toi_num_resaved);
 	return len;
 }
@@ -167,7 +167,7 @@ static int toi_checksum_storage_needed(void)
 		return 0;
 }
 
-/* 
+/*
  * toi_checksum_save_config_info
  * @buffer: Pointer to a buffer of size PAGE_SIZE.
  *
@@ -178,7 +178,7 @@ static int toi_checksum_save_config_info(char *buffer)
 {
 	int namelen = strlen(toi_checksum_name) + 1;
 	int total_len;
-	
+
 	*((unsigned int *) buffer) = namelen;
 	strncpy(buffer + sizeof(unsigned int), toi_checksum_name, namelen);
 	total_len = sizeof(unsigned int) + namelen;
@@ -253,13 +253,13 @@ static void print_checksum(char *buf, int size)
 	int index;
 
 	for (index = 0; index < size; index++)
-		printk("%x ", buf[index]);
+		printk(KERN_INFO "%x ", buf[index]);
 
 	printk("\n");
 }
 #endif
 
-char * tuxonice_get_next_checksum(void)
+char *tuxonice_get_next_checksum(void)
 {
 	if (!toi_checksum_ops.enabled)
 		return NULL;
@@ -325,11 +325,11 @@ void check_checksums(void)
 		pa = kmap_atomic(page, KM_USER1);
 		memcpy(ctx->buf, pa, PAGE_SIZE);
 		kunmap_atomic(pa, KM_USER1);
-		ret= crypto_hash_digest(&ctx->desc, ctx->sg, PAGE_SIZE,
+		ret = crypto_hash_digest(&ctx->desc, ctx->sg, PAGE_SIZE,
 							current_checksum);
 
 		if (ret) {
-			printk("Digest failed. Returned %d.\n", ret);
+			printk(KERN_INFO "Digest failed. Returned %d.\n", ret);
 			return;
 		}
 
@@ -372,7 +372,8 @@ static struct toi_module_ops toi_checksum_ops = {
 	.storage_needed		= toi_checksum_storage_needed,
 
 	.sysfs_data		= sysfs_params,
-	.num_sysfs_entries	= sizeof(sysfs_params) / sizeof(struct toi_sysfs_data),
+	.num_sysfs_entries	= sizeof(sysfs_params) /
+		sizeof(struct toi_sysfs_data),
 };
 
 /* ---- Registration ---- */

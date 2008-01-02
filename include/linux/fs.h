@@ -1056,7 +1056,7 @@ enum {
 	freezer_do_not_count(); \
 	wait_event((sb)->s_wait_unfrozen, ((sb)->s_frozen < (level))); \
 	freezer_count(); \
-} while(0)
+} while (0)
 
 #define get_fs_excl() atomic_inc(&current->fs_excl)
 #define put_fs_excl() atomic_dec(&current->fs_excl)

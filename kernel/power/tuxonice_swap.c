@@ -4,7 +4,7 @@
  * Copyright (C) 2004-2007 Nigel Cunningham (nigel at tuxonice net)
  *
  * Distributed under GPLv2.
- * 
+ *
  * This file encapsulates functions for usage of swap space as a
  * backing store.
  */
@@ -38,7 +38,7 @@ union diskpage {
 union p_diskpage {
 	union diskpage *pointer;
 	char *ptr;
-        unsigned long address;
+	unsigned long address;
 };
 
 /* Devices used for swap */
@@ -71,13 +71,12 @@ static struct block_device *resume_block_device;
 struct sysinfo swapinfo;
 
 /* Block devices open. */
-struct bdev_opened
-{
+struct bdev_opened {
 	dev_t device;
 	struct block_device *bdev;
 };
 
-/* 
+/*
  * Entry MAX_SWAPFILES is the resume block device, which may
  * be a swap device not enabled when we hibernate.
  * Entry MAX_SWAPFILES + 1 is the header block device, which
@@ -89,7 +88,7 @@ struct bdev_opened
  * closing them after sucessfully resuming would be wrong.
  */
 static struct bdev_opened *bdevs_opened[MAX_SWAPFILES + 2];
-       
+
 /**
  * close_bdev: Close a swap bdev.
  *
@@ -145,7 +144,7 @@ static struct block_device *open_bdev(int index, dev_t device, int display_errs)
 	if (bdevs_opened[index]) {
 		if (bdevs_opened[index]->device == device)
 			return bdevs_opened[index]->bdev;
-	
+
 		close_bdev(index);
 	}
 
@@ -153,7 +152,7 @@ static struct block_device *open_bdev(int index, dev_t device, int display_errs)
 
 	if (IS_ERR(bdev) || !bdev) {
 		if (display_errs)
-			toi_early_boot_message(1,TOI_CONTINUE_REQ,  
+			toi_early_boot_message(1, TOI_CONTINUE_REQ,
 				"Failed to get access to block device "
 				"\"%x\" (error %d).\n Maybe you need "
 				"to run mknod and/or lvmsetup in an "
@@ -230,7 +229,8 @@ static int try_to_parse_resume_device(char *commandline, int quiet)
 	resume_swap_dev_t = name_to_dev_t(commandline);
 
 	if (!resume_swap_dev_t) {
-		struct file *file = filp_open(commandline, O_RDONLY|O_LARGEFILE, 0);
+		struct file *file = filp_open(commandline,
+				O_RDONLY|O_LARGEFILE, 0);
 
 		if (!IS_ERR(file) && file) {
 			vfs_getattr(file->f_vfsmnt, file->f_dentry, &stat);
@@ -264,11 +264,11 @@ static int try_to_parse_resume_device(char *commandline, int quiet)
 				commandline);
 		return 1;
 	}
-	
+
 	return 0;
 }
 
-/* 
+/*
  * If we have read part of the image, we might have filled  memory with
  * data that should be zeroed out.
  */
@@ -281,24 +281,24 @@ static int parse_signature(char *header, int restore)
 {
 	int type = -1;
 
-	if (!memcmp("SWAP-SPACE",header,10))
+	if (!memcmp("SWAP-SPACE", header, 10))
 		return 0;
-	else if (!memcmp("SWAPSPACE2",header,10))
+	else if (!memcmp("SWAPSPACE2", header, 10))
 		return 1;
 
-	else if (!memcmp("S1SUSP",header,6))
+	else if (!memcmp("S1SUSP", header, 6))
 		type = 2;
-	else if (!memcmp("S2SUSP",header,6))
+	else if (!memcmp("S2SUSP", header, 6))
 		type = 3;
-	else if (!memcmp("S1SUSPEND",header,9))
+	else if (!memcmp("S1SUSPEND", header, 9))
 		type = 4;
-	
-	else if (!memcmp("z",header,1))
+
+	else if (!memcmp("z", header, 1))
 		type = 12;
-	else if (!memcmp("Z",header,1))
+	else if (!memcmp("Z", header, 1))
 		type = 13;
-	
-	/* 
+
+	/*
 	 * Put bdev of hibernate header in last byte of swap header
 	 * (unsigned short)
 	 */
@@ -308,7 +308,7 @@ static int parse_signature(char *header, int restore)
 			(unsigned char *) &header[5];
 		u32 *headerblock_ptr = (u32 *) &header[6];
 		header_dev_t = *header_ptr;
-		/* 
+		/*
 		 * We are now using the highest bit of the char to indicate
 		 * whether we have attempted to resume from this image before.
 		 */
@@ -321,9 +321,9 @@ static int parse_signature(char *header, int restore)
 	if ((restore) && (type > 5)) {
 		/* We only reset our own signatures */
 		if (type & 1)
-			memcpy(header,"SWAPSPACE2",10);
+			memcpy(header, "SWAPSPACE2", 10);
 		else
-			memcpy(header,"SWAP-SPACE",10);
+			memcpy(header, "SWAP-SPACE", 10);
 	}
 
 	return type;
@@ -360,7 +360,7 @@ static int prepare_signature(dev_t bdev, unsigned long block,
 		current_header[0] = 'z';
 	*header_ptr = bdev;
 	/* prev is the first/last swap page of the resume area */
-	*headerblock_ptr = (unsigned long) block; 
+	*headerblock_ptr = (unsigned long) block;
 	return 0;
 }
 
@@ -379,11 +379,11 @@ static int toi_swap_allocate_header_space(int space_requested)
 
 	toi_extent_state_goto_start(&toi_writer_posn);
 	toi_bio_ops.forward_one_page(); /* To first page */
-	
+
 	for (i = 0; i < space_requested; i++) {
 		if (toi_bio_ops.forward_one_page()) {
-			printk("Out of space while seeking to allocate "
-					"header pages,\n");
+			printk(KERN_INFO "Out of space while seeking to "
+					"allocate header pages,\n");
 			header_pages_allocated = i;
 			return -ENOSPC;
 		}
@@ -420,37 +420,40 @@ static int get_main_pool_phys_params(void)
 		swp_entry_t swap_address = extent_val_to_swap_entry(address);
 		pgoff_t offset = swp_offset(swap_address);
 		unsigned swapfilenum = swp_type(swap_address);
-		struct swap_info_struct *sis = get_swap_info_struct(swapfilenum);
+		struct swap_info_struct *sis =
+			get_swap_info_struct(swapfilenum);
 		sector_t new_sector = map_swap_page(sis, offset);
 
 		if ((new_sector == extent_max + 1) &&
-		    (last_chain == swapfilenum))
+		    (last_chain == swapfilenum)) {
 			extent_max++;
-		else {
-			if (extent_min > -1) {
-				if (test_action_state(TOI_TEST_BIO))
-					printk("Adding extent chain %d %d-%d.\n",
-						swapfilenum,
-						extent_min <<
-						 devinfo[last_chain].bmap_shift,
-						extent_max <<
-						 devinfo[last_chain].bmap_shift);
-						
-				if (toi_add_to_extent_chain(
-					&block_chain[last_chain],
-					extent_min, extent_max)) {
-					free_block_chains();
-					return -ENOMEM;
-				}
-			}
-			extent_min = extent_max = new_sector;
-			last_chain = swapfilenum;
+			continue;
 		}
+
+		if (extent_min > -1) {
+			if (test_action_state(TOI_TEST_BIO))
+				printk(KERN_INFO
+					"Adding extent chain %d %d-%d.\n",
+					swapfilenum,
+					extent_min <<
+					 devinfo[last_chain].bmap_shift,
+					extent_max <<
+					 devinfo[last_chain].bmap_shift);
+
+			if (toi_add_to_extent_chain(
+				&block_chain[last_chain],
+				extent_min, extent_max)) {
+				free_block_chains();
+				return -ENOMEM;
+			}
+		}
+		extent_min = extent_max = new_sector;
+		last_chain = swapfilenum;
 	}
 
 	if (extent_min > -1) {
 		if (test_action_state(TOI_TEST_BIO))
-			printk("Adding extent chain %d %d-%d.\n",
+			printk(KERN_INFO "Adding extent chain %d %d-%d.\n",
 				last_chain,
 				extent_min <<
 					devinfo[last_chain].bmap_shift,
@@ -476,10 +479,11 @@ static int toi_swap_storage_available(void)
 {
 	int diff;
 
- 	si_swapinfo(&swapinfo);
-	diff = (((int) swapinfo.freeswap + main_pages_allocated) * (sizeof(unsigned long) + sizeof(int)) /
+	si_swapinfo(&swapinfo);
+	diff = (((int) swapinfo.freeswap + main_pages_allocated) *
+			(sizeof(unsigned long) + sizeof(int)) /
 		(PAGE_SIZE + sizeof(unsigned long) + sizeof(int))) + 1;
-	return (int) swapinfo.freeswap + main_pages_allocated - diff; 
+	return (int) swapinfo.freeswap + main_pages_allocated - diff;
 }
 
 static int toi_swap_initialise(int starting_cycle)
@@ -491,7 +495,7 @@ static int toi_swap_initialise(int starting_cycle)
 
 	if (resume_swap_dev_t && !resume_block_device &&
 	    IS_ERR(resume_block_device =
-	    		open_bdev(MAX_SWAPFILES, resume_swap_dev_t, 1)))
+			open_bdev(MAX_SWAPFILES, resume_swap_dev_t, 1)))
 		return 1;
 
 	return 0;
@@ -501,7 +505,7 @@ static void toi_swap_cleanup(int ending_cycle)
 {
 	if (ending_cycle)
 		disable_swapfile();
-	
+
 	close_bdevs();
 }
 
@@ -518,7 +522,7 @@ static int toi_swap_release_storage(void)
 		/* Free swap entries */
 		struct extent *extentpointer;
 		unsigned long extentvalue;
-		toi_extent_for_each(&swapextents, extentpointer, 
+		toi_extent_for_each(&swapextents, extentpointer,
 				extentvalue)
 			swap_free(extent_val_to_swap_entry(extentvalue));
 
@@ -549,7 +553,7 @@ static void free_swap_range(unsigned long min, unsigned long max)
 		swap_free(extent_val_to_swap_entry(j));
 }
 
-/* 
+/*
  * Round robin allocation (where swap storage has the same priority).
  * could make this very inefficient, so we track extents allocated on
  * a per-swapfiles basis.
@@ -569,7 +573,7 @@ static int __toi_swap_allocate_storage(int main_space_requested,
 	if (pages_to_get < 1)
 		return 0;
 
-	for (i=0; i < MAX_SWAPFILES; i++) {
+	for (i = 0; i < MAX_SWAPFILES; i++) {
 		struct swap_info_struct *si = get_swap_info_struct(i);
 		to_add[i] = 0;
 		if (!si->bdev)
@@ -580,7 +584,7 @@ static int __toi_swap_allocate_storage(int main_space_requested,
 		devinfo[i].blocks_per_page = 1;
 	}
 
-	for(i=0; i < pages_to_get; i++) {
+	for (i = 0; i < pages_to_get; i++) {
 		swp_entry_t entry;
 		unsigned long new_value;
 		unsigned swapfilenum;
@@ -609,13 +613,16 @@ static int __toi_swap_allocate_storage(int main_space_requested,
 		if (toi_add_to_extent_chain(&swapextents,
 					extent_min[swapfilenum],
 					extent_max[swapfilenum])) {
-			printk("Failed to allocate extent for %lu-%lu.\n", extent_min[swapfilenum], extent_max[swapfilenum]);
+			printk(KERN_INFO "Failed to allocate extent for "
+					"%lu-%lu.\n", extent_min[swapfilenum],
+					extent_max[swapfilenum]);
 			free_swap_range(extent_min[swapfilenum],
 					extent_max[swapfilenum]);
 			swap_free(entry);
 			gotten -= (extent_max[swapfilenum] -
 					extent_min[swapfilenum] + 1);
-			to_add[swapfilenum] = 0; /* Don't try to add again below */
+			/* Don't try to add again below */
+			to_add[swapfilenum] = 0;
 			break;
 		} else {
 			extent_min[swapfilenum] = new_value;
@@ -669,18 +676,20 @@ static int toi_swap_write_header_init(void)
 			devinfo[i].dev_t = (dev_t) 0;
 	}
 
-	if ((result = toi_bio_ops.rw_header_chunk(WRITE,
-			&toi_swapops,
-			(char *) &toi_writer_posn_save, 
-			sizeof(toi_writer_posn_save))))
+	result = toi_bio_ops.rw_header_chunk(WRITE, &toi_swapops,
+			(char *) &toi_writer_posn_save,
+			sizeof(toi_writer_posn_save));
+
+	if (result)
 		return result;
 
-	if ((result = toi_bio_ops.rw_header_chunk(WRITE,
-			&toi_swapops,
-			(char *) &devinfo, sizeof(devinfo))))
+	result = toi_bio_ops.rw_header_chunk(WRITE, &toi_swapops,
+			(char *) &devinfo, sizeof(devinfo));
+
+	if (result)
 		return result;
 
-	for (i=0; i < MAX_SWAPFILES; i++)
+	for (i = 0; i < MAX_SWAPFILES; i++)
 		toi_serialise_extent_chain(&toi_swapops, &block_chain[i]);
 
 	return 0;
@@ -709,7 +718,7 @@ static int toi_swap_write_header_cleanup(void)
 	result = prepare_signature(si->bdev->bd_dev,
 			toi_writer_posn.current_offset,
 		((union swap_header *) toi_writer_buffer)->magic.magic);
-		
+
 	if (!result)
 		toi_bio_ops.bdev_page_io(WRITE, resume_block_device,
 			resume_firstblock,
@@ -724,7 +733,7 @@ static int toi_swap_write_header_cleanup(void)
 
 /*
  * read_header_init()
- * 
+ *
  * Description:
  * 1. Attempt to read the device specified with resume=.
  * 2. Check the contents of the swap header for our signature.
@@ -744,13 +753,14 @@ static int toi_swap_read_header_init(void)
 	int i, result = 0;
 
 	if (!header_dev_t) {
-		printk("read_header_init called when we haven't "
+		printk(KERN_INFO "read_header_init called when we haven't "
 				"verified there is an image!\n");
 		return -EINVAL;
 	}
 
-	/* 
-	 * If the header is not on the resume_swap_dev_t, get the resume device first.
+	/*
+	 * If the header is not on the resume_swap_dev_t, get the resume device
+	 * first.
 	 */
 	if (header_dev_t != resume_swap_dev_t) {
 		header_block_device = open_bdev(MAX_SWAPFILES + 1,
@@ -761,7 +771,7 @@ static int toi_swap_read_header_init(void)
 	} else
 		header_block_device = resume_block_device;
 
-	/* 
+	/*
 	 * Read toi_swap configuration.
 	 * Headerblock size taken into account already.
 	 */
@@ -769,11 +779,13 @@ static int toi_swap_read_header_init(void)
 			headerblock << 3,
 			virt_to_page((unsigned long) toi_writer_buffer));
 
-	memcpy(&toi_writer_posn_save, toi_writer_buffer, 3 * sizeof(struct extent_iterate_saved_state));
+	memcpy(&toi_writer_posn_save, toi_writer_buffer, 3 *
+			sizeof(struct extent_iterate_saved_state));
 
 	toi_writer_buffer_posn = 3 * sizeof(struct extent_iterate_saved_state);
 
-	memcpy(&devinfo, toi_writer_buffer + toi_writer_buffer_posn, sizeof(devinfo));
+	memcpy(&devinfo, toi_writer_buffer + toi_writer_buffer_posn,
+			sizeof(devinfo));
 
 	toi_writer_buffer_posn += sizeof(devinfo);
 
@@ -820,17 +832,18 @@ static int toi_swap_read_header_cleanup(void)
 }
 
 /* toi_swap_remove_image
- * 
+ *
  */
 static int toi_swap_remove_image(void)
 {
 	union p_diskpage cur;
 	int result = 0;
 	char newsig[11];
-	
+
 	cur.address = toi_get_zeroed_page(31, TOI_ATOMIC_GFP);
 	if (!cur.address) {
-		printk("Unable to allocate a page for restoring the swap signature.\n");
+		printk(KERN_INFO "Unable to allocate a page for restoring "
+				"the swap signature.\n");
 		return -ENOMEM;
 	}
 
@@ -842,20 +855,20 @@ static int toi_swap_remove_image(void)
 	if (nr_hibernates > 0)
 		toi_swap_release_storage();
 
-	/* 
-	 * We don't do a sanity check here: we want to restore the swap 
+	/*
+	 * We don't do a sanity check here: we want to restore the swap
 	 * whatever version of kernel made the hibernate image.
-	 * 
+	 *
 	 * We need to write swap, but swap may not be enabled so
 	 * we write the device directly
 	 */
-	
+
 	toi_bio_ops.bdev_page_io(READ, resume_block_device,
 			resume_firstblock,
 			virt_to_page(cur.pointer));
 
 	result = parse_signature(cur.pointer->swh.magic.magic, 1);
-		
+
 	if (result < 5)
 		goto out;
 
@@ -894,20 +907,23 @@ static int toi_swap_print_debug_stats(char *buffer, int size)
 {
 	int len = 0;
 	struct sysinfo sysinfo;
-	
+
 	if (toiActiveAllocator != &toi_swapops) {
-		len = snprintf_used(buffer, size, "- SwapAllocator inactive.\n");
+		len = snprintf_used(buffer, size,
+				"- SwapAllocator inactive.\n");
 		return len;
 	}
 
 	len = snprintf_used(buffer, size, "- SwapAllocator active.\n");
 	if (swapfilename[0])
-		len+= snprintf_used(buffer+len, size-len,
-			"  Attempting to automatically swapon: %s.\n", swapfilename);
+		len += snprintf_used(buffer+len, size-len,
+			"  Attempting to automatically swapon: %s.\n",
+			swapfilename);
 
 	si_swapinfo(&sysinfo);
-	
-	len+= snprintf_used(buffer+len, size-len, "  Swap available for image: %ld pages.\n",
+
+	len += snprintf_used(buffer+len, size-len,
+			"  Swap available for image: %ld pages.\n",
 			(int) sysinfo.freeswap + toi_swap_storage_allocated());
 
 	return len;
@@ -931,7 +947,7 @@ static int toi_swap_storage_needed(void)
 
 	for (i = 0; i < MAX_SWAPFILES; i++) {
 		result += 3 * sizeof(int);
-		result += (2 * sizeof(unsigned long) * 
+		result += (2 * sizeof(unsigned long) *
 			block_chain[i].num_extents);
 	}
 
@@ -945,17 +961,18 @@ static int toi_swap_image_exists(void)
 {
 	int signature_found;
 	union p_diskpage diskpage;
-	
+
 	if (!resume_swap_dev_t) {
-		printk("Not even trying to read header "
+		printk(KERN_INFO "Not even trying to read header "
 				"because resume_swap_dev_t is not set.\n");
 		return 0;
 	}
-	
+
 	if (!resume_block_device &&
 	    IS_ERR(resume_block_device =
 			open_bdev(MAX_SWAPFILES, resume_swap_dev_t, 1))) {
-		printk("Failed to open resume dev_t (%x).\n", resume_swap_dev_t);
+		printk(KERN_INFO "Failed to open resume dev_t (%x).\n",
+				resume_swap_dev_t);
 		return 0;
 	}
 
@@ -970,21 +987,23 @@ static int toi_swap_image_exists(void)
 	toi_free_page(32, diskpage.address);
 
 	if (signature_found < 2) {
-		printk("TuxOnIce: Normal swapspace found.\n");
+		printk(KERN_INFO "TuxOnIce: Normal swapspace found.\n");
 		return 0;	/* Normal swap space */
 	} else if (signature_found == -1) {
 		printk(KERN_ERR "TuxOnIce: Unable to find a signature. Could "
 				"you have moved a swap file?\n");
 		return 0;
 	} else if (signature_found < 6) {
-		printk("TuxOnIce: Detected another implementation's signature.\n");
+		printk(KERN_INFO "TuxOnIce: Detected another implementation's "
+				"signature.\n");
 		return 0;
 	} else if ((signature_found >> 1) != SIGNATURE_VER) {
 		if (!test_toi_state(TOI_NORESUME_SPECIFIED)) {
 			toi_early_boot_message(1, TOI_CONTINUE_REQ,
 			  "Found a different style hibernate image signature.");
 			set_toi_state(TOI_NORESUME_SPECIFIED);
-			printk("TuxOnIce: Dectected another implementation's signature.\n");
+			printk(KERN_INFO "TuxOnIce: Dectected another "
+					"implementation's signature.\n");
 		}
 	}
 
@@ -1000,13 +1019,13 @@ static void toi_swap_mark_resume_attempted(int mark)
 {
 	union p_diskpage diskpage;
 	int signature_found;
-	
+
 	if (!resume_swap_dev_t) {
-		printk("Not even trying to record attempt at resuming"
+		printk(KERN_INFO "Not even trying to record attempt at resuming"
 				" because resume_swap_dev_t is not set.\n");
 		return;
 	}
-	
+
 	diskpage.address = toi_get_zeroed_page(35, TOI_ATOMIC_GFP);
 
 	toi_bio_ops.bdev_page_io(READ, resume_block_device,
@@ -1015,14 +1034,14 @@ static void toi_swap_mark_resume_attempted(int mark)
 	signature_found = parse_signature(diskpage.pointer->swh.magic.magic, 0);
 
 	switch (signature_found) {
-		case 12:
-		case 13:
-			diskpage.pointer->swh.magic.magic[5] &= ~0x80;
-			if (mark)
-				diskpage.pointer->swh.magic.magic[5] |= 0x80;
-			break;
+	case 12:
+	case 13:
+		diskpage.pointer->swh.magic.magic[5] &= ~0x80;
+		if (mark)
+			diskpage.pointer->swh.magic.magic[5] |= 0x80;
+		break;
 	}
-	
+
 	toi_bio_ops.bdev_page_io(WRITE, resume_block_device,
 			resume_firstblock,
 			virt_to_page(diskpage.ptr));
@@ -1059,7 +1078,7 @@ static int toi_swap_parse_sig_location(char *commandline,
 		return 0;
 
 	if (strncmp(commandline, "swap:", 5)) {
-		/* 
+		/*
 		 * Failing swap:, we'll take a simple
 		 * resume=/dev/hda2, but fall through to
 		 * other allocators if /dev/ isn't matched.
@@ -1090,7 +1109,7 @@ static int toi_swap_parse_sig_location(char *commandline,
 
 	clear_toi_state(TOI_CAN_HIBERNATE);
 	clear_toi_state(TOI_CAN_RESUME);
-	
+
 	temp_result = try_to_parse_resume_device(devstart, quiet);
 
 	if (colon)
@@ -1110,7 +1129,7 @@ static int toi_swap_parse_sig_location(char *commandline,
 			resume_firstblock, virt_to_page(diskpage.ptr));
 
 	toi_bio_ops.finish_all_io();
-	
+
 	signature_found = parse_signature(diskpage.pointer->swh.magic.magic, 0);
 
 	if (signature_found != -1) {
@@ -1138,7 +1157,7 @@ static int header_locations_read_sysfs(const char *page, int count)
 	char *path_page = (char *) toi_get_free_page(10, GFP_KERNEL);
 	char *path, *output = (char *) page;
 	int path_len;
-	
+
 	if (!page)
 		return 0;
 
@@ -1147,43 +1166,44 @@ static int header_locations_read_sysfs(const char *page, int count)
 
 		if (!si->swap_file)
 			continue;
-		
+
 		if (S_ISBLK(si->swap_file->f_mapping->host->i_mode)) {
 			haveswap = 1;
 			if (!printedpartitionsmessage) {
-				len += sprintf(output + len, 
+				len += sprintf(output + len,
 					"For swap partitions, simply use the "
 					"format: resume=swap:/dev/hda1.\n");
 				printedpartitionsmessage = 1;
 			}
 		} else {
 			path_len = 0;
-			
+
 			path = d_path(si->swap_file->f_dentry,
 				si->swap_file->f_vfsmnt,
 				path_page,
 				PAGE_SIZE);
 			path_len = snprintf(path_page, 31, "%s", path);
-			
+
 			haveswap = 1;
 			swapf = si->swap_file->f_mapping->host;
-			if (!(zone = bmap(swapf,0))) {
-				len+= sprintf(output + len, 
+			zone = bmap(swapf, 0);
+			if (!zone) {
+				len += sprintf(output + len,
 					"Swapfile %s has been corrupted. Reuse"
 					" mkswap on it and try again.\n",
 					path_page);
 			} else {
 				char name_buffer[255];
-				len+= sprintf(output + len, "For swapfile `%s`,"
+				len += sprintf(output + len,
+					"For swapfile `%s`,"
 					" use resume=swap:/dev/%s:0x%x.\n",
 					path_page,
 					bdevname(si->bdev, name_buffer),
 					zone << (swapf->i_blkbits - 9));
 			}
-
 		}
 	}
-	
+
 	if (!haveswap)
 		len = sprintf(output, "You need to turn on swap partitions "
 				"before examining this file.\n");
@@ -1236,7 +1256,8 @@ static struct toi_module_ops toi_swapops = {
 	.parse_sig_location	= toi_swap_parse_sig_location,
 
 	.sysfs_data		= sysfs_params,
-	.num_sysfs_entries	= sizeof(sysfs_params) / sizeof(struct toi_sysfs_data),
+	.num_sysfs_entries	= sizeof(sysfs_params) /
+		sizeof(struct toi_sysfs_data),
 };
 
 /* ---- Registration ---- */

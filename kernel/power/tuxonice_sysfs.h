@@ -43,11 +43,11 @@ struct toi_sysfs_data {
 			void *data;
 		} special;
 	} data;
-	
+
 	/* Side effects routines. Used, eg, for reparsing the
 	 * resume= entry when it changes */
 	void (*read_side_effect) (void);
-	void (*write_side_effect) (void); 
+	void (*write_side_effect) (void);
 	struct list_head sysfs_data_list;
 };
 
@@ -62,7 +62,7 @@ enum {
 };
 
 #define TOI_ATTR(_name, _mode)      \
-        .attr = {.name  = _name , .mode   = _mode }
+	.attr = {.name  = _name , .mode   = _mode }
 
 #define SYSFS_BIT(_ul, _bit, _flags) \
 	.type = TOI_SYSFS_DATA_BIT, \

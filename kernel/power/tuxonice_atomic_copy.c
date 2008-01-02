@@ -37,7 +37,7 @@ int extra_pd1_pages_used;
  **/
 static void free_pbe_list(struct pbe **list, int highmem)
 {
-	while(*list) {
+	while (*list) {
 		int i;
 		struct pbe *free_pbe, *next_page = NULL;
 		struct page *page;
@@ -56,7 +56,8 @@ static void free_pbe_list(struct pbe **list, int highmem)
 			if (highmem)
 				toi__free_page(29, free_pbe->address);
 			else
-				toi_free_page(29, (unsigned long) free_pbe->address);
+				toi_free_page(29,
+					(unsigned long) free_pbe->address);
 			free_pbe = free_pbe->next;
 		}
 
@@ -124,7 +125,7 @@ void copyback_post(void)
  * because we can't be sure what side effects it has. On my old Duron, with
  * 3DNOW, kernel_fpu_begin increments preempt count, making our preempt
  * count at resume time 4 instead of 3.
- * 
+ *
  * We don't want to call kmap_atomic unconditionally because it has the side
  * effect of incrementing the preempt count, which will leave it one too high
  * post resume (the page containing the preempt count will be copied after
@@ -146,12 +147,12 @@ void toi_copy_pageset1(void)
 
 		origpage = pfn_to_page(source_index);
 		copypage = pfn_to_page(dest_index);
-		
+
 		origvirt = PageHighMem(origpage) ?
 			kmap_atomic(origpage, KM_USER0) :
 			page_address(origpage);
 
-	       	copyvirt = PageHighMem(copypage) ?
+		copyvirt = PageHighMem(copypage) ?
 			kmap_atomic(copypage, KM_USER1) :
 			page_address(copypage);
 
@@ -159,18 +160,20 @@ void toi_copy_pageset1(void)
 			*(copyvirt + loop) = *(origvirt + loop);
 			loop--;
 		}
-		
+
 		if (PageHighMem(origpage))
 			kunmap_atomic(origvirt, KM_USER0);
 		else if (toi_faulted) {
-			printk("%p (%lu) being unmapped after faulting during atomic copy.\n", origpage, source_index);
+			printk(KERN_INFO "%p (%lu) being unmapped after "
+				"faulting during atomic copy.\n", origpage,
+				source_index);
 			kernel_map_pages(origpage, 1, 0);
 			clear_toi_fault();
 		}
 
 		if (PageHighMem(copypage))
 			kunmap_atomic(copyvirt, KM_USER1);
-		
+
 		source_index = get_next_bit_on(&pageset1_map, source_index);
 		dest_index = get_next_bit_on(&pageset1_copy_map, dest_index);
 	}
@@ -188,7 +191,7 @@ void toi_copy_pageset1(void)
 int __toi_post_context_save(void)
 {
 	int old_ps1_size = pagedir1.size;
-	
+
 	check_checksums();
 
 	free_checksum_pages();
@@ -198,7 +201,7 @@ int __toi_post_context_save(void)
 	extra_pd1_pages_used = pagedir1.size - old_ps1_size;
 
 	if (extra_pd1_pages_used > extra_pd1_pages_allowance) {
-		printk("Pageset1 has grown by %d pages. "
+		printk(KERN_INFO "Pageset1 has grown by %d pages. "
 			"extra_pages_allowance is currently only %d.\n",
 			pagedir1.size - old_ps1_size,
 			extra_pd1_pages_allowance);
@@ -259,7 +262,7 @@ int toi_atomic_restore(void)
 	toi_nosave_state1 = toi_action;
 	toi_nosave_state2 = toi_debug_state;
 	toi_nosave_state3 = toi_default_console_level;
-	
+
 	for (loop = 0; loop < 4; loop++)
 		toi_nosave_io_speed[loop/2][loop%2] =
 			toi_io_time[loop/2][loop%2];
@@ -269,13 +272,13 @@ int toi_atomic_restore(void)
 	save_processor_state();
 
 	error = swsusp_arch_resume();
-	/* 
+	/*
 	 * Code below is only ever reached in case of failure. Otherwise
 	 * execution continues at place where swsusp_arch_suspend was called.
 	 *
 	 * We don't know whether it's safe to continue (this shouldn't happen),
 	 * so lets err on the side of caution.
-         */
+	 */
 	BUG();
 
 Failed:
@@ -358,24 +361,24 @@ int toi_go_atomic(pm_message_t state, int suspend_time)
 void toi_end_atomic(int stage, int suspend_time)
 {
 	switch (stage) {
-		case ATOMIC_ALL_STEPS:
-			if (!suspend_time)
-				toi_platform_leave();
-			device_power_up();
-		case ATOMIC_STEP_IRQS:
-			local_irq_enable();
-		case ATOMIC_STEP_CPU_HOTPLUG:
-			if (test_action_state(TOI_LATE_CPU_HOTPLUG))
-				enable_nonboot_cpus();
-		case ATOMIC_STEP_DEVICE_RESUME:
-			toi_platform_finish();
-			device_resume();
-		case ATOMIC_STEP_RESUME_CONSOLE:
-			resume_console();
-		case ATOMIC_STEP_RESTORE_CONSOLE:
-			if (test_action_state(TOI_PM_PREPARE_CONSOLE))
-				pm_restore_console();
-	
-	toi_prepare_status(DONT_CLEAR_BAR, "Post atomic.");
+	case ATOMIC_ALL_STEPS:
+		if (!suspend_time)
+			toi_platform_leave();
+		device_power_up();
+	case ATOMIC_STEP_IRQS:
+		local_irq_enable();
+	case ATOMIC_STEP_CPU_HOTPLUG:
+		if (test_action_state(TOI_LATE_CPU_HOTPLUG))
+			enable_nonboot_cpus();
+	case ATOMIC_STEP_DEVICE_RESUME:
+		toi_platform_finish();
+		device_resume();
+	case ATOMIC_STEP_RESUME_CONSOLE:
+		resume_console();
+	case ATOMIC_STEP_RESTORE_CONSOLE:
+		if (test_action_state(TOI_PM_PREPARE_CONSOLE))
+			pm_restore_console();
+
+		toi_prepare_status(DONT_CLEAR_BAR, "Post atomic.");
 	}
 }

@@ -1,34 +1,34 @@
-/* 
+/*
  * Cryptoapi LZF compression module.
  *
  * Copyright (c) 2004-2005 Nigel Cunningham <nigel at tuxonice net>
  *
  * based on the deflate.c file:
- * 
+ *
  * Copyright (c) 2003 James Morris <jmorris@intercode.com.au>
- * 
+ *
  * and upon the LZF compression module donated to the TuxOnIce project with
  * the following copyright:
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the Free
- * Software Foundation; either version 2 of the License, or (at your option) 
+ * Software Foundation; either version 2 of the License, or (at your option)
  * any later version.
  * Copyright (c) 2000-2003 Marc Alexander Lehmann <pcg@goof.com>
- * 
+ *
  * Redistribution and use in source and binary forms, with or without modifica-
  * tion, are permitted provided that the following conditions are met:
- * 
+ *
  *   1.  Redistributions of source code must retain the above copyright notice,
  *       this list of conditions and the following disclaimer.
- * 
+ *
  *   2.  Redistributions in binary form must reproduce the above copyright
  *       notice, this list of conditions and the following disclaimer in the
  *       documentation and/or other materials provided with the distribution.
- * 
+ *
  *   3.  The name of the author may not be used to endorse or promote products
  *       derived from this software without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR IMPLIED
  * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MER-
  * CHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO
@@ -166,7 +166,8 @@ static int lzf_compress(struct crypto_tfm *tfm, const u8 *in_data,
 			ref = *hslot;
 			*hslot = ip;
 
-			if ((off = ip - ref - 1) < max_off
+			off = ip - ref - 1;
+			if (off < max_off
 			    && ip + 4 < in_end && ref > in_data
 			    && *(u16 *) ref == *(u16 *) ip && ref[2] == ip[2]
 			    ) {
@@ -187,9 +188,9 @@ static int lzf_compress(struct crypto_tfm *tfm, const u8 *in_data,
 				if (lit) {
 					*op++ = lit - 1;
 					lit = -lit;
-					do
+					do {
 						*op++ = ip[lit];
-					while (++lit);
+					} while (++lit);
 				}
 
 				len -= 2;
@@ -239,9 +240,9 @@ static int lzf_compress(struct crypto_tfm *tfm, const u8 *in_data,
 
 		*op++ = lit - 1;
 		lit = -lit;
-		do
+		do {
 			*op++ = ip[lit];
-		while (++lit);
+		} while (++lit);
 	}
 
 	*out_len = op - out_data;
@@ -260,7 +261,8 @@ static int lzf_decompress(struct crypto_tfm *tfm, const u8 *src,
 	do {
 		unsigned int ctrl = *ip++;
 
-		if (ctrl < (1 << 5)) {	/* literal run */
+		if (ctrl < (1 << 5)) {
+			/* literal run */
 			ctrl++;
 
 			if (op + ctrl > out_end)
@@ -283,9 +285,9 @@ static int lzf_decompress(struct crypto_tfm *tfm, const u8 *src,
 			if (op + len > out_end || ref < (u8 *) dst)
 				return 0;
 
-			do
+			do {
 				*op++ = *ref++;
-			while (--len);
+			} while (--len);
 		}
 	}
 	while (op < out_end && ip < in_end);

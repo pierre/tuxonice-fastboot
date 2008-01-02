@@ -53,7 +53,7 @@
 
 static void copyback_high(void)
 {
-	struct page * pbe_page = (struct page *) restore_highmem_pblist;
+	struct page *pbe_page = (struct page *) restore_highmem_pblist;
 	struct pbe *this_pbe, *first_pbe;
 	unsigned long *origpage, *copypage;
 	int pbe_index = 1;
@@ -110,11 +110,12 @@ char toi_wait_for_keypress_dev_console(int timeout)
 	char key = '\0';
 	struct termios t, t_backup;
 
-	/* We should be guaranteed /dev/console exists after populate_rootfs() in
-	 * init/main.c
+	/* We should be guaranteed /dev/console exists after populate_rootfs()
+	 * in init/main.c.
 	 */
-	if ((fd = sys_open("/dev/console", O_RDONLY, 0)) < 0) {
-		printk("Couldn't open /dev/console.\n");
+	fd = sys_open("/dev/console", O_RDONLY, 0);
+	if (fd < 0) {
+		printk(KERN_INFO "Couldn't open /dev/console.\n");
 		return key;
 	}
 
@@ -266,8 +267,8 @@ DECLARE_DYN_PAGEFLAGS(pageset1_copy_map);
 EXPORT_SYMBOL_GPL(pageset1_map);
 EXPORT_SYMBOL_GPL(pageset1_copy_map);
 
-unsigned long toi_result = 0;
-unsigned long toi_debug_state = 0;
+unsigned long toi_result;
+unsigned long toi_debug_state;
 int toi_io_time[2][2];
 struct pagedir pagedir1 = {1};
 
@@ -299,7 +300,7 @@ void toi_try_resume(void)
 	if (toi_core_fns)
 		toi_core_fns->try_resume();
 	else
-		printk("TuxOnIce core not loaded yet.\n");
+		printk(KERN_INFO "TuxOnIce core not loaded yet.\n");
 }
 
 int toi_lowlevel_builtin(void)
@@ -307,7 +308,8 @@ int toi_lowlevel_builtin(void)
 	int error = 0;
 
 	save_processor_state();
-	if ((error = swsusp_arch_suspend()))
+	error = swsusp_arch_suspend();
+	if (error)
 		printk(KERN_ERR "Error %d hibernating\n", error);
 
 	/* Restore control flow appears here */
@@ -346,15 +348,15 @@ EXPORT_SYMBOL_GPL(toi_state);
 unsigned int nr_hibernates;
 EXPORT_SYMBOL_GPL(nr_hibernates);
 
-int toi_running = 0;
+int toi_running;
 EXPORT_SYMBOL_GPL(toi_running);
 
 int toi_in_hibernate __nosavedata;
 EXPORT_SYMBOL_GPL(toi_in_hibernate);
 
-unsigned long toi_nosave_state1 __nosavedata = 0;
-unsigned long toi_nosave_state2 __nosavedata = 0;
-int toi_nosave_state3 __nosavedata = 0;
+unsigned long toi_nosave_state1 __nosavedata;
+unsigned long toi_nosave_state2 __nosavedata;
+int toi_nosave_state3 __nosavedata;
 int toi_nosave_io_speed[2][2] __nosavedata;
 __nosavedata char toi_nosave_commandline[COMMAND_LINE_SIZE];
 
@@ -388,7 +390,8 @@ static int __init toi_wait_setup(char *str)
 
 	if (sscanf(str, "=%d", &value)) {
 		if (value < -1 || value > 255)
-			printk("TuxOnIce_wait outside range -1 to 255.\n");
+			printk(KERN_INFO "TuxOnIce_wait outside range -1 to "
+					"255.\n");
 		else
 			toi_wait = value;
 	}

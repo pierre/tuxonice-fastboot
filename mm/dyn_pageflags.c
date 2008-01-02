@@ -2,7 +2,7 @@
  * lib/dyn_pageflags.c
  *
  * Copyright (C) 2004-2007 Nigel Cunningham <nigel at tuxonice net>
- * 
+ *
  * This file is released under the GPLv2.
  *
  * Routines for dynamically allocating and releasing bitmaps
@@ -51,16 +51,16 @@ static DEFINE_SPINLOCK(flags_list_lock);
 
 static void* (*dyn_allocator)(unsigned long size, unsigned long flags);
 
-static int dyn_pageflags_debug = 0;
+static int dyn_pageflags_debug;
 
 #define PR_DEBUG(a, b...) \
-	do { if (dyn_pageflags_debug) printk(a, ##b); } while(0)
+	do { if (dyn_pageflags_debug) printk(a, ##b); } while (0)
 #define DUMP_DEBUG(bitmap) \
-	do { if (dyn_pageflags_debug) dump_pagemap(bitmap); } while(0)
+	do { if (dyn_pageflags_debug) dump_pagemap(bitmap); } while (0)
 
 #if BITS_PER_LONG == 32
 #define UL_SHIFT 5
-#else 
+#else
 #if BITS_PER_LONG == 64
 #define UL_SHIFT 6
 #else
@@ -121,26 +121,29 @@ static int dyn_pageflags_debug = 0;
  */
 void dump_pagemap(struct dyn_pageflags *pagemap)
 {
-	int i=0;
+	int i = 0;
 	struct pglist_data *pgdat;
-	unsigned long **** bitmap = pagemap->bitmap;
+	unsigned long ****bitmap = pagemap->bitmap;
 
 	printk(" --- Dump bitmap %p ---\n", pagemap);
 
-	printk("%p: Sparse flag = %d\n", &pagemap->sparse, pagemap->sparse);
-	printk("%p: Bitmap      = %p\n", &pagemap->bitmap, bitmap);
+	printk(KERN_INFO "%p: Sparse flag = %d\n",
+			&pagemap->sparse, pagemap->sparse);
+	printk(KERN_INFO "%p: Bitmap      = %p\n",
+			&pagemap->bitmap, bitmap);
 
 	if (!bitmap)
 		goto out;
 
 	for_each_online_pgdat(pgdat) {
 		int node_id = pgdat->node_id, zone_nr;
-		printk("%p: Node %d => %p\n", &bitmap[node_id], node_id,
+		printk(KERN_INFO "%p: Node %d => %p\n",
+				&bitmap[node_id], node_id,
 				bitmap[node_id]);
 		if (!bitmap[node_id])
 			continue;
 		for (zone_nr = 0; zone_nr < MAX_NR_ZONES; zone_nr++) {
-			printk("%p:   Zone %d => %p%s\n",
+			printk(KERN_INFO "%p:   Zone %d => %p%s\n",
 					&bitmap[node_id][zone_nr], zone_nr,
 					bitmap[node_id][zone_nr],
 					bitmap[node_id][zone_nr] ? "" :
@@ -148,23 +151,24 @@ void dump_pagemap(struct dyn_pageflags *pagemap)
 			if (!bitmap[node_id][zone_nr])
 				continue;
 
-			printk("%p:     Zone start pfn  = %p\n",
+			printk(KERN_INFO "%p:     Zone start pfn  = %p\n",
 					&bitmap[node_id][zone_nr][0],
 					bitmap[node_id][zone_nr][0]);
-			printk("%p:     Number of pages = %p\n",
+			printk(KERN_INFO "%p:     Number of pages = %p\n",
 					&bitmap[node_id][zone_nr][1],
 					bitmap[node_id][zone_nr][1]);
-			for (i = 2; i < (unsigned long) bitmap[node_id][zone_nr][1] + 2; i++)
-				printk("%p:     Page %2d         = %p\n",
+			for (i = 2; i < (unsigned long) bitmap[node_id]
+					[zone_nr][1] + 2; i++)
+				printk(KERN_INFO
+					"%p:     Page %2d         = %p\n",
 					&bitmap[node_id][zone_nr][i],
 					i - 2,
 					bitmap[node_id][zone_nr][i]);
 		}
 	}
 out:
-	printk(" --- Dump of bitmap %p finishes\n", pagemap);
+	printk(KERN_INFO " --- Dump of bitmap %p finishes\n", pagemap);
 }
-
 EXPORT_SYMBOL_GPL(dump_pagemap);
 
 /**
@@ -176,9 +180,9 @@ EXPORT_SYMBOL_GPL(dump_pagemap);
  */
 void clear_dyn_pageflags(struct dyn_pageflags *pagemap)
 {
-	int i=0, zone_idx;
+	int i = 0, zone_idx;
 	struct pglist_data *pgdat;
-	unsigned long **** bitmap = pagemap->bitmap;
+	unsigned long ****bitmap = pagemap->bitmap;
 
 	for_each_online_pgdat_zone(pgdat, zone_idx) {
 		int node_id = pgdat->node_id;
@@ -194,7 +198,6 @@ void clear_dyn_pageflags(struct dyn_pageflags *pagemap)
 						PAGE_SIZE);
 	}
 }
-
 EXPORT_SYMBOL_GPL(clear_dyn_pageflags);
 
 /**
@@ -266,7 +269,8 @@ static int try_alloc_dyn_pageflag_part(int nr_ptrs, void **ptr)
 	if (*ptr)
 		return 0;
 
-	printk("Error. Unable to allocate memory for dynamic pageflags.");
+	printk(KERN_INFO
+		"Error. Unable to allocate memory for dynamic pageflags.");
 	return -ENOMEM;
 }
 
@@ -345,10 +349,7 @@ static int resize_zone_bitmap(struct dyn_pageflags *pagemap, struct zone *zone,
 	}
 
 	bitmap[node_id][zone_idx] = new_ptr;
-
-	if (old_ptr)
-		kfree(old_ptr);
-
+	kfree(old_ptr);
 	return result;
 }
 
@@ -422,7 +423,7 @@ void free_dyn_pageflags(struct dyn_pageflags *pagemap)
 
 	if (!pagemap->bitmap)
 		return;
-	
+
 	for_each_online_pgdat_zone(pgdat, zone_idx)
 		check_dyn_pageflag_zone(pagemap,
 				&pgdat->node_zones[zone_idx], 1, 1);
@@ -446,7 +447,6 @@ void free_dyn_pageflags(struct dyn_pageflags *pagemap)
 		spin_unlock_irqrestore(&flags_list_lock, flags);
 	}
 }
-
 EXPORT_SYMBOL_GPL(free_dyn_pageflags);
 
 /**
@@ -508,7 +508,6 @@ out:
 	spin_unlock_irqrestore(&pagemap->struct_lock, flags);
 	return result;
 }
-
 EXPORT_SYMBOL_GPL(allocate_dyn_pageflags);
 
 /**
@@ -525,7 +524,6 @@ int test_dynpageflag(struct dyn_pageflags *bitmap, struct page *page)
 	GET_BIT_AND_UL(bitmap, page);
 	return ul ? test_bit(bit, ul) : 0;
 }
-
 EXPORT_SYMBOL_GPL(test_dynpageflag);
 
 /**
@@ -541,8 +539,11 @@ void set_dynpageflag(struct dyn_pageflags *pageflags, struct page *page)
 {
 	GET_BIT_AND_UL(pageflags, page);
 
-	if (!ul) {	/* Sparse, hotplugged or unprepared */
-		/* Allocate / fill gaps in high levels */
+	if (!ul) {
+		/*
+		 * Sparse, hotplugged or unprepared.
+		 * Allocate / fill gaps in high levels
+		 */
 		if (allocate_dyn_pageflags(pageflags, 1) ||
 		    populate_bitmap_page(pageflags, 1, (unsigned long **)
 				&pageflags->bitmap[node][zone_num][pagenum])) {
@@ -555,7 +556,6 @@ void set_dynpageflag(struct dyn_pageflags *pageflags, struct page *page)
 	} else
 		set_bit(bit, ul);
 }
-
 EXPORT_SYMBOL_GPL(set_dynpageflag);
 
 /**
@@ -573,7 +573,6 @@ void clear_dynpageflag(struct dyn_pageflags *bitmap, struct page *page)
 	if (ul)
 		clear_bit(bit, ul);
 }
-
 EXPORT_SYMBOL_GPL(clear_dynpageflag);
 
 /**
@@ -608,14 +607,14 @@ unsigned long get_next_bit_on(struct dyn_pageflags *pageflags,
 
 	do {
 		zone_offset++;
-	
+
 		if (zone_offset >= zone->spanned_pages) {
 			do {
 				zone = next_zone(zone);
 				if (!zone)
 					return max_pfn + 1;
-			} while(!zone->spanned_pages);
-			
+			} while (!zone->spanned_pages);
+
 			zone_num = zone_idx(zone);
 			node = zone->zone_pgdat->node_id;
 			zone_offset = 0;
@@ -624,16 +623,18 @@ test:
 		pagebit = PAGEBIT(zone_offset);
 
 		if (!pagebit || !ul) {
-			ul = pageflags->bitmap[node][zone_num][PAGENUMBER(zone_offset)+2];
+			ul = pageflags->bitmap[node][zone_num]
+				[PAGENUMBER(zone_offset)+2];
 			if (ul)
-				ul+= PAGEINDEX(zone_offset);
+				ul += PAGEINDEX(zone_offset);
 			else {
 				PR_DEBUG("Unallocated page. Skipping from zone"
 					" offset %lu to the start of the next "
 					"one.\n", zone_offset);
 				zone_offset = roundup(zone_offset + 1,
 						PAGE_SIZE << 3) - 1;
-				PR_DEBUG("New zone offset is %lu.\n", zone_offset);
+				PR_DEBUG("New zone offset is %lu.\n",
+						zone_offset);
 				continue;
 			}
 		}
@@ -643,11 +644,10 @@ test:
 			continue;
 		}
 
-	} while(!ul || !test_bit(pagebit, ul));
+	} while (!ul || !test_bit(pagebit, ul));
 
 	return zone->zone_start_pfn + zone_offset;
 }
-
 EXPORT_SYMBOL_GPL(get_next_bit_on);
 
 #ifdef SELF_TEST
@@ -664,14 +664,14 @@ static __init int dyn_pageflags_test(void)
 
 	printk("Dynpageflags testing...\n");
 
-	printk("Set page 1...");
+	printk(KERN_INFO "Set page 1...");
 	set_dynpageflag(&test_map, test_page1);
 	if (test_dynpageflag(&test_map, test_page1))
-		printk("Ok.\n");
+		printk(KERN_INFO "Ok.\n");
 	else
-		printk("FAILED.\n");
+		printk(KERN_INFO "FAILED.\n");
 
-	printk("Test memory hotplugging #1 ...");
+	printk(KERN_INFO "Test memory hotplugging #1 ...");
 	{
 		unsigned long orig_size;
 		GET_BIT_AND_UL(&test_map, test_page1);
@@ -680,39 +680,45 @@ static __init int dyn_pageflags_test(void)
 		 * Use the code triggered when zone_start_pfn lowers,
 		 * checking that our bit is then set in the third page.
 		 */
-		resize_zone_bitmap(&test_map, zone, orig_size, orig_size + 2, 2);
+		resize_zone_bitmap(&test_map, zone, orig_size,
+				orig_size + 2, 2);
 		DUMP_DEBUG(&test_map);
-		if ((unsigned long) test_map.bitmap[node][zone_num][pagenum + 2] &&
-		    (unsigned long) test_map.bitmap[node][zone_num][pagenum + 2][0] == 2UL)
-			printk("Ok.\n");
+		if ((unsigned long) test_map.bitmap[node][zone_num]
+				[pagenum + 2] &&
+		    (unsigned long) test_map.bitmap[node][zone_num]
+				[pagenum + 2][0] == 2UL)
+			printk(KERN_INFO "Ok.\n");
 		else
-			printk("FAILED.\n");
+			printk(KERN_INFO "FAILED.\n");
 	}
 
-	printk("Test memory hotplugging #2 ...");
+	printk(KERN_INFO "Test memory hotplugging #2 ...");
 	{
 		/*
 		 * Test expanding bitmap length.
 		 */
 		unsigned long orig_size;
 		GET_BIT_AND_UL(&test_map, test_page1);
-		orig_size = (unsigned long) test_map.bitmap[node][zone_num][1];
-		resize_zone_bitmap(&test_map, zone, orig_size, orig_size + 2, 0);
+		orig_size = (unsigned long) test_map.bitmap[node]
+							[zone_num][1];
+		resize_zone_bitmap(&test_map, zone, orig_size,
+				orig_size + 2, 0);
 		DUMP_DEBUG(&test_map);
 		pagenum += 2; /* Offset for first test */
 		if (test_map.bitmap[node][zone_num][pagenum] &&
 		    test_map.bitmap[node][zone_num][pagenum][0] == 2UL &&
 		    (unsigned long) test_map.bitmap[node][zone_num][1] ==
-					    	orig_size + 2)
-			printk("Ok.\n");
+						orig_size + 2)
+			printk(KERN_INFO "Ok.\n");
 		else
-			printk("FAILED ([%d][%d][%d]: %p && %lu == 2UL  && %p == %lu).\n",
-					node, zone_num, pagenum,
-					test_map.bitmap[node][zone_num][pagenum],
-					test_map.bitmap[node][zone_num][pagenum] ?
-					test_map.bitmap[node][zone_num][pagenum][0] : 0,
-					test_map.bitmap[node][zone_num][1],
-					orig_size + 2);
+			printk(KERN_INFO "FAILED ([%d][%d][%d]: %p && %lu == "
+				"2UL  && %p == %lu).\n",
+				node, zone_num, pagenum,
+				test_map.bitmap[node][zone_num][pagenum],
+				test_map.bitmap[node][zone_num][pagenum] ?
+				test_map.bitmap[node][zone_num][pagenum][0] : 0,
+				test_map.bitmap[node][zone_num][1],
+				orig_size + 2);
 	}
 
 	free_dyn_pageflags(&test_map);
@@ -734,7 +740,8 @@ static __init int dyn_pageflags_test(void)
 
 	free_dyn_pageflags(&test_map);
 
-	printk("Dyn: %d iterations of setting & clearing all %lu flags took %lu jiffies.\n",
+	printk(KERN_INFO "Dyn: %d iterations of setting & clearing all %lu "
+			"flags took %lu jiffies.\n",
 			iterations, max_pfn, end - start);
 
 	start = jiffies;
@@ -748,7 +755,8 @@ static __init int dyn_pageflags_test(void)
 
 	end = jiffies;
 
-	printk("Real flags: %d iterations of setting & clearing all %lu flags took %lu jiffies.\n",
+	printk(KERN_INFO "Real flags: %d iterations of setting & clearing "
+			"all %lu flags took %lu jiffies.\n",
 			iterations, max_pfn, end - start);
 
 	iterations = 25000000;
@@ -762,8 +770,8 @@ static __init int dyn_pageflags_test(void)
 
 	end = jiffies;
 
-	printk("Dyn: %d iterations of setting & clearing all one flag took %lu jiffies.\n",
-			iterations, end - start);
+	printk(KERN_INFO "Dyn: %d iterations of setting & clearing all one "
+			"flag took %lu jiffies.\n", iterations, end - start);
 
 	start = jiffies;
 
@@ -774,7 +782,8 @@ static __init int dyn_pageflags_test(void)
 
 	end = jiffies;
 
-	printk("Real pageflag: %d iterations of setting & clearing all one flag took %lu jiffies.\n",
+	printk(KERN_INFO "Real pageflag: %d iterations of setting & clearing "
+			"all one flag took %lu jiffies.\n",
 			iterations, end - start);
 	return 0;
 }
@@ -784,7 +793,7 @@ late_initcall(dyn_pageflags_test);
 
 static int __init dyn_pageflags_debug_setup(char *str)
 {
-	printk("Dynamic pageflags debugging enabled.\n");
+	printk(KERN_INFO "Dynamic pageflags debugging enabled.\n");
 	dyn_pageflags_debug = 1;
 	return 1;
 }

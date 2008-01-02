@@ -15,11 +15,11 @@
 #include "tuxonice_modules.h"
 #include "tuxonice_alloc.h"
 
-struct user_helper_data *uhd_list = NULL;
+struct user_helper_data *uhd_list;
 
-/* 
- * Refill our pool of SKBs for use in emergencies (eg, when eating memory and none
- * can be allocated).
+/*
+ * Refill our pool of SKBs for use in emergencies (eg, when eating memory and
+ * none can be allocated).
  */
 static void toi_fill_skb_pool(struct user_helper_data *uhd)
 {
@@ -36,7 +36,7 @@ static void toi_fill_skb_pool(struct user_helper_data *uhd)
 	}
 }
 
-/* 
+/*
  * Try to allocate a single skb. If we can't get one, try to use one from
  * our pool.
  */
@@ -68,7 +68,7 @@ static void put_skb(struct user_helper_data *uhd, struct sk_buff *skb)
 }
 
 void toi_send_netlink_message(struct user_helper_data *uhd,
-		int type, void* params, size_t len)
+		int type, void *params, size_t len)
 {
 	struct sk_buff *skb;
 	struct nlmsghdr *nlh;
@@ -80,7 +80,7 @@ void toi_send_netlink_message(struct user_helper_data *uhd,
 
 	skb = toi_get_skb(uhd);
 	if (!skb) {
-		printk("toi_netlink: Can't allocate skb!\n");
+		printk(KERN_INFO "toi_netlink: Can't allocate skb!\n");
 		return;
 	}
 
@@ -95,10 +95,12 @@ void toi_send_netlink_message(struct user_helper_data *uhd,
 	netlink_unicast(uhd->nl, skb, uhd->pid, 0);
 
 	read_lock(&tasklist_lock);
-	if ((t = find_task_by_pid(uhd->pid)) == NULL) {
+	t = find_task_by_pid(uhd->pid);
+	if (!t) {
 		read_unlock(&tasklist_lock);
 		if (uhd->pid > -1)
-			printk("Hmm. Can't find the userspace task %d.\n", uhd->pid);
+			printk(KERN_INFO "Hmm. Can't find the userspace task"
+				" %d.\n", uhd->pid);
 		return;
 	}
 	wake_up_process(t);
@@ -112,6 +114,7 @@ nlmsg_failure:
 	if (skb)
 		put_skb(uhd, skb);
 }
+EXPORT_SYMBOL_GPL(toi_send_netlink_message);
 
 static void send_whether_debugging(struct user_helper_data *uhd)
 {
@@ -130,9 +133,11 @@ static int nl_set_nofreeze(struct user_helper_data *uhd, int pid)
 	struct task_struct *t;
 
 	read_lock(&tasklist_lock);
-	if ((t = find_task_by_pid(pid)) == NULL) {
+	t = find_task_by_pid(pid);
+	if (!t) {
 		read_unlock(&tasklist_lock);
-		printk("Strange. Can't find the userspace task %d.\n", pid);
+		printk(KERN_INFO "Strange. Can't find the userspace task %d.\n",
+				pid);
 		return -EINVAL;
 	}
 
@@ -152,8 +157,8 @@ static int nl_set_nofreeze(struct user_helper_data *uhd, int pid)
 static int nl_ready(struct user_helper_data *uhd, int version)
 {
 	if (version != uhd->interface_version) {
-		printk("%s userspace process using invalid interface version."
-				" Trying to continue without it.\n",
+		printk(KERN_INFO "%s userspace process using invalid interface"
+				" version. Trying to continue without it.\n",
 				uhd->name);
 		if (uhd->not_ready)
 			uhd->not_ready();
@@ -192,9 +197,10 @@ static int toi_nl_gen_rcv_msg(struct user_helper_data *uhd,
 
 	/* Let the more specific handler go first. It returns
 	 * 1 for valid messages that it doesn't know. */
-	if ((err = uhd->rcv_msg(skb, nlh)) != 1)
+	err = uhd->rcv_msg(skb, nlh);
+	if (err != -1)
 		return err;
-	
+
 	type = nlh->nlmsg_type;
 
 	/* Only allow one task to receive NOFREEZE privileges */
@@ -203,27 +209,29 @@ static int toi_nl_gen_rcv_msg(struct user_helper_data *uhd,
 		return -EBUSY;
 	}
 
-	data = (int*)NLMSG_DATA(nlh);
+	data = (int *)NLMSG_DATA(nlh);
 
 	switch (type) {
-		case NETLINK_MSG_NOFREEZE_ME:
-			if ((err = nl_set_nofreeze(uhd, nlh->nlmsg_pid)) != 0)
-				return err;
-			break;
-		case NETLINK_MSG_GET_DEBUGGING:
-			send_whether_debugging(uhd);
-			break;
-		case NETLINK_MSG_READY:
-			if (nlh->nlmsg_len < NLMSG_LENGTH(sizeof(int))) {
-				printk("Invalid ready mesage.\n");
-				return -EINVAL;
-			}
-			if ((err = nl_ready(uhd, *data)) != 0)
-				return err;
-			break;
-		case NETLINK_MSG_CLEANUP:
-			toi_netlink_close_complete(uhd);
-			break;
+	case NETLINK_MSG_NOFREEZE_ME:
+		err = nl_set_nofreeze(uhd, nlh->nlmsg_pid);
+		if (err)
+			return err;
+		break;
+	case NETLINK_MSG_GET_DEBUGGING:
+		send_whether_debugging(uhd);
+		break;
+	case NETLINK_MSG_READY:
+		if (nlh->nlmsg_len < NLMSG_LENGTH(sizeof(int))) {
+			printk(KERN_INFO "Invalid ready mesage.\n");
+			return -EINVAL;
+		}
+		err = nl_ready(uhd, *data);
+		if (err)
+			return err;
+		break;
+	case NETLINK_MSG_CLEANUP:
+		toi_netlink_close_complete(uhd);
+		break;
 	}
 
 	return 0;
@@ -236,7 +244,7 @@ static void toi_user_rcv_skb(struct sk_buff *skb)
 	struct user_helper_data *uhd = uhd_list;
 
 	while (uhd && uhd->netlink_id != skb->sk->sk_protocol)
-		uhd= uhd->next;
+		uhd = uhd->next;
 
 	if (!uhd)
 		return;
@@ -252,7 +260,8 @@ static void toi_user_rcv_skb(struct sk_buff *skb)
 		if (rlen > skb->len)
 			rlen = skb->len;
 
-		if ((err = toi_nl_gen_rcv_msg(uhd, skb, nlh)) != 0)
+		err = toi_nl_gen_rcv_msg(uhd, skb, nlh);
+		if (err)
 			netlink_ack(skb, nlh, err);
 		else if (nlh->nlmsg_flags & NLM_F_ACK)
 			netlink_ack(skb, nlh, 0);
@@ -271,7 +280,7 @@ static int netlink_prepare(struct user_helper_data *uhd)
 	uhd->nl = netlink_kernel_create(&init_net, uhd->netlink_id, 0,
 			toi_user_rcv_skb, NULL, THIS_MODULE);
 	if (!uhd->nl) {
-		printk("Failed to allocate netlink socket for %s.\n",
+		printk(KERN_INFO "Failed to allocate netlink socket for %s.\n",
 				uhd->name);
 		return -ENOMEM;
 	}
@@ -286,12 +295,14 @@ void toi_netlink_close(struct user_helper_data *uhd)
 	struct task_struct *t;
 
 	read_lock(&tasklist_lock);
-	if ((t = find_task_by_pid(uhd->pid)))
+	t = find_task_by_pid(uhd->pid);
+	if (t)
 		t->flags &= ~PF_NOFREEZE;
 	read_unlock(&tasklist_lock);
 
 	toi_send_netlink_message(uhd, NETLINK_MSG_CLEANUP, NULL, 0);
 }
+EXPORT_SYMBOL_GPL(toi_netlink_close);
 
 static int toi_launch_userspace_program(char *command, int channel_no)
 {
@@ -301,7 +312,8 @@ static int toi_launch_userspace_program(char *command, int channel_no)
 			"TERM=linux",
 			"PATH=/sbin:/usr/sbin:/bin:/usr/bin",
 			NULL };
-	static char *argv[] = { NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL };
+	static char *argv[] =
+		{ NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL };
 	char *channel = toi_kzalloc(4, 6, GFP_KERNEL);
 	int arg = 0, size;
 	char test_read[255];
@@ -311,8 +323,8 @@ static int toi_launch_userspace_program(char *command, int channel_no)
 		return 1;
 
 	if (!channel) {
-		printk("Failed to allocate memory in preparing to launch "
-				"userspace program.\n");
+		printk(KERN_INFO "Failed to allocate memory in preparing to "
+				"launch userspace program.\n");
 		return 1;
 	}
 
@@ -328,7 +340,7 @@ static int toi_launch_userspace_program(char *command, int channel_no)
 		*test_read = 0;
 		arg++;
 	}
-	
+
 	if (channel_no) {
 		sprintf(channel, "-c%d", channel_no);
 		argv[arg] = channel;
@@ -356,12 +368,12 @@ static int toi_launch_userspace_program(char *command, int channel_no)
 int toi_netlink_setup(struct user_helper_data *uhd)
 {
 	if (netlink_prepare(uhd) < 0) {
-		printk("Netlink prepare failed.\n");
+		printk(KERN_INFO "Netlink prepare failed.\n");
 		return 1;
 	}
 
 	if (toi_launch_userspace_program(uhd->program, uhd->netlink_id) < 0) {
-		printk("Launch userspace program failed.\n");
+		printk(KERN_INFO "Launch userspace program failed.\n");
 		toi_netlink_close_complete(uhd);
 		return 1;
 	}
@@ -370,7 +382,7 @@ int toi_netlink_setup(struct user_helper_data *uhd)
 	wait_for_completion_timeout(&uhd->wait_for_process, 2*HZ);
 
 	if (uhd->pid == -1) {
-		printk("%s: Failed to contact userspace process.\n",
+		printk(KERN_INFO "%s: Failed to contact userspace process.\n",
 				uhd->name);
 		toi_netlink_close_complete(uhd);
 		return 1;
@@ -378,7 +390,4 @@ int toi_netlink_setup(struct user_helper_data *uhd)
 
 	return 0;
 }
-
 EXPORT_SYMBOL_GPL(toi_netlink_setup);
-EXPORT_SYMBOL_GPL(toi_netlink_close);
-EXPORT_SYMBOL_GPL(toi_send_netlink_message);

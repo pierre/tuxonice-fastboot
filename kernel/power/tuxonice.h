@@ -86,7 +86,7 @@ enum {
 extern unsigned long toi_result;
 
 #define set_result_state(bit) (test_and_set_bit(bit, &toi_result))
-#define set_abort_result(bit) (	test_and_set_bit(TOI_ABORTED, &toi_result), \
+#define set_abort_result(bit) (test_and_set_bit(TOI_ABORTED, &toi_result), \
 				test_and_set_bit(bit, &toi_result))
 #define clear_result_state(bit) (test_and_clear_bit(bit, &toi_result))
 #define test_result_state(bit) (test_bit(bit, &toi_result))
@@ -139,7 +139,7 @@ enum {
 
 #define get_toi_state()  (toi_state)
 #define restore_toi_state(saved_state) \
-	do { toi_state = saved_state; } while(0)
+	do { toi_state = saved_state; } while (0)
 
 /*		== Module support ==		*/
 
@@ -178,12 +178,13 @@ extern int toi_io_time[2][2];
 
 #define SECTOR_SIZE 512
 
-extern void toi_early_boot_message 
-	(int can_erase_image, int default_answer, char *warning_reason, ...);
+extern void toi_early_boot_message(int can_erase_image, int default_answer,
+	char *warning_reason, ...);
 
 static inline int load_direct(struct page *page)
 {
-	return test_action_state(TOI_NO_DIRECT_LOAD) ? 0 : PagePageset1Copy(page);
+	return test_action_state(TOI_NO_DIRECT_LOAD) ? 0 :
+		PagePageset1Copy(page);
 }
 
 extern int pre_resume_freeze(void);

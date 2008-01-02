@@ -30,14 +30,15 @@ struct dyn_pageflags {
 #define DECLARE_DYN_PAGEFLAGS(name) \
 	struct dyn_pageflags name = DYN_PAGEFLAGS_INIT(name);
 
-#define BITMAP_FOR_EACH_SET(bitmap, counter) \
-	for (counter = get_next_bit_on(bitmap, max_pfn + 1); counter <= max_pfn; \
-		counter = get_next_bit_on(bitmap, counter))
+#define BITMAP_FOR_EACH_SET(BITMAP, CTR) \
+	for (CTR = get_next_bit_on(BITMAP, max_pfn + 1); CTR <= max_pfn; \
+		CTR = get_next_bit_on(BITMAP, CTR))
 
 extern void clear_dyn_pageflags(struct dyn_pageflags *pagemap);
 extern int allocate_dyn_pageflags(struct dyn_pageflags *pagemap, int sparse);
 extern void free_dyn_pageflags(struct dyn_pageflags *pagemap);
-extern unsigned long get_next_bit_on(struct dyn_pageflags *bitmap, unsigned long counter);
+extern unsigned long get_next_bit_on(struct dyn_pageflags *bitmap,
+	unsigned long counter);
 
 extern int test_dynpageflag(struct dyn_pageflags *bitmap, struct page *page);
 /*
@@ -49,7 +50,7 @@ extern void set_dynpageflag(struct dyn_pageflags *bitmap, struct page *page);
 extern void clear_dynpageflag(struct dyn_pageflags *bitmap, struct page *page);
 extern void dump_pagemap(struct dyn_pageflags *pagemap);
 
-/* 
+/*
  * With the above macros defined, you can do...
  * #define PagePageset1(page) (test_dynpageflag(&pageset1_map, page))
  * #define SetPagePageset1(page) (set_dynpageflag(&pageset1_map, page))

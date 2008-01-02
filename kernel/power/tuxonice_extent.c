@@ -1,10 +1,10 @@
-/* 
+/*
  * kernel/power/tuxonice_extent.c
- * 
+ *
  * Copyright (C) 2003-2007 Nigel Cunningham (nigel at tuxonice net)
  *
  * Distributed under GPLv2.
- * 
+ *
  * These functions encapsulate the manipulation of storage metadata. For
  * pageflags, we use dynamically allocated bitmaps.
  */
@@ -24,8 +24,9 @@
 static struct extent *toi_get_extent(void)
 {
 	struct extent *result;
-	
-	if (!(result = toi_kzalloc(2, sizeof(struct extent), TOI_ATOMIC_GFP)))
+
+	result = toi_kzalloc(2, sizeof(struct extent), TOI_ATOMIC_GFP);
+	if (!result)
 		return NULL;
 
 	result->minimum = result->maximum = 0;
@@ -44,29 +45,29 @@ void toi_put_extent_chain(struct extent_chain *chain)
 
 	this = chain->first;
 
-	while(this) {
+	while (this) {
 		struct extent *next = this->next;
 		toi_kfree(2, this);
 		chain->num_extents--;
 		this = next;
 	}
-	
+
 	chain->first = chain->last_touched = NULL;
 	chain->size = 0;
 }
 
-/* 
+/*
  * toi_add_to_extent_chain
  *
  * Add an extent to an existing chain.
  */
-int toi_add_to_extent_chain(struct extent_chain *chain, 
+int toi_add_to_extent_chain(struct extent_chain *chain,
 		unsigned long minimum, unsigned long maximum)
 {
 	struct extent *new_extent = NULL, *start_at;
 
 	/* Find the right place in the chain */
-	start_at = (chain->last_touched && 
+	start_at = (chain->last_touched &&
 		    (chain->last_touched->minimum < minimum)) ?
 		chain->last_touched : NULL;
 
@@ -90,19 +91,20 @@ int toi_add_to_extent_chain(struct extent_chain *chain,
 		}
 
 		chain->last_touched = start_at;
-		chain->size+= (maximum - minimum + 1);
+		chain->size += (maximum - minimum + 1);
 
 		return 0;
 	}
 
 	new_extent = toi_get_extent();
 	if (!new_extent) {
-		printk("Error unable to append a new extent to the chain.\n");
+		printk(KERN_INFO "Error unable to append a new extent to the "
+				"chain.\n");
 		return 2;
 	}
 
 	chain->num_extents++;
-	chain->size+= (maximum - minimum + 1);
+	chain->size += (maximum - minimum + 1);
 	new_extent->minimum = minimum;
 	new_extent->maximum = maximum;
 	new_extent->next = NULL;
@@ -131,25 +133,25 @@ int toi_serialise_extent_chain(struct toi_module_ops *owner,
 {
 	struct extent *this;
 	int ret, i = 0;
-	
-	if ((ret = toiActiveAllocator->rw_header_chunk(WRITE, owner,
-		(char *) chain,
-		2 * sizeof(int))))
+
+	ret = toiActiveAllocator->rw_header_chunk(WRITE, owner, (char *) chain,
+			2 * sizeof(int));
+	if (ret)
 		return ret;
 
 	this = chain->first;
 	while (this) {
-		if ((ret = toiActiveAllocator->rw_header_chunk(WRITE, owner,
-				(char *) this,
-				2 * sizeof(unsigned long))))
+		ret = toiActiveAllocator->rw_header_chunk(WRITE, owner,
+				(char *) this, 2 * sizeof(unsigned long));
+		if (ret)
 			return ret;
 		this = this->next;
 		i++;
 	}
 
 	if (i != chain->num_extents) {
-		printk(KERN_EMERG "Saved %d extents but chain metadata says there "
-			"should be %d.\n", i, chain->num_extents);
+		printk(KERN_EMERG "Saved %d extents but chain metadata says "
+			"there should be %d.\n", i, chain->num_extents);
 		return 1;
 	}
 
@@ -165,8 +167,9 @@ int toi_load_extent_chain(struct extent_chain *chain)
 	struct extent *this, *last = NULL;
 	int i, ret;
 
-	if ((ret = toiActiveAllocator->rw_header_chunk(READ, NULL,
-		(char *) chain,	2 * sizeof(int)))) {
+	ret = toiActiveAllocator->rw_header_chunk(READ, NULL, (char *) chain,
+			2 * sizeof(int));
+	if (ret) {
 		printk("Failed to read size of extent chain.\n");
 		return 1;
 	}
@@ -174,13 +177,14 @@ int toi_load_extent_chain(struct extent_chain *chain)
 	for (i = 0; i < chain->num_extents; i++) {
 		this = toi_kzalloc(3, sizeof(struct extent), TOI_ATOMIC_GFP);
 		if (!this) {
-			printk("Failed to allocate a new extent.\n");
+			printk(KERN_INFO "Failed to allocate a new extent.\n");
 			return -ENOMEM;
 		}
 		this->next = NULL;
-		if ((ret = toiActiveAllocator->rw_header_chunk(READ, NULL,
-				(char *) this, 2 * sizeof(unsigned long)))) {
-			printk("Failed to an extent.\n");
+		ret = toiActiveAllocator->rw_header_chunk(READ, NULL,
+				(char *) this, 2 * sizeof(unsigned long));
+		if (ret) {
+			printk(KERN_INFO "Failed to an extent.\n");
 			return 1;
 		}
 		if (last)
@@ -208,8 +212,10 @@ unsigned long toi_extent_state_next(struct extent_iterate_state *state)
 	if (state->current_extent) {
 		if (state->current_offset == state->current_extent->maximum) {
 			if (state->current_extent->next) {
-				state->current_extent = state->current_extent->next;
-				state->current_offset = state->current_extent->minimum;
+				state->current_extent =
+					state->current_extent->next;
+				state->current_offset =
+					state->current_extent->minimum;
 			} else {
 				state->current_extent = NULL;
 				state->current_offset = 0;
@@ -218,7 +224,7 @@ unsigned long toi_extent_state_next(struct extent_iterate_state *state)
 			state->current_offset++;
 	}
 
-	while(!state->current_extent) {
+	while (!state->current_extent) {
 		int chain_num = ++(state->current_chain);
 
 		if (chain_num == state->num_chains)
@@ -263,7 +269,7 @@ void toi_extent_state_save(struct extent_iterate_state *state,
 
 	if (saved_state->chain_num == -1)
 		return;
-	
+
 	extent = (state->chains + state->current_chain)->first;
 
 	while (extent != state->current_extent) {

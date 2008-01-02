@@ -288,7 +288,7 @@ extern int toi_running;
 #else /* !CONFIG_TOI */
 
 #define toi_state		(0)
-#define set_toi_state(bit) do { } while(0)
+#define set_toi_state(bit) do { } while (0)
 #define clear_toi_state(bit) do { } while (0)
 #define test_toi_state(bit) (0)
 #define toi_running (0)
@@ -298,7 +298,7 @@ extern int toi_running;
 #ifdef CONFIG_TOI
 extern void toi_try_resume(void);
 #else
-#define toi_try_resume() do { } while(0)
+#define toi_try_resume() do { } while (0)
 #endif
 
 extern int resume_attempted;
@@ -312,7 +312,7 @@ static inline void check_resume_attempted(void)
 	software_resume();
 }
 #else
-#define check_resume_attempted() do { } while(0)
+#define check_resume_attempted() do { } while (0)
 #define resume_attempted (0)
 #endif
 

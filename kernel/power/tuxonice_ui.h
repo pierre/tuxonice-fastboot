@@ -53,22 +53,23 @@ struct ui_ops {
 extern struct ui_ops *toi_current_ui;
 
 #define toi_update_status(val, max, fmt, args...) \
- (toi_current_ui ? (toi_current_ui->update_status) (val, max, fmt, ##args) : max)
+ (toi_current_ui ? (toi_current_ui->update_status) (val, max, fmt, ##args) : \
+	max)
 
 #define toi_ui_post_atomic_restore(void) \
 	do { if (toi_current_ui) \
 		(toi_current_ui->post_atomic_restore)(); \
-	} while(0)
+	} while (0)
 
 #define toi_prepare_console(void) \
 	do { if (toi_current_ui) \
 		(toi_current_ui->prepare)(); \
-	} while(0)
+	} while (0)
 
 #define toi_cleanup_console(void) \
 	do { if (toi_current_ui) \
 		(toi_current_ui->cleanup)(); \
-	} while(0)
+	} while (0)
 
 #define abort_hibernate(result, fmt, args...) \
 	do { if (toi_current_ui) \
@@ -76,19 +77,19 @@ extern struct ui_ops *toi_current_ui;
 	     else { \
 		set_abort_result(result); \
 	     } \
-	} while(0)
+	} while (0)
 
 #define toi_cond_pause(pause, message) \
 	do { if (toi_current_ui) \
 		(toi_current_ui->cond_pause)(pause, message); \
-	} while(0)
+	} while (0)
 
 #define toi_prepare_status(clear, fmt, args...) \
 	do { if (toi_current_ui) \
 		(toi_current_ui->prepare_status)(clear, fmt, ##args); \
 	     else \
 		printk(fmt, ##args); \
-	} while(0)
+	} while (0)
 
 extern int toi_default_console_level;
 
@@ -96,7 +97,7 @@ extern int toi_default_console_level;
 do { \
 	if (toi_current_ui && (!sn || test_debug_state(sn))) \
 		toi_current_ui->message(sn, lev, log, fmt, ##a); \
-} while(0)
+} while (0)
 
 __exit void toi_ui_cleanup(void);
 extern int toi_ui_init(void);

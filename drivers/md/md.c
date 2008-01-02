@@ -5426,7 +5426,7 @@ void md_do_sync(mddev_t *mddev)
 			last_mark = next;
 		}
 
-		while(freezer_is_on())
+		while (freezer_is_on())
 			yield();
 
 		if (kthread_should_stop()) {

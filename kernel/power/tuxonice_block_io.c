@@ -26,9 +26,12 @@
 static int pr_index;
 
 #if 0
-#define PR_DEBUG(a, b...) do { if (pr_index < 20) printk(a, ##b); } while(0)
+#define PR_DEBUG(a, b...) do { \
+	if (pr_index < 20) \
+		printk(a, ##b); \
+} while (0)
 #else
-#define PR_DEBUG(a, b...) do { } while(0)
+#define PR_DEBUG(a, b...) do { } while (0)
 #endif
 
 #define MAX_OUTSTANDING_IO 16384
@@ -67,11 +70,11 @@ static DECLARE_WAIT_QUEUE_HEAD(num_in_progress_wait);
 /* [Max] number of I/O operations pending */
 static atomic_t outstanding_io;
 
-static int extra_page_forward = 0;
+static int extra_page_forward;
 
 static unsigned long toi_readahead_flags[
 	DIV_ROUND_UP(MAX_READAHEAD, BITS_PER_LONG)];
-static spinlock_t toi_readahead_flags_lock = SPIN_LOCK_UNLOCKED;
+static DEFINE_SPINLOCK(toi_readahead_flags_lock);
 static struct page *toi_ra_pages[MAX_READAHEAD];
 static int readahead_index, ra_submit_index;
 
@@ -96,8 +99,8 @@ DEFINE_MUTEX(toi_bio_mutex);
 #define TAKE_BIO_MUTEX(reason) mutex_lock(&toi_bio_mutex)
 #define DROP_BIO_MUTEX() mutex_unlock(&toi_bio_mutex)
 #else
-#define TAKE_BIO_MUTEX(reason) do { } while(0)
-#define DROP_BIO_MUTEX(reason) do { } while(0)
+#define TAKE_BIO_MUTEX(reason) do { } while (0)
+#define DROP_BIO_MUTEX(reason) do { } while (0)
 #endif
 
 /**
@@ -274,7 +277,7 @@ static int toi_prepare_readahead(int index)
 
 	new_page = toi_get_zeroed_page(12, TOI_ATOMIC_GFP);
 
-	if(!new_page)
+	if (!new_page)
 		return -ENOMEM;
 
 	toi_ra_pages[index] = virt_to_page(new_page);
@@ -346,7 +349,7 @@ static int submit(struct io_info *io_info)
 	unsigned long flags;
 
 	while (!bio) {
-		bio = bio_alloc(TOI_ATOMIC_GFP,1);
+		bio = bio_alloc(TOI_ATOMIC_GFP, 1);
 		if (!bio)
 			do_bio_wait(1);
 	}
@@ -468,9 +471,9 @@ static void toi_do_io(int writing, struct block_device *bdev, long block0,
 		waiting_on = io_info->bio_page;
 
 	/*
-	 * If writing, copy our data. The data is probably in lowmem, but we cannot be
-	 * certain. If there is no compression, we might be passed the actual source
-	 * page's address.
+	 * If writing, copy our data. The data is probably in lowmem, but we
+	 * cannot be certain. If there is no compression, we might be passed
+	 * the actual source page's address.
 	 */
 	if (writing) {
 		to = (char *) buffer_virt;
@@ -516,7 +519,7 @@ static void toi_bdev_page_io(int writing, struct block_device *bdev,
 static int toi_bio_print_debug_stats(char *buffer, int size)
 {
 	int len = 0;
-	
+
 	len = snprintf_used(buffer, size, "- Max readahead %d. Max "
 			"outstanding io %d.\n", max_readahead,
 			max_outstanding_io);
@@ -561,25 +564,25 @@ static void dump_block_chains(void)
 	for (i = 0; i < toi_writer_posn.num_chains; i++) {
 		struct extent *this;
 
-		printk("Chain %d:", i);
+		printk(KERN_INFO "Chain %d:", i);
 
 		this = (toi_writer_posn.chains + i)->first;
 
 		if (!this)
-			printk(" (Empty)");
+			printk(KERN_INFO " (Empty)");
 
 		while (this) {
-			printk(" [%lu-%lu]%s", this->minimum, this->maximum,
-					this->next ? "," : "");
+			printk(KERN_INFO " [%lu-%lu]%s", this->minimum,
+					this->maximum, this->next ? "," : "");
 			this = this->next;
 		}
 
-		printk("\n");
+		printk(KERN_INFO "\n");
 	}
 
 	for (i = 0; i < 3; i++)
-		printk("Posn %d: Chain %d, extent %d, offset %lu.\n", i,
-				toi_writer_posn_save[i].chain_num,
+		printk(KERN_INFO "Posn %d: Chain %d, extent %d, offset %lu.\n",
+				i, toi_writer_posn_save[i].chain_num,
 				toi_writer_posn_save[i].extent_num,
 				toi_writer_posn_save[i].offset);
 }
@@ -600,7 +603,7 @@ static int go_next_page(void)
 		toi_extent_state_next(&toi_writer_posn);
 
 	if (toi_extent_state_eof(&toi_writer_posn)) {
-		printk("Extent state eof. "
+		printk(KERN_INFO "Extent state eof. "
 			"Expected compression ratio too optimistic?\n");
 		dump_block_chains();
 		return -ENODATA;
@@ -640,13 +643,16 @@ static int toi_bio_rw_page(int writing, struct page *page,
 	struct toi_bdev_info *dev_info;
 
 	if (go_next_page()) {
-		printk("Failed to advance a page in the extent data.\n");
+		printk(KERN_INFO "Failed to advance a page in the extent "
+				"data.\n");
 		return -ENODATA;
 	}
 
 	if (current_stream == 0 && writing &&
-		toi_writer_posn.current_chain == toi_writer_posn_save[2].chain_num &&
-		toi_writer_posn.current_offset == toi_writer_posn_save[2].offset) {
+		toi_writer_posn.current_chain ==
+			toi_writer_posn_save[2].chain_num &&
+		toi_writer_posn.current_offset ==
+			toi_writer_posn_save[2].offset) {
 		dump_block_chains();
 		BUG();
 	}
@@ -717,7 +723,7 @@ static int toi_rw_cleanup(int writing)
 	toi_finish_all_io();
 
 	if (!writing)
-		for (i=0; i < max_readahead; i++)
+		for (i = 0; i < max_readahead; i++)
 			toi_cleanup_readahead(i);
 
 	current_stream = 0;
@@ -725,8 +731,8 @@ static int toi_rw_cleanup(int writing)
 	for (i = 0; i < NUM_REASONS; i++) {
 		if (!atomic_read(&reasons[i]))
 			continue;
-		printk("Waited for i/o due to %s %d times.\n", reason_name[i],
-				atomic_read(&reasons[i]));
+		printk(KERN_INFO "Waited for i/o due to %s %d times.\n",
+				reason_name[i], atomic_read(&reasons[i]));
 		atomic_set(&reasons[i], 0);
 	}
 	return 0;
@@ -763,7 +769,8 @@ static int toi_bio_read_page_with_readahead(void)
 	do {
 		if (toi_prepare_readahead(ra_submit_index)) {
 			/* We are supposed to have enough memory. */
-			printk("Failed to get readahead buffer page %d.\n", ra_submit_index);
+			printk(KERN_INFO "Failed to get readahead buffer page "
+					"%d.\n", ra_submit_index);
 			toi_alloc_print_debug_stats();
 			toi_message(TOI_ANY_SECTION, TOI_LOW, 1,
 				" - Free memory is %d.\n",
@@ -777,7 +784,8 @@ static int toi_bio_read_page_with_readahead(void)
 			ra_submit_index);
 
 		if (last_result) {
-			printk("Begin read chunk for page %d returned %d.\n",
+			printk(KERN_INFO "Begin read chunk for page %d "
+				"returned %d.\n",
 				ra_submit_index, last_result);
 			break;
 		}
@@ -787,7 +795,7 @@ static int toi_bio_read_page_with_readahead(void)
 		if (ra_submit_index == max_readahead)
 			ra_submit_index = 0;
 
-	} while((!last_result) && (ra_submit_index != readahead_index) &&
+	} while ((!last_result) && (ra_submit_index != readahead_index) &&
 			(!toi_readahead_ready(readahead_index)));
 
 wait:
@@ -1126,8 +1134,7 @@ static struct toi_sysfs_data sysfs_params[] = {
 	},
 };
 
-static struct toi_module_ops toi_blockwriter_ops =
-{
+static struct toi_module_ops toi_blockwriter_ops = {
 	.name					= "lowlevel i/o",
 	.type					= MISC_HIDDEN_MODULE,
 	.directory				= "block_io",
@@ -1141,7 +1148,8 @@ static struct toi_module_ops toi_blockwriter_ops =
 	.cleanup				= toi_bio_cleanup,
 
 	.sysfs_data		= sysfs_params,
-	.num_sysfs_entries	= sizeof(sysfs_params) / sizeof(struct toi_sysfs_data),
+	.num_sysfs_entries	= sizeof(sysfs_params) /
+		sizeof(struct toi_sysfs_data),
 };
 
 /**

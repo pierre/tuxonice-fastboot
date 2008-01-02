@@ -63,26 +63,26 @@ struct toi_module_ops {
 	int header_requested, header_used;
 
 	int (*expected_compression) (void);
-	
-	/* 
+
+	/*
 	 * Debug info
 	 */
 	int (*print_debug_info) (char *buffer, int size);
 	int (*save_config_info) (char *buffer);
 	void (*load_config_info) (char *buffer, int len);
 
-	/* 
+	/*
 	 * Initialise & cleanup - general routines called
 	 * at the start and end of a cycle.
 	 */
 	int (*initialise) (int starting_cycle);
 	void (*cleanup) (int finishing_cycle);
 
-	/* 
+	/*
 	 * Calls for allocating storage (allocators only).
 	 *
 	 * Header space is allocated separately. Note that allocation
-	 * of space for the header might result in allocated space 
+	 * of space for the header might result in allocated space
 	 * being stolen from the main pool if there is no unallocated
 	 * space. We have to be able to allocate enough space for
 	 * the header. We can eat memory to ensure there is enough
@@ -94,7 +94,7 @@ struct toi_module_ops {
 	int (*allocate_storage) (int space_requested);
 	int (*storage_allocated) (void);
 	int (*release_storage) (void);
-	
+
 	/*
 	 * Routines used in image I/O.
 	 */
@@ -108,7 +108,7 @@ struct toi_module_ops {
 	/* Reset module if image exists but reading aborted */
 	void (*noresume_reset) (void);
 
-	/* Read and write the metadata */	
+	/* Read and write the metadata */
 	int (*write_header_init) (void);
 	int (*write_header_cleanup) (void);
 
@@ -117,19 +117,19 @@ struct toi_module_ops {
 
 	int (*rw_header_chunk) (int rw, struct toi_module_ops *owner,
 			char *buffer_start, int buffer_size);
-	
+
 	/* Attempt to parse an image location */
 	int (*parse_sig_location) (char *buffer, int only_writer, int quiet);
 
 	/* Determine whether image exists that we can restore */
 	int (*image_exists) (void);
-	
+
 	/* Mark the image as having tried to resume */
 	void (*mark_resume_attempted) (int);
 
 	/* Destroy image if one exists */
 	int (*remove_image) (void);
-	
+
 	/* Sysfs Data */
 	struct toi_sysfs_data *sysfs_data;
 	int num_sysfs_entries;

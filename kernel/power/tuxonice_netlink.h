@@ -23,7 +23,7 @@
 
 struct user_helper_data {
 	int (*rcv_msg) (struct sk_buff *skb, struct nlmsghdr *nlh);
-	void (* not_ready) (void);
+	void (*not_ready) (void);
 	struct sock *nl;
 	u32 sock_seq;
 	pid_t pid;
@@ -33,7 +33,7 @@ struct user_helper_data {
 	int pool_limit;
 	struct sk_buff *emerg_skbs;
 	int skb_size;
-	int netlink_id;	
+	int netlink_id;
 	char *name;
 	struct user_helper_data *next;
 	struct completion wait_for_process;
@@ -45,7 +45,7 @@ struct user_helper_data {
 int toi_netlink_setup(struct user_helper_data *uhd);
 void toi_netlink_close(struct user_helper_data *uhd);
 void toi_send_netlink_message(struct user_helper_data *uhd,
-		int type, void* params, size_t len);
+		int type, void *params, size_t len);
 #else
 static inline int toi_netlink_setup(struct user_helper_data *uhd)
 {
@@ -54,5 +54,5 @@ static inline int toi_netlink_setup(struct user_helper_data *uhd)
 
 static inline void toi_netlink_close(struct user_helper_data *uhd) { };
 static inline void toi_send_netlink_message(struct user_helper_data *uhd,
-		int type, void* params, size_t len) { };
+		int type, void *params, size_t len) { };
 #endif

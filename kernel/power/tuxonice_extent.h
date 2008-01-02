@@ -41,7 +41,8 @@ struct extent_iterate_saved_state {
 	unsigned long offset;
 };
 
-#define toi_extent_state_eof(state) ((state)->num_chains == (state)->current_chain)
+#define toi_extent_state_eof(state) \
+	((state)->num_chains == (state)->current_chain)
 
 /* Simplify iterating through all the values in an extent chain */
 #define toi_extent_for_each(extent_chain, extentpointer, value) \
@@ -56,13 +57,13 @@ if ((extent_chain)->first) \
 			(value)++))
 
 void toi_put_extent_chain(struct extent_chain *chain);
-int toi_add_to_extent_chain(struct extent_chain *chain, 
+int toi_add_to_extent_chain(struct extent_chain *chain,
 		unsigned long minimum, unsigned long maximum);
 int toi_serialise_extent_chain(struct toi_module_ops *owner,
 		struct extent_chain *chain);
 int toi_load_extent_chain(struct extent_chain *chain);
 
-/* swap_entry_to_extent_val & extent_val_to_swap_entry: 
+/* swap_entry_to_extent_val & extent_val_to_swap_entry:
  * We are putting offset in the low bits so consecutive swap entries
  * make consecutive extent values */
 #define swap_entry_to_extent_val(swp_entry) (swp_entry.val)

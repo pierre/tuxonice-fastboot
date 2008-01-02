@@ -22,8 +22,10 @@
 #include "tuxonice_sysfs.h"
 #include "tuxonice_modules.h"
 
-unsigned long toi_poweroff_method = 0; /* 0 - Kernel power off */
-int wake_delay = 0;
+unsigned long toi_poweroff_method; /* 0 - Kernel power off */
+EXPORT_SYMBOL_GPL(toi_poweroff_method);
+
+int wake_delay;
 static char lid_state_file[256], wake_alarm_dir[256];
 static struct file *lid_file, *alarm_file, *epoch_file;
 int post_wake_state = -1;
@@ -49,23 +51,23 @@ static void __toi_power_down(int method)
 	toi_prepare_status(DONT_CLEAR_BAR, "Powering down.");
 
 	switch (method) {
-		case 0:
-			break;
-		case 3:
-			error = pm_notifier_call_chain(PM_SUSPEND_PREPARE);
-			if (!error)
-				error = suspend_devices_and_enter(PM_SUSPEND_MEM);
-			pm_notifier_call_chain(PM_POST_SUSPEND);
-			if (!error)
-				return;
-			break;
-		case 4:
-			if (!hibernation_platform_enter())
-				return;
-			break;
-		case 5:
-			/* Historic entry only now */
-			break;
+	case 0:
+		break;
+	case 3:
+		error = pm_notifier_call_chain(PM_SUSPEND_PREPARE);
+		if (!error)
+			error = suspend_devices_and_enter(PM_SUSPEND_MEM);
+		pm_notifier_call_chain(PM_POST_SUSPEND);
+		if (!error)
+			return;
+		break;
+	case 4:
+		if (!hibernation_platform_enter())
+			return;
+		break;
+	case 5:
+		/* Historic entry only now */
+		break;
 	}
 
 	if (method && method != 5)
@@ -79,7 +81,9 @@ static void __toi_power_down(int method)
 }
 
 #define CLOSE_FILE(file) \
- if (file) { filp_close(file, NULL); file = NULL; }
+	if (file) { \
+		filp_close(file, NULL); file = NULL; \
+	}
 
 static void powerdown_files_close(int toi_or_resume)
 {
@@ -100,7 +104,7 @@ static void open_file(char *format, char *arg, struct file **var, int mode,
 		sprintf(buf, format, arg);
 		*var = filp_open(buf, mode, 0);
 		if (IS_ERR(*var) || !*var) {
-			printk("Failed to open %s file '%s' (%p).\n",
+			printk(KERN_INFO "Failed to open %s file '%s' (%p).\n",
 				desc, buf, *var);
 			*var = 0;
 		}
@@ -112,7 +116,8 @@ static int powerdown_files_open(int toi_or_resume)
 	if (!toi_or_resume)
 		return 0;
 
-	open_file("/proc/acpi/button/%s/state", lid_state_file, &lid_file, O_RDONLY, "lid");
+	open_file("/proc/acpi/button/%s/state", lid_state_file, &lid_file,
+			O_RDONLY, "lid");
 
 	if (strlen(wake_alarm_dir)) {
 		open_file("/sys/class/rtc/%s/wakealarm", wake_alarm_dir,
@@ -136,7 +141,8 @@ static int lid_closed(void)
 
 	size = vfs_read(lid_file, (char __user *) array, 25, &pos);
 	if ((int) size < 1) {
-		printk("Failed to read lid state file (%d).\n", (int) size);
+		printk(KERN_INFO "Failed to read lid state file (%d).\n",
+			(int) size);
 		return 0;
 	}
 
@@ -160,7 +166,8 @@ static void write_alarm_file(int value)
 	size = vfs_write(alarm_file, (char __user *)buf, strlen(buf), &pos);
 
 	if (size < 0)
-		printk("Error %d writing alarm value %s.\n", (int) size, buf);
+		printk(KERN_INFO "Error %d writing alarm value %s.\n",
+				(int) size, buf);
 }
 
 /**
@@ -181,12 +188,15 @@ void toi_power_down(void)
 	if (alarm_file && wake_delay) {
 		char array[25];
 		loff_t pos = 0;
-		size_t size = vfs_read(epoch_file, (char __user *) array, 25, &pos);
+		size_t size = vfs_read(epoch_file, (char __user *) array, 25,
+				&pos);
 
 		if (((int) size) < 1)
-			printk("Failed to read epoch file (%d).\n", (int) size);
+			printk(KERN_INFO "Failed to read epoch file (%d).\n",
+					(int) size);
 		else {
-			unsigned long since_epoch = simple_strtol(array, NULL, 0);
+			unsigned long since_epoch =
+				simple_strtol(array, NULL, 0);
 
 			/* Clear any wakeup time. */
 			write_alarm_file(0);
@@ -200,6 +210,7 @@ void toi_power_down(void)
 
 	toi_check_resleep();
 }
+EXPORT_SYMBOL_GPL(toi_power_down);
 
 static struct toi_sysfs_data sysfs_params[] = {
 #if defined(CONFIG_ACPI)
@@ -236,7 +247,8 @@ static struct toi_module_ops powerdown_ops = {
 	.directory			= "[ROOT]",
 	.module				= THIS_MODULE,
 	.sysfs_data			= sysfs_params,
-	.num_sysfs_entries		= sizeof(sysfs_params) / sizeof(struct toi_sysfs_data),
+	.num_sysfs_entries		= sizeof(sysfs_params) /
+		sizeof(struct toi_sysfs_data),
 };
 
 int toi_poweroff_init(void)
@@ -248,6 +260,3 @@ void toi_poweroff_exit(void)
 {
 	toi_unregister_module(&powerdown_ops);
 }
-
-EXPORT_SYMBOL_GPL(toi_poweroff_method);
-EXPORT_SYMBOL_GPL(toi_power_down);

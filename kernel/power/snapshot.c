@@ -600,19 +600,7 @@ static unsigned long memory_bm_next_pfn(struct memory_bitmap *bm)
 	return bb->start_pfn + chunk * BM_BITS_PER_CHUNK + bit;
 }
 
-/**
- *	This structure represents a range of page frames the contents of which
- *	should not be saved during the suspend.
- */
-
-struct nosave_region {
-	struct list_head list;
-	unsigned long start_pfn;
-	unsigned long end_pfn;
-};
-
 LIST_HEAD(nosave_regions);
-
 EXPORT_SYMBOL_GPL(nosave_regions);
 
 /**

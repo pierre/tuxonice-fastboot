@@ -87,12 +87,12 @@
  * or timeout before beginning its restoration.
  *
  * If a node has no image, it needs to wait, in case other nodes which do have
- * an image are going to resume, but are taking longer to announce their presence.
- * For this reason, the user can specify a timeout value and a number of nodes
- * detected before we just continue. (We might want to assume in a cluster of,
- * say, 15 nodes, if 8 others have booted without finding an image, the
- * remaining nodes will too. This might help in situations where some nodes are
- * much slower to boot, or more subject to hardware failures or such like).
+ * an image are going to resume, but are taking longer to announce their
+ * presence. For this reason, the user can specify a timeout value and a number
+ * of nodes detected before we just continue. (We might want to assume in a
+ * cluster of, say, 15 nodes, if 8 others have booted without finding an image,
+ * the remaining nodes will too. This might help in situations where some nodes
+ * are much slower to boot, or more subject to hardware failures or such like).
  */
 
 #include <linux/suspend.h>
@@ -115,12 +115,12 @@
 #include "tuxonice_io.h"
 
 #if 1
-#define PRINTK(a, b...) do { printk(a, ##b); } while(0)
+#define PRINTK(a, b...) do { printk(a, ##b); } while (0)
 #else
-#define PRINTK(a, b...) do { } while(0)
+#define PRINTK(a, b...) do { } while (0)
 #endif
 
-static int loopback_mode = 0;
+static int loopback_mode;
 static int num_local_nodes = 1;
 #define MAX_LOCAL_NODES 8
 #define SADDR (loopback_mode ? b->sid : h->saddr)
@@ -142,43 +142,43 @@ enum cluster_message {
 static char *str_message(int message)
 {
 	switch (message) {
-		case 4:
-			return "Ping";
-		case 8:
-			return "Abort";
-		case 9:
-			return "Abort acked";
-		case 10:
-			return "Abort nacked";
-		case 16:
-			return "Bye";
-		case 17:
-			return "Bye acked";
-		case 18:
-			return "Bye nacked";
-		case 32:
-			return "Hibernate request";
-		case 33:
-			return "Hibernate ack";
-		case 34:
-			return "Hibernate nack";
-		case 64:
-			return "Image exists?";
-		case 65:
-			return "Image does exist";
-		case 66:
-			return "No image here";
-		case 128:
-			return "I/O";
-		case 129:
-			return "I/O okay";
-		case 130:
-			return "I/O failed";
-		case 256:
-			return "Running";
-		default:
-			printk("Unrecognised message %d.\n", message);
-			return "Unrecognised message (see dmesg)";
+	case 4:
+		return "Ping";
+	case 8:
+		return "Abort";
+	case 9:
+		return "Abort acked";
+	case 10:
+		return "Abort nacked";
+	case 16:
+		return "Bye";
+	case 17:
+		return "Bye acked";
+	case 18:
+		return "Bye nacked";
+	case 32:
+		return "Hibernate request";
+	case 33:
+		return "Hibernate ack";
+	case 34:
+		return "Hibernate nack";
+	case 64:
+		return "Image exists?";
+	case 65:
+		return "Image does exist";
+	case 66:
+		return "No image here";
+	case 128:
+		return "I/O";
+	case 129:
+		return "I/O okay";
+	case 130:
+		return "I/O failed";
+	case 256:
+		return "Running";
+	default:
+		printk("Unrecognised message %d.\n", message);
+		return "Unrecognised message (see dmesg)";
 	}
 }
 
@@ -239,10 +239,12 @@ static int others_have_image, num_others;
 
 /* Key used to allow multiple clusters on the same lan */
 static char toi_cluster_key[32] = CONFIG_TOI_DEFAULT_CLUSTER_KEY;
-static char pre_hibernate_script[255] = CONFIG_TOI_DEFAULT_CLUSTER_PRE_HIBERNATE;
-static char post_hibernate_script[255] = CONFIG_TOI_DEFAULT_CLUSTER_POST_HIBERNATE;
+static char pre_hibernate_script[255] =
+	CONFIG_TOI_DEFAULT_CLUSTER_PRE_HIBERNATE;
+static char post_hibernate_script[255] =
+	CONFIG_TOI_DEFAULT_CLUSTER_POST_HIBERNATE;
 
-/*				List of cluster members				*/
+/*			List of cluster members			*/
 static unsigned long continue_delay = 5 * HZ;
 static unsigned long cluster_message_timeout = 3 * HZ;
 
@@ -252,17 +254,17 @@ static void print_member_info(int index)
 {
 	struct cluster_member *this;
 
-	printk("==> Dumping node %d.\n", index);
+	printk(KERN_INFO "==> Dumping node %d.\n", index);
 
 	list_for_each_entry(this, &node_array[index].member_list, list)
-		printk("%d.%d.%d.%d last message %s. %s\n",
+		printk(KERN_INFO "%d.%d.%d.%d last message %s. %s\n",
 				NIPQUAD(this->addr),
 				str_message(this->message),
 				this->ignore ? "(Ignored)" : "");
-	printk("== Done ==\n");
+	printk(KERN_INFO "== Done ==\n");
 }
 
-static struct cluster_member *__find_member(int index,__be32 addr)
+static struct cluster_member *__find_member(int index, __be32 addr)
 {
 	struct cluster_member *this;
 
@@ -301,8 +303,9 @@ static int __add_update_member(int index, __be32 addr, int message)
 			if ((message & MSG_NACK) &&
 			    (message & (MSG_HIBERNATE | MSG_IMAGE | MSG_IO)))
 				set_ignore(index, addr, this);
-			PRINTK("Node %d sees node %d.%d.%d.%d now sending %s.\n",
-					index, NIPQUAD(addr), str_message(message));
+			PRINTK("Node %d sees node %d.%d.%d.%d now sending "
+					"%s.\n", index, NIPQUAD(addr),
+					str_message(message));
 			wake_up(&node_array[index].member_events);
 		}
 		return 0;
@@ -321,7 +324,8 @@ static int __add_update_member(int index, __be32 addr, int message)
 
 	node_array[index].peer_count++;
 
-	PRINTK("Node %d sees node %d.%d.%d.%d sending %s.\n", index, NIPQUAD(addr), str_message(message));
+	PRINTK("Node %d sees node %d.%d.%d.%d sending %s.\n", index,
+			NIPQUAD(addr), str_message(message));
 
 	if ((message & MSG_NACK) &&
 	    (message & (MSG_HIBERNATE | MSG_IMAGE | MSG_IO)))
@@ -330,7 +334,7 @@ static int __add_update_member(int index, __be32 addr, int message)
 	return 1;
 }
 
-static int add_update_member(int index,__be32 addr, int message)
+static int add_update_member(int index, __be32 addr, int message)
 {
 	int result;
 	unsigned long flags;
@@ -345,7 +349,7 @@ static int add_update_member(int index,__be32 addr, int message)
 	return result;
 }
 
-static void del_member(int index,__be32 addr)
+static void del_member(int index, __be32 addr)
 {
 	struct cluster_member *this;
 	unsigned long flags;
@@ -384,7 +388,8 @@ static int toi_recv(struct sk_buff *skb, struct net_device *dev,
 	if (dev != net_dev)
 		goto drop;
 
-	if ((skb = skb_share_check(skb, GFP_ATOMIC)) == NULL)
+	skb = skb_share_check(skb, GFP_ATOMIC));
+	if (!skb)
 		return NET_RX_DROP;
 
 	if (!pskb_may_pull(skb,
@@ -429,7 +434,8 @@ static int toi_recv(struct sk_buff *skb, struct net_device *dev,
 	h = &b->iph;
 
 	addr = SADDR;
-	PRINTK(">>> Message %s received from " NIPQUAD_FMT ".\n", str_message(b->message), NIPQUAD(addr));
+	PRINTK(">>> Message %s received from " NIPQUAD_FMT ".\n",
+			str_message(b->message), NIPQUAD(addr));
 
 	message = b->message & MSG_STATE_MASK;
 	ack = b->message & MSG_ACK_MASK;
@@ -448,50 +454,52 @@ static int toi_recv(struct sk_buff *skb, struct net_device *dev,
 
 		result = add_update_member(index, SADDR, b->message);
 		if (result == -1) {
-			printk("Failed to add new cluster member "
+			printk(KERN_INFO "Failed to add new cluster member "
 					NIPQUAD_FMT ".\n",
 					NIPQUAD(addr));
 			goto drop_unlock;
 		}
 
 		switch (b->message & MSG_STATE_MASK) {
-			case MSG_PING:
-				break;
-			case MSG_ABORT:
-				break;
-			case MSG_BYE:
-				break;
-			case MSG_HIBERNATE:
-				/* Can I hibernate? */
-				new_message = MSG_HIBERNATE |
-					((index & 1) ? MSG_NACK : MSG_ACK);
-				break;
-			case MSG_IMAGE:
-				/* Can I resume? */
-				new_message = MSG_IMAGE |
-					((index & 1) ? MSG_NACK : MSG_ACK);
-				if (new_message != old_message)
-					printk("Setting whether I can resume to %d.\n",
-							new_message);
-				break;
-			case MSG_IO:
-				new_message = MSG_IO | MSG_ACK;
-				break;
-			case MSG_RUNNING:
-				break;
-			default:
-				if (net_ratelimit())
-					printk(KERN_ERR "Unrecognised TuxOnIce cluster"
-						" message %d from " NIPQUAD_FMT ".\n",
-						b->message, NIPQUAD(addr));
+		case MSG_PING:
+			break;
+		case MSG_ABORT:
+			break;
+		case MSG_BYE:
+			break;
+		case MSG_HIBERNATE:
+			/* Can I hibernate? */
+			new_message = MSG_HIBERNATE |
+				((index & 1) ? MSG_NACK : MSG_ACK);
+			break;
+		case MSG_IMAGE:
+			/* Can I resume? */
+			new_message = MSG_IMAGE |
+				((index & 1) ? MSG_NACK : MSG_ACK);
+			if (new_message != old_message)
+				printk("Setting whether I can resume to %d.\n",
+						new_message);
+			break;
+		case MSG_IO:
+			new_message = MSG_IO | MSG_ACK;
+			break;
+		case MSG_RUNNING:
+			break;
+		default:
+			if (net_ratelimit())
+				printk(KERN_ERR "Unrecognised TuxOnIce cluster"
+					" message %d from " NIPQUAD_FMT ".\n",
+					b->message, NIPQUAD(addr));
 		};
 
 		if (old_message != new_message) {
 			node_array[index].current_message = new_message;
-			printk(">>> Sending new message for node %d.\n", index);
+			printk(KERN_INFO ">>> Sending new message for node "
+					"%d.\n", index);
 			toi_send_if(new_message, index);
 		} else if (!ack) {
-			printk(">>> Resending message for node %d.\n", index);
+			printk(KERN_INFO ">>> Resending message for node %d.\n",
+					index);
 			toi_send_if(new_message, index);
 		}
 drop_unlock:
@@ -556,7 +564,7 @@ static void toi_send_if(int message, unsigned long my_id)
 	     net_dev->hard_header(skb, net_dev, ntohs(skb->protocol),
 		     net_dev->broadcast, net_dev->dev_addr, skb->len) < 0) ||
 			dev_queue_xmit(skb) < 0)
-		printk("E");
+		printk(KERN_INFO "E");
 }
 
 /*	=========================================		*/
@@ -581,7 +589,8 @@ static int kTOICluster(void *data)
 		toi_send_if(node_array[my_id].current_message, my_id);
 		sleep_on_timeout(&clusterd_events,
 				cluster_message_timeout);
-		PRINTK("Link state %lu is %d.\n", my_id, node_array[my_id].current_message);
+		PRINTK("Link state %lu is %d.\n", my_id,
+				node_array[my_id].current_message);
 	}
 
 	toi_send_if(MSG_BYE, my_id);
@@ -623,8 +632,9 @@ static int peers_not_in_message(int index, int message, int precise)
 			"Seeking %s.\n",
 			NIPQUAD(this->addr),
 			str_message(this->message), str_message(message));
-		if ((precise ? this->message : this->message & MSG_STATE_MASK) !=
-				message)
+		if ((precise ? this->message :
+					this->message & MSG_STATE_MASK) !=
+					message)
 			result++;
 	}
 	spin_unlock_irqrestore(&node_array[index].member_list_lock, flags);
@@ -646,7 +656,8 @@ static void reset_ignored(int index)
 
 static int peers_in_message(int index, int message, int precise)
 {
-	return node_array[index].peer_count - node_array[index].ignored_peer_count -
+	return node_array[index].peer_count -
+		node_array[index].ignored_peer_count -
 		peers_not_in_message(index, message, precise);
 }
 
@@ -668,7 +679,8 @@ static int time_to_continue(int index, unsigned long start, int message)
 		return 1;
 	}
 
-	PRINTK("Not time to continue yet (%lu < %lu).\n", jiffies, start + continue_delay);
+	PRINTK("Not time to continue yet (%lu < %lu).\n", jiffies,
+			start + continue_delay);
 	return 0;
 }
 
@@ -677,7 +689,8 @@ void toi_initiate_cluster_hibernate(void)
 	int result;
 	unsigned long start;
 
-	if ((result = do_toi_step(STEP_HIBERNATE_PREPARE_IMAGE)))
+	result = do_toi_step(STEP_HIBERNATE_PREPARE_IMAGE);
+	if (result)
 		return;
 
 	toi_send_if(MSG_HIBERNATE, 0);
@@ -699,15 +712,14 @@ void toi_initiate_cluster_hibernate(void)
 
 	toi_send_if(MSG_IO, 0);
 
-	if ((result = do_toi_step(STEP_HIBERNATE_SAVE_IMAGE))) {
+	result = do_toi_step(STEP_HIBERNATE_SAVE_IMAGE);
+	if (result)
 		return;
-	}
 
 	/* This code runs at resume time too! */
 	if (toi_in_hibernate)
 		result = do_toi_step(STEP_HIBERNATE_POWERDOWN);
 }
-
 EXPORT_SYMBOL_GPL(toi_initiate_cluster_hibernate);
 
 /* toi_cluster_print_debug_stats
@@ -722,12 +734,14 @@ EXPORT_SYMBOL_GPL(toi_initiate_cluster_hibernate);
 static int toi_cluster_print_debug_stats(char *buffer, int size)
 {
 	int len;
-	
+
 	if (strlen(toi_cluster_iface))
-		len = snprintf_used(buffer, size, "- Cluster interface is '%s'.\n",
+		len = snprintf_used(buffer, size,
+				"- Cluster interface is '%s'.\n",
 				toi_cluster_iface);
 	else
-		len = snprintf_used(buffer, size, "- Cluster support is disabled.\n");
+		len = snprintf_used(buffer, size,
+				"- Cluster support is disabled.\n");
 	return len;
 }
 
@@ -747,7 +761,7 @@ static int toi_cluster_storage_needed(void)
 {
 	return 1 + strlen(toi_cluster_iface);
 }
-	
+
 /* toi_cluster_save_config_info
  *
  * Description:	Save informaton needed when reloading the image at resume time.
@@ -762,7 +776,7 @@ static int toi_cluster_save_config_info(char *buffer)
 
 /* toi_cluster_load_config_info
  *
- * Description:	Reload information needed for declustering the image at 
+ * Description:	Reload information needed for declustering the image at
  * 		resume time.
  * Arguments:	Buffer:		Pointer to the start of the data.
  *		Size:		Number of bytes that were saved.
@@ -801,18 +815,18 @@ static void cluster_startup(void)
 
 	others_have_image = peers_in_message(0, MSG_IMAGE | MSG_ACK, 1);
 
-	printk("Continuing. I %shave an image. Peers with image: %d.\n",
-		have_image ? "" : "don't ", others_have_image);
+	printk(KERN_INFO "Continuing. I %shave an image. Peers with image:"
+		" %d.\n", have_image ? "" : "don't ", others_have_image);
 
 	if (have_image) {
 		int result;
 
 		/* Start to resume */
-		printk("  === Starting to resume ===  \n");
+		printk(KERN_INFO "  === Starting to resume ===  \n");
 		node_array[0].current_message = MSG_IO;
 		toi_send_if(MSG_IO, 0);
 
-		//result = do_toi_step(STEP_RESUME_LOAD_PS1);
+		/* result = do_toi_step(STEP_RESUME_LOAD_PS1); */
 		result = 0;
 
 		if (!result) {
@@ -821,11 +835,11 @@ static void cluster_startup(void)
 			 * path.
 			 */
 
-			//result = do_toi_step(STEP_RESUME_DO_RESTORE);
+			/* result = do_toi_step(STEP_RESUME_DO_RESTORE); */
 			result = 0;
 
-			//do_toi_step(STEP_QUIET_CLEANUP);
-		} 
+			/* do_toi_step(STEP_QUIET_CLEANUP); */
+		}
 
 		node_array[0].current_message |= MSG_NACK;
 
@@ -836,12 +850,13 @@ static void cluster_startup(void)
 
 	if (others_have_image) {
 		/* Wait for them to resume */
-		printk("Waiting for other nodes to resume.\n");
+		printk(KERN_INFO "Waiting for other nodes to resume.\n");
 		start = jiffies;
-		wait_event(node_array[0].member_events, time_to_continue(0, start,
-				MSG_RUNNING));
+		wait_event(node_array[0].member_events,
+				time_to_continue(0, start, MSG_RUNNING));
 		if (peers_not_in_message(0, MSG_RUNNING, 0))
-			printk("Timed out while waiting for other nodes to resume.\n");
+			printk(KERN_INFO "Timed out while waiting for other "
+					"nodes to resume.\n");
 	}
 
 	/* Find out whether an image exists here. Send ACK_IMAGE or NACK_IMAGE
@@ -988,9 +1003,10 @@ static struct toi_module_ops toi_cluster_ops = {
 	.save_config_info	= toi_cluster_save_config_info,
 	.load_config_info	= toi_cluster_load_config_info,
 	.storage_needed		= toi_cluster_storage_needed,
-	
+
 	.sysfs_data		= sysfs_params,
-	.num_sysfs_entries	= sizeof(sysfs_params) / sizeof(struct toi_sysfs_data),
+	.num_sysfs_entries	= sizeof(sysfs_params) /
+		sizeof(struct toi_sysfs_data),
 };
 
 /* ---- Registration ---- */
@@ -1017,11 +1033,13 @@ INIT int toi_cluster_init(void)
 
 		/* Set up sysfs entry */
 		node_array[i].sysfs_data.attr.name = toi_kzalloc(8, GFP_KERNEL);
-		sprintf((char *) node_array[i].sysfs_data.attr.name, "node_%d", i);
+		sprintf((char *) node_array[i].sysfs_data.attr.name, "node_%d",
+				i);
 		node_array[i].sysfs_data.attr.mode = SYSFS_RW;
 		node_array[i].sysfs_data.type = TOI_SYSFS_DATA_INTEGER;
 		node_array[i].sysfs_data.flags = 0;
-		node_array[i].sysfs_data.data.integer.variable = &node_array[i].current_message;
+		node_array[i].sysfs_data.data.integer.variable =
+			&node_array[i].current_message;
 		node_array[i].sysfs_data.data.integer.minimum = 0;
 		node_array[i].sysfs_data.data.integer.maximum = INT_MAX;
 		node_array[i].sysfs_data.write_side_effect =
@@ -1034,7 +1052,7 @@ INIT int toi_cluster_init(void)
 	if (toi_cluster_ops.enabled)
 		toi_cluster_open_iface();
 
-	return temp;	
+	return temp;
 }
 
 EXIT void toi_cluster_exit(void)

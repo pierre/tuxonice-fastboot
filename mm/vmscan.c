@@ -1512,7 +1512,7 @@ void unlink_lru_lists(void)
 
 		this->next = lru_save_list;
 		lru_save_list = this;
-		
+
 		this->zone = zone;
 
 		spin_lock_irq(&zone->lru_lock);
@@ -1532,7 +1532,7 @@ void unlink_lru_lists(void)
 
 void relink_lru_lists(void)
 {
-	while(lru_save_list) {
+	while (lru_save_list) {
 		struct lru_save *this = lru_save_list;
 		struct zone *zone = this->zone;
 		struct pagevec pvec;
@@ -1652,8 +1652,8 @@ void wakeup_kswapd(struct zone *zone, int order)
 }
 
 #ifdef CONFIG_PM
-static unsigned long shrink_ps1_zone(struct zone *zone, unsigned long total_to_free,
-		struct scan_control sc)
+static unsigned long shrink_ps1_zone(struct zone *zone,
+	unsigned long total_to_free, struct scan_control sc)
 {
 	unsigned long freed = 0;
 
@@ -1713,7 +1713,7 @@ unsigned long shrink_ps2_zone(struct zone *zone, unsigned long total_to_free,
 		to_free = min(zone_page_state(zone, NR_ACTIVE) +
 				zone_page_state(zone, NR_INACTIVE),
 				total_to_free - freed);
-		
+
 		do {
 			orig_size = zone_page_state(zone, NR_ACTIVE) +
 				zone_page_state(zone, NR_INACTIVE);
@@ -1731,7 +1731,8 @@ unsigned long shrink_ps2_zone(struct zone *zone, unsigned long total_to_free,
 	return freed;
 }
 
-void shrink_one_zone(struct zone *zone, unsigned long total_to_free, int ps_wanted)
+void shrink_one_zone(struct zone *zone, unsigned long total_to_free,
+		int ps_wanted)
 {
 	unsigned long freed = 0;
 	struct scan_control sc = {

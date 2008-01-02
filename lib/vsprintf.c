@@ -358,7 +358,7 @@ static char *number(char *buf, char *end, unsigned long long num, int base, int 
 /*
  * vsnprintf_used
  *
- * Functionality    : Print a string with parameters to a buffer of a 
+ * Functionality    : Print a string with parameters to a buffer of a
  *                    limited size. Unlike vsnprintf, we return the number
  *                    of bytes actually put in the buffer, not the number
  *                    that would have been put in if it was big enough.

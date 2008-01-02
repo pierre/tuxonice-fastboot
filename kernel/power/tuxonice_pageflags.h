@@ -32,7 +32,8 @@ extern struct dyn_pageflags free_map;
 
 #define PagePageset1Copy(page) (test_dynpageflag(&pageset1_copy_map, page))
 #define SetPagePageset1Copy(page) (set_dynpageflag(&pageset1_copy_map, page))
-#define ClearPagePageset1Copy(page) (clear_dynpageflag(&pageset1_copy_map, page))
+#define ClearPagePageset1Copy(page) \
+	(clear_dynpageflag(&pageset1_copy_map, page))
 
 #define PagePageset2(page) (test_dynpageflag(&pageset2_map, page))
 #define SetPagePageset2(page) (set_dynpageflag(&pageset2_map, page))
@@ -42,15 +43,18 @@ extern struct dyn_pageflags free_map;
 #define SetPageWasRW(page) (set_dynpageflag(&pageset2_map, page))
 #define ClearPageWasRW(page) (clear_dynpageflag(&pageset2_map, page))
 
-#define PageResave(page) (page_resave_map.bitmap ? test_dynpageflag(&page_resave_map, page) : 0)
+#define PageResave(page) (page_resave_map.bitmap ? \
+	test_dynpageflag(&page_resave_map, page) : 0)
 #define SetPageResave(page) (set_dynpageflag(&page_resave_map, page))
 #define ClearPageResave(page) (clear_dynpageflag(&page_resave_map, page))
 
-#define PageNosave(page) (nosave_map.bitmap ? test_dynpageflag(&nosave_map, page) : 0)
+#define PageNosave(page) (nosave_map.bitmap ? \
+		test_dynpageflag(&nosave_map, page) : 0)
 #define SetPageNosave(page) (set_dynpageflag(&nosave_map, page))
 #define ClearPageNosave(page) (clear_dynpageflag(&nosave_map, page))
 
-#define PageNosaveFree(page) (free_map.bitmap ? test_dynpageflag(&free_map, page) : 0)
+#define PageNosaveFree(page) (free_map.bitmap ? \
+		test_dynpageflag(&free_map, page) : 0)
 #define SetPageNosaveFree(page) (set_dynpageflag(&free_map, page))
 #define ClearPageNosaveFree(page) (clear_dynpageflag(&free_map, page))
 

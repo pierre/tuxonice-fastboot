@@ -9,7 +9,7 @@
 static inline int arch_prepare_suspend(void) { return 0; }
 
 extern int toi_faulted;
-#define clear_toi_fault() do { toi_faulted = 0; } while(0)
+#define clear_toi_fault() do { toi_faulted = 0; } while (0)
 
 /* image of the saved processor state */
 struct saved_context {

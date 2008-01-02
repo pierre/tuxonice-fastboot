@@ -34,7 +34,7 @@
 
 extern void die(const char *,struct pt_regs *,long);
 
-int toi_faulted = 0;
+int toi_faulted;
 EXPORT_SYMBOL(toi_faulted);
 
 #ifdef CONFIG_KPROBES

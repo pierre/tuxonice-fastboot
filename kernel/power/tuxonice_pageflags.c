@@ -2,7 +2,7 @@
  * kernel/power/tuxonice_pageflags.c
  *
  * Copyright (C) 2004-2007 Nigel Cunningham (nigel at tuxonice net)
- * 
+ *
  * This file is released under the GPLv2.
  *
  * Routines for serialising and relocating pageflags in which we
@@ -38,7 +38,8 @@ int toi_pageflags_space_needed(void)
 
 	for_each_zone(zone)
 		if (populated_zone(zone))
-			total += sizeof(int) * 3 + pages_for_zone(zone) * PAGE_SIZE;
+			total += sizeof(int) * 3 + pages_for_zone(zone) *
+				PAGE_SIZE;
 
 	total += sizeof(int);
 
@@ -77,12 +78,13 @@ void save_dyn_pageflags(struct dyn_pageflags *pagemap)
 
 			for (i = 0; i < size; i++) {
 				if (!pagemap->bitmap[node][zone_idx][i+2]) {
-					printk("Sparse pagemap?\n");
+					printk(KERN_INFO "Sparse pagemap?\n");
 					dump_pagemap(pagemap);
 					BUG();
 				}
 				toiActiveAllocator->rw_header_chunk(WRITE,
-					NULL, (char *) pagemap->bitmap[node][zone_idx][i+2],
+					NULL, (char *) pagemap->bitmap[node]
+						[zone_idx][i+2],
 					PAGE_SIZE);
 			}
 		}
@@ -120,7 +122,8 @@ int load_dyn_pageflags(struct dyn_pageflags *pagemap)
 			toiActiveAllocator->rw_header_chunk(READ, NULL,
 					(char *) &zone_check, sizeof(int));
 			if (zone_check != node) {
-				printk("Node read (%d) != node (%d).\n",
+				printk(KERN_INFO "Node read (%d) != node "
+						"(%d).\n",
 						zone_check, node);
 				return 1;
 			}
@@ -129,7 +132,8 @@ int load_dyn_pageflags(struct dyn_pageflags *pagemap)
 			toiActiveAllocator->rw_header_chunk(READ, NULL,
 					(char *) &zone_check, sizeof(int));
 			if (zone_check != zone_idx) {
-				printk("Zone read (%d) != node (%d).\n",
+				printk(KERN_INFO "Zone read (%d) != node "
+						"(%d).\n",
 						zone_check, zone_idx);
 				return 1;
 			}
@@ -140,7 +144,8 @@ int load_dyn_pageflags(struct dyn_pageflags *pagemap)
 
 			for (i = 0; i < size; i++)
 				toiActiveAllocator->rw_header_chunk(READ, NULL,
-					(char *) pagemap->bitmap[node][zone_idx][i+2],
+					(char *) pagemap->bitmap[node][zone_idx]
+									[i+2],
 					PAGE_SIZE);
 		}
 		node++;
@@ -148,8 +153,8 @@ int load_dyn_pageflags(struct dyn_pageflags *pagemap)
 	toiActiveAllocator->rw_header_chunk(READ, NULL, (char *) &zone_check,
 			sizeof(int));
 	if (zone_check != -1) {
-		printk("Didn't read end of dyn pageflag data marker.(%x)\n",
-				zone_check);
+		printk(KERN_INFO "Didn't read end of dyn pageflag data marker."
+				"(%x)\n", zone_check);
 		return 1;
 	}
 

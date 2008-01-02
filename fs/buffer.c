@@ -247,7 +247,8 @@ void thaw_bdev(struct block_device *bdev, struct super_block *sb)
 }
 EXPORT_SYMBOL(thaw_bdev);
 
-//#define DEBUG_FS_FREEZING
+/* #define DEBUG_FS_FREEZING */
+
 /**
  * freeze_filesystems - lock all filesystems and force them into a consistent
  * state
@@ -264,7 +265,7 @@ void freeze_filesystems(int which)
 	 */
 	list_for_each_entry_reverse(sb, &super_blocks, s_list) {
 #ifdef DEBUG_FS_FREEZING
-		printk("Considering %s.%s: (root %p, bdev %x)",
+		printk(KERN_INFO "Considering %s.%s: (root %p, bdev %x)",
 			sb->s_type->name ? sb->s_type->name : "?",
 			sb->s_subtype ? sb->s_subtype : "", sb->s_root,
 			sb->s_bdev ? sb->s_bdev->bd_dev : 0);
@@ -285,18 +286,18 @@ void freeze_filesystems(int which)
 		    (sb->s_flags & MS_FROZEN) ||
 		    !(which & FS_FREEZER_NORMAL)) {
 #ifdef DEBUG_FS_FREEZING
-			printk("Nope.\n");
+			printk(KERN_INFO "Nope.\n");
 #endif
 			continue;
 		}
 
 #ifdef DEBUG_FS_FREEZING
-		printk("Freezing %x... ", sb->s_bdev->bd_dev);
+		printk(KERN_INFO "Freezing %x... ", sb->s_bdev->bd_dev);
 #endif
 		freeze_bdev(sb->s_bdev);
 		sb->s_flags |= MS_FROZEN;
 #ifdef DEBUG_FS_FREEZING
-		printk("Done.\n");
+		printk(KERN_INFO "Done.\n");
 #endif
 	}
 
@@ -315,7 +316,7 @@ void thaw_filesystems(int which)
 	list_for_each_entry(sb, &super_blocks, s_list) {
 		if (!(sb->s_flags & MS_FROZEN))
 			continue;
-	       
+
 		if (sb->s_type->fs_flags & FS_IS_FUSE) {
 			if (!(which & FS_FREEZER_FUSE))
 				continue;

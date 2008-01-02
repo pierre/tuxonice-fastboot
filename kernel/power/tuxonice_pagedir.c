@@ -45,7 +45,8 @@ static struct page *first_conflicting_page;
 void free_conflicting_pages(void)
 {
 	while (first_conflicting_page) {
-		struct page *next = *((struct page **) kmap(first_conflicting_page));
+		struct page *next =
+			*((struct page **) kmap(first_conflicting_page));
 		kunmap(first_conflicting_page);
 		toi__free_page(29, first_conflicting_page);
 		first_conflicting_page = next;
@@ -58,7 +59,7 @@ void free_conflicting_pages(void)
  *		while copying the original pages.
  */
 
-struct page * ___toi_get_nonconflicting_page(int can_be_highmem)
+struct page *___toi_get_nonconflicting_page(int can_be_highmem)
 {
 	struct page *page;
 	int flags = TOI_ATOMIC_GFP;
@@ -69,8 +70,8 @@ struct page * ___toi_get_nonconflicting_page(int can_be_highmem)
 	if (test_toi_state(TOI_LOADING_ALT_IMAGE) && pageset2_map.bitmap &&
 				(ptoi_pfn < (max_pfn + 2))) {
 		/*
-		 * ptoi_pfn = max_pfn + 1 when yet to find first ps2 pfn that can
-		 * 		be used.
+		 * ptoi_pfn = max_pfn + 1 when yet to find first ps2 pfn that
+		 * can be used.
 		 * 	   = 0..max_pfn when going through list.
 		 * 	   = max_pfn + 2 when gone through whole list.
 		 */
@@ -89,7 +90,8 @@ struct page * ___toi_get_nonconflicting_page(int can_be_highmem)
 	do {
 		page = toi_alloc_page(29, flags);
 		if (!page) {
-			printk("Failed to get nonconflicting page.\n");
+			printk(KERN_INFO "Failed to get nonconflicting "
+					"page.\n");
 			return 0;
 		}
 		if (PagePageset1(page)) {
@@ -98,7 +100,7 @@ struct page * ___toi_get_nonconflicting_page(int can_be_highmem)
 			first_conflicting_page = page;
 			kunmap(page);
 		}
-	} while(PagePageset1(page));
+	} while (PagePageset1(page));
 
 	return page;
 }
@@ -109,9 +111,10 @@ unsigned long __toi_get_nonconflicting_page(void)
 	return page ? (unsigned long) page_address(page) : 0;
 }
 
-struct pbe *get_next_pbe(struct page **page_ptr, struct pbe *this_pbe, int highmem)
+struct pbe *get_next_pbe(struct page **page_ptr, struct pbe *this_pbe,
+		int highmem)
 {
-	if (((((unsigned long) this_pbe) & (PAGE_SIZE - 1)) 
+	if (((((unsigned long) this_pbe) & (PAGE_SIZE - 1))
 		     + 2 * sizeof(struct pbe)) > PAGE_SIZE) {
 		struct page *new_page =
 			___toi_get_nonconflicting_page(highmem);
@@ -127,7 +130,7 @@ struct pbe *get_next_pbe(struct page **page_ptr, struct pbe *this_pbe, int highm
 }
 
 /* get_pageset1_load_addresses
- * 
+ *
  * Description: We check here that pagedir & pages it points to won't collide
  * 		with pages where we're going to restore from the loaded pages
  * 		later.
@@ -148,7 +151,7 @@ int toi_get_pageset1_load_addresses(void)
 		   **last_high_pbe_ptr = &restore_highmem_pblist,
 		   *this_low_pbe = NULL, *this_high_pbe = NULL;
 	int orig_low_pfn = max_pfn + 1, orig_high_pfn = max_pfn + 1;
-	int high_pbes_done=0, low_pbes_done=0;
+	int high_pbes_done = 0, low_pbes_done = 0;
 	int low_direct = 0, high_direct = 0;
 	int high_to_free, low_to_free;
 
@@ -166,7 +169,7 @@ int toi_get_pageset1_load_addresses(void)
 		return 1;
 	this_low_pbe = (struct pbe *) page_address(low_pbe_page);
 
-	/* 
+	/*
 	 * Next, allocate all possible memory to find where we can
 	 * load data directly into destination pages. I'd like to do
 	 * this in bigger chunks, but then we can't free pages
@@ -179,7 +182,7 @@ int toi_get_pageset1_load_addresses(void)
 			SetPagePageset1Copy(page);
 	} while (page);
 
-	/* 
+	/*
 	 * Find out how many high- and lowmem pages we allocated above,
 	 * and how many pages we can reload directly to their original
 	 * location.
@@ -208,8 +211,8 @@ int toi_get_pageset1_load_addresses(void)
 		}
 	}
 
-	high_needed-= high_direct;
-	low_needed-= low_direct;
+	high_needed -= high_direct;
+	low_needed -= low_direct;
 
 	/*
 	 * Do we need to use some lowmem pages for the copies of highmem
@@ -220,7 +223,7 @@ int toi_get_pageset1_load_addresses(void)
 		high_needed -= low_pages_for_highmem;
 		low_needed += low_pages_for_highmem;
 	}
-	
+
 	high_to_free = highallocd - high_needed;
 	low_to_free = lowallocd - low_needed;
 
@@ -259,13 +262,15 @@ int toi_get_pageset1_load_addresses(void)
 						orig_high_pfn);
 				BUG_ON(orig_high_pfn > max_pfn);
 				orig_page = pfn_to_page(orig_high_pfn);
-			} while(!PageHighMem(orig_page) || load_direct(orig_page));
+			} while (!PageHighMem(orig_page) ||
+					load_direct(orig_page));
 
 			this_high_pbe->orig_address = orig_page;
 			this_high_pbe->address = page;
 			this_high_pbe->next = NULL;
 			if (last_high_pbe_page != high_pbe_page) {
-				*last_high_pbe_ptr = (struct pbe *) high_pbe_page;
+				*last_high_pbe_ptr =
+					(struct pbe *) high_pbe_page;
 				if (!last_high_pbe_page)
 					last_high_pbe_page = high_pbe_page;
 			} else
@@ -275,9 +280,11 @@ int toi_get_pageset1_load_addresses(void)
 				kunmap(last_high_pbe_page);
 				last_high_pbe_page = high_pbe_page;
 			}
-			this_high_pbe = get_next_pbe(&high_pbe_page, this_high_pbe, 1);
+			this_high_pbe = get_next_pbe(&high_pbe_page,
+					this_high_pbe, 1);
 			if (IS_ERR(this_high_pbe)) {
-				printk("This high pbe is an error.\n");
+				printk(KERN_INFO
+						"This high pbe is an error.\n");
 				return -ENOMEM;
 			}
 		} else {
@@ -288,16 +295,18 @@ int toi_get_pageset1_load_addresses(void)
 						orig_low_pfn);
 				BUG_ON(orig_low_pfn > max_pfn);
 				orig_page = pfn_to_page(orig_low_pfn);
-			} while(PageHighMem(orig_page) || load_direct(orig_page));
+			} while (PageHighMem(orig_page) ||
+					load_direct(orig_page));
 
 			this_low_pbe->orig_address = page_address(orig_page);
 			this_low_pbe->address = page_address(page);
 			this_low_pbe->next = NULL;
 			*last_low_pbe_ptr = this_low_pbe;
 			last_low_pbe_ptr = &this_low_pbe->next;
-			this_low_pbe = get_next_pbe(&low_pbe_page, this_low_pbe, 0);
+			this_low_pbe = get_next_pbe(&low_pbe_page,
+					this_low_pbe, 0);
 			if (IS_ERR(this_low_pbe)) {
-				printk("this_low_pbe is an error.\n");
+				printk(KERN_INFO "this_low_pbe is an error.\n");
 				return -ENOMEM;
 			}
 		}

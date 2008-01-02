@@ -25,7 +25,7 @@
 #define __KERNEL_SYSCALLS__
 
 #include <linux/reboot.h>
- 
+
 #include "tuxonice_sysfs.h"
 #include "tuxonice_modules.h"
 #include "tuxonice.h"
@@ -38,7 +38,7 @@ extern int toi_wait;
 struct ui_ops *toi_current_ui;
 
 /*! The console log level we default to. */
-int toi_default_console_level = 0;
+int toi_default_console_level;
 
 /**
  * toi_wait_for_keypress - Wait for keypress via userui or /dev/console.
@@ -61,8 +61,8 @@ static char toi_wait_for_keypress(int timeout)
 /* toi_early_boot_message()
  * Description:	Handle errors early in the process of booting.
  * 		The user may press C to continue booting, perhaps
- * 		invalidating the image,  or space to reboot. 
- * 		This works from either the serial console or normally 
+ * 		invalidating the image,  or space to reboot.
+ * 		This works from either the serial console or normally
  * 		attached keyboard.
  *
  * 		Note that we come in here from init, while the kernel is
@@ -82,7 +82,8 @@ static char toi_wait_for_keypress(int timeout)
 
 #define say(message, a...) printk(KERN_EMERG message, ##a)
 
-void toi_early_boot_message(int message_detail, int default_answer, char *warning_reason, ...)
+void toi_early_boot_message(int message_detail, int default_answer,
+	char *warning_reason, ...)
 {
 #if defined(CONFIG_VT) || defined(CONFIG_SERIAL_CONSOLE)
 	unsigned long orig_state = get_toi_state(), continue_req = 0;
@@ -102,8 +103,8 @@ void toi_early_boot_message(int message_detail, int default_answer, char *warnin
 
 	if (warning_reason) {
 		va_start(args, warning_reason);
-		printed_len = vsnprintf(local_printf_buf, 
-				sizeof(local_printf_buf), 
+		printed_len = vsnprintf(local_printf_buf,
+				sizeof(local_printf_buf),
 				warning_reason,
 				args);
 		va_end(args);
@@ -126,40 +127,47 @@ void toi_early_boot_message(int message_detail, int default_answer, char *warnin
 	if (warning_reason) {
 		say("BIG FAT WARNING!! %s\n\n", local_printf_buf);
 		switch (message_detail) {
-		 case 0:
-			say("If you continue booting, note that any image WILL NOT BE REMOVED.\n");
-			say("TuxOnIce is unable to do so because the appropriate modules aren't\n");
-			say("loaded. You should manually remove the image to avoid any\n");
-			say("possibility of corrupting your filesystem(s) later.\n");
+		case 0:
+			say("If you continue booting, note that any image WILL"
+				"NOT BE REMOVED.\nTuxOnIce is unable to do so "
+				"because the appropriate modules aren't\n"
+				"loaded. You should manually remove the image "
+				"to avoid any\npossibility of corrupting your "
+				"filesystem(s) later.\n");
 			break;
-		 case 1:
-			say("If you want to use the current TuxOnIce image, reboot and try\n");
-			say("again with the same kernel that you hibernated from. If you want\n");
-			say("to forget that image, continue and the image will be erased.\n");
+		case 1:
+			say("If you want to use the current TuxOnIce image, "
+				"reboot and try\nagain with the same kernel "
+				"that you hibernated from. If you want\n"
+				"to forget that image, continue and the image "
+				"will be erased.\n");
 			break;
 		}
-		say("Press SPACE to reboot or C to continue booting with this kernel\n\n");
+		say("Press SPACE to reboot or C to continue booting with "
+			"this kernel\n\n");
 		if (toi_wait > 0)
-			say("Default action if you don't select one in %d seconds is: %s.\n",
+			say("Default action if you don't select one in %d "
+				"seconds is: %s.\n",
 				toi_wait,
 				default_answer == TOI_CONTINUE_REQ ?
 				"continue booting" : "reboot");
 	} else {
-		say("BIG FAT WARNING!!\n\n");
-		say("You have tried to resume from this image before.\n");
-		say("If it failed once, it may well fail again.\n");
-		say("Would you like to remove the image and boot normally?\n");
-		say("This will be equivalent to entering noresume on the\n");
-		say("kernel command line.\n\n");
-		say("Press SPACE to remove the image or C to continue resuming.\n\n");
+		say("BIG FAT WARNING!!\n\n"
+			"You have tried to resume from this image before.\n"
+			"If it failed once, it may well fail again.\n"
+			"Would you like to remove the image and boot "
+			"normally?\nThis will be equivalent to entering "
+			"noresume on the\nkernel command line.\n\n"
+			"Press SPACE to remove the image or C to continue "
+			"resuming.\n\n");
 		if (toi_wait > 0)
-			say("Default action if you don't select one in %d seconds is: %s.\n",
-				toi_wait,
+			say("Default action if you don't select one in %d "
+				"seconds is: %s.\n", toi_wait,
 				!!default_answer ?
 				"continue resuming" : "remove the image");
 	}
 	console_loglevel = orig_loglevel;
-	
+
 	set_toi_state(TOI_SANITY_CHECK_PROMPT);
 	clear_toi_state(TOI_CONTINUE_REQ);
 
@@ -173,7 +181,7 @@ void toi_early_boot_message(int message_detail, int default_answer, char *warnin
 post_ask:
 	if ((warning_reason) && (!continue_req))
 		machine_restart(NULL);
-	
+
 	restore_toi_state(orig_state);
 	if (continue_req)
 		set_toi_state(TOI_CONTINUE_REQ);
@@ -209,14 +217,15 @@ static struct toi_module_ops userui_ops = {
 	.directory			= "user_interface",
 	.module				= THIS_MODULE,
 	.sysfs_data			= sysfs_params,
-	.num_sysfs_entries		= sizeof(sysfs_params) / sizeof(struct toi_sysfs_data),
+	.num_sysfs_entries		= sizeof(sysfs_params) /
+		sizeof(struct toi_sysfs_data),
 };
 
 int toi_register_ui_ops(struct ui_ops *this_ui)
 {
 	if (toi_current_ui) {
-		printk("Only one TuxOnIce user interface module can be loaded"
-			" at a time.");
+		printk(KERN_INFO "Only one TuxOnIce user interface module can "
+				"be loaded at a time.");
 		return -EBUSY;
 	}
 

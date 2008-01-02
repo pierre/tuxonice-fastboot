@@ -17,7 +17,7 @@ extern void toi_checksum_exit(void);
 void check_checksums(void);
 int allocate_checksum_pages(void);
 void free_checksum_pages(void);
-char * tuxonice_get_next_checksum(void);
+char *tuxonice_get_next_checksum(void);
 int tuxonice_calc_checksum(struct page *page, char *checksum_locn);
 #else
 static inline int toi_checksum_init(void) { return 0; }

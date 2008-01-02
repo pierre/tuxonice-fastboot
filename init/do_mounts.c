@@ -146,9 +146,9 @@ dev_t name_to_dev_t(char *name)
 
 #ifdef CONFIG_SYSFS
 	int mkdir_err = sys_mkdir("/sys", 0700);
-	/* 
+	/*
 	 * When changing resume parameter for TuxOnIce, sysfs may
-	 * already be mounted. 
+	 * already be mounted.
 	 */
 	mount_result = sys_mount("sysfs", "/sys", "sysfs", 0, NULL);
 	if (mount_result < 0 && mount_result != -EBUSY)

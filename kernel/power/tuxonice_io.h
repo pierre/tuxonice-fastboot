@@ -15,7 +15,7 @@
 
 /* Non-module data saved in our image header */
 struct toi_header {
-	/* 
+	/*
 	 * Mirror struct swsusp_info, but without
 	 * the page aligned attribute
 	 */

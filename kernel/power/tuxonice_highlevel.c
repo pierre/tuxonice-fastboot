@@ -40,10 +40,11 @@
  * amazed by the quality and quantity of Michael's help.
  *
  * Pavel Machek <pavel@ucw.cz><BR>
- * Modifications, defectiveness pointing, being with Gabor at the very beginning,
- * suspend to swap space, stop all tasks. Port to 2.4.18-ac and 2.5.17. Even
- * though Pavel and I disagree on the direction suspend to disk should take, I
- * appreciate the valuable work he did in helping Gabor get the concept working.
+ * Modifications, defectiveness pointing, being with Gabor at the very
+ * beginning, suspend to swap space, stop all tasks. Port to 2.4.18-ac and
+ * 2.5.17. Even though Pavel and I disagree on the direction suspend to
+ * disk should take, I appreciate the valuable work he did in helping Gabor
+ * get the concept working.
  *
  * ..and of course the myriads of TuxOnIce users who have helped diagnose
  * and fix bugs, made suggestions on how to improve the code, proofread
@@ -56,14 +57,14 @@
  * <B>Cyclades.com.</B> Nigel's employers from Dec 2004 until May 2006, who
  * allowed him to work on TuxOnIce and PM related issues on company time.
  *
- * <B>LinuxFund.org.</B> Sponsored Nigel's work on TuxOnIce for four months Oct 2003
- * to Jan 2004.
+ * <B>LinuxFund.org.</B> Sponsored Nigel's work on TuxOnIce for four months Oct
+ * 2003 to Jan 2004.
  *
  * <B>LAC Linux.</B> Donated P4 hardware that enabled development and ongoing
  * maintenance of SMP and Highmem support.
  *
- * <B>OSDL.</B> Provided access to various hardware configurations, make occasional
- * small donations to the project.
+ * <B>OSDL.</B> Provided access to various hardware configurations, make
+ * occasional small donations to the project.
  */
 
 #include <linux/suspend.h>
@@ -72,6 +73,7 @@
 #include <linux/utsrelease.h>
 #include <linux/cpu.h>
 #include <linux/console.h>
+#include <linux/writeback.h>
 #include <asm/uaccess.h>
 
 #include "tuxonice_modules.h"
@@ -94,7 +96,6 @@ static int get_pmsem = 0, got_pmsem;
 static mm_segment_t oldfs;
 static atomic_t actions_running;
 static int block_dump_save;
-extern int block_dump;
 
 int toi_fail_num;
 
@@ -137,7 +138,7 @@ int toi_start_anything(int hibernate_or_resume)
 {
 	if (atomic_add_return(1, &actions_running) != 1) {
 		if (hibernate_or_resume) {
-			printk("Can't start a cycle when actions are "
+			printk(KERN_INFO "Can't start a cycle when actions are "
 					"already running.\n");
 			atomic_dec(&actions_running);
 			return -EBUSY;
@@ -186,13 +187,6 @@ out_err:
  * Here rather than in prepare_image because we want to do it once only at the
  * start of a cycle.
  */
-extern struct list_head nosave_regions;
-
-struct nosave_region {
-	struct list_head list;
-	unsigned long start_pfn;
-	unsigned long end_pfn;
-};
 
 /**
  * mark_nosave_pages - Set up our Nosave bitmap.
@@ -292,7 +286,7 @@ static int get_toi_debug_info(const char *buffer, int count)
 			toi_poweroff_method);
 	SNPRINTF("- Overall expected compression percentage: %d.\n",
 			100 - toi_expected_compression_ratio());
-	len+= toi_print_module_debug_info(((char *) buffer) + len,
+	len += toi_print_module_debug_info(((char *) buffer) + len,
 			count - len - 1);
 	if (toi_io_time[0][1]) {
 		if ((io_MB_per_second(0) < 5) || (io_MB_per_second(1) < 5)) {
@@ -313,8 +307,7 @@ static int get_toi_debug_info(const char *buffer, int count)
 				  toi_io_time[1][1]));
 		}
 		SNPRINTF(".\n");
-	}
-	else
+	} else
 		SNPRINTF("- No I/O speed stats available.\n");
 	SNPRINTF("- Extra pages    : %d used/%d.\n",
 			extra_pd1_pages_used, extra_pd1_pages_allowance);
@@ -378,7 +371,7 @@ static void do_cleanup(int get_debug_info)
 		/* Printk can only handle 1023 bytes, including
 		 * its level mangling. */
 		for (i = 0; i < 3; i++)
-			printk("%s", buffer + (1023 * i));
+			printk(KERN_INFO "%s", buffer + (1023 * i));
 		toi_free_page(20, (unsigned long) buffer);
 	}
 
@@ -479,7 +472,8 @@ static int can_hibernate(void)
 {
 	if (get_pmsem) {
 		if (!mutex_trylock(&pm_mutex)) {
-			printk("TuxOnIce: Failed to obtain pm_mutex.\n");
+			printk(KERN_INFO "TuxOnIce: Failed to obtain "
+					"pm_mutex.\n");
 			dump_stack();
 			set_abort_result(TOI_PM_SEM);
 			return 0;
@@ -491,7 +485,7 @@ static int can_hibernate(void)
 		toi_attempt_to_parse_resume_device(0);
 
 	if (!test_toi_state(TOI_CAN_HIBERNATE)) {
-		printk("TuxOnIce: Hibernation is disabled.\n"
+		printk(KERN_INFO "TuxOnIce: Hibernation is disabled.\n"
 			"This may be because you haven't put something along "
 			"the lines of\n\nresume=swap:/dev/hda1\n\n"
 			"in lilo.conf or equivalent. (Where /dev/hda1 is your "
@@ -823,7 +817,7 @@ static void prepare_restore_load_alt_image(int prepare)
 int pre_resume_freeze(void)
 {
 	if (!test_action_state(TOI_LATE_CPU_HOTPLUG)) {
-		toi_prepare_status(DONT_CLEAR_BAR,	"Disable nonboot cpus.");
+		toi_prepare_status(DONT_CLEAR_BAR, "Disable nonboot cpus.");
 		if (disable_nonboot_cpus()) {
 			set_abort_result(TOI_CPU_HOTPLUG_FAILED);
 			return 1;
@@ -850,51 +844,50 @@ int pre_resume_freeze(void)
 int do_toi_step(int step)
 {
 	switch (step) {
-		case STEP_HIBERNATE_PREPARE_IMAGE:
-			return do_prepare_image();
-		case STEP_HIBERNATE_SAVE_IMAGE:
-			return do_save_image();
-		case STEP_HIBERNATE_POWERDOWN:
-			return do_post_image_write();
-		case STEP_RESUME_CAN_RESUME:
-			return do_check_can_resume();
-		case STEP_RESUME_LOAD_PS1:
-			return do_load_atomic_copy();
-		case STEP_RESUME_DO_RESTORE:
-			/*
-			 * If we succeed, this doesn't return.
-			 * Instead, we return from do_save_image() in the
-			 * hibernated kernel.
-			 */
-			return toi_atomic_restore();
-		case STEP_RESUME_ALT_IMAGE:
-			printk("Trying to resume alternate image.\n");
-			toi_in_hibernate = 0;
-			save_restore_alt_param(SAVE, NOQUIET);
-			prepare_restore_load_alt_image(1);
-			if (!do_check_can_resume()) {
-				printk("Nothing to resume from.\n");
-				goto out;
-			}
-			if (!do_load_atomic_copy())
-				toi_atomic_restore();
+	case STEP_HIBERNATE_PREPARE_IMAGE:
+		return do_prepare_image();
+	case STEP_HIBERNATE_SAVE_IMAGE:
+		return do_save_image();
+	case STEP_HIBERNATE_POWERDOWN:
+		return do_post_image_write();
+	case STEP_RESUME_CAN_RESUME:
+		return do_check_can_resume();
+	case STEP_RESUME_LOAD_PS1:
+		return do_load_atomic_copy();
+	case STEP_RESUME_DO_RESTORE:
+		/*
+		 * If we succeed, this doesn't return.
+		 * Instead, we return from do_save_image() in the
+		 * hibernated kernel.
+		 */
+		return toi_atomic_restore();
+	case STEP_RESUME_ALT_IMAGE:
+		printk(KERN_INFO "Trying to resume alternate image.\n");
+		toi_in_hibernate = 0;
+		save_restore_alt_param(SAVE, NOQUIET);
+		prepare_restore_load_alt_image(1);
+		if (!do_check_can_resume()) {
+			printk(KERN_INFO "Nothing to resume from.\n");
+			goto out;
+		}
+		if (!do_load_atomic_copy())
+			toi_atomic_restore();
 
-			printk("Failed to load image.\n");
+		printk(KERN_INFO "Failed to load image.\n");
 out:
-			prepare_restore_load_alt_image(0);
-			save_restore_alt_param(RESTORE, NOQUIET);
-			break;
-		case STEP_CLEANUP:
-			do_cleanup(1);
-			break;
-		case STEP_QUIET_CLEANUP:
-			do_cleanup(0);
-			break;
+		prepare_restore_load_alt_image(0);
+		save_restore_alt_param(RESTORE, NOQUIET);
+		break;
+	case STEP_CLEANUP:
+		do_cleanup(1);
+		break;
+	case STEP_QUIET_CLEANUP:
+		do_cleanup(0);
+		break;
 	}
 
 	return 0;
 }
-
 EXPORT_SYMBOL_GPL(do_toi_step);
 
 /* -- Functions for kickstarting a hibernate or resume --- */
@@ -984,7 +977,8 @@ int _toi_try_hibernate(int have_pmsem)
 		attempt_to_parse_alt_resume_param();
 
 		if (!strlen(alt_resume_param)) {
-			printk("Alternate resume parameter now invalid. Aborting.\n");
+			printk(KERN_INFO "Alternate resume parameter now "
+					"invalid. Aborting.\n");
 			goto out;
 		}
 	}
@@ -996,7 +990,8 @@ int _toi_try_hibernate(int have_pmsem)
 		goto out;
 	}
 
-	if ((result = do_toi_step(STEP_HIBERNATE_PREPARE_IMAGE)))
+	result = do_toi_step(STEP_HIBERNATE_PREPARE_IMAGE);
+	if (result)
 		goto out;
 
 	if (test_action_state(TOI_FREEZER_TEST)) {
@@ -1004,7 +999,8 @@ int _toi_try_hibernate(int have_pmsem)
 		goto out;
 	}
 
-	if ((result = do_toi_step(STEP_HIBERNATE_SAVE_IMAGE)))
+	result = do_toi_step(STEP_HIBERNATE_SAVE_IMAGE);
+	if (result)
 		goto out;
 
 	/* This code runs at resume time too! */
@@ -1140,7 +1136,7 @@ static __init int core_load(void)
 	if (toi_sysfs_init())
 		return 1;
 
-	for (i=0; i< numfiles; i++)
+	for (i = 0; i < numfiles; i++)
 		toi_register_sysfs_file(&toi_subsys.kobj,
 				&sysfs_params[i]);
 
@@ -1178,7 +1174,7 @@ static __exit void core_unload(void)
 	toi_cluster_exit();
 	toi_usm_exit();
 
-	for (i=0; i< numfiles; i++)
+	for (i = 0; i < numfiles; i++)
 		toi_unregister_sysfs_file(&toi_subsys.kobj,
 				&sysfs_params[i]);
 

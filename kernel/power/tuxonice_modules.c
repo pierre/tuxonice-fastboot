@@ -19,7 +19,7 @@ LIST_HEAD(toi_modules);
 struct toi_module_ops *toiActiveAllocator;
 int toi_num_filters;
 int toiNumAllocators, toi_num_modules;
- 
+
 /*
  * toi_header_storage_for_modules
  *
@@ -32,7 +32,7 @@ int toi_header_storage_for_modules(void)
 {
 	struct toi_module_ops *this_module;
 	int bytes = 0;
-	
+
 	list_for_each_entry(this_module, &toi_modules, module_list) {
 		if (!this_module->enabled ||
 		    (this_module->type == WRITER_MODULE &&
@@ -88,7 +88,8 @@ int toi_expected_compression_ratio(void)
 		if (!this_module->enabled)
 			continue;
 		if (this_module->expected_compression)
-			ratio = ratio * this_module->expected_compression() / 100;
+			ratio = ratio * this_module->expected_compression()
+				/ 100;
 	}
 
 	return ratio;
@@ -102,12 +103,12 @@ int toi_expected_compression_ratio(void)
 static struct toi_module_ops *toi_find_module_given_dir(char *name)
 {
 	struct toi_module_ops *this_module, *found_module = NULL;
-	
+
 	list_for_each_entry(this_module, &toi_modules, module_list) {
 		if (!strcmp(name, this_module->directory)) {
 			found_module = this_module;
 			break;
-		}			
+		}
 	}
 
 	return found_module;
@@ -121,12 +122,12 @@ static struct toi_module_ops *toi_find_module_given_dir(char *name)
 struct toi_module_ops *toi_find_module_given_name(char *name)
 {
 	struct toi_module_ops *this_module, *found_module = NULL;
-	
+
 	list_for_each_entry(this_module, &toi_modules, module_list) {
 		if (!strcmp(name, this_module->name)) {
 			found_module = this_module;
 			break;
-		}			
+		}
 	}
 
 	return found_module;
@@ -146,7 +147,7 @@ int toi_print_module_debug_info(char *buffer, int buffer_size)
 			continue;
 		if (this_module->print_debug_info) {
 			int result;
-			result = this_module->print_debug_info(buffer + len, 
+			result = this_module->print_debug_info(buffer + len,
 					buffer_size - len);
 			len += result;
 		}
@@ -169,71 +170,67 @@ int toi_register_module(struct toi_module_ops *module)
 	struct kobject *kobj;
 
 	module->enabled = 1;
-	
+
 	if (toi_find_module_given_name(module->name)) {
-		printk("TuxOnIce: Trying to load module %s,"
+		printk(KERN_INFO "TuxOnIce: Trying to load module %s,"
 				" which is already registered.\n",
 				module->name);
 		return -EBUSY;
 	}
 
 	switch (module->type) {
-		case FILTER_MODULE:
-			list_add_tail(&module->type_list,
-					&toi_filters);
-			toi_num_filters++;
-			break;
-
-		case WRITER_MODULE:
-			list_add_tail(&module->type_list,
-					&toiAllocators);
-			toiNumAllocators++;
-			break;
-
-		case MISC_MODULE:
-		case MISC_HIDDEN_MODULE:
-			break;
-
-		default:
-			printk("Hmmm. Module '%s' has an invalid type."
-				" It has been ignored.\n", module->name);
-			return -EINVAL;
+	case FILTER_MODULE:
+		list_add_tail(&module->type_list, &toi_filters);
+		toi_num_filters++;
+		break;
+	case WRITER_MODULE:
+		list_add_tail(&module->type_list, &toiAllocators);
+		toiNumAllocators++;
+		break;
+	case MISC_MODULE:
+	case MISC_HIDDEN_MODULE:
+		break;
+	default:
+		printk("Hmmm. Module '%s' has an invalid type."
+			" It has been ignored.\n", module->name);
+		return -EINVAL;
 	}
 	list_add_tail(&module->module_list, &toi_modules);
 	toi_num_modules++;
 
-	if (module->directory || module->shared_directory) {
-		/* 
-		 * Modules may share a directory, but those with shared_dir
-		 * set must be loaded (via symbol dependencies) after parents
-		 * and unloaded beforehand.
-		 */
-		if (module->shared_directory) {
-			struct toi_module_ops *shared =
-				toi_find_module_given_dir(module->shared_directory);
-			if (!shared) {
-				printk("TuxOnIce: Module %s wants to share %s's directory but %s isn't loaded.\n",
-						module->name,
-						module->shared_directory,
-						module->shared_directory);
-				toi_unregister_module(module);
-				return -ENODEV;
-			}
-			kobj = shared->dir_kobj;
-		} else {
-			if (!strncmp(module->directory, "[ROOT]", 6))
-				kobj = &toi_subsys.kobj;
-			else
-				kobj = make_toi_sysdir(module->directory);
-		}
-		module->dir_kobj = kobj;
-		for (i=0; i < module->num_sysfs_entries; i++) {
-			int result = toi_register_sysfs_file(kobj, &module->sysfs_data[i]);
-			if (result)
-				return result;
-		}
-	}
+	if (!module->directory && !module->shared_directory)
+		return 0;
 
+	/*
+	 * Modules may share a directory, but those with shared_dir
+	 * set must be loaded (via symbol dependencies) after parents
+	 * and unloaded beforehand.
+	 */
+	if (module->shared_directory) {
+		struct toi_module_ops *shared =
+			toi_find_module_given_dir(module->shared_directory);
+		if (!shared) {
+			printk("TuxOnIce: Module %s wants to share %s's "
+					"directory but %s isn't loaded.\n",
+					module->name, module->shared_directory,
+					module->shared_directory);
+			toi_unregister_module(module);
+			return -ENODEV;
+		}
+		kobj = shared->dir_kobj;
+	} else {
+		if (!strncmp(module->directory, "[ROOT]", 6))
+			kobj = &toi_subsys.kobj;
+		else
+			kobj = make_toi_sysdir(module->directory);
+	}
+	module->dir_kobj = kobj;
+	for (i = 0; i < module->num_sysfs_entries; i++) {
+		int result = toi_register_sysfs_file(kobj,
+				&module->sysfs_data[i]);
+		if (result)
+			return result;
+	}
 	return 0;
 }
 
@@ -247,37 +244,35 @@ void toi_unregister_module(struct toi_module_ops *module)
 	int i;
 
 	if (module->dir_kobj)
-		for (i=0; i < module->num_sysfs_entries; i++)
-			toi_unregister_sysfs_file(module->dir_kobj, &module->sysfs_data[i]);
+		for (i = 0; i < module->num_sysfs_entries; i++)
+			toi_unregister_sysfs_file(module->dir_kobj,
+					&module->sysfs_data[i]);
 
 	if (!module->shared_directory && module->directory &&
 			strncmp(module->directory, "[ROOT]", 6))
 		remove_toi_sysdir(module->dir_kobj);
 
 	switch (module->type) {
-		case FILTER_MODULE:
-			list_del(&module->type_list);
-			toi_num_filters--;
-			break;
-
-		case WRITER_MODULE:
-			list_del(&module->type_list);
-			toiNumAllocators--;
-			if (toiActiveAllocator == module) {
-				toiActiveAllocator = NULL;
-				clear_toi_state(TOI_CAN_RESUME);
-				clear_toi_state(TOI_CAN_HIBERNATE);
-			}
-			break;
-		
-		case MISC_MODULE:
-		case MISC_HIDDEN_MODULE:
-			break;
-
-		default:
-			printk("Hmmm. Module '%s' has an invalid type."
-				" It has been ignored.\n", module->name);
-			return;
+	case FILTER_MODULE:
+		list_del(&module->type_list);
+		toi_num_filters--;
+		break;
+	case WRITER_MODULE:
+		list_del(&module->type_list);
+		toiNumAllocators--;
+		if (toiActiveAllocator == module) {
+			toiActiveAllocator = NULL;
+			clear_toi_state(TOI_CAN_RESUME);
+			clear_toi_state(TOI_CAN_HIBERNATE);
+		}
+		break;
+	case MISC_MODULE:
+	case MISC_HIDDEN_MODULE:
+		break;
+	default:
+		printk("Hmmm. Module '%s' has an invalid type."
+			" It has been ignored.\n", module->name);
+		return;
 	}
 	list_del(&module->module_list);
 	toi_num_modules--;
@@ -291,25 +286,21 @@ void toi_unregister_module(struct toi_module_ops *module)
 void toi_move_module_tail(struct toi_module_ops *module)
 {
 	switch (module->type) {
-		case FILTER_MODULE:
-			if (toi_num_filters > 1)
-				list_move_tail(&module->type_list,
-						&toi_filters);
-			break;
-
-		case WRITER_MODULE:
-			if (toiNumAllocators > 1)
-				list_move_tail(&module->type_list,
-						&toiAllocators);
-			break;
-		
-		case MISC_MODULE:
-		case MISC_HIDDEN_MODULE:
-			break;
-		default:
-			printk("Hmmm. Module '%s' has an invalid type."
-				" It has been ignored.\n", module->name);
-			return;
+	case FILTER_MODULE:
+		if (toi_num_filters > 1)
+			list_move_tail(&module->type_list, &toi_filters);
+		break;
+	case WRITER_MODULE:
+		if (toiNumAllocators > 1)
+			list_move_tail(&module->type_list, &toiAllocators);
+		break;
+	case MISC_MODULE:
+	case MISC_HIDDEN_MODULE:
+		break;
+	default:
+		printk("Hmmm. Module '%s' has an invalid type."
+			" It has been ignored.\n", module->name);
+		return;
 	}
 	if ((toi_num_filters + toiNumAllocators) > 1)
 		list_move_tail(&module->module_list, &toi_modules);
@@ -324,7 +315,7 @@ int toi_initialise_modules(int starting_cycle, int early)
 {
 	struct toi_module_ops *this_module;
 	int result;
-	
+
 	list_for_each_entry(this_module, &toi_modules, module_list) {
 		this_module->header_requested = 0;
 		this_module->header_used = 0;
@@ -336,7 +327,8 @@ int toi_initialise_modules(int starting_cycle, int early)
 			toi_message(TOI_MEMORY, TOI_MEDIUM, 1,
 				"Initialising module %s.\n",
 				this_module->name);
-			if ((result = this_module->initialise(starting_cycle)))
+			result = this_module->initialise(starting_cycle);
+			if (result)
 				return result;
 		}
 	}
@@ -344,7 +336,7 @@ int toi_initialise_modules(int starting_cycle, int early)
 	return 0;
 }
 
-/* 
+/*
  * toi_cleanup_modules
  *
  * Tell modules the work is done.
@@ -352,7 +344,7 @@ int toi_initialise_modules(int starting_cycle, int early)
 void toi_cleanup_modules(int finishing_cycle)
 {
 	struct toi_module_ops *this_module;
-	
+
 	list_for_each_entry(this_module, &toi_modules, module_list) {
 		if (!this_module->enabled)
 			continue;
@@ -394,7 +386,7 @@ void toi_print_modules(void)
 	int prev = 0;
 
 	printk("TuxOnIce " TOI_CORE_VERSION ", with support for");
-	
+
 	list_for_each_entry(this_module, &toi_modules, module_list) {
 		if (this_module->type == MISC_HIDDEN_MODULE)
 			continue;
@@ -409,26 +401,28 @@ void toi_print_modules(void)
 }
 
 /* toi_get_modules
- * 
+ *
  * Take a reference to modules so they can't go away under us.
  */
 
 int toi_get_modules(void)
 {
 	struct toi_module_ops *this_module;
-	
+
 	list_for_each_entry(this_module, &toi_modules, module_list) {
-		if (!try_module_get(this_module->module)) {
-			/* Failed! Reverse gets and return error */
-			struct toi_module_ops *this_module2;
-			list_for_each_entry(this_module2, &toi_modules, module_list) {
-				if (this_module == this_module2)
-					return -EINVAL;
-				module_put(this_module2->module);
-			}
+		struct toi_module_ops *this_module2;
+
+		if (try_module_get(this_module->module))
+			continue;
+
+		/* Failed! Reverse gets and return error */
+		list_for_each_entry(this_module2, &toi_modules,
+				module_list) {
+			if (this_module == this_module2)
+				return -EINVAL;
+			module_put(this_module2->module);
 		}
 	}
-
 	return 0;
 }
 
@@ -440,7 +434,7 @@ int toi_get_modules(void)
 void toi_put_modules(void)
 {
 	struct toi_module_ops *this_module;
-	
+
 	list_for_each_entry(this_module, &toi_modules, module_list)
 		module_put(this_module->module);
 }

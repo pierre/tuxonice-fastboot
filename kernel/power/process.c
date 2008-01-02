@@ -15,7 +15,8 @@
 #include <linux/freezer.h>
 #include <linux/buffer_head.h>
 
-int freezer_state = 0;
+int freezer_state;
+EXPORT_SYMBOL(freezer_state);
 
 /* 
  * Timeout for stopping processes
@@ -77,6 +78,7 @@ void refrigerator(void)
 	pr_debug("%s left refrigerator\n", current->comm);
 	__set_current_state(save);
 }
+EXPORT_SYMBOL(refrigerator);
 
 static void fake_signal_wake_up(struct task_struct *p, int resume)
 {
@@ -222,7 +224,8 @@ static int try_to_freeze_tasks(int freeze_user_space)
 		do_each_thread(g, p) {
 			task_lock(p);
 			if (freezing(p) && !freezer_should_skip(p))
-				printk(KERN_ERR " %s (%d) failed to freeze.\n", p->comm, p->pid);
+				printk(KERN_ERR " %s (%d) failed to freeze.\n",
+						p->comm, p->pid);
 			cancel_freezing(p);
 			task_unlock(p);
 		} while_each_thread(g, p);
@@ -242,24 +245,24 @@ int freeze_processes(void)
 {
 	int error;
 
-	printk("Stopping fuse filesystems.\n");
+	printk(KERN_INFO "Stopping fuse filesystems.\n");
 	freeze_filesystems(FS_FREEZER_FUSE);
 	freezer_state = FREEZER_FILESYSTEMS_FROZEN;
-	printk("Freezing user space processes ... ");
+	printk(KERN_INFO "Freezing user space processes ... ");
 	error = try_to_freeze_tasks(FREEZER_USER_SPACE);
 	if (error)
 		goto Exit;
-	printk("done.\n");
+	printk(KERN_INFO "done.\n");
 
 	sys_sync();
-	printk("Stopping normal filesystems.\n");
+	printk(KERN_INFO "Stopping normal filesystems.\n");
 	freeze_filesystems(FS_FREEZER_NORMAL);
 	freezer_state = FREEZER_USERSPACE_FROZEN;
-	printk("Freezing remaining freezable tasks ... ");
+	printk(KERN_INFO "Freezing remaining freezable tasks ... ");
 	error = try_to_freeze_tasks(FREEZER_KERNEL_THREADS);
 	if (error)
 		goto Exit;
-	printk("done.");
+	printk(KERN_INFO "done.");
 	freezer_state = FREEZER_FULLY_ON;
  Exit:
 	BUG_ON(in_atomic());
@@ -291,16 +294,16 @@ void thaw_processes(void)
 	if (old_state == FREEZER_OFF)
 		return;
 
-	/* 
+	/*
 	 * Change state beforehand because thawed tasks might submit I/O
 	 * immediately.
 	 */
 	freezer_state = FREEZER_OFF;
 
-	printk("Restarting all filesystems ...\n");
+	printk(KERN_INFO "Restarting all filesystems ...\n");
 	thaw_filesystems(FS_FREEZER_ALL);
 
-	printk("Restarting tasks ... ");
+	printk(KERN_INFO "Restarting tasks ... ");
 
 	if (old_state == FREEZER_FULLY_ON)
 		thaw_tasks(FREEZER_KERNEL_THREADS);
@@ -312,10 +315,7 @@ void thaw_processes(void)
 void thaw_kernel_threads(void)
 {
 	freezer_state = FREEZER_USERSPACE_FROZEN;
-	printk("Restarting normal filesystems.\n");
+	printk(KERN_INFO "Restarting normal filesystems.\n");
 	thaw_filesystems(FS_FREEZER_NORMAL);
 	thaw_tasks(FREEZER_KERNEL_THREADS);
 }
-
-EXPORT_SYMBOL(refrigerator);
-EXPORT_SYMBOL(freezer_state);

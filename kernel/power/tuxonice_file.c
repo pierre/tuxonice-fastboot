@@ -4,7 +4,7 @@
  * Copyright (C) 2005-2007 Nigel Cunningham (nigel at tuxonice net)
  *
  * Distributed under GPLv2.
- * 
+ *
  * This file encapsulates functions for usage of a simple file as a
  * backing store. It is based upon the swapallocator, and shares the
  * same basic working. Here, though, we have nothing to do with
@@ -60,11 +60,11 @@ static struct inode *target_inode;
 static struct file *target_file;
 static struct block_device *toi_file_target_bdev;
 static dev_t resume_file_dev_t;
-static int used_devt = 0;
-static int setting_toi_file_target = 0;
-static sector_t target_firstblock = 0, target_header_start = 0;
-static int target_storage_available = 0;
-static int target_claim = 0;
+static int used_devt;
+static int setting_toi_file_target;
+static sector_t target_firstblock, target_header_start;
+static int target_storage_available;
+static int target_claim;
 
 static char HaveImage[] = "HaveImage\n";
 static char NoImage[] =   "TuxOnIce\n";
@@ -117,29 +117,29 @@ static int adjust_for_extra_pages(int unadjusted)
 static int toi_file_storage_available(void)
 {
 	int result = 0;
-	struct block_device *bdev=toi_file_target_bdev;
+	struct block_device *bdev = toi_file_target_bdev;
 
 	if (!target_inode)
 		return 0;
 
 	switch (target_inode->i_mode & S_IFMT) {
-		case S_IFSOCK:
-		case S_IFCHR:
-		case S_IFIFO: /* Socket, Char, Fifo */
-			return -1;
-		case S_IFREG: /* Regular file: current size - holes + free
-				 space on part */
-			result = target_storage_available;
-			break;
-		case S_IFBLK: /* Block device */
-			if (!bdev->bd_disk) {
-				printk("bdev->bd_disk null.\n");
-				return 0;
-			}
+	case S_IFSOCK:
+	case S_IFCHR:
+	case S_IFIFO: /* Socket, Char, Fifo */
+		return -1;
+	case S_IFREG: /* Regular file: current size - holes + free
+			 space on part */
+		result = target_storage_available;
+		break;
+	case S_IFBLK: /* Block device */
+		if (!bdev->bd_disk) {
+			printk(KERN_INFO "bdev->bd_disk null.\n");
+			return 0;
+		}
 
-			result = (bdev->bd_part ?
-				bdev->bd_part->nr_sects :
-				bdev->bd_disk->capacity) >> (PAGE_SHIFT - 9);
+		result = (bdev->bd_part ?
+			bdev->bd_part->nr_sects :
+			bdev->bd_disk->capacity) >> (PAGE_SHIFT - 9);
 	}
 
 	return adjust_for_extra_pages(result);
@@ -159,29 +159,30 @@ static int has_contiguous_blocks(int page_num)
 
 		last = this;
 	}
-			
+
 	return (j == devinfo.blocks_per_page);
 }
 
 static int size_ignoring_ignored_pages(void)
 {
 	int mappable = 0, i;
-	
+
 	if (!target_is_normal_file())
 		return toi_file_storage_available();
 
 	for (i = 0; i < (target_inode->i_size >> PAGE_SHIFT) ; i++)
 		if (has_contiguous_blocks(i))
 			mappable++;
-	
+
 	return mappable;
 }
 
 static void __populate_block_list(int min, int max)
 {
 	if (test_action_state(TOI_TEST_BIO))
-		printk("Adding extent %d-%d.\n", min << devinfo.bmap_shift,
-		        ((max + 1) << devinfo.bmap_shift) - 1);
+		printk(KERN_INFO "Adding extent %d-%d.\n",
+			min << devinfo.bmap_shift,
+			((max + 1) << devinfo.bmap_shift) - 1);
 
 	toi_add_to_extent_chain(&block_chain, min, max);
 }
@@ -190,15 +191,15 @@ static void populate_block_list(void)
 {
 	int i;
 	int extent_min = -1, extent_max = -1, got_header = 0;
-	
+
 	if (block_chain.first)
 		toi_put_extent_chain(&block_chain);
 
 	if (!target_is_normal_file()) {
 		if (target_storage_available > 0)
-			__populate_block_list(devinfo.blocks_per_page, 
+			__populate_block_list(devinfo.blocks_per_page,
 				(target_storage_available + 1) *
-			 	devinfo.blocks_per_page - 1);
+				devinfo.blocks_per_page - 1);
 		return;
 	}
 
@@ -211,7 +212,7 @@ static void populate_block_list(void)
 		new_sector = bmap(target_inode,
 		(i * devinfo.blocks_per_page));
 
-		/* 
+		/*
 		 * Ignore the first block in the file.
 		 * It gets the header.
 		 */
@@ -220,13 +221,13 @@ static void populate_block_list(void)
 			continue;
 		}
 
-		/* 
-		 * I'd love to be able to fill in holes and resize 
+		/*
+		 * I'd love to be able to fill in holes and resize
 		 * files, but not yet...
 		 */
 
 		if (new_sector == extent_max + 1)
-			extent_max+= devinfo.blocks_per_page;
+			extent_max += devinfo.blocks_per_page;
 		else {
 			if (extent_min > -1)
 				__populate_block_list(extent_min,
@@ -266,7 +267,7 @@ static void toi_file_cleanup(int finishing_cycle)
 	}
 }
 
-/* 
+/*
  * reopen_resume_devt
  *
  * Having opened resume= once, we remember the major and
@@ -277,7 +278,7 @@ static void reopen_resume_devt(void)
 {
 	toi_file_target_bdev = open_by_devnum(resume_file_dev_t, FMODE_READ);
 	if (IS_ERR(toi_file_target_bdev)) {
-		printk("Got a dev_num (%lx) but failed to open it.\n",
+		printk(KERN_INFO "Got a dev_num (%lx) but failed to open it.\n",
 				(unsigned long) resume_file_dev_t);
 		return;
 	}
@@ -299,7 +300,7 @@ static void toi_file_get_target_info(char *target, int get_size,
 	if (IS_ERR(target_file) || !target_file) {
 
 		if (!resume_param) {
-			printk("Open file %s returned %p.\n",
+			printk(KERN_INFO "Open file %s returned %p.\n",
 					target, target_file);
 			target_file = NULL;
 			return;
@@ -310,20 +311,22 @@ static void toi_file_get_target_info(char *target, int get_size,
 		if (!resume_file_dev_t) {
 			struct kstat stat;
 			int error = vfs_stat(target, &stat);
-			printk("Open file %s returned %p and name_to_devt "
-					"failed.\n", target, target_file);
+			printk(KERN_INFO "Open file %s returned %p and "
+					"name_to_devt failed.\n", target,
+					target_file);
 			if (error)
-				printk("Stating the file also failed."
+				printk(KERN_INFO "Stating the file also failed."
 					" Nothing more we can do.\n");
 			else
 				resume_file_dev_t = stat.rdev;
 			return;
 		}
 
-	     	toi_file_target_bdev = open_by_devnum(resume_file_dev_t,
+		toi_file_target_bdev = open_by_devnum(resume_file_dev_t,
 				FMODE_READ);
 		if (IS_ERR(toi_file_target_bdev)) {
-			printk("Got a dev_num (%lx) but failed to open it.\n",
+			printk(KERN_INFO "Got a dev_num (%lx) but failed to "
+					"open it.\n",
 					(unsigned long) resume_file_dev_t);
 			return;
 		}
@@ -334,8 +337,8 @@ static void toi_file_get_target_info(char *target, int get_size,
 
 	if (S_ISLNK(target_inode->i_mode) || S_ISDIR(target_inode->i_mode) ||
 	    S_ISSOCK(target_inode->i_mode) || S_ISFIFO(target_inode->i_mode)) {
-		printk("File support works with regular files, character "
-				"files and block devices.\n");
+		printk(KERN_INFO "File support works with regular files,"
+				" character files and block devices.\n");
 		goto cleanup;
 	}
 
@@ -356,7 +359,7 @@ static void toi_file_get_target_info(char *target, int get_size,
 
 	if (!resume_param)
 		target_firstblock = bmap(target_inode, 0) << devinfo.bmap_shift;
-	
+
 	return;
 cleanup:
 	target_inode = NULL;
@@ -371,7 +374,8 @@ cleanup:
 static int parse_signature(struct toi_file_header *header)
 {
 	int have_image = !memcmp(HaveImage, header->sig, sizeof(HaveImage) - 1);
-	int no_image_header = !memcmp(NoImage, header->sig, sizeof(NoImage) - 1);
+	int no_image_header = !memcmp(NoImage, header->sig,
+			sizeof(NoImage) - 1);
 
 	if (no_image_header)
 		return 0;
@@ -442,8 +446,8 @@ static int toi_file_allocate_header_space(int space_requested)
 
 	for (i = 0; i < space_requested; i++) {
 		if (toi_bio_ops.forward_one_page()) {
-			printk("Out of space while seeking to allocate "
-					"header pages,\n");
+			printk(KERN_INFO "Out of space while seeking to "
+					"allocate header pages,\n");
 			header_pages_allocated = i;
 			return -ENOSPC;
 		}
@@ -477,7 +481,7 @@ static int __toi_file_allocate_storage(int main_space_requested,
 	int pages_to_get = main_space_requested + extra_pages +
 		header_space_requested;
 	int blocks_to_get = pages_to_get - block_chain.size;
-	
+
 	/* Only release_storage reduces the size */
 	if (blocks_to_get < 1)
 		return 0;
@@ -489,7 +493,8 @@ static int __toi_file_allocate_storage(int main_space_requested,
 		block_chain.size);
 
 	if (block_chain.size < pages_to_get) {
-		printk("Block chain size (%d) < header pages (%d) + extra pages (%d) + main pages (%d) (=%d pages).\n",
+		printk("Block chain size (%d) < header pages (%d) + extra "
+			"pages (%d) + main pages (%d) (=%d pages).\n",
 			block_chain.size, header_pages_allocated, extra_pages,
 			main_space_requested, pages_to_get);
 		result = -ENOSPC;
@@ -518,14 +523,14 @@ static int toi_file_write_header_init(void)
 	 */
 
 	toi_bio_ops.rw_header_chunk(WRITE, &toi_fileops,
-			(char *) &toi_writer_posn_save, 
+			(char *) &toi_writer_posn_save,
 			sizeof(toi_writer_posn_save));
 
 	toi_bio_ops.rw_header_chunk(WRITE, &toi_fileops,
 			(char *) &devinfo, sizeof(devinfo));
 
 	toi_serialise_extent_chain(&toi_fileops, &block_chain);
-	
+
 	return 0;
 }
 
@@ -552,7 +557,7 @@ static int toi_file_write_header_cleanup(void)
 	prepare_signature(header,
 			toi_writer_posn.current_offset <<
 			devinfo.bmap_shift);
-		
+
 	toi_bio_ops.bdev_page_io(WRITE, toi_file_target_bdev,
 			target_firstblock,
 			virt_to_page(toi_writer_buffer));
@@ -572,13 +577,13 @@ static int file_init(void)
 	toi_bio_ops.bdev_page_io(READ, toi_file_target_bdev,
 			target_header_start,
 			virt_to_page((unsigned long) toi_writer_buffer));
-	
+
 	return 0;
 }
 
 /*
  * read_header_init()
- * 
+ *
  * Description:
  * 1. Attempt to read the device specified with resume=.
  * 2. Check the contents of the header for our signature.
@@ -599,7 +604,7 @@ static int toi_file_read_header_init(void)
 	struct block_device *tmp;
 
 	result = file_init();
-	
+
 	if (result) {
 		printk("FileAllocator read header init: Failed to initialise "
 				"reading the first page of data.\n");
@@ -609,7 +614,7 @@ static int toi_file_read_header_init(void)
 	memcpy(&toi_writer_posn_save,
 	       toi_writer_buffer + toi_writer_buffer_posn,
 	       sizeof(toi_writer_posn_save));
-	
+
 	toi_writer_buffer_posn += sizeof(toi_writer_posn_save);
 
 	tmp = devinfo.bdev;
@@ -639,8 +644,8 @@ static int toi_file_signature_op(int op)
 	char *cur;
 	int result = 0, changed = 0;
 	struct toi_file_header *header;
-	
-	if(toi_file_target_bdev <= 0)
+
+	if (toi_file_target_bdev <= 0)
 		return -1;
 
 	cur = (char *) toi_get_zeroed_page(17, TOI_ATOMIC_GFP);
@@ -656,28 +661,28 @@ static int toi_file_signature_op(int op)
 
 	header = (struct toi_file_header *) cur;
 	result = parse_signature(header);
-		
-	switch (op) {
-		case INVALIDATE:
-			if (result == -1)
-				goto out;
 
-			strcpy(header->sig, NoImage);
+	switch (op) {
+	case INVALIDATE:
+		if (result == -1)
+			goto out;
+
+		strcpy(header->sig, NoImage);
+		header->resumed_before = 0;
+		result = changed = 1;
+		break;
+	case MARK_RESUME_ATTEMPTED:
+		if (result == 1) {
+			header->resumed_before = 1;
+			changed = 1;
+		}
+		break;
+	case UNMARK_RESUME_ATTEMPTED:
+		if (result == 1) {
 			header->resumed_before = 0;
-			result = changed = 1;
-			break;
-		case MARK_RESUME_ATTEMPTED:
-			if (result == 1) {
-				header->resumed_before = 1;
-				changed = 1;
-			}
-			break;
-		case UNMARK_RESUME_ATTEMPTED:
-			if (result == 1) {
-				header->resumed_before = 0;
-				changed = 1;
-			}
-			break;
+			changed = 1;
+		}
+		break;
 	}
 
 	if (changed)
@@ -699,16 +704,17 @@ out:
 static int toi_file_print_debug_stats(char *buffer, int size)
 {
 	int len = 0;
-	
+
 	if (toiActiveAllocator != &toi_fileops) {
-		len = snprintf_used(buffer, size, "- FileAllocator inactive.\n");
+		len = snprintf_used(buffer, size,
+				"- FileAllocator inactive.\n");
 		return len;
 	}
 
 	len = snprintf_used(buffer, size, "- FileAllocator active.\n");
 
-	len+= snprintf_used(buffer+len, size-len, "  Storage available for image: "
-			"%ld pages.\n",
+	len += snprintf_used(buffer+len, size-len, "  Storage available for "
+			"image: %ld pages.\n",
 			toi_file_storage_allocated());
 
 	return len;
@@ -733,9 +739,9 @@ static int toi_file_storage_needed(void)
 		(2 * sizeof(unsigned long) * block_chain.num_extents);
 }
 
-/* 
+/*
  * toi_file_remove_image
- * 
+ *
  */
 static int toi_file_remove_image(void)
 {
@@ -789,16 +795,16 @@ static void toi_file_set_resume_param(void)
 		set_devinfo(toi_file_target_bdev, target_inode->i_blkbits);
 
 		bdevname(toi_file_target_bdev, buffer2);
-		offset += snprintf(buffer + offset, PAGE_SIZE - offset, 
+		offset += snprintf(buffer + offset, PAGE_SIZE - offset,
 				"/dev/%s", buffer2);
-		
+
 		if (sector)
 			offset += snprintf(buffer + offset, PAGE_SIZE - offset,
 				":0x%lx", sector << devinfo.bmap_shift);
 	} else
 		offset += snprintf(buffer + offset, PAGE_SIZE - offset,
 				"%s is not a valid target.", toi_file_target);
-			
+
 	sprintf(resume_file, "file:%s", buffer);
 
 	toi_free_page(18, (unsigned long) buffer);
@@ -812,10 +818,11 @@ static int __test_toi_file_target(char *target, int resume_time, int quiet)
 	toi_file_get_target_info(target, 0, resume_time);
 	if (toi_file_signature_op(GET_IMAGE_EXISTS) > -1) {
 		if (!quiet)
-			printk("TuxOnIce: FileAllocator: File signature found.\n");
+			printk(KERN_INFO "TuxOnIce: FileAllocator: File "
+					"signature found.\n");
 		if (!resume_time)
 			toi_file_set_resume_param();
-		
+
 		toi_bio_ops.set_devinfo(&devinfo);
 		toi_writer_posn.chains = &block_chain;
 		toi_writer_posn.num_chains = 1;
@@ -831,12 +838,12 @@ static int __test_toi_file_target(char *target, int resume_time, int quiet)
 		return 1;
 
 	if (*target)
-		printk("TuxOnIce: FileAllocator: Sorry. No signature found at"
-					" %s.\n", target);
+		printk(KERN_INFO "TuxOnIce: FileAllocator: Sorry. No signature "
+				"found at  %s.\n", target);
 	else
 		if (!resume_time)
-			printk("TuxOnIce: FileAllocator: Sorry. Target is not"
-						" set for hibernating.\n");
+			printk(KERN_INFO "TuxOnIce: FileAllocator: Sorry. "
+					"Target is not set for hibernating.\n");
 
 	return 1;
 }
@@ -844,11 +851,11 @@ static int __test_toi_file_target(char *target, int resume_time, int quiet)
 static void test_toi_file_target(void)
 {
 	setting_toi_file_target = 1;
-       	
-	printk("TuxOnIce: Hibernating %sabled.\n",
+
+	printk(KERN_INFO "TuxOnIce: Hibernating %sabled.\n",
 			__test_toi_file_target(toi_file_target, 0, 1) ?
 			"dis" : "en");
-	
+
 	setting_toi_file_target = 0;
 }
 
@@ -862,7 +869,7 @@ static void test_toi_file_target(void)
  * Where:
  * DEVNAME is convertable to a dev_t by name_to_dev_t
  * FIRSTBLOCK is the location of the first block in the file.
- * BLOCKSIZE is the logical blocksize >= SECTOR_SIZE & <= PAGE_SIZE, 
+ * BLOCKSIZE is the logical blocksize >= SECTOR_SIZE & <= PAGE_SIZE,
  * mod SECTOR_SIZE == 0 of the device.
  * Data is validated by attempting to read a header from the
  * location given. Failure will result in toi_file refusing to
@@ -882,14 +889,14 @@ static int toi_file_parse_sig_location(char *commandline,
 	} else
 		commandline += 5;
 
-	/* 
+	/*
 	 * Don't check signature again if we're beginning a cycle. If we already
-	 * did the initialisation successfully, assume we'll be okay when it comes
-	 * to resuming.
+	 * did the initialisation successfully, assume we'll be okay when it
+	 * comes to resuming.
 	 */
 	if (toi_file_target_bdev)
 		return 0;
-	
+
 	devstart = thischar = commandline;
 	while ((*thischar != ':') && (*thischar != '@') &&
 		((thischar - commandline) < 250) && (*thischar))
@@ -901,18 +908,19 @@ static int toi_file_parse_sig_location(char *commandline,
 		thischar++;
 	}
 
-	while ((*thischar != '@') && ((thischar - commandline) < 250) && (*thischar))
+	while ((*thischar != '@') && ((thischar - commandline) < 250)
+			&& (*thischar))
 		thischar++;
 
 	if (*thischar == '@') {
 		at_symbol = thischar;
 		*at_symbol = 0;
 	}
-	
-	/* 
+
+	/*
 	 * For the toi_file, you can be able to resume, but not hibernate,
 	 * because the resume= is set correctly, but the toi_file_target
-	 * isn't. 
+	 * isn't.
 	 *
 	 * We may have come here as a result of setting resume or
 	 * toi_file_target. We only test the toi_file target in the
@@ -932,14 +940,16 @@ static int toi_file_parse_sig_location(char *commandline,
 	if (at_symbol) {
 		target_blocksize = (int) simple_strtoul(at_symbol + 1, NULL, 0);
 		if (target_blocksize & (SECTOR_SIZE - 1)) {
-			printk("FileAllocator: Blocksizes are multiples of %d.\n", SECTOR_SIZE);
+			printk(KERN_INFO "FileAllocator: Blocksizes are "
+					"multiples of %d.\n", SECTOR_SIZE);
 			result = -EINVAL;
 			goto out;
 		}
 	}
-	
+
 	if (!quiet)
-		printk("TuxOnIce FileAllocator: Testing whether you can resume:\n");
+		printk(KERN_INFO "TuxOnIce FileAllocator: Testing whether you"
+				" can resume:\n");
 
 	toi_file_get_target_info(commandline, 0, 1);
 
@@ -959,7 +969,7 @@ out:
 		clear_toi_state(TOI_CAN_HIBERNATE);
 
 	if (!quiet)
-		printk("Resuming %sabled.\n",  result ? "dis" : "en");
+		printk(KERN_INFO "Resuming %sabled.\n",  result ? "dis" : "en");
 
 	if (colon)
 		*colon = ':';
@@ -971,7 +981,8 @@ out:
 
 /* toi_file_save_config_info
  *
- * Description:	Save the target's name, not for resume time, but for all_settings.
+ * Description:	Save the target's name, not for resume time, but for
+ * 		all_settings.
  * Arguments:	Buffer:		Pointer to a buffer of size PAGE_SIZE.
  * Returns:	Number of bytes used for saving our data.
  */
@@ -1001,7 +1012,7 @@ static int toi_file_initialise(int starting_cycle)
 			return 0;
 
 		if (starting_cycle & SYSFS_HIBERNATE && !*toi_file_target) {
-			printk("FileAllocator is the active writer,  "
+			printk(KERN_INFO "FileAllocator is the active writer,  "
 					"but no filename has been set.\n");
 			return 1;
 		}
@@ -1011,8 +1022,8 @@ static int toi_file_initialise(int starting_cycle)
 		toi_file_get_target_info(toi_file_target, starting_cycle, 0);
 
 	if (starting_cycle && (toi_file_image_exists() == -1)) {
-		printk("%s is does not have a valid signature for hibernating.\n",
-				toi_file_target);
+		printk("%s is does not have a valid signature for "
+				"hibernating.\n", toi_file_target);
 		return 1;
 	}
 
@@ -1061,7 +1072,8 @@ static struct toi_module_ops toi_fileops = {
 	.parse_sig_location	= toi_file_parse_sig_location,
 
 	.sysfs_data		= sysfs_params,
-	.num_sysfs_entries	= sizeof(sysfs_params) / sizeof(struct toi_sysfs_data),
+	.num_sysfs_entries	= sizeof(sysfs_params) /
+		sizeof(struct toi_sysfs_data),
 };
 
 /* ---- Registration ---- */

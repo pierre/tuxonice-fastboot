@@ -48,6 +48,6 @@ enum {
 extern __init int toi_usm_init(void);
 extern __exit void toi_usm_cleanup(void);
 #else
-#define toi_usm_init() do { } while(0)
-#define toi_usm_cleanup() do { } while(0)
+#define toi_usm_init() do { } while (0)
+#define toi_usm_cleanup() do { } while (0)
 #endif

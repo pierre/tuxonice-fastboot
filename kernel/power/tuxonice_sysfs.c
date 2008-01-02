@@ -20,7 +20,7 @@
 #include "tuxonice_storage.h"
 #include "tuxonice_alloc.h"
 
-static int toi_sysfs_initialised = 0;
+static int toi_sysfs_initialised;
 
 static void toi_initialise_sysfs(void);
 
@@ -44,34 +44,34 @@ static ssize_t toi_attr_show(struct kobject *kobj, struct attribute *attr,
 
 	if (sysfs_data->flags & SYSFS_NEEDS_SM_FOR_READ)
 		toi_prepare_usm();
-	
+
 	switch (sysfs_data->type) {
-		case TOI_SYSFS_DATA_CUSTOM:
-			len = (sysfs_data->data.special.read_sysfs) ?
-				(sysfs_data->data.special.read_sysfs)(page, PAGE_SIZE)
-				: 0;
-			break;
-		case TOI_SYSFS_DATA_BIT:
-			len = sprintf(page, "%d\n", 
-				-test_bit(sysfs_data->data.bit.bit,
-					sysfs_data->data.bit.bit_vector));
-			break;
-		case TOI_SYSFS_DATA_INTEGER:
-			len = sprintf(page, "%d\n",
-				*(sysfs_data->data.integer.variable));
-			break;
-		case TOI_SYSFS_DATA_LONG:
-			len = sprintf(page, "%ld\n",
-				*(sysfs_data->data.a_long.variable));
-			break;
-		case TOI_SYSFS_DATA_UL:
-			len = sprintf(page, "%lu\n",
-				*(sysfs_data->data.ul.variable));
-			break;
-		case TOI_SYSFS_DATA_STRING:
-			len = sprintf(page, "%s\n",
-				sysfs_data->data.string.variable);
-			break;
+	case TOI_SYSFS_DATA_CUSTOM:
+		len = (sysfs_data->data.special.read_sysfs) ?
+			(sysfs_data->data.special.read_sysfs)(page, PAGE_SIZE)
+			: 0;
+		break;
+	case TOI_SYSFS_DATA_BIT:
+		len = sprintf(page, "%d\n",
+			-test_bit(sysfs_data->data.bit.bit,
+				sysfs_data->data.bit.bit_vector));
+		break;
+	case TOI_SYSFS_DATA_INTEGER:
+		len = sprintf(page, "%d\n",
+			*(sysfs_data->data.integer.variable));
+		break;
+	case TOI_SYSFS_DATA_LONG:
+		len = sprintf(page, "%ld\n",
+			*(sysfs_data->data.a_long.variable));
+		break;
+	case TOI_SYSFS_DATA_UL:
+		len = sprintf(page, "%lu\n",
+			*(sysfs_data->data.ul.variable));
+		break;
+	case TOI_SYSFS_DATA_STRING:
+		len = sprintf(page, "%s\n",
+			sysfs_data->data.string.variable);
+		break;
 	}
 	/* Side effect routine? */
 	if (sysfs_data->read_side_effect)
@@ -86,10 +86,12 @@ static ssize_t toi_attr_show(struct kobject *kobj, struct attribute *attr,
 }
 
 #define BOUND(_variable, _type) \
+	do { \
 	if (*_variable < sysfs_data->data._type.minimum) \
 		*_variable = sysfs_data->data._type.minimum; \
 	else if (*_variable > sysfs_data->data._type.maximum) \
-		*_variable = sysfs_data->data._type.maximum;
+		*_variable = sysfs_data->data._type.maximum; \
+	} while (0)
 
 static ssize_t toi_attr_store(struct kobject *kobj, struct attribute *attr,
 		const char *my_buf, size_t count)
@@ -106,66 +108,70 @@ static ssize_t toi_attr_store(struct kobject *kobj, struct attribute *attr,
 		toi_prepare_usm();
 
 	switch (sysfs_data->type) {
-		case TOI_SYSFS_DATA_CUSTOM:
-			if (sysfs_data->data.special.write_sysfs)
-				result = (sysfs_data->data.special.write_sysfs)
-					(my_buf, count);
+	case TOI_SYSFS_DATA_CUSTOM:
+		if (sysfs_data->data.special.write_sysfs)
+			result = (sysfs_data->data.special.write_sysfs)
+				(my_buf, count);
+		break;
+	case TOI_SYSFS_DATA_BIT:
+		{
+		int value = simple_strtoul(my_buf, NULL, 0);
+		if (value)
+			set_bit(sysfs_data->data.bit.bit,
+				(sysfs_data->data.bit.bit_vector));
+		else
+			clear_bit(sysfs_data->data.bit.bit,
+				(sysfs_data->data.bit.bit_vector));
+		}
+		break;
+	case TOI_SYSFS_DATA_INTEGER:
+		{
+			int *variable =
+				sysfs_data->data.integer.variable;
+			*variable = simple_strtol(my_buf, NULL, 0);
+			BOUND(variable, integer);
 			break;
-		case TOI_SYSFS_DATA_BIT:
-			{
-			int value = simple_strtoul(my_buf, NULL, 0);
-			if (value)
-				set_bit(sysfs_data->data.bit.bit, 
-					(sysfs_data->data.bit.bit_vector));
-			else
-				clear_bit(sysfs_data->data.bit.bit,
-					(sysfs_data->data.bit.bit_vector));
-			}
+		}
+	case TOI_SYSFS_DATA_LONG:
+		{
+			long *variable =
+				sysfs_data->data.a_long.variable;
+			*variable = simple_strtol(my_buf, NULL, 0);
+			BOUND(variable, a_long);
 			break;
-		case TOI_SYSFS_DATA_INTEGER:
-			{
-				int *variable = sysfs_data->data.integer.variable;
-				*variable = simple_strtol(my_buf, NULL, 0);
-				BOUND(variable, integer);
-				break;
-			}
-		case TOI_SYSFS_DATA_LONG:
-			{
-				long *variable = sysfs_data->data.a_long.variable;
-				*variable = simple_strtol(my_buf, NULL, 0);
-				BOUND(variable, a_long);
-				break;
-			}
-		case TOI_SYSFS_DATA_UL:
-			{
-				unsigned long *variable = sysfs_data->data.ul.variable;
-				*variable = simple_strtoul(my_buf, NULL, 0);
-				BOUND(variable, ul);
-				break;
-			}
+		}
+	case TOI_SYSFS_DATA_UL:
+		{
+			unsigned long *variable =
+				sysfs_data->data.ul.variable;
+			*variable = simple_strtoul(my_buf, NULL, 0);
+			BOUND(variable, ul);
 			break;
-		case TOI_SYSFS_DATA_STRING:
-			{
-				int copy_len = count;
-				char *variable =
-					sysfs_data->data.string.variable;
+		}
+		break;
+	case TOI_SYSFS_DATA_STRING:
+		{
+			int copy_len = count;
+			char *variable =
+				sysfs_data->data.string.variable;
 
-				if (sysfs_data->data.string.max_length &&
-				    (copy_len > sysfs_data->data.string.max_length))
-					copy_len = sysfs_data->data.string.max_length;
+			if (sysfs_data->data.string.max_length &&
+			    (copy_len > sysfs_data->data.string.max_length))
+				copy_len = sysfs_data->data.string.max_length;
 
-				if (!variable) {
-					sysfs_data->data.string.variable =
-						variable = (char *) toi_get_zeroed_page(31, TOI_ATOMIC_GFP);
-					assigned_temp_buffer = 1;
-				}
-				strncpy(variable, my_buf, copy_len);
-				if ((copy_len) &&
-					 (my_buf[copy_len - 1] == '\n'))
-					variable[count - 1] = 0;
-				variable[count] = 0;
+			if (!variable) {
+				variable = (char *) toi_get_zeroed_page(31,
+						TOI_ATOMIC_GFP);
+				sysfs_data->data.string.variable = variable;
+				assigned_temp_buffer = 1;
 			}
-			break;
+			strncpy(variable, my_buf, copy_len);
+			if ((copy_len) &&
+				 (my_buf[copy_len - 1] == '\n'))
+				variable[count - 1] = 0;
+			variable[count] = 0;
+		}
+		break;
 	}
 
 	/* Side effect routine? */
@@ -174,7 +180,8 @@ static ssize_t toi_attr_store(struct kobject *kobj, struct attribute *attr,
 
 	/* Free temporary buffers */
 	if (assigned_temp_buffer) {
-		toi_free_page(31, (unsigned long) sysfs_data->data.string.variable);
+		toi_free_page(31,
+			(unsigned long) sysfs_data->data.string.variable);
 		sysfs_data->data.string.variable = NULL;
 	}
 
@@ -235,8 +242,9 @@ struct kobject *make_toi_sysdir(char *name)
 			GFP_KERNEL);
 	int err;
 
-	if(!kobj) {
-		printk("TuxOnIce: Can't allocate kobject for sysfs dir!\n");
+	if (!kobj) {
+		printk(KERN_INFO "TuxOnIce: Can't allocate kobject for sysfs "
+				"dir!\n");
 		return NULL;
 	}
 
@@ -271,13 +279,14 @@ int toi_register_sysfs_file(
 	if (!toi_sysfs_initialised)
 		toi_initialise_sysfs();
 
-	if ((result = sysfs_create_file(kobj, &toi_sysfs_data->attr)))
-		printk("TuxOnIce: sysfs_create_file for %s returned %d.\n",
+	result = sysfs_create_file(kobj, &toi_sysfs_data->attr);
+	if (result)
+		printk(KERN_INFO "TuxOnIce: sysfs_create_file for %s "
+			"returned %d.\n",
 			toi_sysfs_data->attr.name, result);
 
 	return result;
 }
-
 EXPORT_SYMBOL_GPL(toi_register_sysfs_file);
 
 /* toi_unregister_sysfs_file
@@ -300,7 +309,7 @@ void toi_cleanup_sysfs(void)
 	if (!toi_sysfs_initialised)
 		return;
 
-	for (i=0; i< numfiles; i++)
+	for (i = 0; i < numfiles; i++)
 		toi_unregister_sysfs_file(&toi_subsys.kobj,
 				&sysfs_params[i]);
 
@@ -319,7 +328,7 @@ static void toi_initialise_sysfs(void)
 {
 	int i, error;
 	int numfiles = sizeof(sysfs_params) / sizeof(struct toi_sysfs_data);
-	
+
 	if (toi_sysfs_initialised)
 		return;
 
@@ -335,7 +344,7 @@ static void toi_initialise_sysfs(void)
 
 	toi_sysfs_initialised = 1;
 
-	for (i=0; i< numfiles; i++)
+	for (i = 0; i < numfiles; i++)
 		toi_register_sysfs_file(&toi_subsys.kobj,
 				&sysfs_params[i]);
 }

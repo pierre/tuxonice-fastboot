@@ -33,7 +33,7 @@
 #include <linux/kmod.h>
 #include <linux/security.h>
 #include <linux/syscalls.h>
- 
+
 #include "tuxonice_sysfs.h"
 #include "tuxonice_modules.h"
 #include "tuxonice.h"
@@ -107,7 +107,8 @@ static int userui_storage_needed(void)
 static int userui_save_config_info(char *buf)
 {
 	*((int *) buf) = progress_granularity;
-	memcpy(buf + sizeof(int), ui_helper_data.program, sizeof(ui_helper_data.program));
+	memcpy(buf + sizeof(int), ui_helper_data.program,
+			sizeof(ui_helper_data.program));
 	return sizeof(ui_helper_data.program) + sizeof(int) + 1;
 }
 
@@ -268,7 +269,7 @@ static void userui_message(unsigned long section, unsigned long level,
 	}
 
 	if (test_action_state(TOI_LOGALL))
-		printk("%s\n", msg.text);
+		printk(KERN_INFO "%s\n", msg.text);
 
 	toi_send_netlink_message(&ui_helper_data, USERUI_MSG_MESSAGE,
 			&msg, sizeof(msg));
@@ -335,7 +336,7 @@ static char userui_wait_for_keypress(int timeout)
 		wait_for_key_via_userui();
 		key = ' ';
 	}
-	
+
 	return key;
 }
 
@@ -432,64 +433,65 @@ static int userui_user_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 
 	/* Only allow one task to receive NOFREEZE privileges */
 	if (type == NETLINK_MSG_NOFREEZE_ME && ui_helper_data.pid != -1) {
-		printk("Got NOFREEZE_ME request when ui_helper_data.pid is %d.\n", ui_helper_data.pid);
+		printk(KERN_INFO "Got NOFREEZE_ME request when "
+			"ui_helper_data.pid is %d.\n", ui_helper_data.pid);
 		return -EBUSY;
 	}
 
-	data = (int*)NLMSG_DATA(nlh);
+	data = (int *) NLMSG_DATA(nlh);
 
 	switch (type) {
-		case USERUI_MSG_ABORT:
-			request_abort_hibernate();
-			break;
-		case USERUI_MSG_GET_STATE:
-			toi_send_netlink_message(&ui_helper_data, 
-					USERUI_MSG_GET_STATE, &toi_action,
-					sizeof(toi_action));
-			break;
-		case USERUI_MSG_GET_DEBUG_STATE:
-			toi_send_netlink_message(&ui_helper_data,
-					USERUI_MSG_GET_DEBUG_STATE,
-					&toi_debug_state,
-					sizeof(toi_debug_state));
-			break;
-		case USERUI_MSG_SET_STATE:
-			if (nlh->nlmsg_len < NLMSG_LENGTH(sizeof(int)))
-				return -EINVAL;
-			ui_nl_set_state(*data);
-			break;
-		case USERUI_MSG_SET_DEBUG_STATE:
-			if (nlh->nlmsg_len < NLMSG_LENGTH(sizeof(int)))
-				return -EINVAL;
-			toi_debug_state = (*data);
-			break;
-		case USERUI_MSG_SPACE:
-			wake_up_interruptible(&userui_wait_for_key);
-			break;
-		case USERUI_MSG_GET_POWERDOWN_METHOD:
-			toi_send_netlink_message(&ui_helper_data,
-					USERUI_MSG_GET_POWERDOWN_METHOD,
-					&toi_poweroff_method,
-					sizeof(toi_poweroff_method));
-			break;
-		case USERUI_MSG_SET_POWERDOWN_METHOD:
-			if (nlh->nlmsg_len < NLMSG_LENGTH(sizeof(int)))
-				return -EINVAL;
-			toi_poweroff_method = (*data);
-			break;
-		case USERUI_MSG_GET_LOGLEVEL:
-			toi_send_netlink_message(&ui_helper_data,
-					USERUI_MSG_GET_LOGLEVEL,
-					&toi_default_console_level,
-					sizeof(toi_default_console_level));
-			break;
-		case USERUI_MSG_SET_LOGLEVEL:
-			if (nlh->nlmsg_len < NLMSG_LENGTH(sizeof(int)))
-				return -EINVAL;
-			toi_default_console_level = (*data);
-			break;
-		case USERUI_MSG_PRINTK:
-			printk((char *) data);
+	case USERUI_MSG_ABORT:
+		request_abort_hibernate();
+		break;
+	case USERUI_MSG_GET_STATE:
+		toi_send_netlink_message(&ui_helper_data,
+				USERUI_MSG_GET_STATE, &toi_action,
+				sizeof(toi_action));
+		break;
+	case USERUI_MSG_GET_DEBUG_STATE:
+		toi_send_netlink_message(&ui_helper_data,
+				USERUI_MSG_GET_DEBUG_STATE,
+				&toi_debug_state,
+				sizeof(toi_debug_state));
+		break;
+	case USERUI_MSG_SET_STATE:
+		if (nlh->nlmsg_len < NLMSG_LENGTH(sizeof(int)))
+			return -EINVAL;
+		ui_nl_set_state(*data);
+		break;
+	case USERUI_MSG_SET_DEBUG_STATE:
+		if (nlh->nlmsg_len < NLMSG_LENGTH(sizeof(int)))
+			return -EINVAL;
+		toi_debug_state = (*data);
+		break;
+	case USERUI_MSG_SPACE:
+		wake_up_interruptible(&userui_wait_for_key);
+		break;
+	case USERUI_MSG_GET_POWERDOWN_METHOD:
+		toi_send_netlink_message(&ui_helper_data,
+				USERUI_MSG_GET_POWERDOWN_METHOD,
+				&toi_poweroff_method,
+				sizeof(toi_poweroff_method));
+		break;
+	case USERUI_MSG_SET_POWERDOWN_METHOD:
+		if (nlh->nlmsg_len < NLMSG_LENGTH(sizeof(int)))
+			return -EINVAL;
+		toi_poweroff_method = (*data);
+		break;
+	case USERUI_MSG_GET_LOGLEVEL:
+		toi_send_netlink_message(&ui_helper_data,
+				USERUI_MSG_GET_LOGLEVEL,
+				&toi_default_console_level,
+				sizeof(toi_default_console_level));
+		break;
+	case USERUI_MSG_SET_LOGLEVEL:
+		if (nlh->nlmsg_len < NLMSG_LENGTH(sizeof(int)))
+			return -EINVAL;
+		toi_default_console_level = (*data);
+		break;
+	case USERUI_MSG_PRINTK:
+		printk((char *) data);
 	}
 
 	return 1;
@@ -500,7 +502,7 @@ static int userui_user_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
  *
  * @pause: Whether to pause or just display the message.
  * @message: Message to display at the start of pausing.
- * 
+ *
  * Potentially pause and wait for the user to tell us to continue. We normally
  * only pause when @pause is set. While paused, the user can do things like
  * changing the loglevel, toggling the display of debugging sections and such
@@ -509,16 +511,16 @@ static int userui_user_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 static void userui_cond_pause(int pause, char *message)
 {
 	int displayed_message = 0, last_key = 0;
-	
+
 	while (last_key != 32 &&
 		ui_helper_data.pid != -1 &&
-		((test_action_state(TOI_PAUSE) && pause) || 
+		((test_action_state(TOI_PAUSE) && pause) ||
 		 (test_action_state(TOI_SINGLESTEP)))) {
 		if (!displayed_message) {
-			toi_prepare_status(DONT_CLEAR_BAR, 
+			toi_prepare_status(DONT_CLEAR_BAR,
 			   "%s Press SPACE to continue.%s",
 			   message ? message : "",
-			   (test_action_state(TOI_SINGLESTEP)) ? 
+			   (test_action_state(TOI_SINGLESTEP)) ?
 			   " Single step on." : "");
 			displayed_message = 1;
 		}
@@ -548,7 +550,7 @@ static void userui_prepare_console(void)
 	if (*ui_helper_data.program)
 		toi_netlink_setup(&ui_helper_data);
 	else
-		printk("TuxOnIce: Userui program not configured.\n");
+		printk(KERN_INFO "TuxOnIce: Userui program not configured.\n");
 }
 
 /**
@@ -604,7 +606,8 @@ static struct toi_module_ops userui_ops = {
 	.load_config_info		= userui_load_config_info,
 	.memory_needed			= userui_memory_needed,
 	.sysfs_data			= sysfs_params,
-	.num_sysfs_entries		= sizeof(sysfs_params) / sizeof(struct toi_sysfs_data),
+	.num_sysfs_entries		= sizeof(sysfs_params) /
+		sizeof(struct toi_sysfs_data),
 };
 
 static struct ui_ops my_ui_ops = {

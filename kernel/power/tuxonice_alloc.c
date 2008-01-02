@@ -66,13 +66,15 @@ static char *toi_alloc_desc[TOI_ALLOC_PATHS] = {
 };
 
 #define MIGHT_FAIL(FAIL_NUM, FAIL_VAL) \
-	BUG_ON(FAIL_NUM >= TOI_ALLOC_PATHS); \
-	\
-	if (FAIL_NUM == toi_fail_num) { \
-		atomic_inc(&toi_test_count[FAIL_NUM]); \
-		toi_fail_num = 0; \
-		return FAIL_VAL; \
-	}
+	do { \
+		BUG_ON(FAIL_NUM >= TOI_ALLOC_PATHS); \
+		\
+		if (FAIL_NUM == toi_fail_num) { \
+			atomic_inc(&toi_test_count[FAIL_NUM]); \
+			toi_fail_num = 0; \
+			return FAIL_VAL; \
+		} \
+	} while (0)
 
 static void alloc_update_stats(int fail_num, void *result)
 {
@@ -185,12 +187,13 @@ void toi_alloc_print_debug_stats(void)
 {
 	int i;
 
-	printk("Idx  Allocs   Frees   Tests   Fails Max     Description\n");
+	printk(KERN_INFO "Idx  Allocs   Frees   Tests   Fails Max     "
+			"Description\n");
 
 	for (i = 0; i < TOI_ALLOC_PATHS; i++)
 		if (atomic_read(&toi_alloc_count[i]) ||
 		    atomic_read(&toi_free_count[i]))
-			printk("%3d %7d %7d %7d %7d %7d %s\n", i,
+			printk(KERN_INFO "%3d %7d %7d %7d %7d %7d %s\n", i,
 				atomic_read(&toi_alloc_count[i]),
 				atomic_read(&toi_free_count[i]),
 				atomic_read(&toi_test_count[i]),
@@ -203,7 +206,7 @@ EXPORT_SYMBOL_GPL(toi_alloc_print_debug_stats);
 static int toi_alloc_initialise(int starting_cycle)
 {
 	int i;
-	
+
 	if (starting_cycle) {
 		for (i = 0; i < TOI_ALLOC_PATHS; i++) {
 			atomic_set(&toi_alloc_count[i], 0);
@@ -239,7 +242,8 @@ static struct toi_module_ops toi_alloc_ops = {
 	.initialise				= toi_alloc_initialise,
 
 	.sysfs_data		= sysfs_params,
-	.num_sysfs_entries	= sizeof(sysfs_params) / sizeof(struct toi_sysfs_data),
+	.num_sysfs_entries	= sizeof(sysfs_params) /
+		sizeof(struct toi_sysfs_data),
 };
 
 int toi_alloc_init(void)
@@ -251,8 +255,6 @@ void toi_alloc_exit(void)
 {
 	toi_unregister_module(&toi_alloc_ops);
 }
-
-
 #ifdef CONFIG_TOI_EXPORTS
 EXPORT_SYMBOL_GPL(toi_kzalloc);
 EXPORT_SYMBOL_GPL(toi_get_free_pages);

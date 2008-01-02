@@ -20,7 +20,7 @@ struct toi_bdev_info {
 	int blocks_per_page;
 };
 
-/* 
+/*
  * Our exported interface so the swapwriter and filewriter don't
  * need these functions duplicated.
  */

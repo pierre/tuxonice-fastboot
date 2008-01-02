@@ -16,7 +16,8 @@ static char *bits_on(void)
 	int pos = 0;
 
 	while (index <= max_pfn) {
-		pos += snprintf_used(page + pos, PAGE_SIZE - pos - 1, "%d ", index);
+		pos += snprintf_used(page + pos, PAGE_SIZE - pos - 1, "%d ",
+				index);
 		index = get_next_bit_on(&test_map, index);
 	}
 
@@ -35,7 +36,7 @@ static __init int do_check(void)
 		char compare[100];
 
 		if (index > (max_pfn / steps * step)) {
-			printk("%d/%d\r", step, steps);
+			printk(KERN_INFO "%d/%d\r", step, steps);
 			step++;
 		}
 
@@ -52,7 +53,8 @@ static __init int do_check(void)
 		result = bits_on();
 
 		if (strcmp(result, compare)) {
-			printk("Expected \"%s\", got \"%s\"\n", result, compare);
+			printk(KERN_INFO "Expected \"%s\", got \"%s\"\n",
+					result, compare);
 		}
 
 		free_page((unsigned long) result);
