@@ -73,6 +73,10 @@ static void __toi_power_down(int method)
 	if (method && method != 5)
 		toi_prepare_status(DONT_CLEAR_BAR,
 				"Falling back to alternate power off method.");
+
+	if (test_result_state(TOI_ABORTED))
+		return;
+
 	kernel_power_off();
 	kernel_halt();
 	toi_prepare_status(DONT_CLEAR_BAR, "Powerdown failed.");
