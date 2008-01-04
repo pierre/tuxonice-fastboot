@@ -64,8 +64,7 @@ int toi_memory_for_modules(int print_parts)
 	struct toi_module_ops *this_module;
 
 	if (print_parts)
-		printk("Memory for modules:\n"
-		       "===================\n");
+		printk(KERN_INFO "Memory for modules:\n===================\n");
 	list_for_each_entry(this_module, &toi_modules, module_list) {
 		int this;
 		if (!this_module->enabled)
@@ -73,7 +72,8 @@ int toi_memory_for_modules(int print_parts)
 		if (this_module->memory_needed) {
 			this = this_module->memory_needed();
 			if (print_parts)
-				printk("%10d bytes (%5d pages) for module '%s'.\n",
+				printk(KERN_INFO "%10d bytes (%5d pages) for "
+						"module '%s'.\n",
 						this, this >> PAGE_SHIFT,
 						this_module->name);
 			bytes += this;
@@ -82,7 +82,7 @@ int toi_memory_for_modules(int print_parts)
 
 	result = ((bytes + PAGE_SIZE - 1) >> PAGE_SHIFT);
 	if (print_parts)
-		printk(" => %d bytes, %d pages.\n", bytes, result);
+		printk(KERN_INFO " => %d bytes, %d pages.\n", bytes, result);
 
 	return result;
 }
