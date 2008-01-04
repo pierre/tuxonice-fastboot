@@ -58,19 +58,33 @@ int toi_header_storage_for_modules(void)
  * doing their work during the cycle.
  */
 
-int toi_memory_for_modules(void)
+int toi_memory_for_modules(int print_parts)
 {
-	int bytes = 0;
+	int bytes = 0, result;
 	struct toi_module_ops *this_module;
 
+	if (print_parts)
+		printk("Memory for modules:\n"
+		       "===================\n");
 	list_for_each_entry(this_module, &toi_modules, module_list) {
+		int this;
 		if (!this_module->enabled)
 			continue;
-		if (this_module->memory_needed)
-			bytes += this_module->memory_needed();
+		if (this_module->memory_needed) {
+			this = this_module->memory_needed();
+			if (print_parts)
+				printk("%10d bytes (%5d pages) for module '%s'.\n",
+						this, this >> PAGE_SHIFT,
+						this_module->name);
+			bytes += this;
+		}
 	}
 
-	return ((bytes + PAGE_SIZE - 1) >> PAGE_SHIFT);
+	result = ((bytes + PAGE_SIZE - 1) >> PAGE_SHIFT);
+	if (print_parts)
+		printk(" => %d bytes, %d pages.\n", bytes, result);
+
+	return result;
 }
 
 /*

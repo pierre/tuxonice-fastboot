@@ -442,7 +442,7 @@ static int lowpages_ps1_to_free(void)
 {
 	return max_t(int, 0, DIV_ROUND_UP(get_lowmem_size(pagedir1) +
 		extra_pd1_pages_allowance + MIN_FREE_RAM +
-		toi_memory_for_modules() - get_lowmem_size(pagedir2) -
+		toi_memory_for_modules(0) - get_lowmem_size(pagedir2) -
 		real_nr_free_low_pages() - extra_pages_allocated, 2));
 }
 
@@ -458,7 +458,7 @@ static int storage_still_required(void)
 
 static int ram_still_required(void)
 {
-	return max_t(int, 0, MIN_FREE_RAM + toi_memory_for_modules() -
+	return max_t(int, 0, MIN_FREE_RAM + toi_memory_for_modules(0) -
 		real_nr_free_low_pages() + 2 * extra_pd1_pages_allowance);
 }
 
@@ -545,13 +545,16 @@ static void display_failure_reason(int tries_exceeded)
 				"memory.\n", ram_required);
 		printk(KERN_INFO "     Minimum free     : %8d\n", MIN_FREE_RAM);
 		printk(KERN_INFO "   + Reqd. by modules : %8d\n",
-				toi_memory_for_modules());
+				toi_memory_for_modules(0));
 		printk(KERN_INFO "   - Currently free   : %8d\n",
 				real_nr_free_low_pages());
 		printk(KERN_INFO "   + 2 * extra allow  : %8d\n",
 				2 * extra_pd1_pages_allowance);
 		printk(KERN_INFO "                      : ========\n");
 		printk(KERN_INFO "     Still needed     : %8d\n", ram_required);
+
+		/* Print breakdown of memory needed for modules */
+		toi_memory_for_modules(1);
 		set_abort_result(TOI_UNABLE_TO_FREE_ENOUGH_MEMORY);
 	}
 
@@ -599,7 +602,7 @@ static void display_stats(int always, int sub_extra_pd1_allow)
 		/* Needed */
 		lowpages_ps1_to_free(), highpages_ps1_to_free(),
 		any_to_free(1),
-		MIN_FREE_RAM, toi_memory_for_modules(),
+		MIN_FREE_RAM, toi_memory_for_modules(0),
 		extra_pd1_pages_allowance, image_size_limit << 8);
 
 	if (always)
