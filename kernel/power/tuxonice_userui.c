@@ -443,57 +443,59 @@ static int userui_user_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 	switch (type) {
 	case USERUI_MSG_ABORT:
 		request_abort_hibernate();
-		break;
+		return 0;
 	case USERUI_MSG_GET_STATE:
 		toi_send_netlink_message(&ui_helper_data,
 				USERUI_MSG_GET_STATE, &toi_action,
 				sizeof(toi_action));
-		break;
+		return 0;
 	case USERUI_MSG_GET_DEBUG_STATE:
 		toi_send_netlink_message(&ui_helper_data,
 				USERUI_MSG_GET_DEBUG_STATE,
 				&toi_debug_state,
 				sizeof(toi_debug_state));
-		break;
+		return 0;
 	case USERUI_MSG_SET_STATE:
 		if (nlh->nlmsg_len < NLMSG_LENGTH(sizeof(int)))
 			return -EINVAL;
 		ui_nl_set_state(*data);
-		break;
+		return 0;
 	case USERUI_MSG_SET_DEBUG_STATE:
 		if (nlh->nlmsg_len < NLMSG_LENGTH(sizeof(int)))
 			return -EINVAL;
 		toi_debug_state = (*data);
-		break;
+		return 0;
 	case USERUI_MSG_SPACE:
 		wake_up_interruptible(&userui_wait_for_key);
-		break;
+		return 0;
 	case USERUI_MSG_GET_POWERDOWN_METHOD:
 		toi_send_netlink_message(&ui_helper_data,
 				USERUI_MSG_GET_POWERDOWN_METHOD,
 				&toi_poweroff_method,
 				sizeof(toi_poweroff_method));
-		break;
+		return 0;
 	case USERUI_MSG_SET_POWERDOWN_METHOD:
 		if (nlh->nlmsg_len < NLMSG_LENGTH(sizeof(int)))
 			return -EINVAL;
 		toi_poweroff_method = (*data);
-		break;
+		return 0;
 	case USERUI_MSG_GET_LOGLEVEL:
 		toi_send_netlink_message(&ui_helper_data,
 				USERUI_MSG_GET_LOGLEVEL,
 				&toi_default_console_level,
 				sizeof(toi_default_console_level));
-		break;
+		return 0;
 	case USERUI_MSG_SET_LOGLEVEL:
 		if (nlh->nlmsg_len < NLMSG_LENGTH(sizeof(int)))
 			return -EINVAL;
 		toi_default_console_level = (*data);
-		break;
+		return 0;
 	case USERUI_MSG_PRINTK:
 		printk((char *) data);
+		return 0;
 	}
 
+	/* Unhandled here */
 	return 1;
 }
 

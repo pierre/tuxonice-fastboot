@@ -162,7 +162,7 @@ static int nl_ready(struct user_helper_data *uhd, int version)
 				uhd->name);
 		if (uhd->not_ready)
 			uhd->not_ready();
-		return 1;
+		return -EINVAL;
 	}
 
 	complete(&uhd->wait_for_process);
@@ -196,7 +196,7 @@ static int toi_nl_gen_rcv_msg(struct user_helper_data *uhd,
 	/* Let the more specific handler go first. It returns
 	 * 1 for valid messages that it doesn't know. */
 	err = uhd->rcv_msg(skb, nlh);
-	if (err != -1)
+	if (err != 1)
 		return err;
 
 	type = nlh->nlmsg_type;
@@ -211,28 +211,22 @@ static int toi_nl_gen_rcv_msg(struct user_helper_data *uhd,
 
 	switch (type) {
 	case NETLINK_MSG_NOFREEZE_ME:
-		err = nl_set_nofreeze(uhd, nlh->nlmsg_pid);
-		if (err)
-			return err;
-		break;
+		return nl_set_nofreeze(uhd, nlh->nlmsg_pid);
 	case NETLINK_MSG_GET_DEBUGGING:
 		send_whether_debugging(uhd);
-		break;
+		return 0;
 	case NETLINK_MSG_READY:
 		if (nlh->nlmsg_len < NLMSG_LENGTH(sizeof(int))) {
 			printk(KERN_INFO "Invalid ready mesage.\n");
 			return -EINVAL;
 		}
-		err = nl_ready(uhd, *data);
-		if (err)
-			return err;
-		break;
+		return nl_ready(uhd, *data);
 	case NETLINK_MSG_CLEANUP:
 		toi_netlink_close_complete(uhd);
-		break;
+		return 0;
 	}
 
-	return 0;
+	return -EINVAL;
 }
 
 static void toi_user_rcv_skb(struct sk_buff *skb)
