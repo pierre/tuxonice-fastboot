@@ -252,9 +252,9 @@ static void free_bitmaps(void)
  */
 static int io_MB_per_second(int write)
 {
-	return (toi_io_time[write][1]) ?
-		MB((unsigned long) toi_io_time[write][0]) * HZ /
-		toi_io_time[write][1] : 0;
+	return (toi_bkd.toi_io_time[write][1]) ?
+		MB((unsigned long) toi_bkd.toi_io_time[write][0]) * HZ /
+		toi_bkd.toi_io_time[write][1] : 0;
 }
 
 /**
@@ -279,32 +279,34 @@ static int get_toi_debug_info(const char *buffer, int count)
 	SNPRINTF("- Attempt number : %d\n", nr_hibernates);
 	SNPRINTF("- Parameters     : %ld %ld %ld %d %d %ld\n",
 			toi_result,
-			toi_action,
-			toi_debug_state,
-			toi_default_console_level,
+			toi_bkd.toi_action,
+			toi_bkd.toi_debug_state,
+			toi_bkd.toi_default_console_level,
 			image_size_limit,
 			toi_poweroff_method);
 	SNPRINTF("- Overall expected compression percentage: %d.\n",
 			100 - toi_expected_compression_ratio());
 	len += toi_print_module_debug_info(((char *) buffer) + len,
 			count - len - 1);
-	if (toi_io_time[0][1]) {
+	if (toi_bkd.toi_io_time[0][1]) {
 		if ((io_MB_per_second(0) < 5) || (io_MB_per_second(1) < 5)) {
 			SNPRINTF("- I/O speed: Write %d KB/s",
-			  (KB((unsigned long) toi_io_time[0][0]) * HZ /
-			  toi_io_time[0][1]));
-			if (toi_io_time[1][1])
+			  (KB((unsigned long) toi_bkd.toi_io_time[0][0]) * HZ /
+			  toi_bkd.toi_io_time[0][1]));
+			if (toi_bkd.toi_io_time[1][1])
 				SNPRINTF(", Read %d KB/s",
-				  (KB((unsigned long) toi_io_time[1][0]) * HZ /
-				  toi_io_time[1][1]));
+				  (KB((unsigned long)
+				      toi_bkd.toi_io_time[1][0]) * HZ /
+				  toi_bkd.toi_io_time[1][1]));
 		} else {
 			SNPRINTF("- I/O speed: Write %d MB/s",
-			 (MB((unsigned long) toi_io_time[0][0]) * HZ /
-			  toi_io_time[0][1]));
-			if (toi_io_time[1][1])
+			 (MB((unsigned long) toi_bkd.toi_io_time[0][0]) * HZ /
+			  toi_bkd.toi_io_time[0][1]));
+			if (toi_bkd.toi_io_time[1][1])
 				SNPRINTF(", Read %d MB/s",
-				 (MB((unsigned long) toi_io_time[1][0]) * HZ /
-				  toi_io_time[1][1]));
+				 (MB((unsigned long)
+				     toi_bkd.toi_io_time[1][0]) * HZ /
+				  toi_bkd.toi_io_time[1][1]));
 		}
 		SNPRINTF(".\n");
 	} else
@@ -435,8 +437,8 @@ static int toi_init(void)
 
 	nr_hibernates++;
 
-	toi_io_time[0][0] = toi_io_time[0][1] =
-		toi_io_time[1][0] =	toi_io_time[1][1] = 0;
+	toi_bkd.toi_io_time[0][0] = toi_bkd.toi_io_time[0][1] =
+		toi_bkd.toi_io_time[1][0] =	toi_bkd.toi_io_time[1][1] = 0;
 
 	if (!test_toi_state(TOI_CAN_HIBERNATE) ||
 	    allocate_bitmaps())
@@ -1044,7 +1046,7 @@ static struct toi_sysfs_data sysfs_params[] = {
 	},
 
 	{ TOI_ATTR("ignore_rootfs", SYSFS_RW),
-	  SYSFS_BIT(&toi_action, TOI_IGNORE_ROOTFS, 0)
+	  SYSFS_BIT(&toi_bkd.toi_action, TOI_IGNORE_ROOTFS, 0)
 	},
 
 	{ TOI_ATTR("image_size_limit", SYSFS_RW),
@@ -1056,23 +1058,23 @@ static struct toi_sysfs_data sysfs_params[] = {
 	},
 
 	{ TOI_ATTR("no_multithreaded_io", SYSFS_RW),
-	  SYSFS_BIT(&toi_action, TOI_NO_MULTITHREADED_IO, 0)
+	  SYSFS_BIT(&toi_bkd.toi_action, TOI_NO_MULTITHREADED_IO, 0)
 	},
 
 	{ TOI_ATTR("full_pageset2", SYSFS_RW),
-	  SYSFS_BIT(&toi_action, TOI_PAGESET2_FULL, 0)
+	  SYSFS_BIT(&toi_bkd.toi_action, TOI_PAGESET2_FULL, 0)
 	},
 
 	{ TOI_ATTR("reboot", SYSFS_RW),
-	  SYSFS_BIT(&toi_action, TOI_REBOOT, 0)
+	  SYSFS_BIT(&toi_bkd.toi_action, TOI_REBOOT, 0)
 	},
 
 	{ TOI_ATTR("replace_swsusp", SYSFS_RW),
-	  SYSFS_BIT(&toi_action, TOI_REPLACE_SWSUSP, 0)
+	  SYSFS_BIT(&toi_bkd.toi_action, TOI_REPLACE_SWSUSP, 0)
 	},
 
 	{ TOI_ATTR("resume_commandline", SYSFS_RW),
-	  SYSFS_STRING(toi_nosave_commandline, COMMAND_LINE_SIZE, 0)
+	  SYSFS_STRING(toi_bkd.toi_nosave_commandline, COMMAND_LINE_SIZE, 0)
 	},
 
 	{ TOI_ATTR("version", SYSFS_READONLY),
@@ -1080,36 +1082,36 @@ static struct toi_sysfs_data sysfs_params[] = {
 	},
 
 	{ TOI_ATTR("no_load_direct", SYSFS_RW),
-	  SYSFS_BIT(&toi_action, TOI_NO_DIRECT_LOAD, 0)
+	  SYSFS_BIT(&toi_bkd.toi_action, TOI_NO_DIRECT_LOAD, 0)
 	},
 
 	{ TOI_ATTR("freezer_test", SYSFS_RW),
-	  SYSFS_BIT(&toi_action, TOI_FREEZER_TEST, 0)
+	  SYSFS_BIT(&toi_bkd.toi_action, TOI_FREEZER_TEST, 0)
 	},
 
 	{ TOI_ATTR("test_bio", SYSFS_RW),
-	  SYSFS_BIT(&toi_action, TOI_TEST_BIO, 0)
+	  SYSFS_BIT(&toi_bkd.toi_action, TOI_TEST_BIO, 0)
 	},
 
 	{ TOI_ATTR("test_filter_speed", SYSFS_RW),
-	  SYSFS_BIT(&toi_action, TOI_TEST_FILTER_SPEED, 0)
+	  SYSFS_BIT(&toi_bkd.toi_action, TOI_TEST_FILTER_SPEED, 0)
 	},
 
 	{ TOI_ATTR("slow", SYSFS_RW),
-	  SYSFS_BIT(&toi_action, TOI_SLOW, 0)
+	  SYSFS_BIT(&toi_bkd.toi_action, TOI_SLOW, 0)
 	},
 
 	{ TOI_ATTR("no_pageset2", SYSFS_RW),
-	  SYSFS_BIT(&toi_action, TOI_NO_PAGESET2, 0)
+	  SYSFS_BIT(&toi_bkd.toi_action, TOI_NO_PAGESET2, 0)
 	},
 
 	{ TOI_ATTR("late_cpu_hotplug", SYSFS_RW),
-	  SYSFS_BIT(&toi_action, TOI_LATE_CPU_HOTPLUG, 0)
+	  SYSFS_BIT(&toi_bkd.toi_action, TOI_LATE_CPU_HOTPLUG, 0)
 	},
 
 #ifdef CONFIG_TOI_KEEP_IMAGE
 	{ TOI_ATTR("keep_image", SYSFS_RW),
-	  SYSFS_BIT(&toi_action, TOI_KEEP_IMAGE, 0)
+	  SYSFS_BIT(&toi_bkd.toi_action, TOI_KEEP_IMAGE, 0)
 	},
 #endif
 };

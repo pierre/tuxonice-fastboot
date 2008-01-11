@@ -165,6 +165,16 @@ out_close:
 	return key;
 }
 
+struct toi_boot_kernel_data toi_bkd __nosavedata 
+		__attribute__((aligned(PAGE_SIZE))) = {
+        MY_BOOT_KERNEL_DATA_VERSION,
+#ifdef CONFIG_TOI_REPLACE_SWSUSP
+        (1 << TOI_REPLACE_SWSUSP) |
+#endif
+        (1 << TOI_PAGESET2_FULL) | (1 << TOI_LATE_CPU_HOTPLUG),
+};
+EXPORT_SYMBOL_GPL(toi_bkd);
+
 EXPORT_SYMBOL_GPL(toi_wait_for_keypress_dev_console);
 EXPORT_SYMBOL_GPL(hibernation_platform_enter);
 EXPORT_SYMBOL_GPL(platform_start);
@@ -268,12 +278,8 @@ EXPORT_SYMBOL_GPL(pageset1_map);
 EXPORT_SYMBOL_GPL(pageset1_copy_map);
 
 unsigned long toi_result;
-unsigned long toi_debug_state;
-int toi_io_time[2][2];
 struct pagedir pagedir1 = {1};
 
-EXPORT_SYMBOL_GPL(toi_io_time);
-EXPORT_SYMBOL_GPL(toi_debug_state);
 EXPORT_SYMBOL_GPL(toi_result);
 EXPORT_SYMBOL_GPL(pagedir1);
 
@@ -329,16 +335,6 @@ unsigned long toi_compress_bytes_in, toi_compress_bytes_out;
 EXPORT_SYMBOL_GPL(toi_compress_bytes_in);
 EXPORT_SYMBOL_GPL(toi_compress_bytes_out);
 
-#ifdef CONFIG_TOI_REPLACE_SWSUSP
-unsigned long toi_action = (1 << TOI_REPLACE_SWSUSP) | \
-			       (1 << TOI_PAGESET2_FULL) | \
-			       (1 << TOI_LATE_CPU_HOTPLUG);
-#else
-unsigned long toi_action = 	(1 << TOI_PAGESET2_FULL) | \
-				(1 << TOI_LATE_CPU_HOTPLUG);
-#endif
-EXPORT_SYMBOL_GPL(toi_action);
-
 unsigned long toi_state = ((1 << TOI_BOOT_TIME) |
 		(1 << TOI_IGNORE_LOGLEVEL) |
 		(1 << TOI_IO_STOPPED));
@@ -354,12 +350,6 @@ EXPORT_SYMBOL_GPL(toi_running);
 int toi_in_hibernate __nosavedata;
 EXPORT_SYMBOL_GPL(toi_in_hibernate);
 
-unsigned long toi_nosave_state1 __nosavedata;
-unsigned long toi_nosave_state2 __nosavedata;
-int toi_nosave_state3 __nosavedata;
-int toi_nosave_io_speed[2][2] __nosavedata;
-__nosavedata char toi_nosave_commandline[COMMAND_LINE_SIZE];
-
 __nosavedata struct pbe *restore_highmem_pblist;
 
 #ifdef CONFIG_TOI_CORE_EXPORTS
@@ -368,12 +358,6 @@ EXPORT_SYMBOL_GPL(nr_free_highpages);
 EXPORT_SYMBOL_GPL(saveable_highmem_page);
 EXPORT_SYMBOL_GPL(restore_highmem_pblist);
 #endif
-
-EXPORT_SYMBOL_GPL(toi_nosave_state1);
-EXPORT_SYMBOL_GPL(toi_nosave_state2);
-EXPORT_SYMBOL_GPL(toi_nosave_state3);
-EXPORT_SYMBOL_GPL(toi_nosave_io_speed);
-EXPORT_SYMBOL_GPL(toi_nosave_commandline);
 #endif
 
 #if defined(CONFIG_TOI_CORE_EXPORTS) || defined(CONFIG_TOI_PAGEFLAGS_EXPORTS)

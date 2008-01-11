@@ -351,7 +351,7 @@ static struct toi_sysfs_data sysfs_params[] = {
 	},
 
 	{ TOI_ATTR("abort_if_resave_needed", SYSFS_RW),
-	  SYSFS_BIT(&toi_action, TOI_ABORT_ON_RESAVE_NEEDED, 0)
+	  SYSFS_BIT(&toi_bkd.toi_action, TOI_ABORT_ON_RESAVE_NEEDED, 0)
 	}
 };
 

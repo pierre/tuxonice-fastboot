@@ -204,12 +204,13 @@ static int fill_toi_header(struct toi_header *sh)
 	sh->pagedir = pagedir1;
 	sh->pageset_2_size = pagedir2.size;
 	sh->param0 = toi_result;
-	sh->param1 = toi_action;
-	sh->param2 = toi_debug_state;
-	sh->param3 = console_loglevel;
+	sh->param1 = toi_bkd.toi_action;
+	sh->param2 = toi_bkd.toi_debug_state;
+	sh->param3 = toi_bkd.toi_default_console_level;
 	sh->root_fs = current->fs->rootmnt->mnt_sb->s_dev;
 	for (i = 0; i < 4; i++)
-		sh->io_time[i/2][i%2] = toi_io_time[i/2][i%2];
+		sh->io_time[i/2][i%2] = toi_bkd.toi_io_time[i/2][i%2];
+	sh->bkd = (unsigned long) &toi_bkd;
 	return 0;
 }
 
@@ -719,8 +720,8 @@ int write_pageset(struct pagedir *pagedir)
 	end_time = jiffies;
 
 	if ((end_time - start_time) && (!test_result_state(TOI_ABORTED))) {
-		toi_io_time[0][0] += finish_at,
-		toi_io_time[0][1] += (end_time - start_time);
+		toi_bkd.toi_io_time[0][0] += finish_at,
+		toi_bkd.toi_io_time[0][1] += (end_time - start_time);
 	}
 
 	return error;
@@ -775,8 +776,8 @@ static int read_pageset(struct pagedir *pagedir, int overwrittenpagesonly)
 	end_time = jiffies;
 
 	if ((end_time - start_time) && (!test_result_state(TOI_ABORTED))) {
-		toi_io_time[1][0] += finish_at,
-		toi_io_time[1][1] += (end_time - start_time);
+		toi_bkd.toi_io_time[1][0] += finish_at,
+		toi_bkd.toi_io_time[1][1] += (end_time - start_time);
 	}
 
 	return result;
@@ -1177,14 +1178,15 @@ static int __read_pageset1(void)
 	memcpy((char *) &pagedir1,
 		(char *) &toi_header->pagedir, sizeof(pagedir1));
 	toi_result = toi_header->param0;
-	toi_action = toi_header->param1;
-	toi_debug_state = toi_header->param2;
-	toi_default_console_level = toi_header->param3;
+	toi_bkd.toi_action = toi_header->param1;
+	toi_bkd.toi_debug_state = toi_header->param2;
+	toi_bkd.toi_default_console_level = toi_header->param3;
 	clear_toi_state(TOI_IGNORE_LOGLEVEL);
 	pagedir2.size = toi_header->pageset_2_size;
 	for (i = 0; i < 4; i++)
-		toi_io_time[i/2][i%2] =
+		toi_bkd.toi_io_time[i/2][i%2] =
 			toi_header->io_time[i/2][i%2];
+	boot_kernel_data_buffer = toi_header->bkd;
 
 	/* Read module configurations */
 	result = read_module_configs();

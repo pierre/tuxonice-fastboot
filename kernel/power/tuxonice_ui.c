@@ -37,9 +37,6 @@ static char local_printf_buf[1024];	/* Same as printk - should be safe */
 extern int toi_wait;
 struct ui_ops *toi_current_ui;
 
-/*! The console log level we default to. */
-int toi_default_console_level;
-
 /**
  * toi_wait_for_keypress - Wait for keypress via userui or /dev/console.
  *
@@ -195,19 +192,19 @@ post_ask:
 static struct toi_sysfs_data sysfs_params[] = {
 #if defined(CONFIG_NET) && defined(CONFIG_SYSFS)
 	{ TOI_ATTR("default_console_level", SYSFS_RW),
-	  SYSFS_INT(&toi_default_console_level, 0, 7, 0)
+	  SYSFS_INT(&toi_bkd.toi_default_console_level, 0, 7, 0)
 	},
 
 	{ TOI_ATTR("debug_sections", SYSFS_RW),
-	  SYSFS_UL(&toi_debug_state, 0, 1 << 30, 0)
+	  SYSFS_UL(&toi_bkd.toi_debug_state, 0, 1 << 30, 0)
 	},
 
 	{ TOI_ATTR("log_everything", SYSFS_RW),
-	  SYSFS_BIT(&toi_action, TOI_LOGALL, 0)
+	  SYSFS_BIT(&toi_bkd.toi_action, TOI_LOGALL, 0)
 	},
 #endif
 	{ TOI_ATTR("pm_prepare_console", SYSFS_RW),
-	  SYSFS_BIT(&toi_action, TOI_PM_PREPARE_CONSOLE, 0)
+	  SYSFS_BIT(&toi_bkd.toi_action, TOI_PM_PREPARE_CONSOLE, 0)
 	}
 };
 
@@ -261,5 +258,4 @@ EXPORT_SYMBOL_GPL(toi_current_ui);
 EXPORT_SYMBOL_GPL(toi_early_boot_message);
 EXPORT_SYMBOL_GPL(toi_register_ui_ops);
 EXPORT_SYMBOL_GPL(toi_remove_ui_ops);
-EXPORT_SYMBOL_GPL(toi_default_console_level);
 #endif

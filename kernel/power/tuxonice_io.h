@@ -42,6 +42,7 @@ struct toi_header {
 	int io_time[2][2];
 	struct pagedir pagedir;
 	dev_t root_fs;
+	unsigned long bkd; /* Boot kernel data locn */
 };
 
 extern int write_pageset(struct pagedir *pagedir);

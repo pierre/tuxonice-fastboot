@@ -8,15 +8,9 @@
 
 extern struct toi_core_fns *toi_core_fns;
 extern unsigned long toi_compress_bytes_in, toi_compress_bytes_out;
-extern unsigned long toi_action;
 extern unsigned int nr_hibernates;
 extern int toi_in_hibernate;
 
-extern unsigned long toi_nosave_state1 __nosavedata;
-extern unsigned long toi_nosave_state2 __nosavedata;
-extern int toi_nosave_state3 __nosavedata;
-extern int toi_nosave_io_speed[2][2] __nosavedata;
-extern __nosavedata char toi_nosave_commandline[COMMAND_LINE_SIZE];
 extern __nosavedata struct pbe *restore_highmem_pblist;
 
 int toi_lowlevel_builtin(void);

@@ -229,7 +229,7 @@ static struct toi_sysfs_data sysfs_params[] = {
 	},
 
 	{ TOI_ATTR("find_max_mem_allocated", SYSFS_RW),
-	  SYSFS_BIT(&toi_action, TOI_GET_MAX_MEM_ALLOCD, 0)
+	  SYSFS_BIT(&toi_bkd.toi_action, TOI_GET_MAX_MEM_ALLOCD, 0)
 	}
 };
 

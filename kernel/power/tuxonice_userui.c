@@ -71,7 +71,7 @@ static void ui_nl_set_state(int n)
 		(1 << TOI_SINGLESTEP) |
 		(1 << TOI_PAUSE_NEAR_PAGESET_END);
 
-	toi_action = (toi_action & (~toi_action_mask)) |
+	toi_bkd.toi_action = (toi_bkd.toi_action & (~toi_action_mask)) |
 		(n & toi_action_mask);
 
 	if (!test_action_state(TOI_PAUSE) &&
@@ -446,14 +446,14 @@ static int userui_user_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 		return 0;
 	case USERUI_MSG_GET_STATE:
 		toi_send_netlink_message(&ui_helper_data,
-				USERUI_MSG_GET_STATE, &toi_action,
-				sizeof(toi_action));
+				USERUI_MSG_GET_STATE, &toi_bkd.toi_action,
+				sizeof(toi_bkd.toi_action));
 		return 0;
 	case USERUI_MSG_GET_DEBUG_STATE:
 		toi_send_netlink_message(&ui_helper_data,
 				USERUI_MSG_GET_DEBUG_STATE,
-				&toi_debug_state,
-				sizeof(toi_debug_state));
+				&toi_bkd.toi_debug_state,
+				sizeof(toi_bkd.toi_debug_state));
 		return 0;
 	case USERUI_MSG_SET_STATE:
 		if (nlh->nlmsg_len < NLMSG_LENGTH(sizeof(int)))
@@ -463,7 +463,7 @@ static int userui_user_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 	case USERUI_MSG_SET_DEBUG_STATE:
 		if (nlh->nlmsg_len < NLMSG_LENGTH(sizeof(int)))
 			return -EINVAL;
-		toi_debug_state = (*data);
+		toi_bkd.toi_debug_state = (*data);
 		return 0;
 	case USERUI_MSG_SPACE:
 		wake_up_interruptible(&userui_wait_for_key);
@@ -482,13 +482,13 @@ static int userui_user_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 	case USERUI_MSG_GET_LOGLEVEL:
 		toi_send_netlink_message(&ui_helper_data,
 				USERUI_MSG_GET_LOGLEVEL,
-				&toi_default_console_level,
-				sizeof(toi_default_console_level));
+				&toi_bkd.toi_default_console_level,
+				sizeof(toi_bkd.toi_default_console_level));
 		return 0;
 	case USERUI_MSG_SET_LOGLEVEL:
 		if (nlh->nlmsg_len < NLMSG_LENGTH(sizeof(int)))
 			return -EINVAL;
-		toi_default_console_level = (*data);
+		toi_bkd.toi_default_console_level = (*data);
 		return 0;
 	case USERUI_MSG_PRINTK:
 		printk((char *) data);
@@ -576,11 +576,11 @@ static void userui_cleanup_console(void)
 static struct toi_sysfs_data sysfs_params[] = {
 #if defined(CONFIG_NET) && defined(CONFIG_SYSFS)
 	{ TOI_ATTR("enable_escape", SYSFS_RW),
-	  SYSFS_BIT(&toi_action, TOI_CAN_CANCEL, 0)
+	  SYSFS_BIT(&toi_bkd.toi_action, TOI_CAN_CANCEL, 0)
 	},
 
 	{ TOI_ATTR("pause_between_steps", SYSFS_RW),
-	  SYSFS_BIT(&toi_action, TOI_PAUSE, 0)
+	  SYSFS_BIT(&toi_bkd.toi_action, TOI_PAUSE, 0)
 	},
 
 	{ TOI_ATTR("enabled", SYSFS_RW),

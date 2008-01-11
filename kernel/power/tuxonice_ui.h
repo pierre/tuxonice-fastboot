@@ -91,8 +91,6 @@ extern struct ui_ops *toi_current_ui;
 		printk(fmt, ##args); \
 	} while (0)
 
-extern int toi_default_console_level;
-
 #define toi_message(sn, lev, log, fmt, a...) \
 do { \
 	if (toi_current_ui && (!sn || test_debug_state(sn))) \

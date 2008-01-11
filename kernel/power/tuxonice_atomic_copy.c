@@ -91,12 +91,12 @@ void copyback_post(void)
 {
 	int loop;
 
-	toi_action = toi_nosave_state1;
-	toi_debug_state = toi_nosave_state2;
-	toi_default_console_level = toi_nosave_state3;
+	toi_bkd.toi_action = toi_nosave_state1;
+	toi_bkd.toi_debug_state = toi_nosave_state2;
+	toi_bkd.toi_default_console_level = toi_nosave_state3;
 
 	for (loop = 0; loop < 4; loop++)
-		toi_io_time[loop/2][loop%2] =
+		toi_bkd.toi_io_time[loop/2][loop%2] =
 			toi_nosave_io_speed[loop/2][loop%2];
 
 	if (toi_activate_storage(1))
@@ -259,13 +259,13 @@ int toi_atomic_restore(void)
 	if (toi_go_atomic(PMSG_PRETHAW, 0))
 		goto Failed;
 
-	toi_nosave_state1 = toi_action;
-	toi_nosave_state2 = toi_debug_state;
-	toi_nosave_state3 = toi_default_console_level;
+	toi_nosave_state1 = toi_bkd.toi_action;
+	toi_nosave_state2 = toi_bkd.toi_debug_state;
+	toi_nosave_state3 = toi_bkd.toi_default_console_level;
 
 	for (loop = 0; loop < 4; loop++)
 		toi_nosave_io_speed[loop/2][loop%2] =
-			toi_io_time[loop/2][loop%2];
+			toi_bkd.toi_io_time[loop/2][loop%2];
 	memcpy(toi_nosave_commandline, saved_command_line, COMMAND_LINE_SIZE);
 
 	/* We'll ignore saved state, but this gets preempt count (etc) right */

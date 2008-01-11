@@ -22,6 +22,23 @@
 
 #define TOI_CORE_VERSION "3.0-rc3"
 
+#define MY_BOOT_KERNEL_DATA_VERSION 1
+
+struct toi_boot_kernel_data {
+	int version;
+	int size;
+	unsigned long toi_action;
+	unsigned long toi_debug_state;
+	int toi_default_console_level;
+	int toi_io_time[2][2];
+	char toi_nosave_commandline[COMMAND_LINE_SIZE];
+};
+
+extern struct toi_boot_kernel_data toi_bkd;
+
+/* Location of book kernel data struct in kernel being resumed */
+extern unsigned long boot_kernel_data_buffer;
+
 /*		 == Action states == 		*/
 
 enum {
@@ -48,10 +65,8 @@ enum {
 	TOI_GET_MAX_MEM_ALLOCD
 };
 
-extern unsigned long toi_action;
-
-#define clear_action_state(bit) (test_and_clear_bit(bit, &toi_action))
-#define test_action_state(bit) (test_bit(bit, &toi_action))
+#define clear_action_state(bit) (test_and_clear_bit(bit, &toi_bkd.toi_action))
+#define test_action_state(bit) (test_bit(bit, &toi_bkd.toi_action))
 
 /*		 == Result states == 		*/
 
@@ -112,11 +127,9 @@ enum {
 	TOI_MEMORY,
 };
 
-extern unsigned long toi_debug_state;
-
-#define set_debug_state(bit) (test_and_set_bit(bit, &toi_debug_state))
-#define clear_debug_state(bit) (test_and_clear_bit(bit, &toi_debug_state))
-#define test_debug_state(bit) (test_bit(bit, &toi_debug_state))
+#define set_debug_state(bit) (test_and_set_bit(bit, &toi_bkd.toi_debug_state))
+#define clear_debug_state(bit) (test_and_clear_bit(bit, &toi_bkd.toi_debug_state))
+#define test_debug_state(bit) (test_bit(bit, &toi_bkd.toi_debug_state))
 
 /*		== Steps in hibernating ==	*/
 
@@ -173,8 +186,6 @@ extern char alt_resume_param[256];
 extern void copyback_post(void);
 extern int toi_hibernate(void);
 extern int extra_pd1_pages_used;
-
-extern int toi_io_time[2][2];
 
 #define SECTOR_SIZE 512
 
