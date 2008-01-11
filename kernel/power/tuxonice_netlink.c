@@ -184,8 +184,6 @@ void toi_netlink_close_complete(struct user_helper_data *uhd)
 	}
 
 	uhd->pid = -1;
-
-	toi_put_modules();
 }
 
 static int toi_nl_gen_rcv_msg(struct user_helper_data *uhd,
@@ -271,8 +269,6 @@ static void toi_user_rcv_skb(struct sk_buff *skb)
 
 static int netlink_prepare(struct user_helper_data *uhd)
 {
-	toi_get_modules();
-
 	uhd->next = uhd_list;
 	uhd_list = uhd;
 
