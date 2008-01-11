@@ -46,4 +46,5 @@ extern unsigned long __toi_get_nonconflicting_page(void);
 struct page *___toi_get_nonconflicting_page(int can_be_highmem);
 
 extern void toi_reset_alt_image_pageset2_pfn(void);
+extern int add_boot_kernel_data_pbe(void);
 #endif

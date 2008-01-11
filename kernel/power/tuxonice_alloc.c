@@ -13,7 +13,7 @@
 #include "tuxonice_modules.h"
 #include "tuxonice_sysfs.h"
 
-#define TOI_ALLOC_PATHS 37
+#define TOI_ALLOC_PATHS 38
 
 DEFINE_MUTEX(toi_alloc_mutex);
 
@@ -62,7 +62,8 @@ static char *toi_alloc_desc[TOI_ALLOC_PATHS] = {
 	"swap parse sig location",
 	"sysfs kobj",
 	"swap mark resume attempted buffer", /* 35 */
-	"cluster member"
+	"cluster member",
+	"boot kernel data buffer"
 };
 
 #define MIGHT_FAIL(FAIL_NUM, FAIL_VAL) \

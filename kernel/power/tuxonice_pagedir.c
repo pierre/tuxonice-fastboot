@@ -30,6 +30,8 @@
 #include "tuxonice_alloc.h"
 
 static int ptoi_pfn;
+static struct pbe *this_low_pbe;
+static struct pbe **last_low_pbe_ptr;
 
 void toi_reset_alt_image_pageset2_pfn(void)
 {
@@ -147,13 +149,14 @@ int toi_get_pageset1_load_addresses(void)
 	unsigned long flags = GFP_ATOMIC | __GFP_NOWARN | __GFP_HIGHMEM;
 	struct page *page, *high_pbe_page = NULL, *last_high_pbe_page = NULL,
 		    *low_pbe_page;
-	struct pbe **last_low_pbe_ptr = &restore_pblist,
-		   **last_high_pbe_ptr = &restore_highmem_pblist,
-		   *this_low_pbe = NULL, *this_high_pbe = NULL;
+	struct pbe **last_high_pbe_ptr = &restore_highmem_pblist,
+		   *this_high_pbe = NULL;
 	int orig_low_pfn = max_pfn + 1, orig_high_pfn = max_pfn + 1;
 	int high_pbes_done = 0, low_pbes_done = 0;
 	int low_direct = 0, high_direct = 0;
 	int high_to_free, low_to_free;
+
+	last_low_pbe_ptr = &restore_pblist;
 
 	/* First, allocate pages for the start of our pbe lists. */
 	if (high_needed) {
@@ -323,5 +326,22 @@ int toi_get_pageset1_load_addresses(void)
 
 	free_conflicting_pages();
 
+	return 0;
+}
+
+int add_boot_kernel_data_pbe(void)
+{
+	this_low_pbe->address = (char *) __toi_get_nonconflicting_page();
+	if (!this_low_pbe->address) {
+		printk(KERN_INFO "Failed to get bkd atomic restore buffer.");
+		return -ENOMEM;
+	}
+
+	toi_bkd.size = sizeof(toi_bkd);
+	memcpy(this_low_pbe->address, &toi_bkd, sizeof(toi_bkd));
+
+	*last_low_pbe_ptr = this_low_pbe;
+	this_low_pbe->orig_address = (char *) boot_kernel_data_buffer;
+	this_low_pbe->next = NULL;
 	return 0;
 }

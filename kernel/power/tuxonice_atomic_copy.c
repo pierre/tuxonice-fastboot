@@ -89,15 +89,19 @@ static void free_pbe_list(struct pbe **list, int highmem)
 
 void copyback_post(void)
 {
-	int loop;
+	struct toi_boot_kernel_data *bkd =
+		(struct toi_boot_kernel_data *) boot_kernel_data_buffer;
 
-	toi_bkd.toi_action = toi_nosave_state1;
-	toi_bkd.toi_debug_state = toi_nosave_state2;
-	toi_bkd.toi_default_console_level = toi_nosave_state3;
+	/*
+	 * The boot kernel's data may be larger (newer version) or
+	 * smaller (older version) than ours. Copy the minimum
+	 * of the two sizes, so that we don't overwrite valid values
+	 * from pre-atomic copy.
+	 */
 
-	for (loop = 0; loop < 4; loop++)
-		toi_bkd.toi_io_time[loop/2][loop%2] =
-			toi_nosave_io_speed[loop/2][loop%2];
+	memcpy(&toi_bkd, (char *) boot_kernel_data_buffer,
+			min_t(int, sizeof(struct toi_boot_kernel_data),
+				bkd->size));
 
 	if (toi_activate_storage(1))
 		panic("Failed to reactivate our storage.");
@@ -250,23 +254,17 @@ int toi_hibernate(void)
 
 int toi_atomic_restore(void)
 {
-	int error, loop;
+	int error;
 
 	toi_running = 1;
 
 	toi_prepare_status(DONT_CLEAR_BAR,	"Atomic restore.");
 
-	if (toi_go_atomic(PMSG_PRETHAW, 0))
+	if (add_boot_kernel_data_pbe())
 		goto Failed;
 
-	toi_nosave_state1 = toi_bkd.toi_action;
-	toi_nosave_state2 = toi_bkd.toi_debug_state;
-	toi_nosave_state3 = toi_bkd.toi_default_console_level;
-
-	for (loop = 0; loop < 4; loop++)
-		toi_nosave_io_speed[loop/2][loop%2] =
-			toi_bkd.toi_io_time[loop/2][loop%2];
-	memcpy(toi_nosave_commandline, saved_command_line, COMMAND_LINE_SIZE);
+	if (toi_go_atomic(PMSG_PRETHAW, 0))
+		goto Failed;
 
 	/* We'll ignore saved state, but this gets preempt count (etc) right */
 	save_processor_state();

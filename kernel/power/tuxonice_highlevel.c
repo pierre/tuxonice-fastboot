@@ -101,6 +101,8 @@ int toi_fail_num;
 
 int do_toi_step(int step);
 
+unsigned long boot_kernel_data_buffer;
+
 /**
  * toi_finish_anything - Cleanup after doing anything.
  *
@@ -348,6 +350,11 @@ static void do_cleanup(int get_debug_info)
 	set_highmem_size(pagedir1, 0);
 	set_highmem_size(pagedir2, 0);
 
+	if (boot_kernel_data_buffer) {
+		toi_free_page(37, boot_kernel_data_buffer);
+		boot_kernel_data_buffer = 0;
+	}
+
 	if (test_toi_state(TOI_NOTIFIERS_PREPARE)) {
 		pm_notifier_call_chain(PM_POST_HIBERNATION);
 		clear_toi_state(TOI_NOTIFIERS_PREPARE);
@@ -454,6 +461,13 @@ static int toi_init(void)
 		return 1;
 	}
 	set_toi_state(TOI_NOTIFIERS_PREPARE);
+
+	boot_kernel_data_buffer = toi_get_zeroed_page(37, TOI_ATOMIC_GFP);
+	if (!boot_kernel_data_buffer) {
+		printk("TuxOnIce: Failed to allocate boot_kernel_data_buffer.\n");
+		set_result_state(TOI_OUT_OF_MEMORY);
+		return 1;
+	}
 
 	if (test_action_state(TOI_LATE_CPU_HOTPLUG) ||
 			!disable_nonboot_cpus())
