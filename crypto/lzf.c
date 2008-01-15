@@ -73,7 +73,7 @@ struct lzf_ctx {
  * For a low-memory configuration, use hlog == 13;
  * For best compression, use 15 or 16.
  */
-static const int hlog = 14;
+static const int hlog = 13;
 
 /*
  * don't play with this unless you benchmark!
