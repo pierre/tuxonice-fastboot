@@ -34,11 +34,13 @@ static int pr_index;
 #define PR_DEBUG(a, b...) do { } while (0)
 #endif
 
-#define MAX_OUTSTANDING_IO 16384
+#define TARGET_OUTSTANDING_IO 16384
 #define MAX_READAHEAD 2048
 #define CLEANUP_BATCH_SIZE 16
 
-static int max_outstanding_io = 2048;
+static int target_outstanding_io = 2048;
+static atomic_t current_outstanding_io;
+static int max_outstanding_io;
 static int max_readahead = 2048;
 
 struct io_info {
@@ -142,6 +144,7 @@ static void toi_bio_cleanup_one(struct io_info *io_info)
 
 	toi_kfree(1, io_info);
 	atomic_dec(&toi_io_to_cleanup);
+	atomic_dec(&current_outstanding_io);
 }
 
 /**
@@ -392,14 +395,7 @@ static int submit(struct io_info *io_info)
 static struct io_info *get_io_info_struct(void)
 {
 	struct io_info *this = NULL;
-
-	if (max_outstanding_io && (atomic_read(&toi_io_to_cleanup) +
-	       atomic_read(&toi_io_in_progress)) >= max_outstanding_io) {
-		wait_event(num_in_progress_wait,
-			atomic_read(&toi_io_in_progress) < max_outstanding_io);
-
-		toi_cleanup_completed_io(0);
-	}
+	int cur_outstanding_io;
 
 	do {
 		this = toi_kzalloc(1, sizeof(struct io_info), TOI_ATOMIC_GFP);
@@ -412,6 +408,9 @@ static struct io_info *get_io_info_struct(void)
 
 	memset(this, 0, sizeof(struct io_info));
 	INIT_LIST_HEAD(&this->list);
+	cur_outstanding_io = atomic_add_return(1, &current_outstanding_io);
+	if (cur_outstanding_io > max_outstanding_io)
+		max_outstanding_io = cur_outstanding_io;	
 	return this;
 }
 
@@ -527,18 +526,18 @@ static int toi_bio_print_debug_stats(char *buffer, int size)
 /**
  * toi_bio_memory_needed: Report amount of memory needed for block i/o.
  *
- * We want to have at least enough memory so as to have max_outstanding_io
- * transactions on the fly at once. If we can do more, fine.
+ * We want to have at least enough memory so as to have target_outstanding_io
+ * or more transactions on the fly at once. If we can do more, fine.
  */
 static int toi_bio_memory_needed(void)
 {
-	int result = (max(max_outstanding_io, max_readahead) *
+	int result = (max(target_outstanding_io, max_readahead) *
 			(PAGE_SIZE + sizeof(struct request) +
 				sizeof(struct bio) + sizeof(struct io_info)));
 
 	printk(KERN_INFO "toi_bio_memory_needed: %d x (%lu + %lu + "
 			"%lu + %lu) = %d.\n",
-			max(max_outstanding_io, max_readahead),
+			max(target_outstanding_io, max_readahead),
 			PAGE_SIZE, sizeof(struct request),
 			sizeof(struct bio), sizeof(struct io_info),
 			result);
@@ -1077,7 +1076,7 @@ static int toi_bio_storage_needed(void)
 static int toi_bio_save_config_info(char *buf)
 {
 	int *ints = (int *) buf;
-	ints[0] = max_outstanding_io;
+	ints[0] = target_outstanding_io;
 	ints[1] = max_readahead;
 	return 2 * sizeof(int);
 }
@@ -1091,7 +1090,7 @@ static int toi_bio_save_config_info(char *buf)
 static void toi_bio_load_config_info(char *buf, int size)
 {
 	int *ints = (int *) buf;
-	max_outstanding_io  = ints[0];
+	target_outstanding_io  = ints[0];
 	max_readahead = ints[1];
 }
 
@@ -1104,6 +1103,9 @@ static void toi_bio_load_config_info(char *buf, int size)
 static int toi_bio_initialise(int starting_cycle)
 {
 	toi_writer_buffer = (char *) toi_get_zeroed_page(14, TOI_ATOMIC_GFP);
+
+	if (starting_cycle)
+		max_outstanding_io = 0;
 
 	return toi_writer_buffer ? 0 : -ENOMEM;
 }
@@ -1139,8 +1141,8 @@ struct toi_bio_ops toi_bio_ops = {
 };
 
 static struct toi_sysfs_data sysfs_params[] = {
-	{ TOI_ATTR("max_outstanding_io", SYSFS_RW),
-	  SYSFS_INT(&max_outstanding_io, 0, MAX_OUTSTANDING_IO, 0),
+	{ TOI_ATTR("target_outstanding_io", SYSFS_RW),
+	  SYSFS_INT(&target_outstanding_io, 0, TARGET_OUTSTANDING_IO, 0),
 	},
 
 	{ TOI_ATTR("max_readahead", SYSFS_RW),
