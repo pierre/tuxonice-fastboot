@@ -892,10 +892,6 @@ static void toi_bio_queue_page_write(char **full_buffer)
 		if (!*full_buffer)
 			do_bio_wait(7);
 	}
-
-	/* Don't let queue length get away on us */
-	while (atomic_read(&toi_io_queue_length) > 10)
-		yield();
 }
 
 /*
