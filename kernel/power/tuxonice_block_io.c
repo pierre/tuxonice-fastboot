@@ -67,9 +67,6 @@ static atomic_t toi_io_in_progress;
 static atomic_t toi_io_to_cleanup;
 static DECLARE_WAIT_QUEUE_HEAD(num_in_progress_wait);
 
-/* [Max] number of I/O operations pending */
-static atomic_t outstanding_io;
-
 static int extra_page_forward;
 
 static unsigned long toi_readahead_flags[
@@ -488,8 +485,6 @@ static void toi_do_io(int writing, struct block_device *bdev, long block0,
 	get_page(io_info->bio_page);
 
 	submit(io_info);
-
-	atomic_inc(&outstanding_io);
 
 	if (syncio)
 		do_bio_wait(4);
