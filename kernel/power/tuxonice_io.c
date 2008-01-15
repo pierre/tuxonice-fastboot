@@ -378,8 +378,7 @@ static int worker_rw_loop(void *data)
 	int result, my_io_index = 0;
 	struct toi_module_ops *first_filter = toi_get_next_filter(NULL);
 	struct page *buffer = toi_alloc_page(28, TOI_ATOMIC_GFP);
-
-	atomic_inc(&worker_thread_count);
+	int thread_num = atomic_add_return(1, &worker_thread_count) - 1;
 
 	mutex_lock(&io_mutex);
 
@@ -515,20 +514,14 @@ static int worker_rw_loop(void *data)
 			}
 		}
 
-		/* Strictly speaking, this is racy - another thread could
-		 * output the next the next percentage before we've done
-		 * ours. 1/5th of the pageset would have to be done first,
-		 * though, so I'm not worried. In addition, the only impact
-		 * would be messed up output, not image corruption. Doing
-		 * this under the mutex seems an unnecessary slowdown.
-		 */
-		if ((my_io_index + io_base) >= io_nextupdate)
+		if (!thread_num && (my_io_index + io_base) >= io_nextupdate)
 			io_nextupdate = toi_update_status(my_io_index +
 				io_base, io_barmax, " %d/%d MB ",
 				MB(io_base+my_io_index+1), MB(io_barmax));
 
-		if ((my_io_index + 1) == io_pc) {
-			printk(KERN_INFO "%d%%...", 20 * io_pc_step);
+		if (!thread_num && my_io_index >= io_pc) {
+			printk("%s%d%%...", io_pc_step == 1 ? KERN_INFO : "",
+					20 * io_pc_step);
 			io_pc_step++;
 			io_pc = io_finish_at * io_pc_step / 5;
 		}
