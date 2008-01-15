@@ -442,10 +442,10 @@ static int toi_file_allocate_header_space(int space_requested)
 	}
 
 	toi_extent_state_goto_start(&toi_writer_posn);
-	toi_bio_ops.forward_one_page(); /* To first page */
+	toi_bio_ops.forward_one_page(1); /* To first page */
 
 	for (i = 0; i < space_requested; i++) {
-		if (toi_bio_ops.forward_one_page()) {
+		if (toi_bio_ops.forward_one_page(1)) {
 			printk(KERN_INFO "Out of space while seeking to "
 					"allocate header pages,\n");
 			header_pages_allocated = i;
@@ -545,7 +545,7 @@ static int toi_file_write_header_cleanup(void)
 	toi_bio_ops.finish_all_io();
 
 	toi_extent_state_goto_start(&toi_writer_posn);
-	toi_bio_ops.forward_one_page();
+	toi_bio_ops.forward_one_page(1);
 
 	/* Adjust image header */
 	toi_bio_ops.bdev_page_io(READ, toi_file_target_bdev,

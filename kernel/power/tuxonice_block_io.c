@@ -603,7 +603,7 @@ static void dump_block_chains(void)
  * set at the start of reading the image header, to skip the first page
  * of the header, which is read without using the extent chains.
  */
-static int go_next_page(void)
+static int go_next_page(int writing)
 {
 	int i, max = (toi_writer_posn.current_chain == -1) ? 1 :
 	  toi_devinfo[toi_writer_posn.current_chain].blocks_per_page;
@@ -612,15 +612,18 @@ static int go_next_page(void)
 		toi_extent_state_next(&toi_writer_posn);
 
 	if (toi_extent_state_eof(&toi_writer_posn)) {
-		printk(KERN_INFO "Extent state eof. "
-			"Expected compression ratio too optimistic?\n");
-		dump_block_chains();
+		/* Don't complain if readahead falls off the end */
+		if (writing) {
+			printk(KERN_INFO "Extent state eof. "
+				"Expected compression ratio too optimistic?\n");
+			dump_block_chains();
+		}
 		return -ENODATA;
 	}
 
 	if (extra_page_forward) {
 		extra_page_forward = 0;
-		return go_next_page();
+		return go_next_page(writing);
 	}
 
 	return 0;
@@ -651,7 +654,7 @@ static int toi_bio_rw_page(int writing, struct page *page,
 {
 	struct toi_bdev_info *dev_info;
 
-	if (go_next_page()) {
+	if (go_next_page(writing)) {
 		printk(KERN_INFO "Failed to advance a page in the extent "
 				"data.\n");
 		return -ENODATA;
@@ -793,9 +796,14 @@ static int toi_bio_read_page_with_readahead(void)
 			ra_submit_index);
 
 		if (last_result) {
-			printk(KERN_INFO "Begin read chunk for page %d "
-				"returned %d.\n",
-				ra_submit_index, last_result);
+			/* 
+			 * Don't complain about failing to do readahead past
+			 * the end of storage.
+			 */
+			if (last_result != -61)
+				printk(KERN_INFO "Begin read chunk for page %d "
+					"returned %d.\n",
+					ra_submit_index, last_result);
 			break;
 		}
 

@@ -30,7 +30,7 @@ struct toi_bio_ops {
 	void (*check_io_stats) (void);
 	void (*reset_io_stats) (void);
 	void (*finish_all_io) (void);
-	int (*forward_one_page) (void);
+	int (*forward_one_page) (int writing);
 	void (*set_extra_page_forward) (void);
 	void (*set_devinfo) (struct toi_bdev_info *info);
 	int (*read_page) (unsigned long *index, struct page *buffer_page,
