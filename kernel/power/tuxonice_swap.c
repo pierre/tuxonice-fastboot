@@ -1073,10 +1073,6 @@ static int toi_swap_parse_sig_location(char *commandline,
 	union p_diskpage diskpage;
 	int signature_found, result = -EINVAL, temp_result;
 
-	/* If just testing filter speed, don't care */
-	if (unlikely(test_action_state(TOI_TEST_FILTER_SPEED)))
-		return 0;
-
 	if (strncmp(commandline, "swap:", 5)) {
 		/*
 		 * Failing swap:, we'll take a simple
