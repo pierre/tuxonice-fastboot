@@ -981,11 +981,15 @@ static int toi_bio_read_page(unsigned long *pfn, struct page *buffer_page,
 static int toi_bio_write_page(unsigned long pfn, struct page *buffer_page,
 		unsigned int buf_size)
 {
-	char *buffer_virt = kmap(buffer_page);
+	char *buffer_virt;
 	int result = 0;
 
 	pr_index++;
 
+	if (unlikely(test_action_state(TOI_TEST_FILTER_SPEED)))
+		return 0;
+
+	buffer_virt = kmap(buffer_page);
 	TAKE_BIO_MUTEX(6);
 
 	if (toi_rw_buffer(WRITE, (char *) &pfn, sizeof(unsigned long)) ||
