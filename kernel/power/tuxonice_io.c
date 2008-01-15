@@ -643,7 +643,7 @@ static int do_rw_loop(int write, int finish_at, struct dyn_pageflags *pageflags,
 	}
 
 	if (!io_result) {
-		printk(KERN_INFO "done.\n");
+		printk("done.\n");
 
 		toi_update_status(io_base + io_finish_at, io_barmax,
 				" %d/%d MB ",

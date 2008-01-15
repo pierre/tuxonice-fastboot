@@ -361,7 +361,7 @@ static int submit(struct io_info *io_info)
 	io_info->sys_struct = bio;
 
 	if (bio_add_page(bio, io_info->bio_page, PAGE_SIZE, 0) < PAGE_SIZE) {
-		printk("ERROR: adding page to bio at %lld\n",
+		printk(KERN_INFO "ERROR: adding page to bio at %lld\n",
 				(unsigned long long) io_info->first_block);
 		bio_put(bio);
 		return -EFAULT;
@@ -535,9 +535,18 @@ static int toi_bio_print_debug_stats(char *buffer, int size)
  */
 static int toi_bio_memory_needed(void)
 {
-	return (max(max_outstanding_io, max_readahead) *
+	int result = (max(max_outstanding_io, max_readahead) *
 			(PAGE_SIZE + sizeof(struct request) +
 				sizeof(struct bio) + sizeof(struct io_info)));
+
+	printk(KERN_INFO "toi_bio_memory_needed: %d x (%lu + %lu + "
+			"%lu + %lu) = %d.\n",
+			max(max_outstanding_io, max_readahead),
+			PAGE_SIZE, sizeof(struct request),
+			sizeof(struct bio), sizeof(struct io_info),
+			result);
+
+	return result;
 }
 
 /**
@@ -564,20 +573,20 @@ static void dump_block_chains(void)
 	for (i = 0; i < toi_writer_posn.num_chains; i++) {
 		struct extent *this;
 
-		printk(KERN_INFO "Chain %d:", i);
-
 		this = (toi_writer_posn.chains + i)->first;
 
 		if (!this)
-			printk(KERN_INFO " (Empty)");
+			continue;
+
+		printk(KERN_INFO "Chain %d:", i);
 
 		while (this) {
-			printk(KERN_INFO " [%lu-%lu]%s", this->minimum,
+			printk(" [%lu-%lu]%s", this->minimum,
 					this->maximum, this->next ? "," : "");
 			this = this->next;
 		}
 
-		printk(KERN_INFO "\n");
+		printk("\n");
 	}
 
 	for (i = 0; i < 3; i++)
