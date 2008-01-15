@@ -535,11 +535,12 @@ static int toi_bio_memory_needed(void)
 			(PAGE_SIZE + sizeof(struct request) +
 				sizeof(struct bio) + sizeof(struct io_info)));
 
-	printk(KERN_INFO "toi_bio_memory_needed: %d x (%lu + %lu + "
-			"%lu + %lu) = %d.\n",
+	printk(KERN_INFO "toi_bio_memory_needed: %d x (%lu + %u + "
+			"%u + %u) = %d.\n",
 			max(target_outstanding_io, max_readahead),
-			PAGE_SIZE, sizeof(struct request),
-			sizeof(struct bio), sizeof(struct io_info),
+			PAGE_SIZE, (unsigned int) sizeof(struct request),
+			(unsigned int) sizeof(struct bio),
+			(unsigned int) sizeof(struct io_info),
 			result);
 
 	return result;
