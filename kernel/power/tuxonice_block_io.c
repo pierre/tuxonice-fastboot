@@ -227,7 +227,9 @@ static void do_bio_wait(int reason)
 	} else {
 		atomic_inc(&reasons[reason]);
 
-		io_schedule();
+		/* Wait for something to cleanup */
+		wait_event(num_in_progress_wait,
+				atomic_read(&toi_io_to_cleanup));
 		toi_cleanup_completed_io(0);
 	}
 }
