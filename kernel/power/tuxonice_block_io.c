@@ -399,7 +399,7 @@ static struct io_info *get_io_info_struct(void)
 		wait_event(num_in_progress_wait,
 			atomic_read(&toi_io_in_progress) < max_outstanding_io);
 
-		toi_cleanup_completed_io(1);
+		toi_cleanup_completed_io(0);
 	}
 
 	do {
