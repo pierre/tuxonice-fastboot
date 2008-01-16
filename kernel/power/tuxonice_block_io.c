@@ -56,6 +56,7 @@ static struct page *bio_queue_head, *bio_queue_tail;
 static DEFINE_SPINLOCK(bio_queue_lock);
 static atomic_t toi_io_queue_length;
 static int toi_io_max_queue_length;
+static int queue_trigger = 25;
 
 static LIST_HEAD(ioinfo_ready_for_cleanup);
 static DEFINE_SPINLOCK(ioinfo_ready_lock);
@@ -708,7 +709,7 @@ static void toi_read_header_init(void)
 	readahead_index = ra_submit_index = -1;
 }
 
-static int toi_bio_queue_flush_pages(void);
+static int toi_bio_queue_flush_pages(int finish);
 static void toi_bio_queue_page_write(char **full_buffer);
 
 /**
@@ -722,7 +723,7 @@ static int toi_rw_cleanup(int writing)
 
 	if (writing && toi_writer_buffer_posn) {
 		toi_bio_queue_page_write(&toi_writer_buffer);
-		toi_bio_queue_flush_pages();
+		toi_bio_queue_flush_pages(1);
 	}
 
 	if (writing && current_stream == 2)
@@ -830,10 +831,13 @@ wait:
  * toi_bio_queue_flush_pages
  */
 
-static int toi_bio_queue_flush_pages(void)
+static int toi_bio_queue_flush_pages(int finish)
 {
 	unsigned long flags;
 	int result = 0;
+
+	if (!finish && atomic_read(&toi_io_queue_length) < queue_trigger)
+		return 0;
 
 	if (!mutex_trylock(&toi_bio_queue_mutex))
 		return 0;
@@ -1003,7 +1007,7 @@ static int toi_bio_write_page(unsigned long pfn, struct page *buffer_page,
 
 	DROP_BIO_MUTEX();
 	kunmap(buffer_page);
-	toi_bio_queue_flush_pages();
+	toi_bio_queue_flush_pages(0);
 	return result;
 }
 
@@ -1042,7 +1046,7 @@ static int toi_rw_header_chunk(int writing,
 
 	result = toi_rw_buffer(writing, buffer, buffer_size);
 	if (writing) {
-		int flush_result = toi_bio_queue_flush_pages();
+		int flush_result = toi_bio_queue_flush_pages(0);
 		if (!result)
 			result = flush_result;
 	}
@@ -1144,6 +1148,10 @@ struct toi_bio_ops toi_bio_ops = {
 static struct toi_sysfs_data sysfs_params[] = {
 	{ TOI_ATTR("target_outstanding_io", SYSFS_RW),
 	  SYSFS_INT(&target_outstanding_io, 0, TARGET_OUTSTANDING_IO, 0),
+	},
+
+	{ TOI_ATTR("queue_trigger", SYSFS_RW),
+	  SYSFS_INT(&queue_trigger, 1, 4096, 0),
 	},
 
 	{ TOI_ATTR("max_readahead", SYSFS_RW),
