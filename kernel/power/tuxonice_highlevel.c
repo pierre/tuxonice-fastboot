@@ -170,7 +170,7 @@ int toi_start_anything(int hibernate_or_resume)
 		}
 	}
 	
-	if (hibernate_or_resume)
+	if (hibernate_or_resume == SYSFS_HIBERNATE)
 		toi_print_modules();
 
 	if (toi_get_modules()) {
