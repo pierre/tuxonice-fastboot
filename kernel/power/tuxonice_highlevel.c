@@ -1102,7 +1102,11 @@ int toi_launch_userspace_program(char *command, int channel_no,
 
 	retval = call_usermodehelper(argv[0], argv, envp, wait);
 
-	if (retval)
+	/* 
+	 * If the program reports an error, retval = 256. Don't complain
+	 * about that here.
+	 */
+	if (retval && retval != 256)
 		printk("Failed to launch userspace program '%s': Error %d\n",
 				command, retval);
 
