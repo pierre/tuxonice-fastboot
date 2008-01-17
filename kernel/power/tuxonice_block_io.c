@@ -500,6 +500,19 @@ static void toi_bdev_page_io(int writing, struct block_device *bdev,
 	toi_do_io(writing, bdev, pos, page, -1, 1);
 }
 
+/**
+ * toi_bio_memory_needed: Report amount of memory needed for block i/o.
+ *
+ * We want to have at least enough memory so as to have target_outstanding_io
+ * or more transactions on the fly at once. If we can do more, fine.
+ */
+static int toi_bio_memory_needed(void)
+{
+	return (max(target_outstanding_io, max_readahead) *
+			(PAGE_SIZE + sizeof(struct request) +
+				sizeof(struct bio) + sizeof(struct io_info)));
+}
+
 /*
  * toi_bio_print_debug_stats
  *
@@ -513,30 +526,14 @@ static int toi_bio_print_debug_stats(char *buffer, int size)
 			"outstanding io %d.\n", max_readahead,
 			max_outstanding_io);
 
+	len += snprintf_used(buffer + len, size - len,
+		"toi_bio_memory_needed: %d x (%lu + %u + %u + %u) = %d.\n",
+		max(target_outstanding_io, max_readahead),
+		PAGE_SIZE, (unsigned int) sizeof(struct request),
+		(unsigned int) sizeof(struct bio),
+		(unsigned int) sizeof(struct io_info), toi_bio_memory_needed());
+
 	return len;
-}
-
-/**
- * toi_bio_memory_needed: Report amount of memory needed for block i/o.
- *
- * We want to have at least enough memory so as to have target_outstanding_io
- * or more transactions on the fly at once. If we can do more, fine.
- */
-static int toi_bio_memory_needed(void)
-{
-	int result = (max(target_outstanding_io, max_readahead) *
-			(PAGE_SIZE + sizeof(struct request) +
-				sizeof(struct bio) + sizeof(struct io_info)));
-
-	printk(KERN_INFO "toi_bio_memory_needed: %d x (%lu + %u + "
-			"%u + %u) = %d.\n",
-			max(target_outstanding_io, max_readahead),
-			PAGE_SIZE, (unsigned int) sizeof(struct request),
-			(unsigned int) sizeof(struct bio),
-			(unsigned int) sizeof(struct io_info),
-			result);
-
-	return result;
 }
 
 /**
