@@ -158,13 +158,20 @@ int toi_start_anything(int hibernate_or_resume)
 	oldfs = get_fs();
 	set_fs(KERNEL_DS);
 
-	if (hibernate_or_resume) {
-		if (hibernate_or_resume == SYSFS_HIBERNATE &&
-				strlen(pre_hibernate_command))
-			toi_launch_userspace_program(pre_hibernate_command,
-					0, UMH_WAIT_PROC);
-		toi_print_modules();
+	if (hibernate_or_resume == SYSFS_HIBERNATE &&
+			strlen(pre_hibernate_command)) {
+		int result = toi_launch_userspace_program(pre_hibernate_command,
+				0, UMH_WAIT_PROC);
+		if (result) {
+			printk("Pre-hibernate command '%s' returned %d. "
+					"Aborting.\n", pre_hibernate_command,
+					result);
+			goto out_err;
+		}
 	}
+	
+	if (hibernate_or_resume)
+		toi_print_modules();
 
 	if (toi_get_modules()) {
 		printk("TuxOnIce: Get modules failed!\n");
