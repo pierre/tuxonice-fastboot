@@ -234,7 +234,7 @@
 
    A suspend cycle can be started directly by doing:
 
-	echo > /sys/power/tuxonice/do_resume
+	echo > /sys/power/tuxonice/do_hibernate
 
    In practice, though, you'll probably want to use the hibernate script
    to unload modules, configure the kernel the way you like it and so on.
