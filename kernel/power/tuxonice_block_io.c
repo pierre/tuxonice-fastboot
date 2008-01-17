@@ -713,8 +713,9 @@ static int toi_rw_cleanup(int writing)
 {
 	int i;
 
-	if (writing && toi_writer_buffer_posn) {
-		toi_bio_queue_page_write(&toi_writer_buffer);
+	if (writing) {
+		if (toi_writer_buffer_posn)
+			toi_bio_queue_page_write(&toi_writer_buffer);
 		toi_bio_queue_flush_pages(1);
 	}
 
@@ -1050,11 +1051,18 @@ static int toi_rw_header_chunk(int writing,
  */
 static int write_header_chunk_finish(void)
 {
-	if (!toi_writer_buffer_posn)
-		return 0;
+	int result = 0;
 
-	return toi_bio_rw_page(WRITE, virt_to_page(toi_writer_buffer),
-		-1) ? -EIO : 0;
+	toi_bio_queue_flush_pages(1);
+
+	if (toi_writer_buffer_posn) {
+		result = toi_bio_rw_page(WRITE,
+			virt_to_page(toi_writer_buffer), -1) ? -EIO : 0;
+	}
+
+	toi_finish_all_io();
+
+	return result;
 }
 
 /**
