@@ -527,7 +527,7 @@ static int toi_bio_print_debug_stats(char *buffer, int size)
 			max_outstanding_io);
 
 	len += snprintf_used(buffer + len, size - len,
-		"toi_bio_memory_needed: %d x (%lu + %u + %u + %u) = %d.\n",
+		"  Memory_needed: %d x (%lu + %u + %u + %u) = %d bytes.\n",
 		max(target_outstanding_io, max_readahead),
 		PAGE_SIZE, (unsigned int) sizeof(struct request),
 		(unsigned int) sizeof(struct bio),
