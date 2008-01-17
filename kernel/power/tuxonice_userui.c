@@ -634,7 +634,7 @@ static __init int toi_user_ui_init(void)
 	int result;
 
 	ui_helper_data.nl = NULL;
-	strcpy(ui_helper_data.program, CONFIG_TOI_USERUI_DEFAULT_PATH);
+	strncpy(ui_helper_data.program, CONFIG_TOI_USERUI_DEFAULT_PATH, 255);
 	ui_helper_data.pid = -1;
 	ui_helper_data.skb_size = sizeof(struct userui_msg_params);
 	ui_helper_data.pool_limit = 6;
