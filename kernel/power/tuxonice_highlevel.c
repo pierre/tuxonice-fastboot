@@ -96,6 +96,8 @@ static int get_pmsem = 0, got_pmsem;
 static mm_segment_t oldfs;
 static atomic_t actions_running;
 static int block_dump_save;
+static char pre_hibernate_command[256];
+static char post_hibernate_command[256];
 
 int toi_fail_num;
 
@@ -124,6 +126,11 @@ void toi_finish_anything(int hibernate_or_resume)
 		block_dump = block_dump_save;
 		set_cpus_allowed(current, CPU_MASK_ALL);
 		toi_alloc_print_debug_stats();
+
+		if (hibernate_or_resume == SYSFS_HIBERNATE &&
+				strlen(post_hibernate_command))
+			toi_launch_userspace_program(post_hibernate_command,
+					0, UMH_WAIT_PROC);
 	}
 }
 
@@ -151,8 +158,13 @@ int toi_start_anything(int hibernate_or_resume)
 	oldfs = get_fs();
 	set_fs(KERNEL_DS);
 
-	if (hibernate_or_resume)
+	if (hibernate_or_resume) {
+		if (hibernate_or_resume == SYSFS_HIBERNATE &&
+				strlen(pre_hibernate_command))
+			toi_launch_userspace_program(pre_hibernate_command,
+					0, UMH_WAIT_PROC);
 		toi_print_modules();
+	}
 
 	if (toi_get_modules()) {
 		printk("TuxOnIce: Get modules failed!\n");
@@ -1032,6 +1044,74 @@ out:
 }
 
 /*
+ * channel_no: If !0, -c <channel_no> is added to args (userui).
+ */
+int toi_launch_userspace_program(char *command, int channel_no,
+		enum umh_wait wait)
+{
+	int retval;
+	static char *envp[] = {
+			"HOME=/",
+			"TERM=linux",
+			"PATH=/sbin:/usr/sbin:/bin:/usr/bin",
+			NULL };
+	static char *argv[] =
+		{ NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL };
+	char *channel = NULL;
+	int arg = 0, size;
+	char test_read[255];
+	char *orig_posn = command;
+
+	if (!strlen(orig_posn))
+		return 1;
+
+	if (channel_no) {
+		channel = toi_kzalloc(4, 6, GFP_KERNEL);
+		if (!channel) {
+			printk(KERN_INFO "Failed to allocate memory in "
+				"preparing to launch userspace program.\n");
+			return 1;
+		}
+	}
+
+	/* Up to 7 args supported */
+	while (arg < 7) {
+		sscanf(orig_posn, "%s", test_read);
+		size = strlen(test_read);
+		if (!(size))
+			break;
+		argv[arg] = toi_kzalloc(5, size + 1, TOI_ATOMIC_GFP);
+		strcpy(argv[arg], test_read);
+		orig_posn += size + 1;
+		*test_read = 0;
+		arg++;
+	}
+
+	if (channel_no) {
+		sprintf(channel, "-c%d", channel_no);
+		argv[arg] = channel;
+	} else
+		arg--;
+
+	retval = call_usermodehelper(argv[0], argv, envp, wait);
+
+	if (retval)
+		printk("Failed to launch userspace program '%s': Error %d\n",
+				command, retval);
+
+	{
+		int i;
+		for (i = 0; i < arg; i++)
+			if (argv[i] && argv[i] != channel)
+				toi_kfree(5, argv[i]);
+	}
+
+	toi_kfree(4, channel);
+
+	return retval;
+}
+
+/*
  * This array contains entries that are automatically registered at
  * boot. Modules and the console code register their own entries separately.
  */
@@ -1123,6 +1203,14 @@ static struct toi_sysfs_data sysfs_params[] = {
 	  SYSFS_BIT(&toi_bkd.toi_action, TOI_LATE_CPU_HOTPLUG, 0)
 	},
 
+	{ TOI_ATTR("pre_hibernate_command", SYSFS_RW),
+	  SYSFS_STRING(pre_hibernate_command, 0, 255)
+	},
+
+	{ TOI_ATTR("post_hibernate_command", SYSFS_RW),
+	  SYSFS_STRING(post_hibernate_command, 0, 255)
+	},
+
 #ifdef CONFIG_TOI_KEEP_IMAGE
 	{ TOI_ATTR("keep_image", SYSFS_RW),
 	  SYSFS_BIT(&toi_bkd.toi_action, TOI_KEEP_IMAGE, 0)
@@ -1148,6 +1236,9 @@ static __init int core_load(void)
 {
 	int i,
 	    numfiles = sizeof(sysfs_params) / sizeof(struct toi_sysfs_data);
+
+	strncpy(pre_hibernate_command, CONFIG_TOI_DEFAULT_PRE_HIBERNATE, 255);
+	strncpy(post_hibernate_command, CONFIG_TOI_DEFAULT_POST_HIBERNATE, 255);
 
 	if (toi_sysfs_init())
 		return 1;

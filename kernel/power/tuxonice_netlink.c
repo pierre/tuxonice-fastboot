@@ -294,67 +294,6 @@ void toi_netlink_close(struct user_helper_data *uhd)
 }
 EXPORT_SYMBOL_GPL(toi_netlink_close);
 
-static int toi_launch_userspace_program(char *command, int channel_no)
-{
-	int retval;
-	static char *envp[] = {
-			"HOME=/",
-			"TERM=linux",
-			"PATH=/sbin:/usr/sbin:/bin:/usr/bin",
-			NULL };
-	static char *argv[] =
-		{ NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL };
-	char *channel = toi_kzalloc(4, 6, GFP_KERNEL);
-	int arg = 0, size;
-	char test_read[255];
-	char *orig_posn = command;
-
-	if (!strlen(orig_posn))
-		return 1;
-
-	if (!channel) {
-		printk(KERN_INFO "Failed to allocate memory in preparing to "
-				"launch userspace program.\n");
-		return 1;
-	}
-
-	/* Up to 7 args supported */
-	while (arg < 7) {
-		sscanf(orig_posn, "%s", test_read);
-		size = strlen(test_read);
-		if (!(size))
-			break;
-		argv[arg] = toi_kzalloc(5, size + 1, TOI_ATOMIC_GFP);
-		strcpy(argv[arg], test_read);
-		orig_posn += size + 1;
-		*test_read = 0;
-		arg++;
-	}
-
-	if (channel_no) {
-		sprintf(channel, "-c%d", channel_no);
-		argv[arg] = channel;
-	} else
-		arg--;
-
-	retval = call_usermodehelper(argv[0], argv, envp, 0);
-
-	if (retval)
-		printk("Failed to launch userspace program '%s': Error %d\n",
-				command, retval);
-
-	{
-		int i;
-		for (i = 0; i < arg; i++)
-			if (argv[i] && argv[i] != channel)
-				toi_kfree(5, argv[i]);
-	}
-
-	toi_kfree(4, channel);
-
-	return retval;
-}
-
 int toi_netlink_setup(struct user_helper_data *uhd)
 {
 	if (netlink_prepare(uhd) < 0) {
@@ -362,7 +301,8 @@ int toi_netlink_setup(struct user_helper_data *uhd)
 		return 1;
 	}
 
-	if (toi_launch_userspace_program(uhd->program, uhd->netlink_id) < 0) {
+	if (toi_launch_userspace_program(uhd->program, uhd->netlink_id,
+				UMH_NO_WAIT) < 0) {
 		printk(KERN_INFO "Launch userspace program failed.\n");
 		toi_netlink_close_complete(uhd);
 		return 1;

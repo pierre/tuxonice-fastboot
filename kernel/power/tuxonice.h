@@ -17,6 +17,7 @@
 #include <linux/suspend.h>
 #include <linux/dyn_pageflags.h>
 #include <linux/fs.h>
+#include <linux/kmod.h>
 #include <asm/setup.h>
 #include "tuxonice_pageflags.h"
 
@@ -201,4 +202,6 @@ static inline int load_direct(struct page *page)
 extern int pre_resume_freeze(void);
 extern int do_check_can_resume(void);
 extern int do_toi_step(int step);
+extern int toi_launch_userspace_program(char *command, int channel_no,
+		enum umh_wait wait);
 #endif
