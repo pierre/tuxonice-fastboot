@@ -57,6 +57,7 @@ static DEFINE_SPINLOCK(bio_queue_lock);
 static atomic_t toi_io_queue_length;
 static int toi_io_max_queue_length;
 static int queue_trigger = 25;
+static int free_mem_throttle;
 
 static LIST_HEAD(ioinfo_ready_for_cleanup);
 static DEFINE_SPINLOCK(ioinfo_ready_lock);
@@ -94,6 +95,19 @@ static struct toi_bdev_info *toi_devinfo;
 
 DEFINE_MUTEX(toi_bio_queue_mutex);
 DEFINE_MUTEX(toi_bio_mutex);
+
+/**
+ * set_throttle: Set the point where we pause to avoid oom.
+ *
+ * Initially, this value is zero, but when we first fail to allocate memory,
+ * we set it (plus a buffer) and thereafter throttle i/o once that limit is
+ * reached.
+ */
+
+static void set_throttle(void)
+{
+	free_mem_throttle = nr_unallocated_buffer_pages() + 50;
+}
 
 /**
  * toi_bio_cleanup_one: Cleanup one bio.
@@ -177,7 +191,7 @@ static void toi_cleanup_completed_io(int all)
 	spin_unlock_irqrestore(&ioinfo_ready_lock, flags);
 }
 
-#define NUM_REASONS 8
+#define NUM_REASONS 9
 static atomic_t reasons[NUM_REASONS];
 static char *reason_name[NUM_REASONS] = {
 	"readahead not ready",
@@ -187,7 +201,8 @@ static char *reason_name[NUM_REASONS] = {
 	"synchronous I/O",
 	"bio mutex when reading",
 	"bio mutex when writing",
-	"toi_bio_queue_page_write"
+	"toi_bio_queue_page_write",
+	"memory low"
 };
 
 /**
@@ -345,8 +360,11 @@ static int submit(struct io_info *io_info)
 
 	while (!bio) {
 		bio = bio_alloc(TOI_ATOMIC_GFP, 1);
-		if (!bio)
+		if (!bio) {
+			set_throttle();
 			do_bio_wait(1);
+		}
+
 	}
 
 	bio->bi_bdev = io_info->dev;
@@ -389,6 +407,14 @@ static struct io_info *get_io_info_struct(void)
 {
 	struct io_info *this = NULL;
 	int cur_outstanding_io;
+	int free_pages = nr_unallocated_buffer_pages();
+
+	/* Getting low on memory and I/O is in progress? */
+	while (unlikely(free_pages < free_mem_throttle) &&
+			atomic_read(&current_outstanding_io)) {
+		do_bio_wait(8);
+		free_pages = nr_unallocated_buffer_pages();
+	}
 
 	do {
 		this = toi_kzalloc(1, sizeof(struct io_info), TOI_ATOMIC_GFP);
@@ -396,6 +422,7 @@ static struct io_info *get_io_info_struct(void)
 		if (this)
 			break;
 
+		set_throttle();
 		do_bio_wait(2);
 	} while (!this);
 
@@ -441,8 +468,10 @@ static void toi_do_io(int writing, struct block_device *bdev, long block0,
 	io_info->readahead_index = readahead_index;
 
 	if (io_info->readahead_index == -1) {
-		while (!(buffer_virt = toi_get_zeroed_page(13, TOI_ATOMIC_GFP)))
+		while (!(buffer_virt = toi_get_zeroed_page(13, TOI_ATOMIC_GFP))) {
+			set_throttle();
 			do_bio_wait(3);
+		}
 
 		io_info->bio_page = virt_to_page(buffer_virt);
 	} else {
@@ -884,8 +913,10 @@ static void toi_bio_queue_page_write(char **full_buffer)
 
 	while (!*full_buffer) {
 		*full_buffer = (char *) toi_get_zeroed_page(11, TOI_ATOMIC_GFP);
-		if (!*full_buffer)
+		if (!*full_buffer) {
+			set_throttle();
 			do_bio_wait(7);
+		}
 	}
 }
 
