@@ -217,7 +217,6 @@ menuconfig TOI_CORE
 
 	config TOI_DEFAULT_PRE_HIBERNATE
 		string "Default pre-hibernate command"
-		default "/usr/sbin/hibernate --prehibernate"
 		depends on TOI_CORE
 		---help---
 		  This entry allows you to specify a command to be run prior
@@ -226,7 +225,6 @@ menuconfig TOI_CORE
 
 	config TOI_DEFAULT_POST_HIBERNATE
 		string "Default post-resume command"
-		default "/usr/sbin/hibernate --posthibernate"
 		depends on TOI_CORE
 		---help---
 		  This entry allows you to specify a command to be run after
