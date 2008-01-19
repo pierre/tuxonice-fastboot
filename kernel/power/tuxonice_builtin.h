@@ -27,3 +27,4 @@ extern unsigned long toi_get_nonconflicting_page(void);
 extern int toi_post_context_save(void);
 extern int toi_try_hibernate(int have_pmsem);
 extern char toi_wait_for_keypress_dev_console(int timeout);
+extern struct block_device *toi_open_by_devnum(dev_t dev, unsigned mode);

@@ -175,6 +175,18 @@ struct toi_boot_kernel_data toi_bkd __nosavedata
 };
 EXPORT_SYMBOL_GPL(toi_bkd);
 
+struct block_device *toi_open_by_devnum(dev_t dev, unsigned mode)
+{
+	struct block_device *bdev = bdget(dev);
+	int err = -ENOMEM;
+	int flags = mode & FMODE_WRITE ? O_RDWR : O_RDONLY;
+	flags |= O_NONBLOCK;
+	if (bdev)
+		err = blkdev_get(bdev, mode, flags);
+	return err ? ERR_PTR(err) : bdev;
+}
+EXPORT_SYMBOL_GPL(toi_open_by_devnum);
+
 EXPORT_SYMBOL_GPL(toi_wait_for_keypress_dev_console);
 EXPORT_SYMBOL_GPL(hibernation_platform_enter);
 EXPORT_SYMBOL_GPL(platform_start);

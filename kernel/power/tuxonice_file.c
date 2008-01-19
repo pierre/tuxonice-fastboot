@@ -276,7 +276,7 @@ static void toi_file_cleanup(int finishing_cycle)
  */
 static void reopen_resume_devt(void)
 {
-	toi_file_target_bdev = open_by_devnum(resume_file_dev_t, FMODE_READ);
+	toi_file_target_bdev = toi_open_by_devnum(resume_file_dev_t, FMODE_READ);
 	if (IS_ERR(toi_file_target_bdev)) {
 		printk(KERN_INFO "Got a dev_num (%lx) but failed to open it.\n",
 				(unsigned long) resume_file_dev_t);
@@ -322,7 +322,7 @@ static void toi_file_get_target_info(char *target, int get_size,
 			return;
 		}
 
-		toi_file_target_bdev = open_by_devnum(resume_file_dev_t,
+		toi_file_target_bdev = toi_open_by_devnum(resume_file_dev_t,
 				FMODE_READ);
 		if (IS_ERR(toi_file_target_bdev)) {
 			printk(KERN_INFO "Got a dev_num (%lx) but failed to "
