@@ -168,6 +168,7 @@ out_close:
 struct toi_boot_kernel_data toi_bkd __nosavedata 
 		__attribute__((aligned(PAGE_SIZE))) = {
         MY_BOOT_KERNEL_DATA_VERSION,
+	0,
 #ifdef CONFIG_TOI_REPLACE_SWSUSP
         (1 << TOI_REPLACE_SWSUSP) |
 #endif
