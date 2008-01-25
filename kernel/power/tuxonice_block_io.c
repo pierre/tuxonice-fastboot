@@ -35,22 +35,26 @@ static int pr_index;
 #endif
 
 #define TARGET_OUTSTANDING_IO 16384
-#define MAX_READAHEAD 2048
 #define CLEANUP_BATCH_SIZE 16
 
 static int target_outstanding_io = 2048;
 static atomic_t current_outstanding_io;
-static int max_outstanding_io;
-static int max_readahead = 2048;
+static int max_outstanding_writes, max_outstanding_reads;
 
 struct io_info {
 	struct bio *sys_struct;
 	sector_t first_block;
 	struct page *bio_page, *dest_page;
-	int writing, readahead_index, cleaned;
+	int writing, is_readahead, status;
 	struct block_device *dev;
 	struct list_head list;
+	struct list_head readahead_list;
 };
+
+#define IO_IN_PROGRESS 0
+#define READY_FOR_CLEANUP 1
+#define CLEAN_STARTED 2
+#define CLEAN_DONE 3
 
 static struct page *bio_queue_head, *bio_queue_tail;
 static DEFINE_SPINLOCK(bio_queue_lock);
@@ -58,12 +62,15 @@ static atomic_t toi_io_queue_length;
 static int toi_io_max_queue_length;
 static int queue_trigger = 25;
 static int free_mem_throttle;
+static int more_readahead = 1;
 
 static LIST_HEAD(ioinfo_ready_for_cleanup);
 static DEFINE_SPINLOCK(ioinfo_ready_lock);
 
 static LIST_HEAD(ioinfo_busy);
 static DEFINE_SPINLOCK(ioinfo_busy_lock);
+
+static LIST_HEAD(readahead_list);
 
 static struct page *waiting_on;
 
@@ -72,12 +79,6 @@ static atomic_t toi_io_to_cleanup;
 static DECLARE_WAIT_QUEUE_HEAD(num_in_progress_wait);
 
 static int extra_page_forward;
-
-static unsigned long toi_readahead_flags[
-	DIV_ROUND_UP(MAX_READAHEAD, BITS_PER_LONG)];
-static DEFINE_SPINLOCK(toi_readahead_flags_lock);
-static struct page *toi_ra_pages[MAX_READAHEAD];
-static int readahead_index, ra_submit_index;
 
 static int current_stream;
 /* 0 = Header, 1 = Pageset1, 2 = Pageset2 */
@@ -118,13 +119,10 @@ static void set_throttle(void)
  */
 static void toi_bio_cleanup_one(struct io_info *io_info)
 {
-	int readahead_index = io_info->readahead_index;
-	unsigned long flags;
+	BUG_ON(io_info->status >= CLEAN_STARTED);
+	io_info->status = CLEAN_STARTED;
 
-	BUG_ON(io_info->cleaned);
-	io_info->cleaned = 1;
-
-	if (!io_info->writing && readahead_index == -1) {
+	if (!io_info->writing && !io_info->is_readahead) {
 		char *to = (char *) kmap(io_info->dest_page);
 		char *from = (char *) kmap(io_info->bio_page);
 		memcpy(to, from, PAGE_SIZE);
@@ -133,25 +131,19 @@ static void toi_bio_cleanup_one(struct io_info *io_info)
 	}
 
 	put_page(io_info->bio_page);
-	if (io_info->writing || readahead_index == -1)
+	if (io_info->writing || !io_info->is_readahead)
 		toi__free_page(13, io_info->bio_page);
 
 	bio_put(io_info->sys_struct);
 
-	if (readahead_index > -1) {
-		int index = readahead_index/BITS_PER_LONG;
-		int bit = readahead_index - (index * BITS_PER_LONG);
-		spin_lock_irqsave(&toi_readahead_flags_lock, flags);
-		set_bit(bit, &toi_readahead_flags[index]);
-		spin_unlock_irqrestore(&toi_readahead_flags_lock, flags);
-
-		/* Ensure we don't try to clean this up twice */
-		toi_ra_pages[readahead_index]->private = 0;
-	}
-
-	toi_kfree(1, io_info);
+	/* If it was a readahead, we still need the io_info struct to ensure
+	 * reads are handled in the right order, so don't free it yet.
+	 */
+	if (!io_info->is_readahead)
+		toi_kfree(1, io_info);
 	atomic_dec(&toi_io_to_cleanup);
 	atomic_dec(&current_outstanding_io);
+	io_info->status = CLEAN_DONE;
 }
 
 /**
@@ -191,7 +183,7 @@ static void toi_cleanup_completed_io(int all)
 	spin_unlock_irqrestore(&ioinfo_ready_lock, flags);
 }
 
-#define NUM_REASONS 9
+#define NUM_REASONS 10
 static atomic_t reasons[NUM_REASONS];
 static char *reason_name[NUM_REASONS] = {
 	"readahead not ready",
@@ -202,7 +194,8 @@ static char *reason_name[NUM_REASONS] = {
 	"bio mutex when reading",
 	"bio mutex when writing",
 	"toi_bio_queue_page_write",
-	"memory low"
+	"memory low",
+	"readahead buffer allocation"
 };
 
 /**
@@ -253,58 +246,6 @@ static void toi_finish_all_io(void)
 }
 
 /**
- * toi_readahead_ready: Is this readahead finished?
- *
- * Returns whether the readahead requested is ready.
- */
-static int toi_readahead_ready(int readahead_index)
-{
-	int index = readahead_index / BITS_PER_LONG;
-	int bit = readahead_index - (index * BITS_PER_LONG);
-
-	return test_bit(bit, &toi_readahead_flags[index]);
-}
-
-/**
- * toi_wait_on_readahead: Wait on a particular page.
- *
- * @readahead_index: Index of the readahead to wait for.
- */
-static void toi_wait_on_readahead(int readahead_index)
-{
-	if (!toi_readahead_ready(readahead_index)) {
-		waiting_on = toi_ra_pages[readahead_index];
-		do_bio_wait(0);
-	}
-}
-
-static int toi_prepare_readahead(int index)
-{
-	unsigned long new_page;
-
-	if (toi_ra_pages[index])
-		return 0;
-
-	new_page = toi_get_zeroed_page(12, TOI_ATOMIC_GFP);
-
-	if (!new_page)
-		return -ENOMEM;
-
-	toi_ra_pages[index] = virt_to_page(new_page);
-	return 0;
-}
-
-/* toi_readahead_cleanup
- * Clean up structures used for readahead */
-static void toi_cleanup_readahead(int page)
-{
-	if (toi_ra_pages[page]) {
-		toi__free_page(12, toi_ra_pages[page]);
-		toi_ra_pages[page] = 0;
-	}
-}
-
-/**
  * toi_end_bio: bio completion function.
  *
  * @bio: bio that has completed.
@@ -336,6 +277,8 @@ static void toi_end_bio(struct bio *bio, int err)
 
 	atomic_dec(&toi_io_in_progress);
 	atomic_inc(&toi_io_to_cleanup);
+
+	io_info->status = READY_FOR_CLEANUP;
 
 	wake_up(&num_in_progress_wait);
 }
@@ -406,7 +349,6 @@ static int submit(struct io_info *io_info)
 static struct io_info *get_io_info_struct(void)
 {
 	struct io_info *this = NULL;
-	int cur_outstanding_io;
 	int free_pages = nr_unallocated_buffer_pages();
 
 	/* Getting low on memory and I/O is in progress? */
@@ -428,9 +370,7 @@ static struct io_info *get_io_info_struct(void)
 
 	memset(this, 0, sizeof(struct io_info));
 	INIT_LIST_HEAD(&this->list);
-	cur_outstanding_io = atomic_add_return(1, &current_outstanding_io);
-	if (cur_outstanding_io > max_outstanding_io)
-		max_outstanding_io = cur_outstanding_io;	
+	INIT_LIST_HEAD(&this->readahead_list);
 	return this;
 }
 
@@ -454,37 +394,33 @@ static struct io_info *get_io_info_struct(void)
  * Failure? What's that?
  */
 static void toi_do_io(int writing, struct block_device *bdev, long block0,
-	struct page *page, int readahead_index, int syncio)
+	struct page *page, int is_readahead, int syncio)
 {
 	struct io_info *io_info = get_io_info_struct();
 	unsigned long buffer_virt = 0;
 	char *to, *from;
+	int cur_outstanding_io;
 
 	/* Copy settings to the io_info struct */
 	io_info->writing = writing;
 	io_info->dev = bdev;
 	io_info->first_block = block0;
-	io_info->dest_page = page;
-	io_info->readahead_index = readahead_index;
+	io_info->is_readahead = is_readahead;
+	io_info->status = IO_IN_PROGRESS;
 
-	if (io_info->readahead_index == -1) {
+	if (is_readahead)
+		list_add_tail(&io_info->readahead_list, &readahead_list);
+
+	if (!io_info->is_readahead) {
 		while (!(buffer_virt = toi_get_zeroed_page(13, TOI_ATOMIC_GFP))) {
 			set_throttle();
 			do_bio_wait(3);
 		}
 
 		io_info->bio_page = virt_to_page(buffer_virt);
-	} else {
-		unsigned long flags;
-		int index = io_info->readahead_index / BITS_PER_LONG;
-		int bit = io_info->readahead_index - index * BITS_PER_LONG;
-
-		spin_lock_irqsave(&toi_readahead_flags_lock, flags);
-		clear_bit(bit, &toi_readahead_flags[index]);
-		spin_unlock_irqrestore(&toi_readahead_flags_lock, flags);
-
+		io_info->dest_page = page;
+	} else
 		io_info->bio_page = page;
-	}
 
 	/* Done before submitting to avoid races. */
 	if (syncio)
@@ -500,6 +436,15 @@ static void toi_do_io(int writing, struct block_device *bdev, long block0,
 		from = kmap_atomic(page, KM_USER1);
 		memcpy(to, from, PAGE_SIZE);
 		kunmap_atomic(from, KM_USER1);
+	}
+
+	cur_outstanding_io = atomic_add_return(1, &current_outstanding_io);
+	if (writing) {
+		if (cur_outstanding_io > max_outstanding_writes)
+			max_outstanding_writes = cur_outstanding_io;
+	} else {
+		if (cur_outstanding_io > max_outstanding_reads)
+			max_outstanding_reads = cur_outstanding_io;
 	}
 
 	/* Submit the page */
@@ -526,7 +471,7 @@ static void toi_do_io(int writing, struct block_device *bdev, long block0,
 static void toi_bdev_page_io(int writing, struct block_device *bdev,
 		long pos, struct page *page)
 {
-	toi_do_io(writing, bdev, pos, page, -1, 1);
+	toi_do_io(writing, bdev, pos, page, 0, 1);
 }
 
 /**
@@ -537,8 +482,7 @@ static void toi_bdev_page_io(int writing, struct block_device *bdev,
  */
 static int toi_bio_memory_needed(void)
 {
-	return (max(target_outstanding_io, max_readahead) *
-			(PAGE_SIZE + sizeof(struct request) +
+	return (target_outstanding_io * (PAGE_SIZE + sizeof(struct request) +
 				sizeof(struct bio) + sizeof(struct io_info)));
 }
 
@@ -552,12 +496,12 @@ static int toi_bio_print_debug_stats(char *buffer, int size)
 	int len = 0;
 
 	len = snprintf_used(buffer, size, "- Max readahead %d. Max "
-			"outstanding io %d.\n", max_readahead,
-			max_outstanding_io);
+			"outstanding io %d.\n", max_outstanding_reads,
+			max_outstanding_writes);
 
 	len += snprintf_used(buffer + len, size - len,
 		"  Memory_needed: %d x (%lu + %u + %u + %u) = %d bytes.\n",
-		max(target_outstanding_io, max_readahead),
+		target_outstanding_io,
 		PAGE_SIZE, (unsigned int) sizeof(struct request),
 		(unsigned int) sizeof(struct bio),
 		(unsigned int) sizeof(struct io_info), toi_bio_memory_needed());
@@ -666,7 +610,7 @@ static void set_extra_page_forward(void)
  * Submit a page for reading or writing, possibly readahead.
  */
 static int toi_bio_rw_page(int writing, struct page *page,
-		int readahead_index)
+		int is_readahead)
 {
 	struct toi_bdev_info *dev_info;
 
@@ -690,7 +634,7 @@ static int toi_bio_rw_page(int writing, struct page *page,
 	toi_do_io(writing, dev_info->bdev,
 		toi_writer_posn.current_offset <<
 			dev_info->bmap_shift,
-		page, readahead_index, 0);
+		page, is_readahead, 0);
 
 	return 0;
 }
@@ -710,9 +654,8 @@ static int toi_rw_init(int writing, int stream_number)
 
 	current_stream = stream_number;
 
-	readahead_index = ra_submit_index = -1;
-
 	pr_index = 0;
+	more_readahead = 1;
 
 	return 0;
 }
@@ -724,7 +667,7 @@ static int toi_rw_init(int writing, int stream_number)
  */
 static void toi_read_header_init(void)
 {
-	readahead_index = ra_submit_index = -1;
+	more_readahead = 1;
 }
 
 static int toi_bio_queue_flush_pages(int finish);
@@ -751,9 +694,13 @@ static int toi_rw_cleanup(int writing)
 
 	toi_finish_all_io();
 
-	if (!writing)
-		for (i = 0; i < max_readahead; i++)
-			toi_cleanup_readahead(i);
+	while(!list_empty(&readahead_list)) {
+		struct io_info *this = container_of(readahead_list.next,
+				struct io_info, readahead_list);
+		list_del_init(&this->readahead_list);
+		toi__free_page(12, this->bio_page);
+		toi_kfree(1, this);
+	}
 
 	current_stream = 0;
 
@@ -775,19 +722,15 @@ static int toi_rw_cleanup(int writing)
  */
 static int toi_bio_read_page_with_readahead(void)
 {
-	static int last_result;
 	unsigned long *virt;
-
-	if (readahead_index == -1) {
-		last_result = 0;
-		readahead_index = ra_submit_index = 0;
-	}
+	struct io_info *next = NULL;
+	int last_result;
 
 	/* Start a new readahead? */
-	if (last_result) {
+	if (!more_readahead) {
 		/* We failed to submit a read, and have cleaned up
 		 * all the readahead previously submitted */
-		if (ra_submit_index == readahead_index) {
+		if (list_empty(&readahead_list)) {
 			abort_hibernate(TOI_FAILED_IO, "Failed to submit"
 				" a read and no readahead left.");
 			return -EIO;
@@ -796,52 +739,56 @@ static int toi_bio_read_page_with_readahead(void)
 	}
 
 	do {
-		if (toi_prepare_readahead(ra_submit_index)) {
-			/* We are supposed to have enough memory. */
-			printk(KERN_INFO "Failed to get readahead buffer page "
-					"%d.\n", ra_submit_index);
-			toi_alloc_print_debug_stats();
-			toi_message(TOI_ANY_SECTION, TOI_LOW, 1,
-				" - Free memory is %d.\n",
-				real_nr_free_pages(all_zones_mask));
+		char *buffer = NULL;
 
-			BUG();
+		while (!buffer) {
+			buffer = (char *) toi_get_zeroed_page(12,
+					TOI_ATOMIC_GFP);
+			if (!buffer) {
+				set_throttle();
+				do_bio_wait(9);
+			}
 		}
 
-		last_result = toi_bio_rw_page(READ,
-			toi_ra_pages[ra_submit_index],
-			ra_submit_index);
+		last_result = toi_bio_rw_page(READ, virt_to_page(buffer), 1);
 
-		if (last_result) {
+		if (last_result == -ENODATA)
+			more_readahead = 0;
+
+		if (!next)
+			next = container_of(readahead_list.next, struct io_info,
+					readahead_list);
+
+		if (!more_readahead) {
 			/* 
 			 * Don't complain about failing to do readahead past
 			 * the end of storage.
 			 */
-			if (last_result != -61)
-				printk(KERN_INFO "Begin read chunk for page %d "
-					"returned %d.\n",
-					ra_submit_index, last_result);
-			break;
+			if (last_result != -ENODATA)
+				printk(KERN_INFO
+					"Begin read chunk returned %d.\n",
+					last_result);
 		}
 
-		ra_submit_index++;
-
-		if (ra_submit_index == max_readahead)
-			ra_submit_index = 0;
-
-	} while ((!last_result) && (ra_submit_index != readahead_index) &&
-			(!toi_readahead_ready(readahead_index)));
+	} while (more_readahead && next->status == IO_IN_PROGRESS);
 
 wait:
-	toi_wait_on_readahead(readahead_index);
+	if (!next)
+		next = container_of(readahead_list.next, struct io_info,
+					readahead_list);
 
-	virt = kmap_atomic(toi_ra_pages[readahead_index], KM_USER1);
+	if (next->status < CLEAN_DONE) {
+		waiting_on = next->bio_page;
+		do_bio_wait(0);
+	}
+
+	virt = kmap_atomic(next->bio_page, KM_USER1);
 	memcpy(toi_writer_buffer, virt, PAGE_SIZE);
 	kunmap_atomic(virt, KM_USER1);
 
-	readahead_index++;
-	if (readahead_index == max_readahead)
-		readahead_index = 0;
+	list_del(&next->readahead_list);
+	toi__free_page(12, next->bio_page);
+	toi_kfree(1, next);
 
 	return 0;
 }
@@ -869,7 +816,7 @@ static int toi_bio_queue_flush_pages(int finish)
 			bio_queue_tail = NULL;
 		atomic_dec(&toi_io_queue_length);
 		spin_unlock_irqrestore(&bio_queue_lock, flags);
-		result = toi_bio_rw_page(WRITE, page, -1);
+		result = toi_bio_rw_page(WRITE, page, 0);
 		toi__free_page(11, page);
 		if (result)
 			goto out;
@@ -1085,7 +1032,7 @@ static int write_header_chunk_finish(void)
 
 	if (toi_writer_buffer_posn) {
 		result = toi_bio_rw_page(WRITE,
-			virt_to_page(toi_writer_buffer), -1) ? -EIO : 0;
+			virt_to_page(toi_writer_buffer), 0) ? -EIO : 0;
 	}
 
 	toi_finish_all_io();
@@ -1110,8 +1057,7 @@ static int toi_bio_save_config_info(char *buf)
 {
 	int *ints = (int *) buf;
 	ints[0] = target_outstanding_io;
-	ints[1] = max_readahead;
-	return 2 * sizeof(int);
+	return sizeof(int);
 }
 
 /**
@@ -1124,7 +1070,6 @@ static void toi_bio_load_config_info(char *buf, int size)
 {
 	int *ints = (int *) buf;
 	target_outstanding_io  = ints[0];
-	max_readahead = ints[1];
 }
 
 /**
@@ -1137,8 +1082,10 @@ static int toi_bio_initialise(int starting_cycle)
 {
 	toi_writer_buffer = (char *) toi_get_zeroed_page(14, TOI_ATOMIC_GFP);
 
-	if (starting_cycle)
-		max_outstanding_io = 0;
+	if (starting_cycle) {
+		max_outstanding_writes = 0;
+		max_outstanding_reads = 0;
+	}
 
 	return toi_writer_buffer ? 0 : -ENOMEM;
 }
@@ -1180,10 +1127,6 @@ static struct toi_sysfs_data sysfs_params[] = {
 
 	{ TOI_ATTR("queue_trigger", SYSFS_RW),
 	  SYSFS_INT(&queue_trigger, 1, 4096, 0),
-	},
-
-	{ TOI_ATTR("max_readahead", SYSFS_RW),
-	  SYSFS_INT(&max_readahead, 1, MAX_READAHEAD, 0),
 	},
 };
 
