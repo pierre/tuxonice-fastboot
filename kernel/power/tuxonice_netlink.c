@@ -302,7 +302,7 @@ int toi_netlink_setup(struct user_helper_data *uhd)
 	}
 
 	if (toi_launch_userspace_program(uhd->program, uhd->netlink_id,
-				UMH_NO_WAIT) < 0) {
+				UMH_WAIT_EXEC) < 0) {
 		printk(KERN_INFO "Launch userspace program failed.\n");
 		toi_netlink_close_complete(uhd);
 		return 1;
