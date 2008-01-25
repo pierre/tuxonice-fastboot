@@ -67,8 +67,7 @@ static int more_readahead = 1;
 static LIST_HEAD(ioinfo_ready_for_cleanup);
 static DEFINE_SPINLOCK(ioinfo_ready_lock);
 
-static LIST_HEAD(ioinfo_busy);
-static DEFINE_SPINLOCK(ioinfo_busy_lock);
+/* We used to have a busy list, but it was write only */
 
 static LIST_HEAD(readahead_list);
 
@@ -264,10 +263,6 @@ static void toi_end_bio(struct bio *bio, int err)
 
 	BUG_ON(!test_bit(BIO_UPTODATE, &bio->bi_flags));
 
-	spin_lock_irqsave(&ioinfo_busy_lock, flags);
-	list_del_init(&io_info->list);
-	spin_unlock_irqrestore(&ioinfo_busy_lock, flags);
-
 	spin_lock_irqsave(&ioinfo_ready_lock, flags);
 	list_add_tail(&io_info->list, &ioinfo_ready_for_cleanup);
 	spin_unlock_irqrestore(&ioinfo_ready_lock, flags);
@@ -299,7 +294,6 @@ static void toi_end_bio(struct bio *bio, int err)
 static int submit(struct io_info *io_info)
 {
 	struct bio *bio = NULL;
-	unsigned long flags;
 
 	while (!bio) {
 		bio = bio_alloc(TOI_ATOMIC_GFP, 1);
@@ -326,10 +320,6 @@ static int submit(struct io_info *io_info)
 	io_info->bio_page->private = (unsigned long) io_info;
 	lock_page(io_info->bio_page);
 	bio_get(bio);
-
-	spin_lock_irqsave(&ioinfo_busy_lock, flags);
-	list_add_tail(&io_info->list, &ioinfo_busy);
-	spin_unlock_irqrestore(&ioinfo_busy_lock, flags);
 
 	atomic_inc(&toi_io_in_progress);
 
