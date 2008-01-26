@@ -186,14 +186,17 @@ void toi_free_pages(int fail_num, struct page *page, int order)
 
 void toi_alloc_print_debug_stats(void)
 {
-	int i;
-
-	printk(KERN_INFO "Idx  Allocs   Frees   Tests   Fails Max     "
-			"Description\n");
+	int i, header_done = 0;
 
 	for (i = 0; i < TOI_ALLOC_PATHS; i++)
-		if (atomic_read(&toi_alloc_count[i]) ||
-		    atomic_read(&toi_free_count[i]))
+		if (atomic_read(&toi_alloc_count[i]) !=
+		    atomic_read(&toi_free_count[i])) {
+			if (!header_done) {
+				printk(KERN_INFO "Idx  Allocs   Frees   Tests "
+					"  Fails Max     Description\n");
+				header_done = 1;
+			}
+
 			printk(KERN_INFO "%3d %7d %7d %7d %7d %7d %s\n", i,
 				atomic_read(&toi_alloc_count[i]),
 				atomic_read(&toi_free_count[i]),
@@ -201,6 +204,7 @@ void toi_alloc_print_debug_stats(void)
 				atomic_read(&toi_fail_count[i]),
 				toi_max_allocd[i],
 				toi_alloc_desc[i]);
+		}
 }
 EXPORT_SYMBOL_GPL(toi_alloc_print_debug_stats);
 
