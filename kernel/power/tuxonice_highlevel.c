@@ -963,8 +963,16 @@ void _toi_try_resume(void)
 {
 	resume_attempted = 1;
 
+	/*
+	 * There's a comment in kernel/power/disk.c that indicates
+	 * we should be able to use mutex_lock_nested below. That
+	 * doesn't seem to cut it, though, so let's just turn lockdep
+	 * off for now.
+	 */
+	lockdep_off();
+
 	if (toi_start_anything(SYSFS_RESUMING))
-		return;
+		goto out;
 
 	/* Unlock will be done in do_cleanup */
 	mutex_lock(&pm_mutex);
@@ -978,6 +986,10 @@ void _toi_try_resume(void)
 	 */
 	clear_toi_state(TOI_BOOT_TIME);
 	toi_finish_anything(SYSFS_RESUMING);
+
+out:
+	lockdep_on();
+
 }
 
 /**
