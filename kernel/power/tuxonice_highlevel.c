@@ -1214,10 +1214,6 @@ static struct toi_sysfs_data sysfs_params[] = {
 	  SYSFS_BIT(&toi_bkd.toi_action, TOI_TEST_FILTER_SPEED, 0)
 	},
 
-	{ TOI_ATTR("slow", SYSFS_RW),
-	  SYSFS_BIT(&toi_bkd.toi_action, TOI_SLOW, 0)
-	},
-
 	{ TOI_ATTR("no_pageset2", SYSFS_RW),
 	  SYSFS_BIT(&toi_bkd.toi_action, TOI_NO_PAGESET2, 0)
 	},

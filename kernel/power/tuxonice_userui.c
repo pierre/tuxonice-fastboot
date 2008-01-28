@@ -67,7 +67,7 @@ static void ui_nl_set_state(int n)
 	/* Only let them change certain settings */
 	static const int toi_action_mask =
 		(1 << TOI_REBOOT) | (1 << TOI_PAUSE) |
-		(1 << TOI_SLOW) | (1 << TOI_LOGALL) |
+		(1 << TOI_LOGALL) |
 		(1 << TOI_SINGLESTEP) |
 		(1 << TOI_PAUSE_NEAR_PAGESET_END);
 

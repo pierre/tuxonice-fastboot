@@ -45,7 +45,6 @@ extern unsigned long boot_kernel_data_buffer;
 enum {
 	TOI_REBOOT,
 	TOI_PAUSE,
-	TOI_SLOW,
 	TOI_LOGALL,
 	TOI_CAN_CANCEL,
 	TOI_KEEP_IMAGE,
