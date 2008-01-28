@@ -30,6 +30,8 @@ static char lid_state_file[256], wake_alarm_dir[256];
 static struct file *lid_file, *alarm_file, *epoch_file;
 int post_wake_state = -1;
 
+static int did_suspend_to_both;
+
 /*
  * __toi_power_down
  * Functionality   : Powers down or reboots the computer once the image
@@ -58,8 +60,10 @@ static void __toi_power_down(int method)
 		if (!error)
 			error = suspend_devices_and_enter(PM_SUSPEND_MEM);
 		pm_notifier_call_chain(PM_POST_SUSPEND);
-		if (!error)
+		if (!error) {
+			did_suspend_to_both = 1;
 			return;
+		}
 		break;
 	case 4:
 		if (!hibernation_platform_enter())
@@ -89,7 +93,7 @@ static void __toi_power_down(int method)
 		filp_close(file, NULL); file = NULL; \
 	}
 
-static void powerdown_files_close(int toi_or_resume)
+static void powerdown_cleanup(int toi_or_resume)
 {
 	if (!toi_or_resume)
 		return;
@@ -115,10 +119,12 @@ static void open_file(char *format, char *arg, struct file **var, int mode,
 	}
 }
 
-static int powerdown_files_open(int toi_or_resume)
+static int powerdown_init(int toi_or_resume)
 {
 	if (!toi_or_resume)
 		return 0;
+
+	did_suspend_to_both = 0;
 
 	open_file("/proc/acpi/button/%s/state", lid_state_file, &lid_file,
 			O_RDONLY, "lid");
@@ -240,14 +246,18 @@ static struct toi_sysfs_data sysfs_params[] = {
 	{ TOI_ATTR("powerdown_method", SYSFS_RW),
 	  SYSFS_UL(&toi_poweroff_method, 0, 5, 0)
 	},
+
+	{ TOI_ATTR("did_suspend_to_both", SYSFS_READONLY),
+	  SYSFS_INT(&did_suspend_to_both, 0, 0, 0)
+	},
 #endif
 };
 
 static struct toi_module_ops powerdown_ops = {
 	.type				= MISC_HIDDEN_MODULE,
 	.name				= "poweroff",
-	.initialise			= powerdown_files_open,
-	.cleanup			= powerdown_files_close,
+	.initialise			= powerdown_init,
+	.cleanup			= powerdown_cleanup,
 	.directory			= "[ROOT]",
 	.module				= THIS_MODULE,
 	.sysfs_data			= sysfs_params,
