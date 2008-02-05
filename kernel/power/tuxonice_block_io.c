@@ -140,9 +140,11 @@ static void toi_bio_cleanup_one(struct io_info *io_info)
 	 */
 	if (!io_info->is_readahead)
 		toi_kfree(1, io_info);
+	else
+		io_info->status = CLEAN_DONE;
+
 	atomic_dec(&toi_io_to_cleanup);
 	atomic_dec(&current_outstanding_io);
-	io_info->status = CLEAN_DONE;
 }
 
 /**
