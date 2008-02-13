@@ -35,7 +35,6 @@ static int pr_index;
 #endif
 
 #define TARGET_OUTSTANDING_IO 16384
-#define CLEANUP_BATCH_SIZE 16
 
 static int target_outstanding_io = 2048;
 static atomic_t current_outstanding_io;
