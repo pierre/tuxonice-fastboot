@@ -53,7 +53,6 @@ static struct page *bio_queue_head, *bio_queue_tail;
 static DEFINE_SPINLOCK(bio_queue_lock);
 static atomic_t toi_io_queue_length;
 static int toi_io_max_queue_length;
-static int queue_trigger = 25;
 static int free_mem_throttle;
 static int more_readahead = 1;
 static LIST_HEAD(readahead_list);
@@ -673,9 +672,6 @@ static int toi_bio_queue_flush_pages(int finish)
 	unsigned long flags;
 	int result = 0;
 
-	if (!finish && atomic_read(&toi_io_queue_length) < queue_trigger)
-		return 0;
-
 	if (!mutex_trylock(&toi_bio_queue_mutex))
 		return 0;
 
@@ -994,11 +990,7 @@ struct toi_bio_ops toi_bio_ops = {
 static struct toi_sysfs_data sysfs_params[] = {
 	{ TOI_ATTR("target_outstanding_io", SYSFS_RW),
 	  SYSFS_INT(&target_outstanding_io, 0, TARGET_OUTSTANDING_IO, 0),
-	},
-
-	{ TOI_ATTR("queue_trigger", SYSFS_RW),
-	  SYSFS_INT(&queue_trigger, 1, 4096, 0),
-	},
+	}
 };
 
 static struct toi_module_ops toi_blockwriter_ops = {
