@@ -294,12 +294,9 @@ int toi_go_atomic(pm_message_t state, int suspend_time)
 {
 	toi_prepare_status(DONT_CLEAR_BAR, "Going atomic.");
 
-	if (test_action_state(TOI_PM_PREPARE_CONSOLE))
-		pm_prepare_console();
-
-	if (suspend_time && toi_platform_start()) {
+	if (suspend_time && toi_platform_begin()) {
 		set_abort_result(TOI_PLATFORM_PREP_FAILED);
-		toi_end_atomic(ATOMIC_STEP_RESTORE_CONSOLE, suspend_time);
+		toi_end_atomic(ATOMIC_STEP_PLATFORM_END, suspend_time);
 		return 1;
 	}
 
@@ -313,20 +310,20 @@ int toi_go_atomic(pm_message_t state, int suspend_time)
 
 	if (suspend_time && toi_platform_pre_snapshot()) {
 		set_abort_result(TOI_PRE_SNAPSHOT_FAILED);
-		toi_end_atomic(ATOMIC_STEP_RESUME_CONSOLE, suspend_time);
+		toi_end_atomic(ATOMIC_STEP_DEVICE_RESUME, suspend_time);
 		return 1;
 	}
 
 	if (!suspend_time && toi_platform_pre_restore()) {
 		set_abort_result(TOI_PRE_RESTORE_FAILED);
-		toi_end_atomic(ATOMIC_STEP_RESUME_CONSOLE, suspend_time);
+		toi_end_atomic(ATOMIC_STEP_DEVICE_RESUME, suspend_time);
 		return 1;
 	}
 
 	if (test_action_state(TOI_LATE_CPU_HOTPLUG)) {
 		if (disable_nonboot_cpus()) {
 			set_abort_result(TOI_CPU_HOTPLUG_FAILED);
-			toi_end_atomic(ATOMIC_STEP_DEVICE_RESUME,
+			toi_end_atomic(ATOMIC_STEP_CPU_HOTPLUG,
 					suspend_time);
 			return 1;
 		}
@@ -368,14 +365,13 @@ void toi_end_atomic(int stage, int suspend_time)
 	case ATOMIC_STEP_CPU_HOTPLUG:
 		if (test_action_state(TOI_LATE_CPU_HOTPLUG))
 			enable_nonboot_cpus();
-	case ATOMIC_STEP_DEVICE_RESUME:
 		toi_platform_finish();
+	case ATOMIC_STEP_DEVICE_RESUME:
 		device_resume();
 	case ATOMIC_STEP_RESUME_CONSOLE:
 		resume_console();
-	case ATOMIC_STEP_RESTORE_CONSOLE:
-		if (test_action_state(TOI_PM_PREPARE_CONSOLE))
-			pm_restore_console();
+	case ATOMIC_STEP_PLATFORM_END:
+		toi_platform_end();
 
 		toi_prepare_status(DONT_CLEAR_BAR, "Post atomic.");
 	}

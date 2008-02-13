@@ -31,6 +31,7 @@
 #include "tuxonice_modules.h"
 #include "tuxonice_builtin.h"
 #include "tuxonice_power_off.h"
+#include "power.h"
 
 /*
  * Highmem related functions (x86 only).
@@ -190,18 +191,21 @@ EXPORT_SYMBOL_GPL(toi_open_by_devnum);
 
 EXPORT_SYMBOL_GPL(toi_wait_for_keypress_dev_console);
 EXPORT_SYMBOL_GPL(hibernation_platform_enter);
-EXPORT_SYMBOL_GPL(platform_start);
+EXPORT_SYMBOL_GPL(platform_begin);
 EXPORT_SYMBOL_GPL(platform_pre_snapshot);
 EXPORT_SYMBOL_GPL(platform_leave);
+EXPORT_SYMBOL_GPL(platform_end);
 EXPORT_SYMBOL_GPL(platform_finish);
 EXPORT_SYMBOL_GPL(platform_pre_restore);
 EXPORT_SYMBOL_GPL(platform_restore_cleanup);
+EXPORT_SYMBOL_GPL(power_kobj);
+EXPORT_SYMBOL_GPL(pm_notifier_call_chain);
+EXPORT_SYMBOL_GPL(init_swsusp_header);
 
 #ifdef CONFIG_ARCH_HIBERNATION_HEADER
 EXPORT_SYMBOL_GPL(arch_hibernation_header_save);
 EXPORT_SYMBOL_GPL(arch_hibernation_header_restore);
 #endif
-EXPORT_SYMBOL_GPL(init_swsusp_header);
 
 #ifdef CONFIG_TOI_CORE_EXPORTS
 #ifdef CONFIG_X86_64
@@ -209,8 +213,6 @@ EXPORT_SYMBOL_GPL(restore_processor_state);
 EXPORT_SYMBOL_GPL(save_processor_state);
 #endif
 
-EXPORT_SYMBOL_GPL(pm_chain_head);
-EXPORT_SYMBOL_GPL(kernel_shutdown_prepare);
 EXPORT_SYMBOL_GPL(drop_pagecache);
 EXPORT_SYMBOL_GPL(restore_pblist);
 EXPORT_SYMBOL_GPL(pm_mutex);
@@ -232,7 +234,6 @@ EXPORT_SYMBOL_GPL(machine_halt);
 EXPORT_SYMBOL_GPL(block_dump);
 EXPORT_SYMBOL_GPL(unlink_lru_lists);
 EXPORT_SYMBOL_GPL(relink_lru_lists);
-EXPORT_SYMBOL_GPL(power_subsys);
 EXPORT_SYMBOL_GPL(machine_power_off);
 EXPORT_SYMBOL_GPL(suspend_devices_and_enter);
 EXPORT_SYMBOL_GPL(first_online_pgdat);

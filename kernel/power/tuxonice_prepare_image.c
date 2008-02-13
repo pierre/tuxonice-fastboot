@@ -334,7 +334,7 @@ static int toi_allocate_extra_pagedir_memory(int extra_pages_needed)
 int real_nr_free_pages(unsigned long zone_idx_mask)
 {
 	struct zone *zone;
-	int result = 0, i = 0, cpu;
+	int result = 0, cpu;
 
 	/* PCP lists */
 	for_each_zone(zone) {
@@ -346,13 +346,8 @@ int real_nr_free_pages(unsigned long zone_idx_mask)
 
 		for_each_online_cpu(cpu) {
 			struct per_cpu_pageset *pset = zone_pcp(zone, cpu);
-
-			for (i = 0; i < ARRAY_SIZE(pset->pcp); i++) {
-				struct per_cpu_pages *pcp;
-
-				pcp = &pset->pcp[i];
-				result += pcp->count;
-			}
+			struct per_cpu_pages *pcp = &pset->pcp;
+			result += pcp->count;
 		}
 
 		result += zone_page_state(zone, NR_FREE_PAGES);
@@ -649,15 +644,11 @@ static void generate_free_page_map(void)
 
 		for_each_online_cpu(cpu) {
 			struct per_cpu_pageset *pset = zone_pcp(zone, cpu);
+			struct per_cpu_pages *pcp = &pset->pcp;
+			struct page *page;
 
-			for (i = 0; i < ARRAY_SIZE(pset->pcp); i++) {
-				struct per_cpu_pages *pcp;
-				struct page *page;
-
-				pcp = &pset->pcp[i];
-				list_for_each_entry(page, &pcp->list, lru)
-					SetPageNosaveFree(page);
-			}
+			list_for_each_entry(page, &pcp->list, lru)
+				SetPageNosaveFree(page);
 		}
 
 		spin_unlock_irqrestore(&zone->lock, flags);

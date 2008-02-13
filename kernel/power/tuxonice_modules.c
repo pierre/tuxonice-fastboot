@@ -234,7 +234,7 @@ int toi_register_module(struct toi_module_ops *module)
 		kobj = shared->dir_kobj;
 	} else {
 		if (!strncmp(module->directory, "[ROOT]", 6))
-			kobj = &toi_subsys.kobj;
+			kobj = tuxonice_kobj;
 		else
 			kobj = make_toi_sysdir(module->directory);
 	}

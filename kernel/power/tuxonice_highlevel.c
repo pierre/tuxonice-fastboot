@@ -1263,8 +1263,7 @@ static __init int core_load(void)
 		return 1;
 
 	for (i = 0; i < numfiles; i++)
-		toi_register_sysfs_file(&toi_subsys.kobj,
-				&sysfs_params[i]);
+		toi_register_sysfs_file(tuxonice_kobj, &sysfs_params[i]);
 
 	toi_core_fns = &my_fns;
 
@@ -1301,8 +1300,7 @@ static __exit void core_unload(void)
 	toi_usm_exit();
 
 	for (i = 0; i < numfiles; i++)
-		toi_unregister_sysfs_file(&toi_subsys.kobj,
-				&sysfs_params[i]);
+		toi_unregister_sysfs_file(tuxonice_kobj, &sysfs_params[i]);
 
 	toi_core_fns = NULL;
 

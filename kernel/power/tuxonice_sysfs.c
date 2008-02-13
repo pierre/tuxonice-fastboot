@@ -202,7 +202,7 @@ static struct kobj_type toi_ktype = {
 	.sysfs_ops	= &toi_sysfs_ops,
 };
 
-decl_subsys_name(toi, tuxonice, &toi_ktype, NULL);
+struct kobject *tuxonice_kobj;
 
 /* Non-module sysfs entries.
  *
@@ -231,16 +231,12 @@ void remove_toi_sysdir(struct kobject *kobj)
 	if (!kobj)
 		return;
 
-	kobject_unregister(kobj);
-
-	toi_kfree(34, kobj);
+	kobject_put(kobj);
 }
 
 struct kobject *make_toi_sysdir(char *name)
 {
-	struct kobject *kobj = toi_kzalloc(34, sizeof(struct kobject),
-			GFP_KERNEL);
-	int err;
+	struct kobject *kobj = kobject_create_and_add(name, tuxonice_kobj);
 
 	if (!kobj) {
 		printk(KERN_INFO "TuxOnIce: Can't allocate kobject for sysfs "
@@ -248,21 +244,9 @@ struct kobject *make_toi_sysdir(char *name)
 		return NULL;
 	}
 
-	err = kobject_set_name(kobj, "%s", name);
+	kobj->ktype = &toi_ktype;
 
-	if (err) {
-		toi_kfree(34, kobj);
-		return NULL;
-	}
-
-	kobj->kset = &toi_subsys;
-
-	err = kobject_register(kobj);
-
-	if (err)
-		toi_kfree(34, kobj);
-
-	return err ? NULL : kobj;
+	return kobj;
 }
 
 /* toi_register_sysfs_file
@@ -284,6 +268,7 @@ int toi_register_sysfs_file(
 		printk(KERN_INFO "TuxOnIce: sysfs_create_file for %s "
 			"returned %d.\n",
 			toi_sysfs_data->attr.name, result);
+	kobj->ktype = &toi_ktype;
 
 	return result;
 }
@@ -310,12 +295,9 @@ void toi_cleanup_sysfs(void)
 		return;
 
 	for (i = 0; i < numfiles; i++)
-		toi_unregister_sysfs_file(&toi_subsys.kobj,
-				&sysfs_params[i]);
+		toi_unregister_sysfs_file(tuxonice_kobj, &sysfs_params[i]);
 
-	kobj_set_kset_s(&toi_subsys, power_subsys);
-	subsystem_unregister(&toi_subsys);
-
+	kobject_put(tuxonice_kobj);
 	toi_sysfs_initialised = 0;
 }
 
@@ -326,27 +308,21 @@ void toi_cleanup_sysfs(void)
 
 static void toi_initialise_sysfs(void)
 {
-	int i, error;
+	int i;
 	int numfiles = sizeof(sysfs_params) / sizeof(struct toi_sysfs_data);
 
 	if (toi_sysfs_initialised)
 		return;
 
 	/* Make our TuxOnIce directory a child of /sys/power */
-	kobj_set_kset_s(&toi_subsys, power_subsys);
-	error = subsystem_register(&toi_subsys);
-
-	if (error)
+	tuxonice_kobj = kobject_create_and_add("tuxonice", power_kobj);
+	if (!tuxonice_kobj)
 		return;
-
-	/* Make it use the .store and .show routines above */
-	kobj_set_kset_s(&toi_subsys, toi_subsys);
 
 	toi_sysfs_initialised = 1;
 
 	for (i = 0; i < numfiles; i++)
-		toi_register_sysfs_file(&toi_subsys.kobj,
-				&sysfs_params[i]);
+		toi_register_sysfs_file(tuxonice_kobj, &sysfs_params[i]);
 }
 
 int toi_sysfs_init(void)

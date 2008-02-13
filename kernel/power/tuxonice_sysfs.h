@@ -117,7 +117,7 @@ int toi_register_sysfs_file(struct kobject *kobj,
 void toi_unregister_sysfs_file(struct kobject *kobj,
 		struct toi_sysfs_data *toi_sysfs_data);
 
-extern struct kset toi_subsys;
+extern struct kobject *tuxonice_kobj;
 
 struct kobject *make_toi_sysdir(char *name);
 void remove_toi_sysdir(struct kobject *obj);
