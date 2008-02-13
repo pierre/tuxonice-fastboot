@@ -43,7 +43,7 @@ static int max_outstanding_writes, max_outstanding_reads;
 struct io_info {
 	struct bio *sys_struct;
 	struct page *bio_page;
-	int writing, is_readahead, completed, free_group;
+	int is_readahead, completed, free_group;
 	struct list_head readahead_list;
 };
 
@@ -194,7 +194,7 @@ static void toi_end_bio(struct bio *bio, int err)
  *	With a twist, though - we handle block_size != PAGE_SIZE.
  *	Caller has already checked that our page is not fragmented.
  */
-static int submit(struct io_info *io_info, struct block_device *dev,
+static int submit(struct io_info *io_info, int writing, struct block_device *dev,
 		sector_t first_block)
 {
 	struct bio *bio = NULL;
@@ -231,7 +231,7 @@ static int submit(struct io_info *io_info, struct block_device *dev,
 		set_bit(BIO_UPTODATE, &bio->bi_flags);
 		toi_end_bio(bio, 0);
 	} else
-		submit_bio(io_info->writing | (1 << BIO_RW_SYNC), bio);
+		submit_bio(writing | (1 << BIO_RW_SYNC), bio);
 
 	return 0;
 }
@@ -291,7 +291,6 @@ static void toi_do_io(int writing, struct block_device *bdev, long block0,
 	int cur_outstanding_io;
 
 	/* Copy settings to the io_info struct */
-	io_info->writing = writing;
 	io_info->is_readahead = is_readahead;
 	io_info->free_group = free_group;
 
@@ -316,7 +315,7 @@ static void toi_do_io(int writing, struct block_device *bdev, long block0,
 	/* Submit the page */
 	get_page(io_info->bio_page);
 
-	submit(io_info, bdev, block0);
+	submit(io_info, writing, bdev, block0);
 
 	if (syncio)
 		do_bio_wait(4);
