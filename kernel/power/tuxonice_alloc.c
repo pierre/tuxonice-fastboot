@@ -268,5 +268,6 @@ EXPORT_SYMBOL_GPL(toi_get_zeroed_page);
 EXPORT_SYMBOL_GPL(toi_kfree);
 EXPORT_SYMBOL_GPL(toi_free_page);
 EXPORT_SYMBOL_GPL(toi__free_page);
+EXPORT_SYMBOL_GPL(toi_alloc_page);
 #endif
 #endif
