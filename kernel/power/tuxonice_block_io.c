@@ -63,12 +63,6 @@ static int toi_io_max_queue_length;
 static int queue_trigger = 25;
 static int free_mem_throttle;
 static int more_readahead = 1;
-
-static LIST_HEAD(ioinfo_ready_for_cleanup);
-static DEFINE_SPINLOCK(ioinfo_ready_lock);
-
-/* We used to have a busy list, but it was write only */
-
 static LIST_HEAD(readahead_list);
 
 static struct page *waiting_on;
@@ -109,70 +103,6 @@ static void set_throttle(void)
 	free_mem_throttle = nr_unallocated_buffer_pages() + 50;
 }
 
-/**
- * toi_bio_cleanup_one: Cleanup one bio.
- * @io_info : Struct io_info to be cleaned up.
- *
- * Cleanup the bio pointed to by io_info and record as appropriate that the
- * cleanup is done.
- */
-static void toi_bio_cleanup_one(struct io_info *io_info)
-{
-	BUG_ON(io_info->status >= CLEAN_STARTED);
-	io_info->status = CLEAN_STARTED;
-
-	put_page(io_info->bio_page);
-	bio_put(io_info->sys_struct);
-
-	/* If it was a readahead, we still need the io_info struct to ensure
-	 * reads are handled in the right order, so don't free it yet.
-	 */
-	if (!io_info->is_readahead)
-		toi_kfree(1, io_info);
-	else
-		io_info->status = CLEAN_DONE;
-
-	atomic_dec(&toi_io_to_cleanup);
-	atomic_dec(&current_outstanding_io);
-}
-
-/**
- * toi_cleanup_completed_io: Cleanup completed TuxOnIce i/o.
- *
- * Cleanup i/o that has been completed. In the end_bio routine (below), we only
- * move the associated io_info struct from the busy list to the
- * ready_for_cleanup list. Now (no longer in an interrupt context), we can we
- * can do the real work.
- *
- * No locking is needed because we're under toi_bio_mutex. List items can be
- * added from the bio_end routine, but we're the only one removing them.
- */
-static void toi_cleanup_completed_io(int all)
-{
-	int num_cleaned = 0;
-	struct io_info *this;
-	unsigned long flags;
-
-	spin_lock_irqsave(&ioinfo_ready_lock, flags);
-	while (!list_empty(&ioinfo_ready_for_cleanup)) {
-		this = list_first_entry(&ioinfo_ready_for_cleanup,
-				struct io_info, list);
-		list_del_init(&this->list);
-
-		if (waiting_on == this->bio_page)
-			waiting_on = NULL;
-
-		spin_unlock_irqrestore(&ioinfo_ready_lock, flags);
-		toi_bio_cleanup_one(this);
-		spin_lock_irqsave(&ioinfo_ready_lock, flags);
-
-		num_cleaned++;
-		if (!all && num_cleaned == CLEANUP_BATCH_SIZE)
-			break;
-	}
-	spin_unlock_irqrestore(&ioinfo_ready_lock, flags);
-}
-
 #define NUM_REASONS 10
 static atomic_t reasons[NUM_REASONS];
 static char *reason_name[NUM_REASONS] = {
@@ -196,8 +126,6 @@ static char *reason_name[NUM_REASONS] = {
  */
 static void do_bio_wait(int reason)
 {
-	unsigned long flags;
-	struct io_info *mine = NULL;
 	struct page *was_waiting_on = waiting_on;
 
 	/* On SMP, waiting_on can be reset, so we make a copy */
@@ -206,22 +134,12 @@ static void do_bio_wait(int reason)
 			wait_on_page_bit(was_waiting_on, PG_locked);
 			atomic_inc(&reasons[reason]);
 		}
-		spin_lock_irqsave(&ioinfo_ready_lock, flags);
-		if (waiting_on) {
-			mine = (struct io_info *) waiting_on->private;
-			list_del_init(&mine->list);
-			waiting_on = NULL;
-		}
-		spin_unlock_irqrestore(&ioinfo_ready_lock, flags);
-		if (mine)
-			toi_bio_cleanup_one(mine);
 	} else {
+		int old_count = atomic_read(&toi_io_to_cleanup);
 		atomic_inc(&reasons[reason]);
 
-		/* Wait for something to cleanup */
 		wait_event(num_in_progress_wait,
-				atomic_read(&toi_io_to_cleanup));
-		toi_cleanup_completed_io(0);
+				atomic_read(&toi_io_to_cleanup) < old_count);
 	}
 }
 
@@ -231,7 +149,6 @@ static void do_bio_wait(int reason)
 static void toi_finish_all_io(void)
 {
 	wait_event(num_in_progress_wait, !atomic_read(&toi_io_in_progress));
-	toi_cleanup_completed_io(1);
 	BUG_ON(atomic_read(&toi_io_to_cleanup));
 }
 
@@ -250,21 +167,30 @@ static void toi_end_bio(struct bio *bio, int err)
 {
 	struct page *page = bio->bi_io_vec[0].bv_page;
 	struct io_info *io_info = bio->bi_private;
-	unsigned long flags;
 
 	BUG_ON(!test_bit(BIO_UPTODATE, &bio->bi_flags));
 
-	spin_lock_irqsave(&ioinfo_ready_lock, flags);
-	list_add_tail(&io_info->list, &ioinfo_ready_for_cleanup);
-	spin_unlock_irqrestore(&ioinfo_ready_lock, flags);
+	list_del_init(&io_info->list);
 
 	unlock_page(page);
 	bio_put(bio);
 
-	atomic_dec(&toi_io_in_progress);
-	atomic_inc(&toi_io_to_cleanup);
+	if (waiting_on == io_info->bio_page)
+		waiting_on = NULL;
 
-	io_info->status = READY_FOR_CLEANUP;
+	put_page(io_info->bio_page);
+	bio_put(io_info->sys_struct);
+
+	/* If it was a readahead, we still need the io_info struct to ensure
+	 * reads are handled in the right order, so don't free it yet.
+	 */
+	if (!io_info->is_readahead)
+		toi_kfree(1, io_info);
+	else
+		io_info->status = CLEAN_DONE;
+
+	atomic_dec(&toi_io_in_progress);
+	atomic_dec(&current_outstanding_io);
 
 	wake_up(&num_in_progress_wait);
 }
