@@ -40,15 +40,9 @@ static int target_outstanding_io = 2048;
 static atomic_t current_outstanding_io;
 static int max_outstanding_writes, max_outstanding_reads;
 
-struct io_info {
-	struct page *bio_page;
-	int free_group;
-	struct list_head readahead_list;
-};
-
 static int free_mem_throttle;
 static int more_readahead = 1;
-static LIST_HEAD(readahead_list);
+static struct page *readahead_list_head, *readahead_list_tail;
 
 static struct page *waiting_on;
 
@@ -143,14 +137,12 @@ static void toi_finish_all_io(void)
  * @err: Error value. Yes, like end_swap_bio_read, we ignore it.
  *
  * Function called by block driver from interrupt context when I/O is completed.
- * This is the reason we use spinlocks in manipulating the io_info lists. Nearly
- * the fs/buffer.c version, but we want to mark the page as done in our own
- * structures too.
+ * Nearly the fs/buffer.c version, but we want to do our cleanup too. We only
+ * free pages if they were buffers used when writing the image.
  */
 static void toi_end_bio(struct bio *bio, int err)
 {
 	struct page *page = bio->bi_io_vec[0].bv_page;
-	struct io_info *io_info = bio->bi_private;
 
 	BUG_ON(!test_bit(BIO_UPTODATE, &bio->bi_flags));
 
@@ -161,16 +153,11 @@ static void toi_end_bio(struct bio *bio, int err)
 		waiting_on = NULL;
 
 	put_page(page);
+
+	if (bio->bi_private)
+		toi__free_page((int) ((unsigned long) bio->bi_private) , page);
+
 	bio_put(bio);
-
-	if (io_info->free_group)
-		toi__free_page(io_info->free_group, page);
-
-	/* If it was a readahead, we still need the io_info struct to ensure
-	 * reads are handled in the right order, so don't free it yet.
-	 */
-	if (list_empty(&io_info->readahead_list))
-		toi_kfree(1, io_info);
 
 	atomic_dec(&toi_io_in_progress);
 	atomic_dec(&current_outstanding_io);
@@ -181,7 +168,6 @@ static void toi_end_bio(struct bio *bio, int err)
 /**
  *	submit - submit BIO request.
  *	@writing: READ or WRITE.
- *	@io_info: IO info structure.
  *
  * 	Based on Patrick's pmdisk code from long ago:
  *	"Straight from the textbook - allocate and initialize the bio.
@@ -191,10 +177,18 @@ static void toi_end_bio(struct bio *bio, int err)
  *	With a twist, though - we handle block_size != PAGE_SIZE.
  *	Caller has already checked that our page is not fragmented.
  */
-static int submit(struct io_info *io_info, int writing, struct block_device *dev,
-		sector_t first_block, struct page *page)
+static int submit(int writing, struct block_device *dev, sector_t first_block,
+		struct page *page, int free_group)
 {
 	struct bio *bio = NULL;
+	int free_pages = nr_unallocated_buffer_pages();
+
+	/* Getting low on memory and I/O is in progress? */
+	while (unlikely(free_pages < free_mem_throttle) &&
+			atomic_read(&current_outstanding_io)) {
+		do_bio_wait(8);
+		free_pages = nr_unallocated_buffer_pages();
+	}
 
 	while (!bio) {
 		bio = bio_alloc(TOI_ATOMIC_GFP, 1);
@@ -206,7 +200,7 @@ static int submit(struct io_info *io_info, int writing, struct block_device *dev
 
 	bio->bi_bdev = dev;
 	bio->bi_sector = first_block;
-	bio->bi_private = io_info;
+	bio->bi_private = (void *) ((unsigned long) free_group);
 	bio->bi_end_io = toi_end_bio;
 
 	if (bio_add_page(bio, page, PAGE_SIZE, 0) < PAGE_SIZE) {
@@ -216,7 +210,6 @@ static int submit(struct io_info *io_info, int writing, struct block_device *dev
 		return -EFAULT;
 	}
 
-	page->private = (unsigned long) io_info;
 	lock_page(page);
 	bio_get(bio);
 
@@ -230,35 +223,6 @@ static int submit(struct io_info *io_info, int writing, struct block_device *dev
 		submit_bio(writing | (1 << BIO_RW_SYNC), bio);
 
 	return 0;
-}
-
-/**
- * get_io_info_struct: Allocate a struct for recording info on i/o submitted.
- */
-static struct io_info *get_io_info_struct(void)
-{
-	struct io_info *this = NULL;
-	int free_pages = nr_unallocated_buffer_pages();
-
-	/* Getting low on memory and I/O is in progress? */
-	while (unlikely(free_pages < free_mem_throttle) &&
-			atomic_read(&current_outstanding_io)) {
-		do_bio_wait(8);
-		free_pages = nr_unallocated_buffer_pages();
-	}
-
-	do {
-		this = toi_kzalloc(1, sizeof(struct io_info), TOI_ATOMIC_GFP);
-
-		if (this)
-			break;
-
-		set_throttle();
-		do_bio_wait(2);
-	} while (!this);
-
-	INIT_LIST_HEAD(&this->readahead_list);
-	return this;
 }
 
 /**
@@ -283,15 +247,18 @@ static struct io_info *get_io_info_struct(void)
 static void toi_do_io(int writing, struct block_device *bdev, long block0,
 	struct page *page, int is_readahead, int syncio, int free_group)
 {
-	struct io_info *io_info = get_io_info_struct();
 	int cur_outstanding_io;
 
-	/* Copy settings to the io_info struct */
-	io_info->bio_page = page;
-	io_info->free_group = free_group;
+	page->private = 0;
 
-	if (is_readahead)
-		list_add_tail(&io_info->readahead_list, &readahead_list);
+	if (is_readahead) {
+		if (readahead_list_head)
+			readahead_list_tail->private = (unsigned long) page;
+		else
+			readahead_list_head = page;
+
+		readahead_list_tail = page;
+	}
 
 	/* Done before submitting to avoid races. */
 	if (syncio)
@@ -309,7 +276,7 @@ static void toi_do_io(int writing, struct block_device *bdev, long block0,
 	/* Submit the page */
 	get_page(page);
 
-	submit(io_info, writing, bdev, block0, page);
+	submit(writing, bdev, block0, page, free_group);
 
 	if (syncio)
 		do_bio_wait(4);
@@ -342,7 +309,7 @@ static void toi_bdev_page_io(int writing, struct block_device *bdev,
 static int toi_bio_memory_needed(void)
 {
 	return (target_outstanding_io * (PAGE_SIZE + sizeof(struct request) +
-				sizeof(struct bio) + sizeof(struct io_info)));
+				sizeof(struct bio)));
 }
 
 /*
@@ -359,11 +326,10 @@ static int toi_bio_print_debug_stats(char *buffer, int size)
 			max_outstanding_writes);
 
 	len += snprintf_used(buffer + len, size - len,
-		"  Memory_needed: %d x (%lu + %u + %u + %u) = %d bytes.\n",
+		"  Memory_needed: %d x (%lu + %u + %u) = %d bytes.\n",
 		target_outstanding_io,
 		PAGE_SIZE, (unsigned int) sizeof(struct request),
-		(unsigned int) sizeof(struct bio),
-		(unsigned int) sizeof(struct io_info), toi_bio_memory_needed());
+		(unsigned int) sizeof(struct bio), toi_bio_memory_needed());
 
 	return len;
 }
@@ -551,13 +517,13 @@ static int toi_rw_cleanup(int writing)
 
 	toi_finish_all_io();
 
-	while(!list_empty(&readahead_list)) {
-		struct io_info *this = container_of(readahead_list.next,
-				struct io_info, readahead_list);
-		list_del_init(&this->readahead_list);
-		toi__free_page(12, this->bio_page);
-		toi_kfree(1, this);
+	while(readahead_list_head) {
+		void *next = (void *) readahead_list_head->private;
+		toi__free_page(12, readahead_list_head);
+		readahead_list_head = next;
 	}
+
+	readahead_list_tail = NULL;
 
 	current_stream = 0;
 
@@ -580,14 +546,14 @@ static int toi_rw_cleanup(int writing)
 static int toi_bio_read_page_with_readahead(void)
 {
 	unsigned long *virt;
-	struct io_info *next = NULL;
-	int last_result;
+	int last_result, oom = 0;
+	struct page *next;
 
 	/* Start a new readahead? */
 	if (!more_readahead) {
 		/* We failed to submit a read, and have cleaned up
 		 * all the readahead previously submitted */
-		if (list_empty(&readahead_list)) {
+		if (!readahead_list_head) {
 			abort_hibernate(TOI_FAILED_IO, "Failed to submit"
 				" a read and no readahead left.");
 			return -EIO;
@@ -612,10 +578,6 @@ static int toi_bio_read_page_with_readahead(void)
 		if (last_result == -ENODATA)
 			more_readahead = 0;
 
-		if (!next)
-			next = container_of(readahead_list.next, struct io_info,
-					readahead_list);
-
 		if (!more_readahead) {
 			/* 
 			 * Don't complain about failing to do readahead past
@@ -630,22 +592,18 @@ static int toi_bio_read_page_with_readahead(void)
 	} while (more_readahead && !next->completed);
 
 wait:
-	if (!next)
-		next = container_of(readahead_list.next, struct io_info,
-					readahead_list);
-
-	if (PageLocked(next->bio_page)) {
-		waiting_on = next->bio_page;
+	if (PageLocked(readahead_list_head)) {
+		waiting_on = readahead_list_head;
 		do_bio_wait(0);
 	}
 
-	virt = kmap_atomic(next->bio_page, KM_USER1);
+	virt = kmap_atomic(readahead_list_head, KM_USER1);
 	memcpy(toi_writer_buffer, virt, PAGE_SIZE);
 	kunmap_atomic(virt, KM_USER1);
 
-	list_del(&next->readahead_list);
-	toi__free_page(12, next->bio_page);
-	toi_kfree(1, next);
+	next = (struct page *) readahead_list_head->private;
+	toi__free_page(12, readahead_list_head);
+	readahead_list_head = next;
 
 	return 0;
 }
