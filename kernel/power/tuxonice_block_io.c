@@ -41,7 +41,6 @@ static atomic_t current_outstanding_io;
 static int max_outstanding_writes, max_outstanding_reads;
 
 struct io_info {
-	struct bio *sys_struct;
 	struct page *bio_page;
 	int completed, free_group;
 	struct list_head readahead_list;
@@ -162,7 +161,7 @@ static void toi_end_bio(struct bio *bio, int err)
 		waiting_on = NULL;
 
 	put_page(io_info->bio_page);
-	bio_put(io_info->sys_struct);
+	bio_put(bio);
 
 	if (io_info->free_group)
 		toi__free_page(io_info->free_group, io_info->bio_page);
@@ -211,7 +210,6 @@ static int submit(struct io_info *io_info, int writing, struct block_device *dev
 	bio->bi_sector = first_block;
 	bio->bi_private = io_info;
 	bio->bi_end_io = toi_end_bio;
-	io_info->sys_struct = bio;
 
 	if (bio_add_page(bio, io_info->bio_page, PAGE_SIZE, 0) < PAGE_SIZE) {
 		printk(KERN_INFO "ERROR: adding page to bio at %lld\n",
