@@ -44,7 +44,7 @@ static int max_outstanding_writes, max_outstanding_reads;
 struct io_info {
 	struct bio *sys_struct;
 	sector_t first_block;
-	struct page *bio_page, *dest_page;
+	struct page *bio_page;
 	int writing, is_readahead, status;
 	struct block_device *dev;
 	struct list_head list;
@@ -121,18 +121,7 @@ static void toi_bio_cleanup_one(struct io_info *io_info)
 	BUG_ON(io_info->status >= CLEAN_STARTED);
 	io_info->status = CLEAN_STARTED;
 
-	if (!io_info->writing && !io_info->is_readahead) {
-		char *to = (char *) kmap(io_info->dest_page);
-		char *from = (char *) kmap(io_info->bio_page);
-		memcpy(to, from, PAGE_SIZE);
-		kunmap(io_info->dest_page);
-		kunmap(io_info->bio_page);
-	}
-
 	put_page(io_info->bio_page);
-	if (io_info->writing || !io_info->is_readahead)
-		toi__free_page(13, io_info->bio_page);
-
 	bio_put(io_info->sys_struct);
 
 	/* If it was a readahead, we still need the io_info struct to ensure
@@ -389,8 +378,6 @@ static void toi_do_io(int writing, struct block_device *bdev, long block0,
 	struct page *page, int is_readahead, int syncio)
 {
 	struct io_info *io_info = get_io_info_struct();
-	unsigned long buffer_virt = 0;
-	char *to, *from;
 	int cur_outstanding_io;
 
 	/* Copy settings to the io_info struct */
@@ -403,32 +390,11 @@ static void toi_do_io(int writing, struct block_device *bdev, long block0,
 	if (is_readahead)
 		list_add_tail(&io_info->readahead_list, &readahead_list);
 
-	if (!io_info->is_readahead) {
-		while (!(buffer_virt = toi_get_zeroed_page(13, TOI_ATOMIC_GFP))) {
-			set_throttle();
-			do_bio_wait(3);
-		}
-
-		io_info->bio_page = virt_to_page(buffer_virt);
-		io_info->dest_page = page;
-	} else
-		io_info->bio_page = page;
+	io_info->bio_page = page;
 
 	/* Done before submitting to avoid races. */
 	if (syncio)
 		waiting_on = io_info->bio_page;
-
-	/*
-	 * If writing, copy our data. The data is probably in lowmem, but we
-	 * cannot be certain. If there is no compression, we might be passed
-	 * the actual source page's address.
-	 */
-	if (writing) {
-		to = (char *) buffer_virt;
-		from = kmap_atomic(page, KM_USER1);
-		memcpy(to, from, PAGE_SIZE);
-		kunmap_atomic(from, KM_USER1);
-	}
 
 	cur_outstanding_io = atomic_add_return(1, &current_outstanding_io);
 	if (writing) {
