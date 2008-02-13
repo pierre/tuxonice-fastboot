@@ -208,7 +208,6 @@ static int submit(struct io_info *io_info)
 			set_throttle();
 			do_bio_wait(1);
 		}
-
 	}
 
 	bio->bi_bdev = io_info->dev;
@@ -367,8 +366,8 @@ static int toi_bio_print_debug_stats(char *buffer, int size)
 {
 	int len = 0;
 
-	len = snprintf_used(buffer, size, "- Max readahead %d. Max "
-			"outstanding io %d.\n", max_outstanding_reads,
+	len = snprintf_used(buffer, size, "- Max outstanding reads %d. Max "
+			"writes %d.\n", max_outstanding_reads,
 			max_outstanding_writes);
 
 	len += snprintf_used(buffer + len, size - len,
