@@ -262,7 +262,6 @@ static struct io_info *get_io_info_struct(void)
 		do_bio_wait(2);
 	} while (!this);
 
-	memset(this, 0, sizeof(struct io_info));
 	INIT_LIST_HEAD(&this->readahead_list);
 	return this;
 }
