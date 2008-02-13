@@ -62,7 +62,6 @@ static LIST_HEAD(readahead_list);
 static struct page *waiting_on;
 
 static atomic_t toi_io_in_progress;
-static atomic_t toi_io_to_cleanup;
 static DECLARE_WAIT_QUEUE_HEAD(num_in_progress_wait);
 
 static int extra_page_forward;
@@ -129,11 +128,11 @@ static void do_bio_wait(int reason)
 			atomic_inc(&reasons[reason]);
 		}
 	} else {
-		int old_count = atomic_read(&toi_io_to_cleanup);
+		int old_count = atomic_read(&toi_io_in_progress);
 		atomic_inc(&reasons[reason]);
 
 		wait_event(num_in_progress_wait,
-				atomic_read(&toi_io_to_cleanup) < old_count);
+				atomic_read(&toi_io_in_progress) < old_count);
 	}
 }
 
@@ -143,7 +142,7 @@ static void do_bio_wait(int reason)
 static void toi_finish_all_io(void)
 {
 	wait_event(num_in_progress_wait, !atomic_read(&toi_io_in_progress));
-	BUG_ON(atomic_read(&toi_io_to_cleanup));
+	BUG_ON(atomic_read(&toi_io_in_progress));
 }
 
 /**
