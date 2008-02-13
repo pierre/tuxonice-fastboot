@@ -47,7 +47,6 @@ struct io_info {
 	struct page *bio_page;
 	int writing, is_readahead, completed;
 	struct block_device *dev;
-	struct list_head list;
 	struct list_head readahead_list;
 };
 
@@ -165,8 +164,6 @@ static void toi_end_bio(struct bio *bio, int err)
 
 	BUG_ON(!test_bit(BIO_UPTODATE, &bio->bi_flags));
 
-	list_del_init(&io_info->list);
-
 	unlock_page(page);
 	bio_put(bio);
 
@@ -271,7 +268,6 @@ static struct io_info *get_io_info_struct(void)
 	} while (!this);
 
 	memset(this, 0, sizeof(struct io_info));
-	INIT_LIST_HEAD(&this->list);
 	INIT_LIST_HEAD(&this->readahead_list);
 	return this;
 }
