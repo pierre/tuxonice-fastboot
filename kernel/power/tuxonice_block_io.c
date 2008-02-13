@@ -45,16 +45,11 @@ struct io_info {
 	struct bio *sys_struct;
 	sector_t first_block;
 	struct page *bio_page;
-	int writing, is_readahead, status;
+	int writing, is_readahead, completed;
 	struct block_device *dev;
 	struct list_head list;
 	struct list_head readahead_list;
 };
-
-#define IO_IN_PROGRESS 0
-#define READY_FOR_CLEANUP 1
-#define CLEAN_STARTED 2
-#define CLEAN_DONE 3
 
 static struct page *bio_queue_head, *bio_queue_tail;
 static DEFINE_SPINLOCK(bio_queue_lock);
@@ -187,7 +182,7 @@ static void toi_end_bio(struct bio *bio, int err)
 	if (!io_info->is_readahead)
 		toi_kfree(1, io_info);
 	else
-		io_info->status = CLEAN_DONE;
+		io_info->completed = 1;
 
 	atomic_dec(&toi_io_in_progress);
 	atomic_dec(&current_outstanding_io);
@@ -311,7 +306,6 @@ static void toi_do_io(int writing, struct block_device *bdev, long block0,
 	io_info->dev = bdev;
 	io_info->first_block = block0;
 	io_info->is_readahead = is_readahead;
-	io_info->status = IO_IN_PROGRESS;
 
 	if (is_readahead)
 		list_add_tail(&io_info->readahead_list, &readahead_list);
@@ -654,14 +648,14 @@ static int toi_bio_read_page_with_readahead(void)
 					last_result);
 		}
 
-	} while (more_readahead && next->status == IO_IN_PROGRESS);
+	} while (more_readahead && !next->completed);
 
 wait:
 	if (!next)
 		next = container_of(readahead_list.next, struct io_info,
 					readahead_list);
 
-	if (next->status < CLEAN_DONE) {
+	if (!next->completed) {
 		waiting_on = next->bio_page;
 		do_bio_wait(0);
 	}
