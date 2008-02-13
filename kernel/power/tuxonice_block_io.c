@@ -157,14 +157,14 @@ static void toi_end_bio(struct bio *bio, int err)
 	unlock_page(page);
 	bio_put(bio);
 
-	if (waiting_on == io_info->bio_page)
+	if (waiting_on == page)
 		waiting_on = NULL;
 
-	put_page(io_info->bio_page);
+	put_page(page);
 	bio_put(bio);
 
 	if (io_info->free_group)
-		toi__free_page(io_info->free_group, io_info->bio_page);
+		toi__free_page(io_info->free_group, page);
 
 	/* If it was a readahead, we still need the io_info struct to ensure
 	 * reads are handled in the right order, so don't free it yet.
@@ -194,7 +194,7 @@ static void toi_end_bio(struct bio *bio, int err)
  *	Caller has already checked that our page is not fragmented.
  */
 static int submit(struct io_info *io_info, int writing, struct block_device *dev,
-		sector_t first_block)
+		sector_t first_block, struct page *page)
 {
 	struct bio *bio = NULL;
 
@@ -211,15 +211,15 @@ static int submit(struct io_info *io_info, int writing, struct block_device *dev
 	bio->bi_private = io_info;
 	bio->bi_end_io = toi_end_bio;
 
-	if (bio_add_page(bio, io_info->bio_page, PAGE_SIZE, 0) < PAGE_SIZE) {
+	if (bio_add_page(bio, page, PAGE_SIZE, 0) < PAGE_SIZE) {
 		printk(KERN_INFO "ERROR: adding page to bio at %lld\n",
 				(unsigned long long) first_block);
 		bio_put(bio);
 		return -EFAULT;
 	}
 
-	io_info->bio_page->private = (unsigned long) io_info;
-	lock_page(io_info->bio_page);
+	page->private = (unsigned long) io_info;
+	lock_page(page);
 	bio_get(bio);
 
 	atomic_inc(&toi_io_in_progress);
@@ -289,16 +289,15 @@ static void toi_do_io(int writing, struct block_device *bdev, long block0,
 	int cur_outstanding_io;
 
 	/* Copy settings to the io_info struct */
+	io_info->bio_page = page;
 	io_info->free_group = free_group;
 
 	if (is_readahead)
 		list_add_tail(&io_info->readahead_list, &readahead_list);
 
-	io_info->bio_page = page;
-
 	/* Done before submitting to avoid races. */
 	if (syncio)
-		waiting_on = io_info->bio_page;
+		waiting_on = page;
 
 	cur_outstanding_io = atomic_add_return(1, &current_outstanding_io);
 	if (writing) {
@@ -310,9 +309,9 @@ static void toi_do_io(int writing, struct block_device *bdev, long block0,
 	}
 
 	/* Submit the page */
-	get_page(io_info->bio_page);
+	get_page(page);
 
-	submit(io_info, writing, bdev, block0);
+	submit(io_info, writing, bdev, block0, page);
 
 	if (syncio)
 		do_bio_wait(4);
