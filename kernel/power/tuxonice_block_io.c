@@ -42,7 +42,7 @@ static int max_outstanding_writes, max_outstanding_reads;
 
 struct io_info {
 	struct page *bio_page;
-	int completed, free_group;
+	int free_group;
 	struct list_head readahead_list;
 };
 
@@ -171,8 +171,6 @@ static void toi_end_bio(struct bio *bio, int err)
 	 */
 	if (list_empty(&io_info->readahead_list))
 		toi_kfree(1, io_info);
-	else
-		io_info->completed = 1;
 
 	atomic_dec(&toi_io_in_progress);
 	atomic_dec(&current_outstanding_io);
@@ -636,7 +634,7 @@ wait:
 		next = container_of(readahead_list.next, struct io_info,
 					readahead_list);
 
-	if (!next->completed) {
+	if (PageLocked(next->bio_page)) {
 		waiting_on = next->bio_page;
 		do_bio_wait(0);
 	}
