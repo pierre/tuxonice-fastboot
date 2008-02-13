@@ -656,6 +656,7 @@ static int toi_swap_write_header_init(void)
 
 	toi_extent_state_goto_start(&toi_writer_posn);
 
+	toi_bio_ops.rw_init(WRITE, 0);
 	toi_writer_buffer_posn = 0;
 
 	/* Info needed to bootstrap goes at the start of the header.
@@ -699,6 +700,7 @@ static int toi_swap_write_header_cleanup(void)
 {
 	int result;
 	struct swap_info_struct *si;
+	unsigned long sig_page = toi_get_zeroed_page(38, TOI_ATOMIC_GFP);
 
 	/* Write any unsaved data */
 	if (toi_writer_buffer_posn)
@@ -712,19 +714,20 @@ static int toi_swap_write_header_cleanup(void)
 	/* Adjust swap header */
 	toi_bio_ops.bdev_page_io(READ, resume_block_device,
 			resume_firstblock,
-			virt_to_page(toi_writer_buffer));
+			virt_to_page(sig_page));
 
 	si = get_swap_info_struct(toi_writer_posn.current_chain);
 	result = prepare_signature(si->bdev->bd_dev,
 			toi_writer_posn.current_offset,
-		((union swap_header *) toi_writer_buffer)->magic.magic);
+		((union swap_header *) sig_page)->magic.magic);
 
 	if (!result)
 		toi_bio_ops.bdev_page_io(WRITE, resume_block_device,
 			resume_firstblock,
-			virt_to_page(toi_writer_buffer));
+			virt_to_page(sig_page));
 
 	toi_bio_ops.finish_all_io();
+	toi_free_page(38, sig_page);
 
 	return result;
 }
@@ -771,6 +774,8 @@ static int toi_swap_read_header_init(void)
 	} else
 		header_block_device = resume_block_device;
 
+	toi_bio_ops.read_header_init();
+
 	/*
 	 * Read toi_swap configuration.
 	 * Headerblock size taken into account already.
@@ -815,7 +820,6 @@ static int toi_swap_read_header_init(void)
 		devinfo[i].bdev = bdevs_opened[i]->bdev;
 	}
 
-	toi_bio_ops.read_header_init();
 	toi_extent_state_goto_start(&toi_writer_posn);
 	toi_bio_ops.set_extra_page_forward();
 
