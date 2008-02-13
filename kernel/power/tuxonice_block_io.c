@@ -42,7 +42,6 @@ static int max_outstanding_writes, max_outstanding_reads;
 
 struct io_info {
 	struct bio *sys_struct;
-	sector_t first_block;
 	struct page *bio_page;
 	int writing, is_readahead, completed, free_group;
 	struct list_head readahead_list;
@@ -195,7 +194,8 @@ static void toi_end_bio(struct bio *bio, int err)
  *	With a twist, though - we handle block_size != PAGE_SIZE.
  *	Caller has already checked that our page is not fragmented.
  */
-static int submit(struct io_info *io_info, struct block_device *dev)
+static int submit(struct io_info *io_info, struct block_device *dev,
+		sector_t first_block)
 {
 	struct bio *bio = NULL;
 
@@ -208,14 +208,14 @@ static int submit(struct io_info *io_info, struct block_device *dev)
 	}
 
 	bio->bi_bdev = dev;
-	bio->bi_sector = io_info->first_block;
+	bio->bi_sector = first_block;
 	bio->bi_private = io_info;
 	bio->bi_end_io = toi_end_bio;
 	io_info->sys_struct = bio;
 
 	if (bio_add_page(bio, io_info->bio_page, PAGE_SIZE, 0) < PAGE_SIZE) {
 		printk(KERN_INFO "ERROR: adding page to bio at %lld\n",
-				(unsigned long long) io_info->first_block);
+				(unsigned long long) first_block);
 		bio_put(bio);
 		return -EFAULT;
 	}
@@ -292,7 +292,6 @@ static void toi_do_io(int writing, struct block_device *bdev, long block0,
 
 	/* Copy settings to the io_info struct */
 	io_info->writing = writing;
-	io_info->first_block = block0;
 	io_info->is_readahead = is_readahead;
 	io_info->free_group = free_group;
 
@@ -317,7 +316,7 @@ static void toi_do_io(int writing, struct block_device *bdev, long block0,
 	/* Submit the page */
 	get_page(io_info->bio_page);
 
-	submit(io_info, bdev);
+	submit(io_info, bdev, block0);
 
 	if (syncio)
 		do_bio_wait(4);
