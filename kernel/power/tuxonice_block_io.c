@@ -43,7 +43,7 @@ static int max_outstanding_writes, max_outstanding_reads;
 struct io_info {
 	struct bio *sys_struct;
 	struct page *bio_page;
-	int is_readahead, completed, free_group;
+	int completed, free_group;
 	struct list_head readahead_list;
 };
 
@@ -170,7 +170,7 @@ static void toi_end_bio(struct bio *bio, int err)
 	/* If it was a readahead, we still need the io_info struct to ensure
 	 * reads are handled in the right order, so don't free it yet.
 	 */
-	if (!io_info->is_readahead)
+	if (list_empty(&io_info->readahead_list))
 		toi_kfree(1, io_info);
 	else
 		io_info->completed = 1;
@@ -291,7 +291,6 @@ static void toi_do_io(int writing, struct block_device *bdev, long block0,
 	int cur_outstanding_io;
 
 	/* Copy settings to the io_info struct */
-	io_info->is_readahead = is_readahead;
 	io_info->free_group = free_group;
 
 	if (is_readahead)
