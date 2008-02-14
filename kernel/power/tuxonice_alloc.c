@@ -17,6 +17,8 @@
 
 DEFINE_MUTEX(toi_alloc_mutex);
 
+static struct toi_module_ops toi_alloc_ops;
+
 static int toi_fail_num;
 static atomic_t toi_alloc_count[TOI_ALLOC_PATHS],
 		toi_free_count[TOI_ALLOC_PATHS],
@@ -116,9 +118,11 @@ void *toi_kzalloc(int fail_num, size_t size, gfp_t flags)
 {
 	void *result;
 
-	MIGHT_FAIL(fail_num, NULL);
+	if (toi_alloc_ops.enabled)
+		MIGHT_FAIL(fail_num, NULL);
 	result = kzalloc(size, flags);
-	alloc_update_stats(fail_num, result);
+	if (toi_alloc_ops.enabled)
+		alloc_update_stats(fail_num, result);
 	return result;
 }
 
@@ -127,9 +131,11 @@ unsigned long toi_get_free_pages(int fail_num, gfp_t mask,
 {
 	unsigned long result;
 
-	MIGHT_FAIL(fail_num, 0);
+	if (toi_alloc_ops.enabled)
+		MIGHT_FAIL(fail_num, 0);
 	result = __get_free_pages(mask, order);
-	alloc_update_stats(fail_num, (void *) result);
+	if (toi_alloc_ops.enabled)
+		alloc_update_stats(fail_num, (void *) result);
 	return result;
 }
 
@@ -137,9 +143,11 @@ struct page *toi_alloc_page(int fail_num, gfp_t mask)
 {
 	struct page *result;
 
-	MIGHT_FAIL(fail_num, 0);
+	if (toi_alloc_ops.enabled)
+		MIGHT_FAIL(fail_num, 0);
 	result = alloc_page(mask);
-	alloc_update_stats(fail_num, (void *) result);
+	if (toi_alloc_ops.enabled)
+		alloc_update_stats(fail_num, (void *) result);
 	return result;
 }
 
@@ -147,15 +155,17 @@ unsigned long toi_get_zeroed_page(int fail_num, gfp_t mask)
 {
 	unsigned long result;
 
-	MIGHT_FAIL(fail_num, 0);
+	if (toi_alloc_ops.enabled)
+		MIGHT_FAIL(fail_num, 0);
 	result = get_zeroed_page(mask);
-	alloc_update_stats(fail_num, (void *) result);
+	if (toi_alloc_ops.enabled)
+		alloc_update_stats(fail_num, (void *) result);
 	return result;
 }
 
 void toi_kfree(int fail_num, const void *arg)
 {
-	if (arg)
+	if (arg && toi_alloc_ops.enabled)
 		free_update_stats(fail_num);
 
 	kfree(arg);
@@ -163,7 +173,7 @@ void toi_kfree(int fail_num, const void *arg)
 
 void toi_free_page(int fail_num, unsigned long virt)
 {
-	if (virt)
+	if (virt && toi_alloc_ops.enabled)
 		free_update_stats(fail_num);
 
 	free_page(virt);
@@ -171,7 +181,7 @@ void toi_free_page(int fail_num, unsigned long virt)
 
 void toi__free_page(int fail_num, struct page *page)
 {
-	if (page)
+	if (page && toi_alloc_ops.enabled)
 		free_update_stats(fail_num);
 
 	__free_page(page);
@@ -179,7 +189,7 @@ void toi__free_page(int fail_num, struct page *page)
 
 void toi_free_pages(int fail_num, struct page *page, int order)
 {
-	if (page)
+	if (page && toi_alloc_ops.enabled)
 		free_update_stats(fail_num);
 
 	__free_pages(page, order);
@@ -188,6 +198,9 @@ void toi_free_pages(int fail_num, struct page *page, int order)
 void toi_alloc_print_debug_stats(void)
 {
 	int i, header_done = 0;
+
+	if (!toi_alloc_ops.enabled)
+		return;
 
 	for (i = 0; i < TOI_ALLOC_PATHS; i++)
 		if (atomic_read(&toi_alloc_count[i]) !=
@@ -213,7 +226,7 @@ static int toi_alloc_initialise(int starting_cycle)
 {
 	int i;
 
-	if (starting_cycle) {
+	if (starting_cycle && toi_alloc_ops.enabled) {
 		for (i = 0; i < TOI_ALLOC_PATHS; i++) {
 			atomic_set(&toi_alloc_count[i], 0);
 			atomic_set(&toi_free_count[i], 0);
@@ -236,6 +249,10 @@ static struct toi_sysfs_data sysfs_params[] = {
 
 	{ TOI_ATTR("find_max_mem_allocated", SYSFS_RW),
 	  SYSFS_BIT(&toi_bkd.toi_action, TOI_GET_MAX_MEM_ALLOCD, 0)
+	},
+
+	{ TOI_ATTR("enabled", SYSFS_RW),
+	  SYSFS_INT(&toi_alloc_ops.enabled, 0, 1, 0)
 	}
 };
 
@@ -254,7 +271,9 @@ static struct toi_module_ops toi_alloc_ops = {
 
 int toi_alloc_init(void)
 {
-	return toi_register_module(&toi_alloc_ops);
+	int result = toi_register_module(&toi_alloc_ops);
+	toi_alloc_ops.enabled = 0;
+	return result;
 }
 
 void toi_alloc_exit(void)
