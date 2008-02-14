@@ -116,6 +116,7 @@ static void do_bio_wait(int reason)
 		atomic_inc(&reasons[reason]);
 
 		wait_event(num_in_progress_wait,
+				!atomic_read(&toi_io_in_progress) ||
 				atomic_read(&toi_io_in_progress) < old_count);
 	}
 }
