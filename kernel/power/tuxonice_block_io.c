@@ -125,7 +125,10 @@ static int toi_bio_queue_flush_pages(int dedicated_thread);
 
 static void set_throttle(void)
 {
-	free_mem_throttle = nr_unallocated_buffer_pages() + 50;
+	int new_throttle = nr_unallocated_buffer_pages() + 256;
+
+	if (new_throttle > free_mem_throttle)
+		free_mem_throttle = new_throttle;
 }
 
 #define NUM_REASONS 10
@@ -138,7 +141,7 @@ static char *reason_name[NUM_REASONS] = {
 	"synchronous I/O",
 	"bio mutex when reading",
 	"bio mutex when writing",
-	"toi_bio_queue_write_and_get_new_page",
+	"toi_bio_get_new_page",
 	"memory low",
 	"readahead buffer allocation"
 };
@@ -160,13 +163,25 @@ static void do_bio_wait(int reason)
 			atomic_inc(&reasons[reason]);
 		}
 	} else {
-		int old_count = atomic_read(&toi_io_in_progress);
 		atomic_inc(&reasons[reason]);
 
 		wait_event(num_in_progress_wait,
 				!atomic_read(&toi_io_in_progress) ||
-				atomic_read(&toi_io_in_progress) < old_count);
+				nr_unallocated_buffer_pages() > free_mem_throttle);
 	}
+}
+
+static void throttle_if_memory_low(void)
+{
+	int free_pages = nr_unallocated_buffer_pages();
+
+	/* Getting low on memory and I/O is in progress? */
+	while (unlikely(free_pages < free_mem_throttle) &&
+			atomic_read(&toi_io_in_progress)) {
+		do_bio_wait(8);
+		free_pages = nr_unallocated_buffer_pages();
+	}
+
 }
 
 /**
@@ -227,15 +242,9 @@ static int submit(int writing, struct block_device *dev, sector_t first_block,
 		struct page *page, int free_group)
 {
 	struct bio *bio = NULL;
-	int free_pages = nr_unallocated_buffer_pages();
 	int cur_outstanding_io;
 
-	/* Getting low on memory and I/O is in progress? */
-	while (unlikely(free_pages < free_mem_throttle) &&
-			atomic_read(&toi_io_in_progress)) {
-		do_bio_wait(8);
-		free_pages = nr_unallocated_buffer_pages();
-	}
+	throttle_if_memory_low();
 
 	while (!bio) {
 		bio = bio_alloc(TOI_ATOMIC_GFP, 1);
@@ -402,6 +411,9 @@ static int toi_bio_print_debug_stats(char *buffer, int size)
 
 	len += snprintf_used(buffer + len, size - len,
 		"  Readahead target got to %d.\n", ra_target);
+
+	len += snprintf_used(buffer + len, size - len,
+		"  Free mem throttle point reached %d.\n", free_mem_throttle);
 	return len;
 }
 
@@ -677,6 +689,8 @@ static int toi_start_new_readahead(int dedicated_thread)
 	do {
 		char *buffer = NULL;
 
+		throttle_if_memory_low();
+
 		while (!buffer) {
 			buffer = (char *) toi_get_zeroed_page(12,
 					TOI_ATOMIC_GFP);
@@ -796,6 +810,8 @@ top:
  */
 static void toi_bio_get_new_page(char **full_buffer)
 {
+	throttle_if_memory_low();
+
 	while (!*full_buffer) {
 		*full_buffer = (char *) toi_get_zeroed_page(11, TOI_ATOMIC_GFP);
 		if (!*full_buffer) {
