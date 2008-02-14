@@ -105,6 +105,7 @@ static void alloc_update_stats(int fail_num, void *result)
 
 static void free_update_stats(int fail_num)
 {
+	BUG_ON(fail_num >= TOI_ALLOC_PATHS);
 	atomic_inc(&toi_free_count[fail_num]);
 	if (unlikely(test_action_state(TOI_GET_MAX_MEM_ALLOCD))) {
 		mutex_lock(&toi_alloc_mutex);
