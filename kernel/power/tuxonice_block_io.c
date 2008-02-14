@@ -577,8 +577,11 @@ static int toi_bio_rw_page(int writing, struct page *page,
  */
 static int toi_rw_init(int writing, int stream_number)
 {
-	toi_extent_state_restore(&toi_writer_posn,
-			&toi_writer_posn_save[stream_number]);
+	if (stream_number)
+		toi_extent_state_restore(&toi_writer_posn,
+				&toi_writer_posn_save[stream_number]);
+	else
+		toi_extent_state_goto_start(&toi_writer_posn);
 
 	toi_writer_buffer = (char *) toi_get_zeroed_page(11, TOI_ATOMIC_GFP);
 	toi_writer_buffer_posn = writing ? 0 : PAGE_SIZE;

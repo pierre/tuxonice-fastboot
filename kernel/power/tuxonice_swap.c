@@ -654,8 +654,6 @@ static int toi_swap_write_header_init(void)
 	int i, result;
 	struct swap_info_struct *si;
 
-	toi_extent_state_goto_start(&toi_writer_posn);
-
 	toi_bio_ops.rw_init(WRITE, 0);
 	toi_writer_buffer_posn = 0;
 
