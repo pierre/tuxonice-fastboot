@@ -216,7 +216,6 @@ static int submit(int writing, struct block_device *dev, sector_t first_block,
 		return -EFAULT;
 	}
 
-	lock_page(page);
 	bio_get(bio);
 
 	atomic_inc(&toi_io_in_progress);
@@ -256,6 +255,9 @@ static void toi_do_io(int writing, struct block_device *bdev, long block0,
 	int cur_outstanding_io;
 
 	page->private = 0;
+
+	/* Do here so we don't race against toi_bio_get_next_page_read */
+	lock_page(page);
 
 	if (is_readahead) {
 		if (readahead_list_head)
