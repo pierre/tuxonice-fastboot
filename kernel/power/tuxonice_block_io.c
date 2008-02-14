@@ -40,6 +40,9 @@ static int target_outstanding_io = 2048;
 static atomic_t current_outstanding_io;
 static int max_outstanding_writes, max_outstanding_reads;
 
+static struct page *bio_queue_head, *bio_queue_tail;
+static DEFINE_SPINLOCK(bio_queue_lock);
+
 static int free_mem_throttle;
 static int more_readahead = 1;
 static struct page *readahead_list_head, *readahead_list_tail;
@@ -67,6 +70,9 @@ static struct toi_bdev_info *toi_devinfo;
 
 DEFINE_MUTEX(toi_bio_mutex);
 
+static struct task_struct *toi_queue_flusher;
+static int toi_bio_queue_flush_pages(void);
+
 /**
  * set_throttle: Set the point where we pause to avoid oom.
  *
@@ -90,7 +96,7 @@ static char *reason_name[NUM_REASONS] = {
 	"synchronous I/O",
 	"bio mutex when reading",
 	"bio mutex when writing",
-	"toi_bio_submit_write_and_get_new_page",
+	"toi_bio_queue_write_and_get_new_page",
 	"memory low",
 	"readahead buffer allocation"
 };
@@ -497,6 +503,29 @@ static void toi_read_header_init(void)
 	more_readahead = 1;
 }
 
+/*
+ * toi_bio_queue_write
+ */
+static void toi_bio_queue_write(char **full_buffer)
+{
+	struct page *page = virt_to_page(*full_buffer);
+	unsigned long flags;
+
+	page->private = 0;
+
+	spin_lock_irqsave(&bio_queue_lock, flags);
+	if (!bio_queue_head)
+		bio_queue_head = page;
+	else
+		bio_queue_tail->private = (unsigned long) page;
+
+	bio_queue_tail = page;
+
+	spin_unlock_irqrestore(&bio_queue_lock, flags);
+
+	*full_buffer = NULL;
+}
+
 /**
  * toi_rw_cleanup: Cleanup after i/o.
  *
@@ -506,14 +535,16 @@ static int toi_rw_cleanup(int writing)
 {
 	int i;
 
-	if (writing && toi_writer_buffer_posn) {
-		toi_bio_rw_page(WRITE, virt_to_page(toi_writer_buffer), 0, 11);
-		toi_writer_buffer = NULL;
-	}
+	if (writing) {
+		if (toi_writer_buffer_posn)
+			toi_bio_queue_write(&toi_writer_buffer);
 
-	if (writing && current_stream == 2)
-		toi_extent_state_save(&toi_writer_posn,
-				&toi_writer_posn_save[1]);
+		toi_bio_queue_flush_pages();
+
+		if (current_stream == 2)
+			toi_extent_state_save(&toi_writer_posn,
+					&toi_writer_posn_save[1]);
+	}
 
 	toi_finish_all_io();
 
@@ -613,16 +644,35 @@ wait:
 }
 
 /*
- * toi_bio_submit_write_and_get_new_page
+ * toi_bio_queue_flush_pages
  */
-static void toi_bio_submit_write_and_get_new_page(char **full_buffer)
+
+static int toi_bio_queue_flush_pages(void)
 {
-	struct page *page = virt_to_page(*full_buffer);
+	unsigned long flags;
+	int result = 0;
 
-	toi_bio_rw_page(WRITE, page, 0, 11);
+	spin_lock_irqsave(&bio_queue_lock, flags);
+	while (bio_queue_head) {
+		struct page *page = bio_queue_head;
+		bio_queue_head = (struct page *) page->private;
+		if (bio_queue_tail == page)
+			bio_queue_tail = NULL;
+		spin_unlock_irqrestore(&bio_queue_lock, flags);
+		result = toi_bio_rw_page(WRITE, page, 0, 11);
+		if (result)
+			return result;
+		spin_lock_irqsave(&bio_queue_lock, flags);
+	}
+	spin_unlock_irqrestore(&bio_queue_lock, flags);
+	return 0;
+}
 
-	*full_buffer = NULL;
-
+/*
+ * toi_bio_get_new_page
+ */
+static void toi_bio_get_new_page(char **full_buffer)
+{
 	while (!*full_buffer) {
 		*full_buffer = (char *) toi_get_zeroed_page(11, TOI_ATOMIC_GFP);
 		if (!*full_buffer) {
@@ -663,8 +713,10 @@ static int toi_rw_buffer(int writing, char *buffer, int buffer_size)
 		if (!writing) {
 			if (toi_bio_read_page_with_readahead())
 				return -EIO;
-		} else
-			toi_bio_submit_write_and_get_new_page(&toi_writer_buffer);
+		} else {
+			toi_bio_queue_write(&toi_writer_buffer);
+			toi_bio_get_new_page(&toi_writer_buffer);
+		}
 
 		toi_writer_buffer_posn = 0;
 		toi_cond_pause(0, NULL);
@@ -720,7 +772,7 @@ static int toi_bio_write_page(unsigned long pfn, struct page *buffer_page,
 		unsigned int buf_size)
 {
 	char *buffer_virt;
-	int result = 0;
+	int result = 0, result2 = 0;
 
 	pr_index++;
 
@@ -740,7 +792,11 @@ static int toi_bio_write_page(unsigned long pfn, struct page *buffer_page,
 
 	kunmap(buffer_page);
 	mutex_unlock(&toi_bio_mutex);
-	return result;
+
+	if (current == toi_queue_flusher)
+		result2 = toi_bio_queue_flush_pages();
+
+	return result ? result : result2;
 }
 
 /**
@@ -787,12 +843,10 @@ static int write_header_chunk_finish(void)
 {
 	int result = 0;
 
-	if (toi_writer_buffer_posn) {
-		result = toi_bio_rw_page(WRITE,
-			virt_to_page(toi_writer_buffer), 0, 11) ? -EIO : 0;
-		toi_writer_buffer = NULL;
-	}
+	if (toi_writer_buffer_posn)
+		toi_bio_queue_write(&toi_writer_buffer);
 
+	toi_bio_queue_flush_pages();
 	toi_finish_all_io();
 
 	return result;
@@ -841,6 +895,7 @@ static int toi_bio_initialise(int starting_cycle)
 	if (starting_cycle) {
 		max_outstanding_writes = 0;
 		max_outstanding_reads = 0;
+		toi_queue_flusher = current;
 	}
 
 	return 0;
