@@ -394,8 +394,7 @@ static int toi_swap_allocate_header_space(int space_requested)
 
 	/* The end of header pages will be the start of pageset 2;
 	 * we are now sitting on the first pageset2 page. */
-	toi_extent_state_save(&toi_writer_posn,
-			&toi_writer_posn_save[2]);
+	toi_extent_state_save(&toi_writer_posn, &toi_writer_posn_save[2]);
 	return 0;
 }
 
