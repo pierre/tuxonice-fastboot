@@ -567,6 +567,10 @@ static int toi_bio_read_page_with_readahead(void)
 			buffer = (char *) toi_get_zeroed_page(12,
 					TOI_ATOMIC_GFP);
 			if (!buffer) {
+				if (oom)
+					goto wait;
+
+				oom = 1;
 				set_throttle();
 				do_bio_wait(9);
 			}
