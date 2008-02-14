@@ -49,9 +49,8 @@ static inline void inc_pr_index(void)
 #endif
 
 #define TARGET_OUTSTANDING_IO 16384
-static int ra_target;
 
-/* #define MEASURE_MUTEX_CONTENTION */
+#define MEASURE_MUTEX_CONTENTION
 #ifndef MEASURE_MUTEX_CONTENTION
 #define my_mutex_lock(index, the_lock) mutex_lock(the_lock)
 #define my_mutex_unlock(index, the_lock) mutex_unlock(the_lock)
@@ -79,7 +78,7 @@ unsigned long mutex_times[2][2][NR_CPUS];
 } while(0)
 #endif
 
-static int target_outstanding_io = 2048;
+static int target_outstanding_io = 256;
 static int max_outstanding_writes, max_outstanding_reads;
 
 static struct page *bio_queue_head, *bio_queue_tail;
@@ -182,6 +181,8 @@ static void throttle_if_memory_low(void)
 		free_pages = nr_unallocated_buffer_pages();
 	}
 
+	wait_event(num_in_progress_wait,
+		atomic_read(&toi_io_in_progress) < target_outstanding_io);
 }
 
 /**
@@ -408,9 +409,6 @@ static int toi_bio_print_debug_stats(char *buffer, int size)
 
 	}
 #endif
-
-	len += snprintf_used(buffer + len, size - len,
-		"  Readahead target got to %d.\n", ra_target);
 
 	len += snprintf_used(buffer + len, size - len,
 		"  Free mem throttle point reached %d.\n", free_mem_throttle);
@@ -724,8 +722,10 @@ static int toi_start_new_readahead(int dedicated_thread)
 		} else
 			num_submitted++;
 
-	} while (more_readahead && (dedicated_thread || (num_submitted < ra_target && 
-			atomic_read(&toi_io_in_progress) < ra_target)));
+	} while (more_readahead &&
+		 (dedicated_thread ||
+		  (num_submitted < target_outstanding_io &&
+		   atomic_read(&toi_io_in_progress) < target_outstanding_io)));
 	return 0;
 }
 
@@ -761,7 +761,6 @@ static void toi_bio_get_next_page_read(void)
 	}
 
 	if (PageLocked(readahead_list_head)) {
-		ra_target += 16;
 		waiting_on = readahead_list_head;
 		do_bio_wait(0);
 	}
@@ -1068,7 +1067,6 @@ static int toi_bio_initialise(int starting_cycle)
 					mutex_times[i][j][k] = 0;
 		}
 #endif
-		ra_target = 256;
 	}
 
 	return 0;
