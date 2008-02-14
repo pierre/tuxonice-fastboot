@@ -375,7 +375,7 @@ static struct page *copy_page_from_orig_page(struct page *orig_page)
 static int worker_rw_loop(void *data)
 {
 	unsigned long orig_pfn, write_pfn;
-	int result, my_io_index = 0;
+	int result, my_io_index = 0, temp;
 	struct toi_module_ops *first_filter = toi_get_next_filter(NULL);
 	struct page *buffer = toi_alloc_page(28, TOI_ATOMIC_GFP);
 	int thread_num = atomic_add_return(1, &worker_thread_count) - 1;
@@ -408,7 +408,8 @@ static int worker_rw_loop(void *data)
 				break;
 			}
 
-			atomic_dec(&io_count);
+			my_io_index = io_finish_at -
+				atomic_sub_return(1, &io_count);
 
 			orig_pfn = pfn;
 			write_pfn = pfn;
@@ -425,8 +426,6 @@ static int worker_rw_loop(void *data)
 			}
 			page = pfn_to_page(pfn);
 
-			my_io_index = io_finish_at - atomic_read(&io_count);
-
 			if (io_pageset == 2)
 				*my_checksum_locn =
 					tuxonice_get_next_checksum();
@@ -440,7 +439,8 @@ static int worker_rw_loop(void *data)
 			result = first_filter->write_page(write_pfn, page,
 					PAGE_SIZE);
 		} else {
-			atomic_dec(&io_count);
+			my_io_index = io_finish_at -
+				atomic_sub_return(1, &io_count);
 			mutex_unlock(&io_mutex);
 
 			/*
@@ -503,10 +503,6 @@ static int worker_rw_loop(void *data)
 				kunmap(copy_page);
 				kunmap(buffer);
 				clear_dynpageflag(&io_map, final_page);
-				mutex_lock(&io_mutex);
-				my_io_index = io_finish_at -
-					atomic_read(&io_count);
-				mutex_unlock(&io_mutex);
 			} else {
 				mutex_lock(&io_mutex);
 				atomic_inc(&io_count);
@@ -514,12 +510,14 @@ static int worker_rw_loop(void *data)
 			}
 		}
 
-		if (!thread_num && (my_io_index + io_base) >= io_nextupdate)
+		temp = my_io_index + io_base - io_nextupdate;
+
+		if (my_io_index + io_base == io_nextupdate)
 			io_nextupdate = toi_update_status(my_io_index +
 				io_base, io_barmax, " %d/%d MB ",
 				MB(io_base+my_io_index+1), MB(io_barmax));
 
-		if (!thread_num && my_io_index >= io_pc) {
+		if (my_io_index == io_pc) {
 			printk("%s%d%%...", io_pc_step == 1 ? KERN_INFO : "",
 					20 * io_pc_step);
 			io_pc_step++;
@@ -593,7 +591,7 @@ static int do_rw_loop(int write, int finish_at, struct dyn_pageflags *pageflags,
 	io_pc = io_finish_at / 5;
 	io_pc_step = 1;
 	io_result = 0;
-	io_nextupdate = 0;
+	io_nextupdate = base + 1;
 
 	for_each_online_cpu(cpu) {
 		per_cpu(last_sought, cpu) = NULL;
