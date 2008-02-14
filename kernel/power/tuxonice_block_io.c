@@ -48,6 +48,7 @@ static inline void inc_pr_index(void)
 #endif
 
 #define TARGET_OUTSTANDING_IO 16384
+static int ra_target;
 
 /* #define MEASURE_MUTEX_CONTENTION */
 #ifndef MEASURE_MUTEX_CONTENTION
@@ -636,17 +637,16 @@ static int toi_rw_cleanup(int writing)
 	return 0;
 }
 
-/**
- * toi_bio_read_page_with_readahead: Read a disk page with readahead.
+/*
+ * toi_start_new_readahead
  *
- * Read a page from disk, submitting readahead and cleaning up finished i/o
- * while we wait for the page we're after.
+ * Start readahead of image pages.
+ *
+ * No mutex needed because this is only ever called by one cpu.
  */
-static int toi_bio_read_page_with_readahead(void)
+int toi_start_new_readahead(void)
 {
-	unsigned long *virt;
-	int last_result, oom = 0;
-	struct page *next;
+	int last_result, num_submitted = 0, oom = 0;
 
 	/* Start a new readahead? */
 	if (!more_readahead) {
@@ -655,9 +655,11 @@ static int toi_bio_read_page_with_readahead(void)
 		if (!readahead_list_head) {
 			abort_hibernate(TOI_FAILED_IO, "Failed to submit"
 				" a read and no readahead left.");
+			dump_stack();
 			return -EIO;
 		}
-		goto wait;
+
+		return 0;
 	}
 
 	do {
@@ -668,7 +670,7 @@ static int toi_bio_read_page_with_readahead(void)
 					TOI_ATOMIC_GFP);
 			if (!buffer) {
 				if (oom)
-					goto wait;
+					return 0;
 
 				oom = 1;
 				set_throttle();
@@ -690,25 +692,49 @@ static int toi_bio_read_page_with_readahead(void)
 				printk(KERN_INFO
 					"Begin read chunk returned %d.\n",
 					last_result);
-		}
+		} else
+			num_submitted++;
 
-	} while (more_readahead && !next->completed);
+	} while (more_readahead && num_submitted < ra_target && 
+			atomic_read(&toi_io_in_progress) < ra_target);
+	return 0;
+}
 
-wait:
+
+/**
+ * toi_bio_get_next_page_read: Read a disk page with readahead.
+ *
+ * Read a page from disk, submitting readahead and cleaning up finished i/o
+ * while we wait for the page we're after.
+ */
+static void toi_bio_get_next_page_read(void)
+{
+	unsigned long *virt;
+	struct page *next;
+
+	/*
+	 * On SMP, we may need to wait for the first readahead
+	 * to be submitted.
+	 */
+	if (unlikely(!readahead_list_head)) {
+		BUG_ON(!more_readahead);
+		do {
+			cpu_relax();
+		} while (!readahead_list_head);
+	}
+
 	if (PageLocked(readahead_list_head)) {
+		ra_target += 16;
 		waiting_on = readahead_list_head;
 		do_bio_wait(0);
 	}
 
-	virt = kmap_atomic(readahead_list_head, KM_USER1);
+	virt = page_address(readahead_list_head);
 	memcpy(toi_writer_buffer, virt, PAGE_SIZE);
-	kunmap_atomic(virt, KM_USER1);
 
 	next = (struct page *) readahead_list_head->private;
 	toi__free_page(12, readahead_list_head);
 	readahead_list_head = next;
-
-	return 0;
 }
 
 /*
@@ -778,10 +804,9 @@ static int toi_rw_buffer(int writing, char *buffer, int buffer_size)
 		memcpy(to, from, capacity);
 		bytes_left -= capacity;
 
-		if (!writing) {
-			if (toi_bio_read_page_with_readahead())
-				return -EIO;
-		} else {
+		if (!writing)
+			toi_bio_get_next_page_read();
+		else {
 			toi_bio_queue_write(&toi_writer_buffer);
 			toi_bio_get_new_page(&toi_writer_buffer);
 		}
@@ -810,6 +835,9 @@ static int toi_bio_read_page(unsigned long *pfn, struct page *buffer_page,
 	char *buffer_virt = kmap(buffer_page);
 
 	inc_pr_index;
+
+	if (current == toi_queue_flusher && toi_start_new_readahead())
+		return -EIO;
 
 	my_mutex_lock(0, &toi_bio_mutex);
 
@@ -991,6 +1019,7 @@ static int toi_bio_initialise(int starting_cycle)
 					mutex_times[i][j][k] = 0;
 		}
 #endif
+		ra_target = 256;
 	}
 
 	return 0;
