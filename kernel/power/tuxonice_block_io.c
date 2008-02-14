@@ -79,7 +79,6 @@ unsigned long mutex_times[2][2][NR_CPUS];
 #endif
 
 static int target_outstanding_io = 2048;
-static atomic_t current_outstanding_io;
 static int max_outstanding_writes, max_outstanding_reads;
 
 static struct page *bio_queue_head, *bio_queue_tail;
@@ -208,7 +207,6 @@ static void toi_end_bio(struct bio *bio, int err)
 	bio_put(bio);
 
 	atomic_dec(&toi_io_in_progress);
-	atomic_dec(&current_outstanding_io);
 
 	wake_up(&num_in_progress_wait);
 }
@@ -230,10 +228,11 @@ static int submit(int writing, struct block_device *dev, sector_t first_block,
 {
 	struct bio *bio = NULL;
 	int free_pages = nr_unallocated_buffer_pages();
+	int cur_outstanding_io;
 
 	/* Getting low on memory and I/O is in progress? */
 	while (unlikely(free_pages < free_mem_throttle) &&
-			atomic_read(&current_outstanding_io)) {
+			atomic_read(&toi_io_in_progress)) {
 		do_bio_wait(8);
 		free_pages = nr_unallocated_buffer_pages();
 	}
@@ -260,7 +259,15 @@ static int submit(int writing, struct block_device *dev, sector_t first_block,
 
 	bio_get(bio);
 
-	atomic_inc(&toi_io_in_progress);
+	cur_outstanding_io = atomic_add_return(1, &toi_io_in_progress);
+	if (writing) {
+		if (cur_outstanding_io > max_outstanding_writes)
+			max_outstanding_writes = cur_outstanding_io;
+	} else {
+		if (cur_outstanding_io > max_outstanding_reads)
+			max_outstanding_reads = cur_outstanding_io;
+	}
+
 
 	if (unlikely(test_action_state(TOI_TEST_FILTER_SPEED))) {
 		/* Fake having done the hard work */
@@ -294,8 +301,6 @@ static int submit(int writing, struct block_device *dev, sector_t first_block,
 static void toi_do_io(int writing, struct block_device *bdev, long block0,
 	struct page *page, int is_readahead, int syncio, int free_group)
 {
-	int cur_outstanding_io;
-
 	page->private = 0;
 
 	/* Do here so we don't race against toi_bio_get_next_page_read */
@@ -313,15 +318,6 @@ static void toi_do_io(int writing, struct block_device *bdev, long block0,
 	/* Done before submitting to avoid races. */
 	if (syncio)
 		waiting_on = page;
-
-	cur_outstanding_io = atomic_add_return(1, &current_outstanding_io);
-	if (writing) {
-		if (cur_outstanding_io > max_outstanding_writes)
-			max_outstanding_writes = cur_outstanding_io;
-	} else {
-		if (cur_outstanding_io > max_outstanding_reads)
-			max_outstanding_reads = cur_outstanding_io;
-	}
 
 	/* Submit the page */
 	get_page(page);
