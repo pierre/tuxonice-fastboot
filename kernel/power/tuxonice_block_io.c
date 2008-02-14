@@ -65,7 +65,6 @@ int toi_writer_buffer_posn;
 
 static struct toi_bdev_info *toi_devinfo;
 
-DEFINE_MUTEX(toi_bio_queue_mutex);
 DEFINE_MUTEX(toi_bio_mutex);
 
 /**
