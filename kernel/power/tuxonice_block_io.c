@@ -175,7 +175,6 @@ static void do_bio_wait(int reason)
 static void toi_finish_all_io(void)
 {
 	wait_event(num_in_progress_wait, !atomic_read(&toi_io_in_progress));
-	BUG_ON(atomic_read(&toi_io_in_progress));
 }
 
 /**
