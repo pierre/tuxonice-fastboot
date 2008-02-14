@@ -78,7 +78,7 @@ unsigned long mutex_times[2][2][NR_CPUS];
 } while(0)
 #endif
 
-static int target_outstanding_io = 256;
+static int target_outstanding_io = 1024;
 static int max_outstanding_writes, max_outstanding_reads;
 
 static struct page *bio_queue_head, *bio_queue_tail;
