@@ -784,10 +784,10 @@ static int toi_swap_read_header_init(void)
 			headerblock << 3,
 			virt_to_page((unsigned long) toi_writer_buffer));
 
-	memcpy(&toi_writer_posn_save, toi_writer_buffer, 3 *
-			sizeof(struct extent_iterate_saved_state));
+	memcpy(&toi_writer_posn_save, toi_writer_buffer,
+			sizeof(toi_writer_posn_save));
 
-	toi_writer_buffer_posn = 3 * sizeof(struct extent_iterate_saved_state);
+	toi_writer_buffer_posn = sizeof(toi_writer_posn_save);
 
 	memcpy(&devinfo, toi_writer_buffer + toi_writer_buffer_posn,
 			sizeof(devinfo));

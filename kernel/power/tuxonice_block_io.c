@@ -97,8 +97,8 @@ static DECLARE_WAIT_QUEUE_HEAD(num_in_progress_wait);
 static int extra_page_forward;
 
 static int current_stream;
-/* 0 = Header, 1 = Pageset1, 2 = Pageset2 */
-struct extent_iterate_saved_state toi_writer_posn_save[3];
+/* 0 = Header, 1 = Pageset1, 2 = Pageset2, 3 = End of PS1 */
+struct extent_iterate_saved_state toi_writer_posn_save[4];
 
 /* Pointer to current entry being loaded/saved. */
 struct extent_iterate_state toi_writer_posn;
@@ -445,7 +445,7 @@ static void dump_block_chains(void)
 		printk("\n");
 	}
 
-	for (i = 0; i < 3; i++)
+	for (i = 0; i < 4; i++)
 		printk(KERN_INFO "Posn %d: Chain %d, extent %d, offset %lu.\n",
 				i, toi_writer_posn_save[i].chain_num,
 				toi_writer_posn_save[i].extent_num,
@@ -532,6 +532,28 @@ static int toi_bio_rw_page(int writing, struct page *page,
 			dev_info->bmap_shift,
 		page, is_readahead, 0, free_group);
 
+	if (!writing) {
+		int compare_to = 0;
+
+		switch (current_stream) {
+		case 0:
+			compare_to = 2;
+			break;
+		case 1:
+			compare_to = 3;
+			break;
+		case 2:
+			compare_to = 1;
+			break;
+		}
+
+		if (toi_writer_posn.current_chain ==
+				toi_writer_posn_save[compare_to].chain_num &&
+		    toi_writer_posn.current_offset ==
+		    		toi_writer_posn_save[compare_to].offset) {
+			more_readahead = 0;
+		}
+	}
 	return 0;
 }
 
@@ -610,6 +632,9 @@ static int toi_rw_cleanup(int writing)
 		if (current_stream == 2)
 			toi_extent_state_save(&toi_writer_posn,
 					&toi_writer_posn_save[1]);
+		else if (current_stream == 1)
+			toi_extent_state_save(&toi_writer_posn,
+					&toi_writer_posn_save[3]);
 	}
 
 	toi_finish_all_io();
@@ -646,18 +671,8 @@ static int toi_start_new_readahead(int dedicated_thread)
 	int last_result, num_submitted = 0, oom = 0;
 
 	/* Start a new readahead? */
-	if (!more_readahead) {
-		/* We failed to submit a read, and have cleaned up
-		 * all the readahead previously submitted */
-		if (!readahead_list_head) {
-			abort_hibernate(TOI_FAILED_IO, "Failed to submit"
-				" a read and no readahead left.");
-			dump_stack();
-			return -EIO;
-		}
-
+	if (!more_readahead)
 		return 0;
-	}
 
 	do {
 		char *buffer = NULL;
@@ -680,7 +695,7 @@ static int toi_start_new_readahead(int dedicated_thread)
 		if (last_result == -ENODATA)
 			more_readahead = 0;
 
-		if (!more_readahead) {
+		if (!more_readahead && last_result) {
 			/* 
 			 * Don't complain about failing to do readahead past
 			 * the end of storage.
