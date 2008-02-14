@@ -292,7 +292,7 @@ Failed:
 
 int toi_go_atomic(pm_message_t state, int suspend_time)
 {
-	toi_prepare_status(DONT_CLEAR_BAR, "Going atomic.");
+	toi_prepare_status(DONT_CLEAR_BAR, "Doing atomic copy/restore.");
 
 	if (suspend_time && toi_platform_begin()) {
 		set_abort_result(TOI_PLATFORM_PREP_FAILED);
