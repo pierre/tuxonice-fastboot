@@ -23,18 +23,59 @@
 #include "tuxonice_ui.h"
 #include "tuxonice_alloc.h"
 
-static int pr_index;
 
 #if 0
+static int pr_index;
+
+static inline void reset_pr_index(void)
+{
+	pr_index = 0;
+}
+
 #define PR_DEBUG(a, b...) do { \
 	if (pr_index < 20) \
 		printk(a, ##b); \
 } while (0)
+
+static inline void inc_pr_index(void)
+{
+	pr_index++;
+}
 #else
 #define PR_DEBUG(a, b...) do { } while (0)
+#define reset_pr_index() do { } while(0)
+#define inc_pr_index do { } while(0)
 #endif
 
 #define TARGET_OUTSTANDING_IO 16384
+
+/* #define MEASURE_MUTEX_CONTENTION */
+#ifndef MEASURE_MUTEX_CONTENTION
+#define my_mutex_lock(index, the_lock) mutex_lock(the_lock)
+#define my_mutex_unlock(index, the_lock) mutex_unlock(the_lock)
+#else
+unsigned long mutex_times[2][2][NR_CPUS];
+#define my_mutex_lock(index, the_lock) do { \
+	int have_mutex; \
+	unsigned long mutex_acquired, mutex_freed; \
+	have_mutex = mutex_trylock(the_lock); \
+	if (!have_mutex) { \
+		/* unsigned long start = jiffies; */ \
+		mutex_lock(the_lock); \
+		mutex_acquired = jiffies; \
+		/* mutex_times[index][0][smp_processor_id()] += (mutex_acquired - start); */ \
+		mutex_times[index][0][smp_processor_id()] ++; \
+	} else { \
+		mutex_acquired = jiffies; \
+		mutex_times[index][1][smp_processor_id()] ++; \
+	}
+
+#define my_mutex_unlock(index, the_lock) \
+	mutex_unlock(the_lock); \
+	mutex_freed = jiffies; \
+	/* mutex_times[index][1][smp_processor_id()] += mutex_freed - mutex_acquired; */ \
+} while(0)
+#endif
 
 static int target_outstanding_io = 2048;
 static atomic_t current_outstanding_io;
@@ -339,6 +380,31 @@ static int toi_bio_print_debug_stats(char *buffer, int size)
 		PAGE_SIZE, (unsigned int) sizeof(struct request),
 		(unsigned int) sizeof(struct bio), toi_bio_memory_needed());
 
+#ifdef MEASURE_MUTEX_CONTENTION
+	{
+	int i;
+
+	len += snprintf_used(buffer + len, size - len,
+		"  Mutex contention while reading:\n  Contended      Free\n");
+
+	for (i = 0; i < NR_CPUS; i++)
+		len += snprintf_used(buffer + len, size - len,
+		"  %9lu %9lu\n",
+		mutex_times[0][0][i], mutex_times[0][1][i]);
+
+	len += snprintf_used(buffer + len, size - len,
+		"  Mutex contention while writing:\n  Contended      Free\n");
+
+	for (i = 0; i < NR_CPUS; i++)
+		len += snprintf_used(buffer + len, size - len,
+		"  %9lu %9lu\n",
+		mutex_times[1][0][i], mutex_times[1][1][i]);
+
+	}
+#endif
+
+	len += snprintf_used(buffer + len, size - len,
+		"  Readahead target got to %d.\n", ra_target);
 	return len;
 }
 
@@ -488,7 +554,7 @@ static int toi_rw_init(int writing, int stream_number)
 
 	current_stream = stream_number;
 
-	pr_index = 0;
+	reset_pr_index();
 	more_readahead = 1;
 
 	return toi_writer_buffer ? 0 : -ENOMEM;
@@ -743,9 +809,9 @@ static int toi_bio_read_page(unsigned long *pfn, struct page *buffer_page,
 	int result = 0;
 	char *buffer_virt = kmap(buffer_page);
 
-	pr_index++;
+	inc_pr_index;
 
-	mutex_lock(&toi_bio_mutex);
+	my_mutex_lock(0, &toi_bio_mutex);
 
 	if (toi_rw_buffer(READ, (char *) pfn, sizeof(unsigned long)) ||
 	    toi_rw_buffer(READ, (char *) buf_size, sizeof(int)) ||
@@ -755,7 +821,7 @@ static int toi_bio_read_page(unsigned long *pfn, struct page *buffer_page,
 	} else
 		PR_DEBUG("%d: PFN %ld, %d bytes.\n", pr_index, *pfn, *buf_size);
 
-	mutex_unlock(&toi_bio_mutex);
+	my_mutex_unlock(0, &toi_bio_mutex);
 	kunmap(buffer_page);
 	return result;
 }
@@ -776,12 +842,12 @@ static int toi_bio_write_page(unsigned long pfn, struct page *buffer_page,
 	char *buffer_virt;
 	int result = 0, result2 = 0;
 
-	pr_index++;
+	inc_pr_index;
 
 	if (unlikely(test_action_state(TOI_TEST_FILTER_SPEED)))
 		return 0;
 
-	mutex_lock(&toi_bio_mutex);
+	my_mutex_lock(1, &toi_bio_mutex);
 	buffer_virt = kmap(buffer_page);
 
 	if (toi_rw_buffer(WRITE, (char *) &pfn, sizeof(unsigned long)) ||
@@ -793,7 +859,7 @@ static int toi_bio_write_page(unsigned long pfn, struct page *buffer_page,
 			buf_size, result);
 
 	kunmap(buffer_page);
-	mutex_unlock(&toi_bio_mutex);
+	my_mutex_unlock(1, &toi_bio_mutex);
 
 	if (current == toi_queue_flusher)
 		result2 = toi_bio_queue_flush_pages();
@@ -915,6 +981,16 @@ static int toi_bio_initialise(int starting_cycle)
 		max_outstanding_writes = 0;
 		max_outstanding_reads = 0;
 		toi_queue_flusher = current;
+#ifdef MEASURE_MUTEX_CONTENTION
+		{
+		int i, j, k;
+
+		for (i = 0; i < 2; i++)
+			for (j = 0; j < 2; j++)
+				for (k=0; k < NR_CPUS; k++)
+					mutex_times[i][j][k] = 0;
+		}
+#endif
 	}
 
 	return 0;
