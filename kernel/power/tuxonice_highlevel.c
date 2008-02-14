@@ -1178,6 +1178,10 @@ static struct toi_sysfs_data sysfs_params[] = {
 	  SYSFS_BIT(&toi_bkd.toi_action, TOI_NO_MULTITHREADED_IO, 0)
 	},
 
+	{ TOI_ATTR("no_flusher_thread", SYSFS_RW),
+	  SYSFS_BIT(&toi_bkd.toi_action, TOI_NO_FLUSHER_THREAD, 0)
+	},
+
 	{ TOI_ATTR("full_pageset2", SYSFS_RW),
 	  SYSFS_BIT(&toi_bkd.toi_action, TOI_PAGESET2_FULL, 0)
 	},

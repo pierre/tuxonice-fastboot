@@ -46,6 +46,7 @@ struct toi_bio_ops {
 	int (*write_header_chunk_finish) (void);
 	int (*rw_init) (int rw, int stream_number);
 	int (*rw_cleanup) (int rw);
+	void (*io_flusher) (int rw);
 };
 
 extern struct toi_bio_ops toi_bio_ops;

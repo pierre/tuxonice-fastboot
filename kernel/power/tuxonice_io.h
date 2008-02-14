@@ -56,6 +56,7 @@ extern void attempt_to_parse_alt_resume_param(void);
 int image_exists_read(const char *page, int count);
 int image_exists_write(const char *buffer, int count);
 extern void save_restore_alt_param(int replace, int quiet);
+extern atomic_t toi_io_workers;
 
 /* Args to save_restore_alt_param */
 #define RESTORE 0
@@ -65,3 +66,6 @@ extern void save_restore_alt_param(int replace, int quiet);
 #define QUIET 1
 
 extern dev_t name_to_dev_t(char *line);
+
+extern wait_queue_head_t toi_io_queue_flusher;
+extern int toi_bio_queue_flusher_should_finish;

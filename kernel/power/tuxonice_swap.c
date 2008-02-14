@@ -1270,6 +1270,7 @@ static __init int toi_swap_load(void)
 	toi_swapops.rw_header_chunk = toi_bio_ops.rw_header_chunk;
 	toi_swapops.rw_header_chunk_noreadahead =
 		toi_bio_ops.rw_header_chunk_noreadahead;
+	toi_swapops.io_flusher = toi_bio_ops.io_flusher;
 
 	return toi_register_module(&toi_swapops);
 }

@@ -45,8 +45,10 @@ static DEFINE_PER_CPU(struct page *, last_sought);
 static DEFINE_PER_CPU(struct page *, last_high_page);
 static DEFINE_PER_CPU(char *, checksum_locn);
 static DEFINE_PER_CPU(struct pbe *, last_low_page);
-static atomic_t worker_thread_count;
 static atomic_t io_count;
+atomic_t toi_io_workers;
+DECLARE_WAIT_QUEUE_HEAD(toi_io_queue_flusher);
+int toi_bio_queue_flusher_should_finish;
 
 /* toi_attempt_to_parse_resume_device
  *
@@ -378,8 +380,8 @@ static int worker_rw_loop(void *data)
 	int result, my_io_index = 0, temp;
 	struct toi_module_ops *first_filter = toi_get_next_filter(NULL);
 	struct page *buffer = toi_alloc_page(28, TOI_ATOMIC_GFP);
-	int thread_num = atomic_add_return(1, &worker_thread_count) - 1;
 
+	atomic_inc(&toi_io_workers);
 	mutex_lock(&io_mutex);
 
 	do {
@@ -449,8 +451,8 @@ static int worker_rw_loop(void *data)
 			 * clear the bdev flags, making this thread oops.
 			 */
 			if (unlikely(test_toi_state(TOI_STOP_RESUME))) {
-				atomic_dec(&worker_thread_count);
-				if (!atomic_read(&worker_thread_count))
+				atomic_dec(&toi_io_workers);
+				if (!atomic_read(&toi_io_workers))
 					set_toi_state(TOI_IO_STOPPED);
 				while (1)
 					schedule();
@@ -538,10 +540,13 @@ static int worker_rw_loop(void *data)
 
 		mutex_lock(&io_mutex);
 
-	} while (atomic_read(&io_count) >= atomic_read(&worker_thread_count) &&
+	} while (atomic_read(&io_count) >= atomic_read(&toi_io_workers) &&
 		!(io_write && test_result_state(TOI_ABORTED)));
 
-	atomic_dec(&worker_thread_count);
+	if (atomic_dec_and_test(&toi_io_workers)) {
+		toi_bio_queue_flusher_should_finish = 1;
+		wake_up(&toi_io_queue_flusher);
+	}
 	mutex_unlock(&io_mutex);
 
 	toi__free_page(28, buffer);
@@ -549,9 +554,9 @@ static int worker_rw_loop(void *data)
 	return 0;
 }
 
-void start_other_threads(void)
+int start_other_threads(void)
 {
-	int cpu;
+	int cpu, num_started = 0;
 	struct task_struct *p;
 
 	for_each_online_cpu(cpu) {
@@ -566,7 +571,10 @@ void start_other_threads(void)
 		kthread_bind(p, cpu);
 		p->flags |= PF_MEMALLOC;
 		wake_up_process(p);
+		num_started++;
 	}
+
+	return num_started;
 }
 
 /*
@@ -577,7 +585,7 @@ void start_other_threads(void)
 static int do_rw_loop(int write, int finish_at, struct dyn_pageflags *pageflags,
 		int base, int barmax, int pageset)
 {
-	int index = 0, cpu;
+	int index = 0, cpu, num_other_threads = 0;
 
 	if (!finish_at)
 		return 0;
@@ -592,6 +600,7 @@ static int do_rw_loop(int write, int finish_at, struct dyn_pageflags *pageflags,
 	io_pc_step = 1;
 	io_result = 0;
 	io_nextupdate = base + 1;
+	toi_bio_queue_flusher_should_finish = 0;
 
 	for_each_online_cpu(cpu) {
 		per_cpu(last_sought, cpu) = NULL;
@@ -621,10 +630,15 @@ static int do_rw_loop(int write, int finish_at, struct dyn_pageflags *pageflags,
 	clear_toi_state(TOI_IO_STOPPED);
 
 	if (!test_action_state(TOI_NO_MULTITHREADED_IO))
-		start_other_threads();
-	worker_rw_loop(NULL);
+		num_other_threads = start_other_threads();
 
-	while (atomic_read(&worker_thread_count))
+	if (!num_other_threads || !toiActiveAllocator->io_flusher ||
+		test_action_state(TOI_NO_FLUSHER_THREAD))
+		worker_rw_loop(NULL);
+	else
+		toiActiveAllocator->io_flusher(write);
+
+	while (atomic_read(&toi_io_workers))
 		schedule();
 
 	set_toi_state(TOI_IO_STOPPED);
@@ -1409,5 +1423,8 @@ int image_exists_write(const char *buffer, int count)
 #ifdef CONFIG_TOI_EXPORTS
 EXPORT_SYMBOL_GPL(toi_attempt_to_parse_resume_device);
 EXPORT_SYMBOL_GPL(attempt_to_parse_resume_device2);
+EXPORT_SYMBOL_GPL(toi_io_workers);
+EXPORT_SYMBOL_GPL(toi_io_queue_flusher);
+EXPORT_SYMBOL_GPL(toi_bio_queue_flusher_should_finish);
 #endif
 

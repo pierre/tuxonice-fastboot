@@ -22,6 +22,7 @@
 #include "tuxonice_block_io.h"
 #include "tuxonice_ui.h"
 #include "tuxonice_alloc.h"
+#include "tuxonice_io.h"
 
 
 #if 0
@@ -112,7 +113,7 @@ static struct toi_bdev_info *toi_devinfo;
 DEFINE_MUTEX(toi_bio_mutex);
 
 static struct task_struct *toi_queue_flusher;
-static int toi_bio_queue_flush_pages(void);
+static int toi_bio_queue_flush_pages(int dedicated_thread);
 
 /**
  * set_throttle: Set the point where we pause to avoid oom.
@@ -587,6 +588,7 @@ static void toi_bio_queue_write(char **full_buffer)
 	bio_queue_tail = page;
 
 	spin_unlock_irqrestore(&bio_queue_lock, flags);
+	wake_up(&toi_io_queue_flusher);
 
 	*full_buffer = NULL;
 }
@@ -604,7 +606,7 @@ static int toi_rw_cleanup(int writing)
 		if (toi_writer_buffer_posn)
 			toi_bio_queue_write(&toi_writer_buffer);
 
-		toi_bio_queue_flush_pages();
+		toi_bio_queue_flush_pages(0);
 
 		if (current_stream == 2)
 			toi_extent_state_save(&toi_writer_posn,
@@ -640,7 +642,7 @@ static int toi_rw_cleanup(int writing)
  *
  * No mutex needed because this is only ever called by one cpu.
  */
-int toi_start_new_readahead(void)
+static int toi_start_new_readahead(int dedicated_thread)
 {
 	int last_result, num_submitted = 0, oom = 0;
 
@@ -665,7 +667,7 @@ int toi_start_new_readahead(void)
 			buffer = (char *) toi_get_zeroed_page(12,
 					TOI_ATOMIC_GFP);
 			if (!buffer) {
-				if (oom)
+				if (oom && !dedicated_thread)
 					return 0;
 
 				oom = 1;
@@ -691,11 +693,19 @@ int toi_start_new_readahead(void)
 		} else
 			num_submitted++;
 
-	} while (more_readahead && num_submitted < ra_target && 
-			atomic_read(&toi_io_in_progress) < ra_target);
+	} while (more_readahead && (dedicated_thread || (num_submitted < ra_target && 
+			atomic_read(&toi_io_in_progress) < ra_target)));
 	return 0;
 }
 
+static void bio_io_flusher(int writing)
+{
+
+	if (writing)
+		toi_bio_queue_flush_pages(1);
+	else
+		toi_start_new_readahead(1);
+}
 
 /**
  * toi_bio_get_next_page_read: Read a disk page with readahead.
@@ -737,11 +747,12 @@ static void toi_bio_get_next_page_read(void)
  * toi_bio_queue_flush_pages
  */
 
-static int toi_bio_queue_flush_pages(void)
+static int toi_bio_queue_flush_pages(int dedicated_thread)
 {
 	unsigned long flags;
 	int result = 0;
 
+top:
 	spin_lock_irqsave(&bio_queue_lock, flags);
 	while (bio_queue_head) {
 		struct page *page = bio_queue_head;
@@ -755,6 +766,14 @@ static int toi_bio_queue_flush_pages(void)
 		spin_lock_irqsave(&bio_queue_lock, flags);
 	}
 	spin_unlock_irqrestore(&bio_queue_lock, flags);
+
+	if (dedicated_thread) {
+		wait_event(toi_io_queue_flusher, bio_queue_head ||
+				toi_bio_queue_flusher_should_finish);
+		if (likely(!toi_bio_queue_flusher_should_finish))
+			goto top;
+		toi_bio_queue_flusher_should_finish = 0;
+	}
 	return 0;
 }
 
@@ -832,7 +851,8 @@ static int toi_bio_read_page(unsigned long *pfn, struct page *buffer_page,
 
 	inc_pr_index;
 
-	if (current == toi_queue_flusher && toi_start_new_readahead())
+	/* Only call start_new_readahead if we don't have a dedicated thread */
+	if (current == toi_queue_flusher && toi_start_new_readahead(0))
 		return -EIO;
 
 	my_mutex_lock(0, &toi_bio_mutex);
@@ -886,7 +906,7 @@ static int toi_bio_write_page(unsigned long pfn, struct page *buffer_page,
 	my_mutex_unlock(1, &toi_bio_mutex);
 
 	if (current == toi_queue_flusher)
-		result2 = toi_bio_queue_flush_pages();
+		result2 = toi_bio_queue_flush_pages(0);
 
 	return result ? result : result2;
 }
@@ -925,7 +945,7 @@ static int _toi_rw_header_chunk(int writing, struct toi_module_ops *owner,
 			"Header: (No owner): %d bytes.\n", buffer_size);
 
 	if (!writing && !no_readahead)
-		result = toi_start_new_readahead();
+		result = toi_start_new_readahead(0);
 
 	if (!result)
 		result = toi_rw_buffer(writing, buffer, buffer_size);
@@ -955,7 +975,7 @@ static int write_header_chunk_finish(void)
 	if (toi_writer_buffer_posn)
 		toi_bio_queue_write(&toi_writer_buffer);
 
-	toi_bio_queue_flush_pages();
+	toi_bio_queue_flush_pages(0);
 	toi_finish_all_io();
 
 	return result;
@@ -1048,6 +1068,7 @@ struct toi_bio_ops toi_bio_ops = {
 	.rw_header_chunk = toi_rw_header_chunk,
 	.rw_header_chunk_noreadahead = toi_rw_header_chunk_noreadahead,
 	.write_header_chunk_finish = write_header_chunk_finish,
+	.io_flusher = bio_io_flusher,
 };
 
 static struct toi_sysfs_data sysfs_params[] = {

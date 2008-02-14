@@ -104,6 +104,7 @@ struct toi_module_ops {
 			unsigned int buf_size);
 	int (*read_page) (unsigned long *index, struct page *buffer_page,
 			unsigned int *buf_size);
+	void (*io_flusher) (int rw);
 
 	/* Reset module if image exists but reading aborted */
 	void (*noresume_reset) (void);
