@@ -1268,6 +1268,8 @@ static __init int toi_swap_load(void)
 	toi_swapops.read_page = toi_bio_ops.read_page;
 	toi_swapops.write_page = toi_bio_ops.write_page;
 	toi_swapops.rw_header_chunk = toi_bio_ops.rw_header_chunk;
+	toi_swapops.rw_header_chunk_noreadahead =
+		toi_bio_ops.rw_header_chunk_noreadahead;
 
 	return toi_register_module(&toi_swapops);
 }

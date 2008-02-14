@@ -40,6 +40,9 @@ struct toi_bio_ops {
 	void (*read_header_init) (void);
 	int (*rw_header_chunk) (int rw, struct toi_module_ops *owner,
 			char *buffer, int buffer_size);
+	int (*rw_header_chunk_noreadahead) (int rw,
+			struct toi_module_ops *owner,
+			char *buffer, int buffer_size);
 	int (*write_header_chunk_finish) (void);
 	int (*rw_init) (int rw, int stream_number);
 	int (*rw_cleanup) (int rw);

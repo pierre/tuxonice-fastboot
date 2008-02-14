@@ -167,8 +167,8 @@ int toi_load_extent_chain(struct extent_chain *chain)
 	struct extent *this, *last = NULL;
 	int i, ret;
 
-	ret = toiActiveAllocator->rw_header_chunk(READ, NULL, (char *) chain,
-			2 * sizeof(int));
+	ret = toiActiveAllocator->rw_header_chunk_noreadahead(READ, NULL,
+			(char *) chain, 2 * sizeof(int));
 	if (ret) {
 		printk("Failed to read size of extent chain.\n");
 		return 1;
@@ -181,8 +181,8 @@ int toi_load_extent_chain(struct extent_chain *chain)
 			return -ENOMEM;
 		}
 		this->next = NULL;
-		ret = toiActiveAllocator->rw_header_chunk(READ, NULL,
-				(char *) this, 2 * sizeof(unsigned long));
+		ret = toiActiveAllocator->rw_header_chunk_noreadahead(READ,
+				NULL, (char *) this, 2 * sizeof(unsigned long));
 		if (ret) {
 			printk(KERN_INFO "Failed to an extent.\n");
 			return 1;

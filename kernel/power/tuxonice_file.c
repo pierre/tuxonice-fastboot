@@ -1084,6 +1084,8 @@ static __init int toi_file_load(void)
 	toi_fileops.read_page = toi_bio_ops.read_page;
 	toi_fileops.write_page = toi_bio_ops.write_page;
 	toi_fileops.rw_header_chunk = toi_bio_ops.rw_header_chunk;
+	toi_fileops.rw_header_chunk_noreadahead =
+		toi_bio_ops.rw_header_chunk_noreadahead;
 
 	return toi_register_module(&toi_fileops);
 }

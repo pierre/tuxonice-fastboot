@@ -807,12 +807,12 @@ static int toi_bio_write_page(unsigned long pfn, struct page *buffer_page,
  * don't use more header space than they asked for.
  * @buffer: Address of the data to write.
  * @buffer_size: Size of the data buffer.
+ * @no_readahead: Don't try to start readhead (when still getting extents)
  */
-static int toi_rw_header_chunk(int writing,
-		struct toi_module_ops *owner,
-		char *buffer, int buffer_size)
+static int _toi_rw_header_chunk(int writing, struct toi_module_ops *owner,
+		char *buffer, int buffer_size, int no_readahead)
 {
-	int result;
+	int result = 0;
 
 	if (owner) {
 		owner->header_used += buffer_size;
@@ -832,8 +832,25 @@ static int toi_rw_header_chunk(int writing,
 		toi_message(TOI_HEADER, TOI_LOW, 1,
 			"Header: (No owner): %d bytes.\n", buffer_size);
 
-	result = toi_rw_buffer(writing, buffer, buffer_size);
+	if (!writing && !no_readahead)
+		result = toi_start_new_readahead();
+
+	if (!result)
+		result = toi_rw_buffer(writing, buffer, buffer_size);
+
 	return result;
+}
+
+static int toi_rw_header_chunk(int writing, struct toi_module_ops *owner,
+		char *buffer, int size)
+{
+	return _toi_rw_header_chunk(writing, owner, buffer, size, 0);
+}
+
+static int toi_rw_header_chunk_noreadahead(int writing,
+		struct toi_module_ops *owner, char *buffer, int size)
+{
+	return _toi_rw_header_chunk(writing, owner, buffer, size, 1);
 }
 
 /**
@@ -926,6 +943,7 @@ struct toi_bio_ops toi_bio_ops = {
 	.rw_cleanup = toi_rw_cleanup,
 	.read_header_init = toi_read_header_init,
 	.rw_header_chunk = toi_rw_header_chunk,
+	.rw_header_chunk_noreadahead = toi_rw_header_chunk_noreadahead,
 	.write_header_chunk_finish = write_header_chunk_finish,
 };
 

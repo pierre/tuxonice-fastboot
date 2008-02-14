@@ -118,6 +118,10 @@ struct toi_module_ops {
 	int (*rw_header_chunk) (int rw, struct toi_module_ops *owner,
 			char *buffer_start, int buffer_size);
 
+	int (*rw_header_chunk_noreadahead) (int rw,
+			struct toi_module_ops *owner, char *buffer_start,
+			int buffer_size);
+
 	/* Attempt to parse an image location */
 	int (*parse_sig_location) (char *buffer, int only_writer, int quiet);
 
