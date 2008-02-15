@@ -1,4 +1,4 @@
-	--- TuxOnIce, version 2.2 ---
+	--- TuxOnIce, version 3.0 ---
 
 1.  What is it?
 2.  Why would you want it?
@@ -21,8 +21,8 @@
    have your computer store the contents of its memory to disk and power down.
    Then, when you next start up your computer, it loads that image back into
    memory and you can carry on from where you were, just as if you'd never
-   turned the computer off. Far less time to start up, no reopening
-   applications and finding what directory you put that file in yesterday.
+   turned the computer off. You have far less time to start up, no reopening of
+   applications or finding what directory you put that file in yesterday.
    That's what TuxOnIce does.
 
    TuxOnIce has a long heritage. It began life as work by Gabor Kuti, who,
@@ -57,9 +57,9 @@
    TuxOnIce is part of the Linux Kernel. This version is not part of Linus's
    2.6 tree at the moment, so you will need to download the kernel source and
    apply the latest patch. Having done that, enable the appropriate options in
-   make [menu|x]config (under Power Management Options), compile and install your
-   kernel. TuxOnIce works with SMP, Highmem, preemption, fuse filesystems,
-   x86-32, PPC and x86_64.
+   make [menu|x]config (under Power Management Options - look for "Enhanced
+   Hibernation"), compile and install your kernel. TuxOnIce works with SMP,
+   Highmem, preemption, fuse filesystems, x86-32, PPC and x86_64.
 
    TuxOnIce patches are available from http://tuxonice.net.
 
@@ -67,7 +67,9 @@
 
    Compression support is implemented via the cryptoapi. You will therefore want
    to select any Cryptoapi transforms that you want to use on your image from
-   the Cryptoapi menu while configuring your kernel.
+   the Cryptoapi menu while configuring your kernel. Part of the TuxOnIce patch
+   adds a new cryptoapi compression called LZF. We recommend the use of this
+   compression method - it is very fast and still achieves good compression.
 
    You can also tell TuxOnIce to write it's image to an encrypted and/or
    compressed filesystem/swap partition. In that case, you don't need to do
@@ -79,24 +81,24 @@
    to build as modules. We recommend this because there are a number of drivers
    that are still in the process of implementing proper power management
    support. In those cases, the best way to work around their current lack is
-   to build them as modules and remove the modules while suspending. You might
+   to build them as modules and remove the modules while hibernating. You might
    also bug the driver authors to get their support up to speed, or even help!
 
    b. Storage.
 
    i) Swap.
 
-   TuxOnIce can store the suspend image in your swap partition, a swap file or
+   TuxOnIce can store the hibernation image in your swap partition, a swap file or
    a combination thereof. Whichever combination you choose, you will probably
    want to create enough swap space to store the largest image you could have,
    plus the space you'd normally use for swap. A good rule of thumb would be
    to calculate the amount of swap you'd want without using TuxOnIce, and then
    add the amount of memory you have. This swapspace can be arranged in any way
    you'd like. It can be in one partition or file, or spread over a number. The
-   only requirement is that they be active when you start a suspend cycle.
+   only requirement is that they be active when you start a hibernation cycle.
    
    There is one exception to this requirement. TuxOnIce has the ability to turn
-   on one swap file or partition at the start of suspending and turn it back off
+   on one swap file or partition at the start of hibernating and turn it back off
    at the end. If you want to ensure you have enough memory to store a image
    when your memory is fully used, you might want to make one swap partition or
    file for 'normal' use, and another for TuxOnIce to activate & deactivate
@@ -107,31 +109,31 @@
    TuxOnIce includes a 'file allocator'. The file allocator can store your
    image in a simple file. Since Linux has the concept of everything being a
    file, this is more powerful than it initially sounds. If, for example, you
-   were to set up a network block device file, you could suspend to a network
+   were to set up a network block device file, you could hibernate to a network
    server. This has been tested and works to a point, but nbd itself isn't
    stateless enough for our purposes.
 
    Take extra care when setting up the file allocator. If you just type
-   commands without thinking and then try to suspend, you could cause
+   commands without thinking and then try to hibernate, you could cause
    irreversible corruption on your filesystems! Make sure you have backups.
 
-   Most people will only want to suspend to a local file. To achieve that, do
+   Most people will only want to hibernate to a local file. To achieve that, do
    something along the lines of:
 
-   echo "TuxOnIce" > /suspend-file
-   dd if=/dev/zero bs=1M count=512 >> suspend-file
+   echo "TuxOnIce" > /hibernation-file
+   dd if=/dev/zero bs=1M count=512 >> hibernation-file
 
-   This will create a 512MB file called /suspend-file. To get TuxOnIce to use
+   This will create a 512MB file called /hibernation-file. To get TuxOnIce to use
    it:
 
-   echo /suspend-file > /sys/power/tuxonice/file/target
+   echo /hibernation-file > /sys/power/tuxonice/file/target
 
    Then
 
    cat /sys/power/tuxonice/resume
 
    Put the results of this into your bootloader's configuration (see also step
-   C, below:
+   C, below):
 
    ---EXAMPLE-ONLY-DON'T-COPY-AND-PASTE---
    # cat /sys/power/tuxonice/resume
@@ -145,9 +147,10 @@
  
    For those who are thinking 'Could I make the file sparse?', the answer is
    'No!'. At the moment, there is no way for TuxOnIce to fill in the holes in
-   a sparse file while suspending. In the longer term (post merge!), I'd like
-   to change things so that the file could be dynamically resized as needed.
-   Right now, however, that's not possible and not a priority.
+   a sparse file while hibernating. In the longer term (post merge!), I'd like
+   to change things so that the file could be dynamically resized and have
+   holes filled as needed. Right now, however, that's not possible and not a
+   priority.
 
    c. Bootloader configuration.
    
@@ -158,7 +161,7 @@
 
    This would tell TuxOnIce that /dev/hda1 is a swap partition you 
    have. TuxOnIce will use the swap signature of this partition as a
-   pointer to your data when you suspend. This means that (in this example)
+   pointer to your data when you hibernate. This means that (in this example)
    /dev/hda1 doesn't need to be _the_ swap partition where all of your data
    is actually stored. It just needs to be a swap partition that has a
    valid signature.
@@ -187,18 +190,26 @@
 
    If you only compile in the swap allocator, or only compile in the file
    allocator, you don't need to add the "swap:" part of the resume=
-   parameters above. resume=/dev/hda2:0x242d will work just as well.
+   parameters above. resume=/dev/hda2:0x242d will work just as well. If you
+   have compiled both and your storage is on swap, you can also use this
+   format (the swap allocator is the default allocator).
+
+   When compiling your kernel, one of the options in the 'Power Management
+   Support' menu, just above the 'Enhanced Hibernation (TuxOnIce)' entry is
+   called 'Default resume partition'. This can be used to set a default value
+   for the resume= parameter.
 
    d. The hibernate script.
 
    Since the driver model in 2.6 kernels is still being developed, you may need
-   to do more, however. Users of TuxOnIce usually start the process via a script
-   which prepares for the suspend, tells the kernel to do its stuff and then
-   restore things afterwards. This script might involve:
+   to do more than just configure TuxOnIce. Users of TuxOnIce usually start the
+   process via a script which prepares for the hibernation cycle, tells the
+   kernel to do its stuff and then restore things afterwards. This script might
+   involve:
 
    - Switching to a text console and back if X doesn't like the video card
      status on resume.
-   - Un/reloading PCMCIA support since it doesn't play well with suspend.
+   - Un/reloading drivers that don't play well with hibernation.
   
    Note that you might not be able to unload some drivers if there are 
    processes using them. You might have to kill off processes that hold
@@ -207,13 +218,39 @@
    module.
 
    Check out the latest script (available on tuxonice.net).
-   
+
+   e. The userspace user interface.
+
+   TuxOnIce has very limited support for displaying status if you only apply
+   the kernel patch - it can printk messages, but that is all. In addition,
+   some of the functions mentioned in this document (such as cancelling a cycle
+   or performing interactive debugging) are unavailable. To utilise these
+   functions, or simply get a nice display, you need the 'userui' component.
+   Userui comes in three flavours, usplash, fbsplash and text. Text should
+   work on any console. Usplash and fbsplash require the appropriate
+   (distro specific?) support.
+
+   To utilise a userui, TuxOnIce just needs to be told where to find the
+   userspace binary:
+
+   echo "/usr/local/sbin/tuxoniceui_fbsplash" > /sys/power/tuxonice/user_interface/program
+
+   The hibernate script can do this for you, and a default value for this
+   setting can be configured when compiling the kernel. This path is also
+   stored in the image header, so if you have an initrd or initramfs, you can
+   use the userui during the first part of resuming (prior to the atomic
+   restore) by putting the binary in the same path in your initrd/ramfs.
+   Alternatively, you can put it in a different location and do an echo
+   similar to the above prior to the echo > do_resume. The value saved in the
+   image header will then be ignored.
+
 4. Why not just use the version already in the kernel?
 
-   The version in the vanilla kernel has a number of drawbacks. Among these:
+   The version in the vanilla kernel has a number of drawbacks. The most
+   serious of these are:
 	- it has a maximum image size of 1/2 total memory.
 	- it doesn't allocate storage until after it has snapshotted memory.
-	  This means that you can't be sure suspending will work until you
+	  This means that you can't be sure hibernating will work until you
 	  see it start to write the image.
 	- it performs all of it's I/O synchronously.
 	- it does not allow you to press escape to cancel a cycle
@@ -223,16 +260,16 @@
 	- it does not allow you to use swapfiles.
 	- it does not allow you to use ordinary files.
 	- it just invalidates an image and continues to boot if you
-	  accidentally boot the wrong kernel after suspending.
-	- it doesn't support any sort of nice display while suspending
+	  accidentally boot the wrong kernel after hibernating.
+	- it doesn't support any sort of nice display while hibernating
 	- it is moving toward requiring that you have an initrd/initramfs
 	  to ever have a hope of resuming (uswsusp). While uswsusp will
-	  address some of the concerns above, it won't address all, and
-	  will be more complicated to get set up.
+	  address some of the concerns above, it won't address all of them,
+          and will be more complicated to get set up.
 
 5. How do you use it?
 
-   A suspend cycle can be started directly by doing:
+   A hibernation cycle can be started directly by doing:
 
 	echo > /sys/power/tuxonice/do_hibernate
 
@@ -245,18 +282,35 @@
    See the hibernate script's man page for more details on the options it
    takes.
 
-   If you're using the text or splash user interface modules, one neat feature
-   of TuxOnIce that you might find useful is that you can press Escape at any
-   time during suspending, and the process will be aborted.
-   
-   Due to the way suspend works, this means you'll have your system back and
-   perfectly usable almost instantly. The only exception is when it's at the
-   very end of writing the image. Then it will need to reload a small (
-   usually 4-50MBs, depending upon the image characteristics) portion first.
+   If you're using the text or splash user interface modules, one feature of
+   TuxOnIce that you might find useful is that you can press Escape at any time
+   during hibernating, and the process will be aborted.
 
+   Due to the way hibernation works, this means you'll have your system back and
+   perfectly usable almost instantly. The only exception is when it's at the
+   very end of writing the image. Then it will need to reload a small (usually
+   4-50MBs, depending upon the image characteristics) portion first.
+
+   Likewise, when resuming, you can press escape and resuming will be aborted.
+   The computer will then powerdown again according to settings at that time for
+   the powerdown method or rebooting.
+
+   You can change the settings for powering down while the image is being
+   written by pressing 'R' to toggle rebooting and 'O' to toggle between
+   suspending to ram and powering down completely).
+   
    If you run into problems with resuming, adding the "noresume" option to
    the kernel command line will let you skip the resume step and recover your
-   system.
+   system. This option shouldn't normally be needed, because TuxOnIce modifies
+   the image header prior to the atomic restore, and will thus prompt you
+   if it detects that you've tried to resume an image before (this flag is
+   removed if you press Escape to cancel a resume, so you won't be prompted
+   then).
+
+   Recent kernels (2.6.24 onwards) add support for resuming from a different
+   kernel to the one that was hibernated (thanks to Rafael for his work on
+   this - I've just embraced and enhanced the support for TuxOnIce). This
+   should further reduce the need for you to use the noresume option.
 
 6. What do all those entries in /sys/power/tuxonice do?
 
@@ -265,14 +319,13 @@
    the directory will depend upon the version of TuxOnIce you're
    running and the options you selected at compile time. In the following
    descriptions, names in brackets refer to compile time options.
-   (Note that they're all dependant upon you having selected CONFIG_SUSPEND2
+   (Note that they're all dependant upon you having selected CONFIG_TUXONICE
    in the first place!).
 
-   Since the values of these settings can open potential security risks, they
-   are usually accessible only to the root user. You can, however, enable a
-   compile time option which makes all of these files world-accessible. This
-   should only be done if you trust everyone with shell access to this
-   computer!
+   Since the values of these settings can open potential security risks, the
+   writeable ones are accessible only to the root user. You may want to
+   configure sudo to allow you to invoke your hibernate script as an ordinary
+   user.
  
    - checksum/enabled
 
@@ -280,7 +333,7 @@
    while we're saving the first part of the image, and to get any pages that
    do change resaved in the atomic copy. This should normally not be needed,
    but if you're seeing issues, please enable this. If your issues stop you
-   being able to resume, enable this option, suspend and cancel the cycle
+   being able to resume, enable this option, hibernate and cancel the cycle
    after the atomic copy is done. If the debugging info shows a non-zero
    number of pages resaved, please report this to Nigel.
  
@@ -290,61 +343,56 @@
 
    - compression/expected_compression
 
-   These values allow you to set an expected compression ratio, which Software
-   Suspend will use in calculating whether it meets constraints on the image
-   size. If this expected compression ratio is not attained, the suspend will
+   These values allow you to set an expected compression ratio, which TuxOnice
+   will use in calculating whether it meets constraints on the image size. If
+   this expected compression ratio is not attained, the hibernation cycle will
    abort, so it is wise to allow some spare. You can see what compression
-   ratio is achieved in the logs after suspending.
+   ratio is achieved in the logs after hibernating.
 
    - debug_info:
   
    This file returns information about your configuration that may be helpful
-   in diagnosing problems with suspending.
+   in diagnosing problems with hibernating.
 
-   - do_resume:
-
-   When anything is written to this file suspend will attempt to read and
-   restore an image. If there is no image, it will return almost immediately.
-   If an image exists, the echo > will never return. Instead, the original
-   kernel context will be restored and the original echo > do_suspend will
-   return.
-
-   - do_suspend:
+   - do_hibernate:
 
    When anything is written to this file, the kernel side of TuxOnIce will
    begin to attempt to write an image to disk and power down. You'll normally
    want to run the hibernate script instead, to get modules unloaded first.
 
-   - driver_model_beeping
+   - do_resume:
 
-   Enable beeping when suspending and resuming the drivers. Might help with
-   determining where a problem in resuming occurs.
+   When anything is written to this file TuxOnIce will attempt to read and
+   restore an image. If there is no image, it will return almost immediately.
+   If an image exists, the echo > will never return. Instead, the original
+   kernel context will be restored and the original echo > do_hibernate will
+   return.
 
    - */enabled
 
-   These option can be used to temporarily disable various parts of suspend.
+   These option can be used to temporarily disable various parts of TuxOnIce.
 
    - extra_pages_allowance
 
    When TuxOnIce does its atomic copy, it calls the driver model suspend
    and resume methods. If you have DRI enabled with a driver such as fglrx,
    this can result in the driver allocating a substantial amount of memory
-   for storing its state. Extra_pages_allowance tells tuxonice how much
+   for storing its state. Extra_pages_allowance tells TuxOnIce how much
    extra memory it should ensure is available for those allocations. If
-   your attempts at suspending end with a message in dmesg indicating that
+   your attempts at hibernating end with a message in dmesg indicating that
    insufficient extra pages were allowed, you need to increase this value.
 
    - file/target:
 
-   Read this value to get the current setting. Write to it to point Suspend
-   at a new storage location for the file allocator. See above for details of
-   how to set up the file allocator.
+   Read this value to get the current setting. Write to it to point TuxOnice
+   at a new storage location for the file allocator. See section 3.b.ii above
+   for details of how to set up the file allocator.
 
    - freezer_test
 
-   This entry can be used to get TuxOnIce to just test the freezer without
-   actually doing a suspend cycle. It is useful for diagnosing freezing
-   issues.
+   This entry can be used to get TuxOnIce to just test the freezer and prepare
+   an image without actually doing a hibernation cycle. It is useful for
+   diagnosing freezing and image preparation issues.
 
    - image_exists:
 
@@ -356,7 +404,7 @@
 
    - image_size_limit:
 
-   The maximum size of suspend image written to disk, measured in megabytes
+   The maximum size of hibernation image written to disk, measured in megabytes
    (1024*1024).
 
    - interface_version:
@@ -368,7 +416,7 @@
 
    - last_result:
 
-   The result of the last suspend, as defined in
+   The result of the last hibernation cycle, as defined in
    include/linux/suspend-debug.h with the values SUSPEND_ABORTED to
    SUSPEND_KEPT_IMAGE. This is a bitmask.
 
@@ -396,7 +444,7 @@
 
    Note that these options are highly dependant upon your hardware & software:
 
-   3: When succesful, your machine suspends-to-ram instead of powering off.
+   3: When succesful, your machine suspends to ram instead of powering off.
       The advantage of using this mode is that it doesn't matter whether your
       battery has enough charge to make it through to your next resume. If it
       lasts, you will simply resume from suspend to ram (and the image on disk
@@ -412,7 +460,7 @@
       you want to protect your machine with the bios password, this is probably
       not the right choice. Mode 4 may be necessary on some machines where ACPI
       wake up methods need to be run to properly reinitialise hardware after a
-      suspend-to-disk cycle.  
+      hibernation cycle.  
    0: Switch the machine completely off. The only possible wakeup is the power
       button. For the bios, resume is then the same as a cold boot, in
       particular you would  have to provide your bios boot password if your
@@ -445,7 +493,7 @@
    This entry is used to specify the swapfile or partition that
    TuxOnIce will attempt to swapon/swapoff automatically. Thus, if
    I normally use /dev/hda1 for swap, and want to use /dev/hda2 for specifically
-   for my suspend image, I would
+   for my hibernation image, I would
   
    echo /dev/hda2 > /sys/power/tuxonice/swap/swapfile
 
@@ -467,14 +515,14 @@
    - toggle_process_nofreeze
 
    This entry can be used to toggle the NOFREEZE flag on a process, to allow it
-   to run during Suspending. It should be used with extreme caution. There are
-   strict limitations on what a process running during suspend can do. This is
-   really only intended for use by Suspend's helpers (userui in particular).
+   to run during hibernating. It should be used with extreme caution. There are
+   strict limitations on what a process running during hibernation can do. This
+   is really only intended for use by TuxOnice's helpers (userui in particular).
 
    - userui_program
 
-   This entry is used to tell Suspend what userspace program to use for
-   providing a user interface while suspending. The program uses a netlink
+   This entry is used to tell TuxOnice what userspace program to use for
+   providing a user interface while hibernating. The program uses a netlink
    socket to pass messages back and forward to the kernel, allowing all of the
    functions formerly implemented in the kernel user interface components.
 
@@ -490,7 +538,7 @@
    - user_interface/default_console_level (CONFIG_PM_DEBUG):
 
    This determines the value of the console log level at the start of a
-   suspend cycle. If debugging is compiled in, the console log level can be
+   hibernation cycle. If debugging is compiled in, the console log level can be
    changed during a cycle by pressing the digit keys. Meanings are:
 
    0: Nice display.
@@ -503,18 +551,19 @@
 
    - user_interface/enable_escape:
 
-   Setting this to "1" will enable you abort a suspend by
+   Setting this to "1" will enable you abort a hibernation cycle or resuming by
    pressing escape, "0" (default) disables this feature. Note that enabling
-   this option means that you cannot initiate a suspend and then walk away
+   this option means that you cannot initiate a hibernation cycle and then walk
+away
    from your computer, expecting it to be secure. With feature disabled,
-   you can validly have this expectation once Suspend begins to write the
-   image to disk. (Prior to this point, it is possible that Suspend might
+   you can validly have this expectation once TuxOnice begins to write the
+   image to disk. (Prior to this point, it is possible that TuxOnice might
    about because of failure to freeze all processes or because constraints
    on its ability to save the image are not met).
 
    - version:
   
-   The version of suspend you have compiled into the currently running kernel.
+   The version of TuxOnIce you have compiled into the currently running kernel.
 
 7. How do you get support?
 
@@ -532,7 +581,7 @@
    related to drivers not having adequate power management support. In this
    case, it is not a bug with TuxOnIce, but we can still help you. As we
    mentioned above, such issues can usually be worked around by building the
-   functionality as modules and unloading them while suspending. Please visit
+   functionality as modules and unloading them while hibernating. Please visit
    the Wiki for up-to-date lists of known issues and work arounds.
 
    If this information doesn't help, try running:
@@ -560,14 +609,14 @@
 
    a. Freezing system activity.
 
-   The first main stage in suspending is to stop all other activity. This is
+   The first main stage in hibernating is to stop all other activity. This is
    achieved in stages. Processes are considered in fours groups, which we will
    describe in reverse order for clarity's sake: Threads with the PF_NOFREEZE
    flag, kernel threads without this flag, userspace processes with the
    PF_SYNCTHREAD flag and all other processes. The first set (PF_NOFREEZE) are
-   untouched by the refrigerator code. They are allowed to run during suspending
+   untouched by the refrigerator code. They are allowed to run during hibernating
    and resuming, and are used to support user interaction, storage access or the
-   like. Other kernel threads (those unneeded while suspending) are frozen last.
+   like. Other kernel threads (those unneeded while hibernating) are frozen last.
    This leaves us with userspace processes that need to be frozen. When a
    process enters one of the *_sync system calls, we set a PF_SYNCTHREAD flag on
    that process for the duration of that call. Processes that have this flag are
@@ -583,7 +632,7 @@
 
    b. Eating memory.
 
-   For a successful suspend, you need to have enough disk space to store the
+   For a successful hibernation cycle, you need to have enough disk space to store the
    image and enough memory for the various limitations of TuxOnIce's
    algorithm. You can also specify a maximum image size. In order to attain
    to those constraints, TuxOnIce may 'eat' memory. If, after freezing
@@ -629,7 +678,7 @@
    e. Suspending drivers and storing processor context.
 
    Having written pageset2, TuxOnIce calls the power management functions to
-   notify drivers of the suspend, and saves the processor state in preparation
+   notify drivers of the hibernation, and saves the processor state in preparation
    for the atomic copy of memory we are about to make.
 
    f. Atomic copy.
@@ -642,14 +691,14 @@
 
    g. Save the atomic copy (pageset 1).
 
-   Suspend can then write the atomic copy of the remaining pages. Since we
+   TuxOnice can then write the atomic copy of the remaining pages. Since we
    have copied the pages into other locations, we can continue to use the
    normal block I/O routines without fear of corruption our image.
 
-   f. Save the suspend header.
+   f. Save the image header.
 
    Nearly there! We save our settings and other parameters needed for
-   reloading pageset 1 in a 'suspend header'. We also tell our allocator to
+   reloading pageset 1 in an 'image header'. We also tell our allocator to
    serialise its data at this stage, so that it can reread the image at resume
    time.
 
@@ -676,7 +725,7 @@
    context. We are now running with the original kernel. Next, we reload the
    pageset 2 pages, free the memory and swap used by TuxOnIce, restore
    the pageset header and restart processes. Sounds easy in comparison to
-   suspending, doesn't it!
+   hibernating, doesn't it!
 
    There is of course more to TuxOnIce than this, but this explanation
    should be a good start. If there's interest, I'll write further
@@ -702,7 +751,7 @@
    The above mentioned developers have been aided in their efforts by a host
    of hundreds, if not thousands of testers and people who have submitted bug
    fixes & suggestions. Of special note are the efforts of Michael Frank, who
-   had his computers repetitively suspend and resume for literally tens of
+   had his computers repetitively hibernate and resume for literally tens of
    thousands of cycles and developed scripts to stress the system and test
    TuxOnIce far beyond the point most of us (Nigel included!) would consider
    testing. His efforts have contributed as much to TuxOnIce as any of the
