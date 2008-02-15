@@ -289,8 +289,7 @@ static int lzf_decompress(struct crypto_tfm *tfm, const u8 *src,
 				*op++ = *ref++;
 			} while (--len);
 		}
-	}
-	while (op < out_end && ip < in_end);
+	} while (op < out_end && ip < in_end);
 
 	*dlen = op - (u8 *) dst;
 	return 0;

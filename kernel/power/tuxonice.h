@@ -129,7 +129,8 @@ enum {
 };
 
 #define set_debug_state(bit) (test_and_set_bit(bit, &toi_bkd.toi_debug_state))
-#define clear_debug_state(bit) (test_and_clear_bit(bit, &toi_bkd.toi_debug_state))
+#define clear_debug_state(bit) \
+	(test_and_clear_bit(bit, &toi_bkd.toi_debug_state))
 #define test_debug_state(bit) (test_bit(bit, &toi_bkd.toi_debug_state))
 
 /*		== Steps in hibernating ==	*/

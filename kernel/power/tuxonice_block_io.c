@@ -44,8 +44,8 @@ static inline void inc_pr_index(void)
 }
 #else
 #define PR_DEBUG(a, b...) do { } while (0)
-#define reset_pr_index() do { } while(0)
-#define inc_pr_index do { } while(0)
+#define reset_pr_index() do { } while (0)
+#define inc_pr_index do { } while (0)
 #endif
 
 #define TARGET_OUTSTANDING_IO 16384
@@ -58,24 +58,17 @@ static inline void inc_pr_index(void)
 unsigned long mutex_times[2][2][NR_CPUS];
 #define my_mutex_lock(index, the_lock) do { \
 	int have_mutex; \
-	unsigned long mutex_acquired, mutex_freed; \
 	have_mutex = mutex_trylock(the_lock); \
 	if (!have_mutex) { \
-		/* unsigned long start = jiffies; */ \
 		mutex_lock(the_lock); \
-		mutex_acquired = jiffies; \
-		/* mutex_times[index][0][smp_processor_id()] += (mutex_acquired - start); */ \
-		mutex_times[index][0][smp_processor_id()] ++; \
+		mutex_times[index][0][smp_processor_id()]++; \
 	} else { \
-		mutex_acquired = jiffies; \
-		mutex_times[index][1][smp_processor_id()] ++; \
+		mutex_times[index][1][smp_processor_id()]++; \
 	}
 
 #define my_mutex_unlock(index, the_lock) \
 	mutex_unlock(the_lock); \
-	mutex_freed = jiffies; \
-	/* mutex_times[index][1][smp_processor_id()] += mutex_freed - mutex_acquired; */ \
-} while(0)
+} while (0)
 #endif
 
 static int target_outstanding_io = 1024;
@@ -165,8 +158,8 @@ static void do_bio_wait(int reason)
 		atomic_inc(&reasons[reason]);
 
 		wait_event(num_in_progress_wait,
-				!atomic_read(&toi_io_in_progress) ||
-				nr_unallocated_buffer_pages() > free_mem_throttle);
+			!atomic_read(&toi_io_in_progress) ||
+			nr_unallocated_buffer_pages() > free_mem_throttle);
 	}
 }
 
@@ -560,9 +553,8 @@ static int toi_bio_rw_page(int writing, struct page *page,
 		if (toi_writer_posn.current_chain ==
 				toi_writer_posn_save[compare_to].chain_num &&
 		    toi_writer_posn.current_offset ==
-		    		toi_writer_posn_save[compare_to].offset) {
+				toi_writer_posn_save[compare_to].offset)
 			more_readahead = 0;
-		}
 	}
 	return 0;
 }
@@ -652,7 +644,7 @@ static int toi_rw_cleanup(int writing)
 
 	toi_finish_all_io();
 
-	while(readahead_list_head) {
+	while (readahead_list_head) {
 		void *next = (void *) readahead_list_head->private;
 		toi__free_page(12, readahead_list_head);
 		readahead_list_head = next;
@@ -711,7 +703,7 @@ static int toi_start_new_readahead(int dedicated_thread)
 			more_readahead = 0;
 
 		if (!more_readahead && last_result) {
-			/* 
+			/*
 			 * Don't complain about failing to do readahead past
 			 * the end of storage.
 			 */
@@ -1063,7 +1055,7 @@ static int toi_bio_initialise(int starting_cycle)
 
 		for (i = 0; i < 2; i++)
 			for (j = 0; j < 2; j++)
-				for (k=0; k < NR_CPUS; k++)
+				for (k = 0; k < NR_CPUS; k++)
 					mutex_times[i][j][k] = 0;
 		}
 #endif

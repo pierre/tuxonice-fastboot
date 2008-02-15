@@ -169,7 +169,7 @@ int toi_start_anything(int hibernate_or_resume)
 			goto out_err;
 		}
 	}
-	
+
 	if (hibernate_or_resume == SYSFS_HIBERNATE)
 		toi_print_modules();
 
@@ -483,7 +483,8 @@ static int toi_init(void)
 
 	boot_kernel_data_buffer = toi_get_zeroed_page(37, TOI_ATOMIC_GFP);
 	if (!boot_kernel_data_buffer) {
-		printk("TuxOnIce: Failed to allocate boot_kernel_data_buffer.\n");
+		printk(KERN_ERR "TuxOnIce: Failed to allocate "
+				"boot_kernel_data_buffer.\n");
 		set_result_state(TOI_OUT_OF_MEMORY);
 		return 1;
 	}
@@ -1114,7 +1115,7 @@ int toi_launch_userspace_program(char *command, int channel_no,
 
 	retval = call_usermodehelper(argv[0], argv, envp, wait);
 
-	/* 
+	/*
 	 * If the program reports an error, retval = 256. Don't complain
 	 * about that here.
 	 */

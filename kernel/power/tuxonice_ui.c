@@ -32,9 +32,9 @@
 #include "tuxonice_ui.h"
 #include "tuxonice_netlink.h"
 #include "tuxonice_power_off.h"
+#include "tuxonice_builtin.h"
 
 static char local_printf_buf[1024];	/* Same as printk - should be safe */
-extern int toi_wait;
 struct ui_ops *toi_current_ui;
 
 /**

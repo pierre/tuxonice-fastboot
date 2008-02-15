@@ -101,9 +101,12 @@ static DEFINE_SPINLOCK(logbuf_lock);
  * The indices into log_buf are not constrained to log_buf_len - they
  * must be masked before subscripting
  */
-static unsigned POSS_NOSAVE log_start;	/* Index into log_buf: next char to be read by syslog() */
-static unsigned POSS_NOSAVE con_start;	/* Index into log_buf: next char to be sent to consoles */
-static unsigned POSS_NOSAVE log_end;	/* Index into log_buf: most-recently-written-char + 1 */
+/* Index into log_buf: next char to be read by syslog() */
+static unsigned POSS_NOSAVE log_start;
+/* Index into log_buf: next char to be sent to consoles */
+static unsigned POSS_NOSAVE con_start;
+/* Index into log_buf: most-recently-written-char + 1 */
+static unsigned POSS_NOSAVE log_end;
 
 /*
  *	Array of consoles built from command line options (console=)
@@ -129,7 +132,8 @@ static int console_may_schedule;
 static POSS_NOSAVE char __log_buf[__LOG_BUF_LEN];
 static POSS_NOSAVE char *log_buf = __log_buf;
 static POSS_NOSAVE int log_buf_len = __LOG_BUF_LEN;
-static POSS_NOSAVE unsigned logged_chars; /* Number of chars produced since last read+clear operation */
+/* Number of chars produced since last read+clear operation */
+static POSS_NOSAVE unsigned logged_chars;
 
 static int __init log_buf_len_setup(char *str)
 {

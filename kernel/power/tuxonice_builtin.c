@@ -166,14 +166,14 @@ out_close:
 	return key;
 }
 
-struct toi_boot_kernel_data toi_bkd __nosavedata 
+struct toi_boot_kernel_data toi_bkd __nosavedata
 		__attribute__((aligned(PAGE_SIZE))) = {
-        MY_BOOT_KERNEL_DATA_VERSION,
+	MY_BOOT_KERNEL_DATA_VERSION,
 	0,
 #ifdef CONFIG_TOI_REPLACE_SWSUSP
-        (1 << TOI_REPLACE_SWSUSP) |
+	(1 << TOI_REPLACE_SWSUSP) |
 #endif
-        (1 << TOI_PAGESET2_FULL) | (1 << TOI_LATE_CPU_HOTPLUG),
+	(1 << TOI_PAGESET2_FULL) | (1 << TOI_LATE_CPU_HOTPLUG),
 };
 EXPORT_SYMBOL_GPL(toi_bkd);
 
