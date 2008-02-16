@@ -1175,10 +1175,8 @@ static int header_locations_read_sysfs(const char *page, int count)
 		} else {
 			path_len = 0;
 
-			path = d_path(si->swap_file->f_dentry,
-				si->swap_file->f_vfsmnt,
-				path_page,
-				PAGE_SIZE);
+			path = d_path(&si->swap_file->f_path, path_page,
+					PAGE_SIZE);
 			path_len = snprintf(path_page, 31, "%s", path);
 
 			haveswap = 1;

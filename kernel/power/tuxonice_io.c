@@ -209,7 +209,7 @@ static int fill_toi_header(struct toi_header *sh)
 	sh->param1 = toi_bkd.toi_action;
 	sh->param2 = toi_bkd.toi_debug_state;
 	sh->param3 = toi_bkd.toi_default_console_level;
-	sh->root_fs = current->fs->rootmnt->mnt_sb->s_dev;
+	sh->root_fs = current->fs->root.mnt->mnt_sb->s_dev;
 	for (i = 0; i < 4; i++)
 		sh->io_time[i/2][i%2] = toi_bkd.toi_io_time[i/2][i%2];
 	sh->bkd = boot_kernel_data_buffer;
