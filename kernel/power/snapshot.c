@@ -876,8 +876,8 @@ unsigned int count_highmem_pages(void)
 #endif /* CONFIG_HIGHMEM */
 
 /**
- *	saveable - Determine whether a non-highmem page should be included in
- *	the suspend image.
+ *	saveable_page - Determine whether a non-highmem page should be included
+ *	in the suspend image.
  *
  *	We should save the page if it isn't Nosave, and is not in the range
  *	of pages statically defined as 'unsaveable', and it isn't a part of
@@ -898,7 +898,8 @@ struct page *saveable_page(unsigned long pfn)
 	if (swsusp_page_is_forbidden(page) || swsusp_page_is_free(page))
 		return NULL;
 
-	if (PageReserved(page) && pfn_is_nosave(pfn))
+	if (PageReserved(page)
+	    && (!kernel_page_present(page) || pfn_is_nosave(pfn)))
 		return NULL;
 
 	return page;
@@ -939,6 +940,25 @@ static inline void do_copy_page(long *dst, long *src)
 		*dst++ = *src++;
 }
 
+
+/**
+ *	safe_copy_page - check if the page we are going to copy is marked as
+ *		present in the kernel page tables (this always is the case if
+ *		CONFIG_DEBUG_PAGEALLOC is not set and in that case
+ *		kernel_page_present() always returns 'true').
+ */
+static void safe_copy_page(void *dst, struct page *s_page)
+{
+	if (kernel_page_present(s_page)) {
+		do_copy_page(dst, page_address(s_page));
+	} else {
+		kernel_map_pages(s_page, 1, 1);
+		do_copy_page(dst, page_address(s_page));
+		kernel_map_pages(s_page, 1, 0);
+	}
+}
+
+
 #ifdef CONFIG_HIGHMEM
 static inline struct page *
 page_is_saveable(struct zone *zone, unsigned long pfn)
@@ -947,8 +967,7 @@ page_is_saveable(struct zone *zone, unsigned long pfn)
 			saveable_highmem_page(pfn) : saveable_page(pfn);
 }
 
-static inline void
-copy_data_page(unsigned long dst_pfn, unsigned long src_pfn)
+static void copy_data_page(unsigned long dst_pfn, unsigned long src_pfn)
 {
 	struct page *s_page, *d_page;
 	void *src, *dst;
@@ -962,29 +981,26 @@ copy_data_page(unsigned long dst_pfn, unsigned long src_pfn)
 		kunmap_atomic(src, KM_USER0);
 		kunmap_atomic(dst, KM_USER1);
 	} else {
-		src = page_address(s_page);
 		if (PageHighMem(d_page)) {
 			/* Page pointed to by src may contain some kernel
 			 * data modified by kmap_atomic()
 			 */
-			do_copy_page(buffer, src);
+			safe_copy_page(buffer, s_page);
 			dst = kmap_atomic(pfn_to_page(dst_pfn), KM_USER0);
 			memcpy(dst, buffer, PAGE_SIZE);
 			kunmap_atomic(dst, KM_USER0);
 		} else {
-			dst = page_address(d_page);
-			do_copy_page(dst, src);
+			safe_copy_page(page_address(d_page), s_page);
 		}
 	}
 }
 #else
 #define page_is_saveable(zone, pfn)	saveable_page(pfn)
 
-static inline void
-copy_data_page(unsigned long dst_pfn, unsigned long src_pfn)
+static inline void copy_data_page(unsigned long dst_pfn, unsigned long src_pfn)
 {
-	do_copy_page(page_address(pfn_to_page(dst_pfn)),
-			page_address(pfn_to_page(src_pfn)));
+	safe_copy_page(page_address(pfn_to_page(dst_pfn)),
+				pfn_to_page(src_pfn));
 }
 #endif /* CONFIG_HIGHMEM */
 

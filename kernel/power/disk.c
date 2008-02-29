@@ -393,7 +393,7 @@ int hibernation_platform_enter(void)
 		goto Close;
 
 	suspend_console();
-	error = device_suspend(PMSG_SUSPEND);
+	error = device_suspend(PMSG_HIBERNATE);
 	if (error)
 		goto Resume_console;
 
@@ -406,7 +406,7 @@ int hibernation_platform_enter(void)
 		goto Finish;
 
 	local_irq_disable();
-	error = device_power_down(PMSG_SUSPEND);
+	error = device_power_down(PMSG_HIBERNATE);
 	if (!error) {
 		hibernation_ops->enter();
 		/* We should never get here */
