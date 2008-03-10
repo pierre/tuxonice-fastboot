@@ -274,6 +274,7 @@ static int try_to_parse_resume_device(char *commandline, int quiet)
  */
 static void toi_swap_noresume_reset(void)
 {
+	toi_bio_ops.rw_cleanup(READ);
 	memset((char *) &devinfo, 0, sizeof(devinfo));
 }
 
