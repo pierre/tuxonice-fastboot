@@ -671,6 +671,29 @@ static int toi_rw_cleanup(int writing)
 	return 0;
 }
 
+int toi_start_one_readahead(int dedicated_thread)
+{
+	char *buffer = NULL;
+	int oom = 0;
+
+	throttle_if_memory_low();
+
+	while (!buffer) {
+		buffer = (char *) toi_get_zeroed_page(12,
+				TOI_ATOMIC_GFP);
+		if (!buffer) {
+			if (oom && !dedicated_thread)
+				return -EIO;
+
+			oom = 1;
+			set_throttle();
+			do_bio_wait(9);
+		}
+	}
+
+	return toi_bio_rw_page(READ, virt_to_page(buffer), 1, 0);
+}
+
 /*
  * toi_start_new_readahead
  *
@@ -680,31 +703,19 @@ static int toi_rw_cleanup(int writing)
  */
 static int toi_start_new_readahead(int dedicated_thread)
 {
-	int last_result, num_submitted = 0, oom = 0;
+	int last_result, num_submitted = 0;
 
 	/* Start a new readahead? */
 	if (!more_readahead)
 		return 0;
 
 	do {
-		char *buffer = NULL;
+		int result = toi_start_one_readahead(dedicated_thread);
 
-		throttle_if_memory_low();
-
-		while (!buffer) {
-			buffer = (char *) toi_get_zeroed_page(12,
-					TOI_ATOMIC_GFP);
-			if (!buffer) {
-				if (oom && !dedicated_thread)
-					return 0;
-
-				oom = 1;
-				set_throttle();
-				do_bio_wait(9);
-			}
-		}
-
-		last_result = toi_bio_rw_page(READ, virt_to_page(buffer), 1, 0);
+		if (result == -EIO)
+			return result;
+		else
+			last_result = result;
 
 		if (last_result == -ENODATA)
 			more_readahead = 0;
@@ -753,7 +764,7 @@ static int toi_bio_get_next_page_read(int no_readahead)
 	 * delay submitting the read until after we've gotten the
 	 * extents out of the first page.
 	 */
-	if (unlikely(no_readahead) && toi_start_new_readahead(0))
+	if (unlikely(no_readahead && toi_start_one_readahead(0)))
 		return -EIO;
 
 	/*
