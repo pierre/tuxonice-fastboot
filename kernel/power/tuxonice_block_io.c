@@ -1001,7 +1001,7 @@ static int _toi_rw_header_chunk(int writing, struct toi_module_ops *owner,
 		result = toi_start_new_readahead(0);
 
 	if (!result)
-		result = toi_rw_buffer(writing, buffer, buffer_size, 0);
+		result = toi_rw_buffer(writing, buffer, buffer_size, no_readahead);
 
 	return result;
 }
