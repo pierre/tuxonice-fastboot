@@ -1026,7 +1026,7 @@ static int toi_file_initialise(int starting_cycle)
 		}
 	}
 
-	if (toi_file_target)
+	if (*toi_file_target)
 		toi_file_get_target_info(toi_file_target, starting_cycle, 0);
 
 	if (starting_cycle && (toi_file_image_exists() == -1)) {
