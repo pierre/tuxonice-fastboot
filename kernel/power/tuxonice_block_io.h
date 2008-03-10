@@ -25,7 +25,7 @@ struct toi_bdev_info {
  * need these functions duplicated.
  */
 struct toi_bio_ops {
-	void (*bdev_page_io) (int rw, struct block_device *bdev, long pos,
+	int (*bdev_page_io) (int rw, struct block_device *bdev, long pos,
 			struct page *page);
 	void (*check_io_stats) (void);
 	void (*reset_io_stats) (void);

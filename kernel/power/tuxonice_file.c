@@ -538,6 +538,7 @@ static int toi_file_write_header_init(void)
 static int toi_file_write_header_cleanup(void)
 {
 	struct toi_file_header *header;
+	int result;
 
 	/* Write any unsaved data */
 	if (toi_writer_buffer_posn)
@@ -549,9 +550,11 @@ static int toi_file_write_header_cleanup(void)
 	toi_bio_ops.forward_one_page(1);
 
 	/* Adjust image header */
-	toi_bio_ops.bdev_page_io(READ, toi_file_target_bdev,
+	result = toi_bio_ops.bdev_page_io(READ, toi_file_target_bdev,
 			target_firstblock,
 			virt_to_page(toi_writer_buffer));
+	if (result)
+		return result;
 
 	header = (struct toi_file_header *) toi_writer_buffer;
 
@@ -559,13 +562,13 @@ static int toi_file_write_header_cleanup(void)
 			toi_writer_posn.current_offset <<
 			devinfo.bmap_shift);
 
-	toi_bio_ops.bdev_page_io(WRITE, toi_file_target_bdev,
+	result = toi_bio_ops.bdev_page_io(WRITE, toi_file_target_bdev,
 			target_firstblock,
 			virt_to_page(toi_writer_buffer));
 
 	toi_bio_ops.finish_all_io();
 
-	return 0;
+	return result;
 }
 
 /* HEADER READING */
@@ -575,11 +578,9 @@ static int file_init(void)
 	toi_writer_buffer_posn = 0;
 
 	/* Read toi_file configuration */
-	toi_bio_ops.bdev_page_io(READ, toi_file_target_bdev,
+	return toi_bio_ops.bdev_page_io(READ, toi_file_target_bdev,
 			target_header_start,
 			virt_to_page((unsigned long) toi_writer_buffer));
-
-	return 0;
 }
 
 /*
@@ -656,9 +657,12 @@ static int toi_file_signature_op(int op)
 		return -ENOMEM;
 	}
 
-	toi_bio_ops.bdev_page_io(READ, toi_file_target_bdev,
+	result = toi_bio_ops.bdev_page_io(READ, toi_file_target_bdev,
 			target_firstblock,
 			virt_to_page(cur));
+
+	if (result)
+		goto out;
 
 	header = (struct toi_file_header *) cur;
 	result = parse_signature(header);
@@ -686,10 +690,13 @@ static int toi_file_signature_op(int op)
 		break;
 	}
 
-	if (changed)
-		toi_bio_ops.bdev_page_io(WRITE, toi_file_target_bdev,
-				target_firstblock,
+	if (changed) {
+		int io_result = toi_bio_ops.bdev_page_io(WRITE,
+				toi_file_target_bdev, target_firstblock,
 				virt_to_page(cur));
+		if (io_result)
+			result = io_result;
+	}
 
 out:
 	toi_bio_ops.finish_all_io();
@@ -769,9 +776,9 @@ static int toi_file_image_exists(void)
  * Record that we tried to resume from this image.
  */
 
-static void toi_file_mark_resume_attempted(int mark)
+static int toi_file_mark_resume_attempted(int mark)
 {
-	toi_file_signature_op(mark ? MARK_RESUME_ATTEMPTED:
+	return toi_file_signature_op(mark ? MARK_RESUME_ATTEMPTED:
 		UNMARK_RESUME_ATTEMPTED);
 }
 

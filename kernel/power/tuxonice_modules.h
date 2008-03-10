@@ -130,7 +130,7 @@ struct toi_module_ops {
 	int (*image_exists) (void);
 
 	/* Mark the image as having tried to resume */
-	void (*mark_resume_attempted) (int);
+	int (*mark_resume_attempted) (int);
 
 	/* Destroy image if one exists */
 	int (*remove_image) (void);

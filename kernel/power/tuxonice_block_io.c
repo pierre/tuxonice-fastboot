@@ -298,10 +298,8 @@ static int submit(int writing, struct block_device *dev, sector_t first_block,
  * compression buffer that will immediately be used to start compressing the
  * next page. For reading, we do readahead and therefore don't know the final
  * address where the data needs to go.
- *
- * Failure? What's that?
  */
-static void toi_do_io(int writing, struct block_device *bdev, long block0,
+static int toi_do_io(int writing, struct block_device *bdev, long block0,
 	struct page *page, int is_readahead, int syncio, int free_group)
 {
 	page->private = 0;
@@ -325,10 +323,13 @@ static void toi_do_io(int writing, struct block_device *bdev, long block0,
 	/* Submit the page */
 	get_page(page);
 
-	submit(writing, bdev, block0, page, free_group);
+	if (submit(writing, bdev, block0, page, free_group))
+		return -EFAULT;
 
 	if (syncio)
 		do_bio_wait(4);
+
+	return 0;
 }
 
 /**
@@ -343,10 +344,10 @@ static void toi_do_io(int writing, struct block_device *bdev, long block0,
  * blocksize != PAGE_SIZE. Now we create a submit_info to get the data we
  * want and use our normal routines (synchronously).
  */
-static void toi_bdev_page_io(int writing, struct block_device *bdev,
+static int toi_bdev_page_io(int writing, struct block_device *bdev,
 		long pos, struct page *page)
 {
-	toi_do_io(writing, bdev, pos, page, 0, 1, 0);
+	return toi_do_io(writing, bdev, pos, page, 0, 1, 0);
 }
 
 /**
@@ -512,6 +513,7 @@ static int toi_bio_rw_page(int writing, struct page *page,
 		int is_readahead, int free_group)
 {
 	struct toi_bdev_info *dev_info;
+	int result;
 
 	if (go_next_page(writing)) {
 		printk(KERN_INFO "Failed to advance a page in the extent "
@@ -530,10 +532,15 @@ static int toi_bio_rw_page(int writing, struct page *page,
 
 	dev_info = &toi_devinfo[toi_writer_posn.current_chain];
 
-	toi_do_io(writing, dev_info->bdev,
+	result = toi_do_io(writing, dev_info->bdev,
 		toi_writer_posn.current_offset <<
 			dev_info->bmap_shift,
 		page, is_readahead, 0, free_group);
+
+	if (result) {
+		more_readahead = 0;
+		return result;
+	}
 
 	if (!writing) {
 		int compare_to = 0;

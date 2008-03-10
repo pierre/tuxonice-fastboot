@@ -709,9 +709,10 @@ static int toi_swap_write_header_cleanup(void)
 	toi_bio_ops.forward_one_page(1);
 
 	/* Adjust swap header */
-	toi_bio_ops.bdev_page_io(READ, resume_block_device,
-			resume_firstblock,
-			virt_to_page(sig_page));
+	result = toi_bio_ops.bdev_page_io(READ, resume_block_device,
+			resume_firstblock, virt_to_page(sig_page));
+	if (result)
+		goto out;
 
 	si = get_swap_info_struct(toi_writer_posn.current_chain);
 	result = prepare_signature(si->bdev->bd_dev,
@@ -719,10 +720,10 @@ static int toi_swap_write_header_cleanup(void)
 		((union swap_header *) sig_page)->magic.magic);
 
 	if (!result)
-		toi_bio_ops.bdev_page_io(WRITE, resume_block_device,
-			resume_firstblock,
-			virt_to_page(sig_page));
+		result = toi_bio_ops.bdev_page_io(WRITE, resume_block_device,
+			resume_firstblock, virt_to_page(sig_page));
 
+out:
 	toi_bio_ops.finish_all_io();
 	toi_free_page(38, sig_page);
 
@@ -777,9 +778,11 @@ static int toi_swap_read_header_init(void)
 	 * Read toi_swap configuration.
 	 * Headerblock size taken into account already.
 	 */
-	toi_bio_ops.bdev_page_io(READ, header_block_device,
+	result = toi_bio_ops.bdev_page_io(READ, header_block_device,
 			headerblock << 3,
 			virt_to_page((unsigned long) toi_writer_buffer));
+	if (result)
+		return result;
 
 	memcpy(&toi_writer_posn_save, toi_writer_buffer,
 			sizeof(toi_writer_posn_save));
@@ -838,7 +841,7 @@ static int toi_swap_read_header_cleanup(void)
 static int toi_swap_remove_image(void)
 {
 	union p_diskpage cur;
-	int result = 0;
+	int result = 0, io_result;
 	char newsig[11];
 
 	cur.address = toi_get_zeroed_page(31, TOI_ATOMIC_GFP);
@@ -864,9 +867,10 @@ static int toi_swap_remove_image(void)
 	 * we write the device directly
 	 */
 
-	toi_bio_ops.bdev_page_io(READ, resume_block_device,
-			resume_firstblock,
-			virt_to_page(cur.pointer));
+	result = toi_bio_ops.bdev_page_io(READ, resume_block_device,
+			resume_firstblock, virt_to_page(cur.pointer));
+	if (result)
+		goto out;
 
 	result = parse_signature(cur.pointer->swh.magic.magic, 1);
 
@@ -876,13 +880,14 @@ static int toi_swap_remove_image(void)
 	strncpy(newsig, cur.pointer->swh.magic.magic, 10);
 	newsig[10] = 0;
 
-	toi_bio_ops.bdev_page_io(WRITE, resume_block_device,
-			resume_firstblock,
-			virt_to_page(cur.pointer));
+	io_result = toi_bio_ops.bdev_page_io(WRITE, resume_block_device,
+			resume_firstblock, virt_to_page(cur.pointer));
+	if (io_result)
+		result = io_result;
 out:
 	toi_bio_ops.finish_all_io();
 	toi_free_page(31, cur.address);
-	return 0;
+	return result;
 }
 
 /*
@@ -960,7 +965,7 @@ static int toi_swap_storage_needed(void)
  */
 static int toi_swap_image_exists(void)
 {
-	int signature_found;
+	int signature_found, result;
 	union p_diskpage diskpage;
 
 	if (!resume_swap_dev_t) {
@@ -979,26 +984,25 @@ static int toi_swap_image_exists(void)
 
 	diskpage.address = toi_get_zeroed_page(32, TOI_ATOMIC_GFP);
 
-	toi_bio_ops.bdev_page_io(READ, resume_block_device,
-			resume_firstblock,
-			virt_to_page(diskpage.ptr));
+	result = toi_bio_ops.bdev_page_io(READ, resume_block_device,
+			resume_firstblock, virt_to_page(diskpage.ptr));
 	toi_bio_ops.finish_all_io();
 
 	signature_found = parse_signature(diskpage.pointer->swh.magic.magic, 0);
 	toi_free_page(32, diskpage.address);
 
-	if (signature_found < 2) {
+	if (result)
+		return result;
+
+	if (signature_found < 2)
 		printk(KERN_INFO "TuxOnIce: Normal swapspace found.\n");
-		return 0;	/* Normal swap space */
-	} else if (signature_found == -1) {
+	else if (signature_found == -1)
 		printk(KERN_ERR "TuxOnIce: Unable to find a signature. Could "
 				"you have moved a swap file?\n");
-		return 0;
-	} else if (signature_found < 6) {
+	else if (signature_found < 6)
 		printk(KERN_INFO "TuxOnIce: Detected another implementation's "
 				"signature.\n");
-		return 0;
-	} else if ((signature_found >> 1) != SIGNATURE_VER) {
+	else if ((signature_found >> 1) != SIGNATURE_VER) {
 		if (!test_toi_state(TOI_NORESUME_SPECIFIED)) {
 			toi_early_boot_message(1, TOI_CONTINUE_REQ,
 			  "Found a different style hibernate image signature.");
@@ -1006,9 +1010,10 @@ static int toi_swap_image_exists(void)
 			printk(KERN_INFO "TuxOnIce: Dectected another "
 					"implementation's signature.\n");
 		}
-	}
+	} else
+		result = 1;
 
-	return 1;
+	return result;
 }
 
 /*
@@ -1016,22 +1021,26 @@ static int toi_swap_image_exists(void)
  *
  * Record that we tried to resume from this image.
  */
-static void toi_swap_mark_resume_attempted(int mark)
+static int toi_swap_mark_resume_attempted(int mark)
 {
 	union p_diskpage diskpage;
-	int signature_found;
+	int signature_found, result;
 
 	if (!resume_swap_dev_t) {
 		printk(KERN_INFO "Not even trying to record attempt at resuming"
 				" because resume_swap_dev_t is not set.\n");
-		return;
+		return -ENODEV;
 	}
 
 	diskpage.address = toi_get_zeroed_page(35, TOI_ATOMIC_GFP);
+	if (!diskpage.address)
+		return -ENOMEM;
 
-	toi_bio_ops.bdev_page_io(READ, resume_block_device,
-			resume_firstblock,
-			virt_to_page(diskpage.ptr));
+	result = toi_bio_ops.bdev_page_io(READ, resume_block_device,
+			resume_firstblock, virt_to_page(diskpage.ptr));
+	if (result)
+		goto out;
+
 	signature_found = parse_signature(diskpage.pointer->swh.magic.magic, 0);
 
 	switch (signature_found) {
@@ -1043,12 +1052,13 @@ static void toi_swap_mark_resume_attempted(int mark)
 		break;
 	}
 
-	toi_bio_ops.bdev_page_io(WRITE, resume_block_device,
-			resume_firstblock,
-			virt_to_page(diskpage.ptr));
+	result = toi_bio_ops.bdev_page_io(WRITE, resume_block_device,
+			resume_firstblock, virt_to_page(diskpage.ptr));
+
+out:
 	toi_bio_ops.finish_all_io();
 	toi_free_page(35, diskpage.address);
-	return;
+	return result;
 }
 
 /*
