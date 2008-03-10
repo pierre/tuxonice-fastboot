@@ -1143,7 +1143,6 @@ static int toi_swap_parse_sig_location(char *commandline,
 				"signature found at %s.\n", devstart);
 	toi_free_page(33, (unsigned long) diskpage.address);
 	return result;
-
 }
 
 static int header_locations_read_sysfs(const char *page, int count)
