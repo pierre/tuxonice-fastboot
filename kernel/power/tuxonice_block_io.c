@@ -743,10 +743,18 @@ static void bio_io_flusher(int writing)
  * Read a page from disk, submitting readahead and cleaning up finished i/o
  * while we wait for the page we're after.
  */
-static void toi_bio_get_next_page_read(void)
+static int toi_bio_get_next_page_read(int no_readahead)
 {
 	unsigned long *virt;
 	struct page *next;
+
+	/*
+	 * When reading the second page of the header, we have to
+	 * delay submitting the read until after we've gotten the
+	 * extents out of the first page.
+	 */
+	if (unlikely(no_readahead) && toi_start_new_readahead(0))
+		return -EIO;
 
 	/*
 	 * On SMP, we may need to wait for the first readahead
@@ -770,6 +778,7 @@ static void toi_bio_get_next_page_read(void)
 	next = (struct page *) readahead_list_head->private;
 	toi__free_page(12, readahead_list_head);
 	readahead_list_head = next;
+	return 0;
 }
 
 /*
@@ -829,7 +838,7 @@ static void toi_bio_get_new_page(char **full_buffer)
  * @buffer: The start of the buffer to write or fill.
  * @buffer_size: The size of the buffer to write or fill.
  */
-static int toi_rw_buffer(int writing, char *buffer, int buffer_size)
+static int toi_rw_buffer(int writing, char *buffer, int buffer_size, int no_readahead)
 {
 	int bytes_left = buffer_size;
 
@@ -850,9 +859,11 @@ static int toi_rw_buffer(int writing, char *buffer, int buffer_size)
 		memcpy(to, from, capacity);
 		bytes_left -= capacity;
 
-		if (!writing)
-			toi_bio_get_next_page_read();
-		else {
+		if (!writing) {
+			int result = toi_bio_get_next_page_read(no_readahead);
+			if (result)
+				return result;
+		} else {
 			toi_bio_queue_write(&toi_writer_buffer);
 			toi_bio_get_new_page(&toi_writer_buffer);
 		}
@@ -888,9 +899,9 @@ static int toi_bio_read_page(unsigned long *pfn, struct page *buffer_page,
 
 	my_mutex_lock(0, &toi_bio_mutex);
 
-	if (toi_rw_buffer(READ, (char *) pfn, sizeof(unsigned long)) ||
-	    toi_rw_buffer(READ, (char *) buf_size, sizeof(int)) ||
-	    toi_rw_buffer(READ, buffer_virt, *buf_size)) {
+	if (toi_rw_buffer(READ, (char *) pfn, sizeof(unsigned long), 0) ||
+	    toi_rw_buffer(READ, (char *) buf_size, sizeof(int), 0) ||
+	    toi_rw_buffer(READ, buffer_virt, *buf_size, 0)) {
 		abort_hibernate(TOI_FAILED_IO, "Read of data failed.");
 		result = 1;
 	} else
@@ -925,9 +936,9 @@ static int toi_bio_write_page(unsigned long pfn, struct page *buffer_page,
 	my_mutex_lock(1, &toi_bio_mutex);
 	buffer_virt = kmap(buffer_page);
 
-	if (toi_rw_buffer(WRITE, (char *) &pfn, sizeof(unsigned long)) ||
-	    toi_rw_buffer(WRITE, (char *) &buf_size, sizeof(int)) ||
-	    toi_rw_buffer(WRITE, buffer_virt, buf_size))
+	if (toi_rw_buffer(WRITE, (char *) &pfn, sizeof(unsigned long), 0) ||
+	    toi_rw_buffer(WRITE, (char *) &buf_size, sizeof(int), 0) ||
+	    toi_rw_buffer(WRITE, buffer_virt, buf_size, 0))
 		result = -EIO;
 
 	PR_DEBUG("%d: Index %ld, %d bytes. Result %d.\n", pr_index, pfn,
@@ -979,7 +990,7 @@ static int _toi_rw_header_chunk(int writing, struct toi_module_ops *owner,
 		result = toi_start_new_readahead(0);
 
 	if (!result)
-		result = toi_rw_buffer(writing, buffer, buffer_size);
+		result = toi_rw_buffer(writing, buffer, buffer_size, 0);
 
 	return result;
 }
