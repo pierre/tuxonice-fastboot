@@ -483,7 +483,10 @@ static int toi_swap_storage_available(void)
 	diff = (((int) swapinfo.freeswap + main_pages_allocated) *
 			(sizeof(unsigned long) + sizeof(int)) /
 		(PAGE_SIZE + sizeof(unsigned long) + sizeof(int))) + 1;
-	return (int) swapinfo.freeswap + main_pages_allocated - diff;
+	if (swapinfo.freeswap)
+		return (int) swapinfo.freeswap + main_pages_allocated - diff;
+	else
+		return 0;
 }
 
 static int toi_swap_initialise(int starting_cycle)
