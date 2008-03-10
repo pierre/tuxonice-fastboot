@@ -181,7 +181,8 @@ int toi_start_anything(int hibernate_or_resume)
 	if (hibernate_or_resume) {
 		block_dump_save = block_dump;
 		block_dump = 0;
-		set_cpus_allowed(current, CPU_MASK_CPU0);
+		set_cpus_allowed(current,
+				cpumask_of_cpu(first_cpu(cpu_online_map)));
 	}
 
 	if (toi_initialise_modules_early(hibernate_or_resume))
