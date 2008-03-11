@@ -46,11 +46,11 @@ static void __toi_power_down(int method)
 	int error;
 
 	if (test_action_state(TOI_REBOOT)) {
-		toi_prepare_status(DONT_CLEAR_BAR, "Ready to reboot.");
+		toi_cond_pause(1, "Ready to reboot.");
 		kernel_restart(NULL);
 	}
 
-	toi_prepare_status(DONT_CLEAR_BAR, "Powering down.");
+	toi_cond_pause(1, "Powering down.");
 
 	switch (method) {
 	case 0:
@@ -75,15 +75,15 @@ static void __toi_power_down(int method)
 	}
 
 	if (method && method != 5)
-		toi_prepare_status(DONT_CLEAR_BAR,
-				"Falling back to alternate power off method.");
+		toi_cond_pause(1,
+			"Falling back to alternate power off method.");
 
 	if (test_result_state(TOI_ABORTED))
 		return;
 
 	kernel_power_off();
 	kernel_halt();
-	toi_prepare_status(DONT_CLEAR_BAR, "Powerdown failed.");
+	toi_cond_pause(1, "Powerdown failed.");
 	while (1)
 		cpu_relax();
 }
