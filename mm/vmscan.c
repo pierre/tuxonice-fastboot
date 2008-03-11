@@ -1904,6 +1904,7 @@ void shrink_one_zone(struct zone *zone, unsigned long total_to_free,
 		.may_swap = 0,
 		.may_writepage = 1,
 		.swappiness = vm_swappiness,
+		.isolate_pages = isolate_pages_global,
 	};
 
 	if (total_to_free <= 0)
