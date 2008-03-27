@@ -257,7 +257,7 @@ int freeze_processes(void)
 	error = try_to_freeze_tasks(FREEZER_KERNEL_THREADS);
 	if (error)
 		goto Exit;
-	printk(KERN_INFO "done.");
+	printk("done.");
 	freezer_state = FREEZER_FULLY_ON;
  Exit:
 	BUG_ON(in_atomic());
