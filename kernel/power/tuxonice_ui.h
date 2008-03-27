@@ -88,7 +88,7 @@ extern struct ui_ops *toi_current_ui;
 	do { if (toi_current_ui) \
 		(toi_current_ui->prepare_status)(clear, fmt, ##args); \
 	     else \
-		printk(KERN_ERR fmt"%s", ##args, "\n"); \
+		printk(KERN_ERR fmt "%s", ##args, "\n"); \
 	} while (0)
 
 #define toi_message(sn, lev, log, fmt, a...) \

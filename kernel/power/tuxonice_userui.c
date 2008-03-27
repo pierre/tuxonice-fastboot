@@ -372,7 +372,7 @@ static void userui_abort_hibernate(int result_code, const char *fmt, ...)
 		printed_len = sprintf(local_printf_buf + printed_len,
 					" (Press SPACE to continue)");
 
-	toi_prepare_status(CLEAR_BAR, local_printf_buf);
+	toi_prepare_status(CLEAR_BAR, "%s", local_printf_buf);
 
 	if (ui_helper_data.pid != -1)
 		userui_wait_for_keypress(0);
