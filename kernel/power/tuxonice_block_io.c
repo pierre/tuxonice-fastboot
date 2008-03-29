@@ -986,7 +986,7 @@ static int _toi_rw_header_chunk(int writing, struct toi_module_ops *owner,
 			buffer_size, owner->header_used,
 			owner->header_requested);
 		if (owner->header_used > owner->header_requested) {
-			printk(KERN_EMERG "TuxOnIce module %s is using more"
+			printk(KERN_EMERG "TuxOnIce module %s is using more "
 				"header space (%u) than it requested (%u).\n",
 				owner->name,
 				owner->header_used,
