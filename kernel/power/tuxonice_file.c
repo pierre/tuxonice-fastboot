@@ -372,6 +372,11 @@ cleanup:
 	target_storage_available = 0;
 }
 
+static void toi_file_noresume_reset(void)
+{
+	toi_bio_ops.rw_cleanup(READ);
+}
+
 static int parse_signature(struct toi_file_header *header)
 {
 	int have_image = !memcmp(HaveImage, header->sig, sizeof(HaveImage) - 1);
@@ -510,8 +515,9 @@ static int __toi_file_allocate_storage(int main_space_requested,
 
 static int toi_file_write_header_init(void)
 {
-	toi_extent_state_goto_start(&toi_writer_posn);
+	int result;
 
+	toi_bio_ops.rw_init(WRITE, 0);
 	toi_writer_buffer_posn = 0;
 
 	/* Info needed to bootstrap goes at the start of the header.
@@ -523,12 +529,18 @@ static int toi_file_write_header_init(void)
 	 * next header page by the time we go to use it.
 	 */
 
-	toi_bio_ops.rw_header_chunk(WRITE, &toi_fileops,
+	result = toi_bio_ops.rw_header_chunk(WRITE, &toi_fileops,
 			(char *) &toi_writer_posn_save,
 			sizeof(toi_writer_posn_save));
 
-	toi_bio_ops.rw_header_chunk(WRITE, &toi_fileops,
+	if (result)
+		return result;
+
+	result = toi_bio_ops.rw_header_chunk(WRITE, &toi_fileops,
 			(char *) &devinfo, sizeof(devinfo));
+
+	if (result)
+		return result;
 
 	toi_serialise_extent_chain(&toi_fileops, &block_chain);
 
@@ -539,6 +551,7 @@ static int toi_file_write_header_cleanup(void)
 {
 	struct toi_file_header *header;
 	int result;
+	unsigned long sig_page = toi_get_zeroed_page(38, TOI_ATOMIC_GFP);
 
 	/* Write any unsaved data */
 	if (toi_writer_buffer_posn)
@@ -552,11 +565,11 @@ static int toi_file_write_header_cleanup(void)
 	/* Adjust image header */
 	result = toi_bio_ops.bdev_page_io(READ, toi_file_target_bdev,
 			target_firstblock,
-			virt_to_page(toi_writer_buffer));
+			virt_to_page(sig_page));
 	if (result)
-		return result;
+		goto out;
 
-	header = (struct toi_file_header *) toi_writer_buffer;
+	header = (struct toi_file_header *) sig_page;
 
 	prepare_signature(header,
 			toi_writer_posn.current_offset <<
@@ -564,24 +577,16 @@ static int toi_file_write_header_cleanup(void)
 
 	result = toi_bio_ops.bdev_page_io(WRITE, toi_file_target_bdev,
 			target_firstblock,
-			virt_to_page(toi_writer_buffer));
+			virt_to_page(sig_page));
 
+out:
 	toi_bio_ops.finish_all_io();
+	toi_free_page(38, sig_page);
 
 	return result;
 }
 
 /* HEADER READING */
-
-static int file_init(void)
-{
-	toi_writer_buffer_posn = 0;
-
-	/* Read toi_file configuration */
-	return toi_bio_ops.bdev_page_io(READ, toi_file_target_bdev,
-			target_header_start,
-			virt_to_page((unsigned long) toi_writer_buffer));
-}
 
 /*
  * read_header_init()
@@ -605,19 +610,24 @@ static int toi_file_read_header_init(void)
 	int result;
 	struct block_device *tmp;
 
-	result = file_init();
+	toi_bio_ops.read_header_init();
+
+	/* Read toi_file configuration */
+	result = toi_bio_ops.bdev_page_io(READ, toi_file_target_bdev,
+			target_header_start,
+			virt_to_page((unsigned long) toi_writer_buffer));
 
 	if (result) {
 		printk("FileAllocator read header init: Failed to initialise "
 				"reading the first page of data.\n");
+		toi_bio_ops.rw_cleanup(READ);
 		return result;
 	}
 
-	memcpy(&toi_writer_posn_save,
-	       toi_writer_buffer + toi_writer_buffer_posn,
+	memcpy(&toi_writer_posn_save, toi_writer_buffer,
 	       sizeof(toi_writer_posn_save));
 
-	toi_writer_buffer_posn += sizeof(toi_writer_posn_save);
+	toi_writer_buffer_posn = sizeof(toi_writer_posn_save);
 
 	tmp = devinfo.bdev;
 
@@ -628,7 +638,6 @@ static int toi_file_read_header_init(void)
 	devinfo.bdev = tmp;
 	toi_writer_buffer_posn += sizeof(devinfo);
 
-	toi_bio_ops.read_header_init();
 	toi_extent_state_goto_start(&toi_writer_posn);
 	toi_bio_ops.set_extra_page_forward();
 
@@ -741,7 +750,7 @@ static int toi_file_print_debug_stats(char *buffer, int size)
 static int toi_file_storage_needed(void)
 {
 	return sig_size + strlen(toi_file_target) + 1 +
-		3 * sizeof(struct extent_iterate_saved_state) +
+		sizeof(toi_writer_posn_save) +
 		sizeof(devinfo) +
 		sizeof(struct extent_chain) - 2 * sizeof(void *) +
 		(2 * sizeof(unsigned long) * block_chain.num_extents);
@@ -1065,6 +1074,7 @@ static struct toi_module_ops toi_fileops = {
 	.initialise				= toi_file_initialise,
 	.cleanup				= toi_file_cleanup,
 
+	.noresume_reset		= toi_file_noresume_reset,
 	.storage_available 	= toi_file_storage_available,
 	.storage_allocated	= toi_file_storage_allocated,
 	.release_storage	= toi_file_release_storage,
