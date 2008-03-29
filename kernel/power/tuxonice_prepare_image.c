@@ -663,12 +663,14 @@ static void generate_free_page_map(void)
 static int size_of_free_region(struct page *page)
 {
 	struct zone *zone = page_zone(page);
-	struct page *posn = page, *last_in_zone =
-		pfn_to_page(zone->zone_start_pfn) + zone->spanned_pages - 1;
+	unsigned long this_pfn = page_to_pfn(page),
+		      orig_pfn = this_pfn,
+		      end_pfn = zone->zone_start_pfn + zone->spanned_pages - 1;
 
-	while (posn <= last_in_zone && PageNosaveFree(posn))
-		posn++;
-	return (posn - page);
+	while (this_pfn <= end_pfn && PageNosaveFree(pfn_to_page(this_pfn)))
+		this_pfn++;
+
+	return (this_pfn - orig_pfn);
 }
 
 /* flag_image_pages
