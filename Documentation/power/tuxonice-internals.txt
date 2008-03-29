@@ -1,9 +1,9 @@
-		   TuxOnIce 2.2 Internal Documentation.
-			Updated to 18 September 2007
+		   TuxOnIce 3.0 Internal Documentation.
+			Updated to 11 March 2008
 
 1.  Introduction.
 
-    TuxOnIce 2.2 is an addition to the Linux Kernel, designed to
+    TuxOnIce 3.0 is an addition to the Linux Kernel, designed to
     allow the user to quickly shutdown and quickly boot a computer, without
     needing to close documents or programs. It is equivalent to the
     hibernate facility in some laptops. This implementation, however,
@@ -115,7 +115,7 @@
     are not met, or we fail to allocate the required space for the metadata, we
     seek to free the amount of memory that we calculate is needed and try again.
     We allow up to four iterations of this loop before aborting the cycle. If we
-    do fail, it should only be because of a bug in Suspend's calculations.
+    do fail, it should only be because of a bug in TuxOnIce's calculations.
     
     These steps are merged together in the prepare_image function, found in
     prepare_image.c. The functions are merged because of the cyclical nature
@@ -197,7 +197,7 @@
 
     a) Pageflags bitmaps.
 
-    Suspend records which pages will be in pageset1, pageset2, the destination
+    TuxOnIce records which pages will be in pageset1, pageset2, the destination
     of the atomic copy and the source of the atomically restored image using
     bitmaps. These bitmaps are created from order zero allocations to maximise
     reliability. The individual pages are combined together with pointers to
