@@ -713,7 +713,7 @@ static int toi_start_new_readahead(int dedicated_thread)
 		int result = toi_start_one_readahead(dedicated_thread);
 
 		if (result == -EIO)
-			return result;
+			return 0;
 		else
 			last_result = result;
 
@@ -764,8 +764,10 @@ static int toi_bio_get_next_page_read(int no_readahead)
 	 * delay submitting the read until after we've gotten the
 	 * extents out of the first page.
 	 */
-	if (unlikely(no_readahead && toi_start_one_readahead(0)))
+	if (unlikely(no_readahead && toi_start_one_readahead(0))) {
+		printk("No readahead and toi_start_one_readahead returned non-zero.\n");
 		return -EIO;
+	}
 
 	/*
 	 * On SMP, we may need to wait for the first readahead
@@ -905,8 +907,10 @@ static int toi_bio_read_page(unsigned long *pfn, struct page *buffer_page,
 	inc_pr_index;
 
 	/* Only call start_new_readahead if we don't have a dedicated thread */
-	if (current == toi_queue_flusher && toi_start_new_readahead(0))
+	if (current == toi_queue_flusher && toi_start_new_readahead(0)) {
+		printk("Queue flusher and toi_start_one_readahead returned non-zero.\n");
 		return -EIO;
+	}
 
 	my_mutex_lock(0, &toi_bio_mutex);
 
@@ -949,8 +953,10 @@ static int toi_bio_write_page(unsigned long pfn, struct page *buffer_page,
 
 	if (toi_rw_buffer(WRITE, (char *) &pfn, sizeof(unsigned long), 0) ||
 	    toi_rw_buffer(WRITE, (char *) &buf_size, sizeof(int), 0) ||
-	    toi_rw_buffer(WRITE, buffer_virt, buf_size, 0))
+	    toi_rw_buffer(WRITE, buffer_virt, buf_size, 0)) {
+		printk("toi_rw_buffer returned non-zero to toi_bio_write_page.\n");
 		result = -EIO;
+	}
 
 	PR_DEBUG("%d: Index %ld, %d bytes. Result %d.\n", pr_index, pfn,
 			buf_size, result);
