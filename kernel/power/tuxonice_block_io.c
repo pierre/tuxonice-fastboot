@@ -402,9 +402,8 @@ static int toi_bio_print_debug_stats(char *buffer, int size)
 	}
 #endif
 
-	len += snprintf_used(buffer + len, size - len,
+	return len + snprintf_used(buffer + len, size - len,
 		"  Free mem throttle point reached %d.\n", free_mem_throttle);
-	return len;
 }
 
 /**
