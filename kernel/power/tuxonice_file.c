@@ -74,6 +74,7 @@ struct toi_file_header {
 	char sig[sig_size];
 	int resumed_before;
 	unsigned long first_header_block;
+	int have_image;
 };
 
 /* Header Page Information */
@@ -382,11 +383,13 @@ static int parse_signature(struct toi_file_header *header)
 	int have_image = !memcmp(HaveImage, header->sig, sizeof(HaveImage) - 1);
 	int no_image_header = !memcmp(NoImage, header->sig,
 			sizeof(NoImage) - 1);
+	int binary_sig = !memcmp(tuxonice_signature, header->sig,
+			sizeof(tuxonice_signature));
 
-	if (no_image_header)
+	if (no_image_header || (binary_sig && !header->have_image))
 		return 0;
 
-	if (!have_image)
+	if (!have_image && !binary_sig)
 		return -1;
 
 	if (header->resumed_before)
@@ -403,9 +406,11 @@ static int parse_signature(struct toi_file_header *header)
 static int prepare_signature(struct toi_file_header *current_header,
 		unsigned long first_header_block)
 {
-	strncpy(current_header->sig, HaveImage, sizeof(HaveImage));
+	strncpy(current_header->sig, tuxonice_signature,
+			sizeof(tuxonice_signature));
 	current_header->resumed_before = 0;
 	current_header->first_header_block = first_header_block;
+	current_header->have_image = 1;
 	return 0;
 }
 
@@ -681,8 +686,9 @@ static int toi_file_signature_op(int op)
 		if (result == -1)
 			goto out;
 
-		strcpy(header->sig, NoImage);
+		strcpy(header->sig, tuxonice_signature);
 		header->resumed_before = 0;
+		header->have_image = 0;
 		result = changed = 1;
 		break;
 	case MARK_RESUME_ATTEMPTED:
