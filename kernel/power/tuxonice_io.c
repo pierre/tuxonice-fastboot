@@ -241,8 +241,6 @@ static int rw_init_modules(int rw, int which)
 	if (toiActiveAllocator->rw_init(rw, which)) {
 		abort_hibernate(TOI_FAILED_MODULE_INIT,
 				"Failed to initialise the allocator.");
-		if (!rw)
-			toiActiveAllocator->remove_image();
 		return 1;
 	}
 
@@ -908,7 +906,6 @@ static int read_module_configs(void)
 					"registered.\n",
 					toi_module_header.name);
 				if (!(test_toi_state(TOI_CONTINUE_REQ))) {
-					toiActiveAllocator->remove_image();
 					toi_free_page(23,
 							(unsigned long) buffer);
 					return -EINVAL;
