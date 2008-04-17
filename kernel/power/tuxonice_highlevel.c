@@ -99,6 +99,8 @@ static int block_dump_save;
 static char pre_hibernate_command[256];
 static char post_hibernate_command[256];
 
+char *tuxonice_signature = "\x0c\xe5\x56\x98\xe9\x02\xc3\xed";
+
 int toi_fail_num;
 
 int do_toi_step(int step);
@@ -1320,6 +1322,7 @@ late_initcall(core_load);
 #endif
 
 #ifdef CONFIG_TOI_EXPORTS
+EXPORT_SYMBOL_GPL(tuxonice_signature);
 EXPORT_SYMBOL_GPL(pagedir2);
 EXPORT_SYMBOL_GPL(toi_fail_num);
 EXPORT_SYMBOL_GPL(do_check_can_resume);
