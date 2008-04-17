@@ -656,7 +656,8 @@ static int toi_rw_cleanup(int writing)
 
 	readahead_list_tail = NULL;
 
-	current_stream = 0;
+	if (!current_stream)
+		return 0;
 
 	for (i = 0; i < NUM_REASONS; i++) {
 		if (!atomic_read(&reasons[i]))
@@ -665,6 +666,8 @@ static int toi_rw_cleanup(int writing)
 				reason_name[i], atomic_read(&reasons[i]));
 		atomic_set(&reasons[i], 0);
 	}
+
+	current_stream = 0;
 	return 0;
 }
 
