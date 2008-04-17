@@ -99,7 +99,7 @@ static int block_dump_save;
 static char pre_hibernate_command[256];
 static char post_hibernate_command[256];
 
-char *tuxonice_signature = "\x0c\xe5\x56\x98\xe9\x02\xc3\xed";
+char *tuxonice_signature = "\xed\xc3\x02\xe9\x98\x56\xe5\x0c";
 
 int toi_fail_num;
 
