@@ -987,9 +987,9 @@ void _toi_try_resume(void)
 	 * flag after trying to resume
 	 */
 	clear_toi_state(TOI_BOOT_TIME);
-	toi_finish_anything(SYSFS_RESUMING);
 
 out:
+	toi_finish_anything(SYSFS_RESUMING);
 	lockdep_on();
 
 }
