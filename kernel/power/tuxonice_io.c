@@ -1101,12 +1101,30 @@ static int __read_pageset1(void)
 	}
 
 	/* Check for an image */
-	result = toiActiveAllocator->image_exists();
+	result = toiActiveAllocator->image_exists(1);
 	if (!result) {
 		result = -ENODATA;
 		noresume_reset_modules();
 		printk(KERN_INFO "TuxOnIce: No image found.\n");
 		goto out;
+	}
+
+	/*
+	 * Prepare the active allocator for reading the image header. The
+	 * activate allocator might read its own configuration.
+	 *
+	 * NB: This call may never return because there might be a signature
+	 * for a different image such that we warn the user and they choose
+	 * to reboot. (If the device ids look erroneous (2.4 vs 2.6) or the
+	 * location of the image might be unavailable if it was stored on a
+	 * network connection).
+	 */
+
+	result = toiActiveAllocator->read_header_init();
+	if (result) {
+		printk("TuxOnIce: Failed to initialise, reading the image "
+				"header.\n");
+		goto out_remove_image;
 	}
 
 	/* Check for noresume command line option */
@@ -1127,24 +1145,6 @@ static int __read_pageset1(void)
 	}
 
 	clear_toi_state(TOI_CONTINUE_REQ);
-
-	/*
-	 * Prepare the active allocator for reading the image header. The
-	 * activate allocator might read its own configuration.
-	 *
-	 * NB: This call may never return because there might be a signature
-	 * for a different image such that we warn the user and they choose
-	 * to reboot. (If the device ids look erroneous (2.4 vs 2.6) or the
-	 * location of the image might be unavailable if it was stored on a
-	 * network connection).
-	 */
-
-	result = toiActiveAllocator->read_header_init();
-	if (result) {
-		printk("TuxOnIce: Failed to initialise, reading the image "
-				"header.\n");
-		goto out_remove_image;
-	}
 
 	/* Read hibernate header */
 	result = toiActiveAllocator->rw_header_chunk(READ, NULL,
@@ -1312,7 +1312,7 @@ static char *get_have_image_data(void)
 	}
 
 	/* Check for an image */
-	if (!toiActiveAllocator->image_exists() ||
+	if (!toiActiveAllocator->image_exists(1) ||
 	    toiActiveAllocator->read_header_init() ||
 	    toiActiveAllocator->rw_header_chunk(READ, NULL,
 			output_buffer, sizeof(struct toi_header))) {
@@ -1407,7 +1407,7 @@ int image_exists_write(const char *buffer, int count)
 	if (toi_activate_storage(0))
 		return count;
 
-	if (toiActiveAllocator && toiActiveAllocator->image_exists())
+	if (toiActiveAllocator && toiActiveAllocator->image_exists(1))
 		toiActiveAllocator->remove_image();
 
 	toi_deactivate_storage(0);

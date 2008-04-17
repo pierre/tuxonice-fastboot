@@ -771,7 +771,7 @@ static int toi_file_remove_image(void)
  *
  */
 
-static int toi_file_image_exists(void)
+static int toi_file_image_exists(int quiet)
 {
 	if (!toi_file_target_bdev)
 		reopen_resume_devt();
@@ -1038,7 +1038,7 @@ static int toi_file_initialise(int starting_cycle)
 	if (*toi_file_target)
 		toi_file_get_target_info(toi_file_target, starting_cycle, 0);
 
-	if (starting_cycle && (toi_file_image_exists() == -1)) {
+	if (starting_cycle && (toi_file_image_exists(1) == -1)) {
 		printk("%s is does not have a valid signature for "
 				"hibernating.\n", toi_file_target);
 		return 1;

@@ -27,12 +27,18 @@
 
 static struct toi_module_ops toi_swapops;
 
-#define SIGNATURE_VER 6
-
 /* --- Struct of pages stored on disk */
+
+struct tuxonice_sig_data {
+	dev_t device;
+	unsigned long sector;
+	int resume_attempted;
+	int orig_sig_type;
+};
 
 union diskpage {
 	union swap_header swh;	/* swh.magic is the only member used */
+	struct tuxonice_sig_data tuxonice_sig_data;
 };
 
 union p_diskpage {
@@ -40,6 +46,22 @@ union p_diskpage {
 	char *ptr;
 	unsigned long address;
 };
+
+enum {
+	IMAGE_SIGNATURE,
+	NO_IMAGE_SIGNATURE,
+	TRIED_RESUME,
+	NO_TRIED_RESUME,
+};
+
+/*
+ * Both of these point to versions of the swap header page. original_sig points
+ * to the data we read from disk at the start of hibernating or checking whether
+ * to resume. no_image is the page stored in the image header, showing what the
+ * swap header page looked like at the start of hibernating.
+ */
+static char *current_signature_page;
+static char no_image_signature_contents[sizeof(struct tuxonice_sig_data)];
 
 /* Devices used for swap */
 static struct toi_bdev_info devinfo[MAX_SWAPFILES];
@@ -278,91 +300,143 @@ static void toi_swap_noresume_reset(void)
 	memset((char *) &devinfo, 0, sizeof(devinfo));
 }
 
-static int parse_signature(char *header, int restore)
+static int get_current_signature(void)
 {
-	int type = -1;
+	int result;
 
-	if (!memcmp("SWAP-SPACE", header, 10))
+	if (current_signature_page)
 		return 0;
-	else if (!memcmp("SWAPSPACE2", header, 10))
-		return 1;
 
-	else if (!memcmp("S1SUSP", header, 6))
-		type = 2;
-	else if (!memcmp("S2SUSP", header, 6))
-		type = 3;
-	else if (!memcmp("S1SUSPEND", header, 9))
-		type = 4;
+	current_signature_page = (char *) toi_get_zeroed_page(38, TOI_ATOMIC_GFP);
+	if (!current_signature_page)
+		return -ENOMEM;
 
-	else if (!memcmp("z", header, 1))
-		type = 12;
-	else if (!memcmp("Z", header, 1))
-		type = 13;
+	result = toi_bio_ops.bdev_page_io(READ, resume_block_device,
+		resume_firstblock, virt_to_page(current_signature_page));
 
-	/*
-	 * Put bdev of hibernate header in last byte of swap header
-	 * (unsigned short)
-	 */
-	if (type > 11) {
-		dev_t *header_ptr = (dev_t *) &header[1];
-		unsigned char *headerblocksize_ptr =
-			(unsigned char *) &header[5];
-		u32 *headerblock_ptr = (u32 *) &header[6];
-		header_dev_t = *header_ptr;
-		/*
-		 * We are now using the highest bit of the char to indicate
-		 * whether we have attempted to resume from this image before.
-		 */
-		clear_toi_state(TOI_RESUMED_BEFORE);
-		if (((int) *headerblocksize_ptr) & 0x80)
-			set_toi_state(TOI_RESUMED_BEFORE);
-		headerblock = (unsigned long) *headerblock_ptr;
+	return result;
+}
+
+static int parse_signature(void)
+{
+	union p_diskpage swap_header_page;
+	struct tuxonice_sig_data *sig;
+	int type;
+	char *swap_header;
+	const char *sigs[] = {
+		"SWAP-SPACE", "SWAPSPACE2", "S1SUSP", "S2SUSP", "S1SUSPEND"
+	};
+
+	if (!current_signature_page) {
+		int result = get_current_signature();
+
+		if (result)
+			return result;
 	}
 
-	if ((restore) && (type > 5)) {
-		/* We only reset our own signatures */
-		if (type & 1)
-			memcpy(header, "SWAPSPACE2", 10);
-		else
-			memcpy(header, "SWAP-SPACE", 10);
-	}
+	swap_header_page = (union p_diskpage) current_signature_page;
+	sig = (struct tuxonice_sig_data *) current_signature_page;
+	swap_header = swap_header_page.pointer->swh.magic.magic;
 
-	return type;
+	for (type = 0; type < 5; type++)
+		if (!memcmp(sigs[type], swap_header, strlen(sigs[type])))
+			return type;
+
+	if (memcmp(tuxonice_signature, swap_header, 1))
+		return -1;
+
+	header_dev_t = sig->device;
+	clear_toi_state(TOI_RESUMED_BEFORE);
+	if (sig->resume_attempted)
+		set_toi_state(TOI_RESUMED_BEFORE);
+	headerblock = sig->sector;
+
+	return 10;
+}
+
+static void forget_signatures(void)
+{
+	if (current_signature_page) {
+		toi_free_page(38, (unsigned long) current_signature_page);
+		current_signature_page = NULL;
+	}
 }
 
 /*
- * prepare_signature
+ * write_modified_signature
+ *
+ * Write a (potentially) modified signature page without forgetting the
+ * original contents.
  */
-static int prepare_signature(dev_t bdev, unsigned long block,
-		char *current_header)
+static int write_modified_signature(int modification)
 {
-	int current_type = parse_signature(current_header, 0);
-	dev_t *header_ptr = (dev_t *) (&current_header[1]);
-	unsigned long *headerblock_ptr =
-		(unsigned long *) (&current_header[6]);
+	union p_diskpage swap_header_page;
+	struct swap_info_struct *si;
+	int result;
+	char *orig_sig;
 
-	if ((current_type > 1) && (current_type < 6))
-		return 1;
+	/* In case we haven't already */
+	result = get_current_signature();
 
-	/* At the moment, I don't have a way to handle the block being
-	 * > 32 bits. Not enough room in the signature and no way to
-	 * safely put the data elsewhere. */
+	if (result)
+		return result;
 
-	if (BITS_PER_LONG == 64 && ffs(block) > 31) {
-		toi_prepare_status(DONT_CLEAR_BAR,
-			"Header sector requires 33+ bits. "
-			"Would not be able to resume.");
-		return 1;
+	swap_header_page.address = toi_get_zeroed_page(38, TOI_ATOMIC_GFP);
+
+	if (!swap_header_page.address)
+		return -ENOMEM;
+
+	memcpy(swap_header_page.ptr, current_signature_page, PAGE_SIZE);
+
+	switch (modification) {
+	case IMAGE_SIGNATURE:
+
+		memcpy(no_image_signature_contents, swap_header_page.ptr,
+				sizeof(no_image_signature_contents));
+
+		/* Get the details of the header first page. */
+		toi_extent_state_goto_start(&toi_writer_posn);
+		toi_bio_ops.forward_one_page(1);
+
+		si = get_swap_info_struct(toi_writer_posn.current_chain);
+
+		/* Prepare the signature */
+		swap_header_page.pointer->tuxonice_sig_data.device =
+			si->bdev->bd_dev;
+		swap_header_page.pointer->tuxonice_sig_data.sector =
+			toi_writer_posn.current_offset;
+		swap_header_page.pointer->tuxonice_sig_data.resume_attempted =0;
+		swap_header_page.pointer->tuxonice_sig_data.orig_sig_type =
+			parse_signature();
+
+		memcpy(swap_header_page.pointer->swh.magic.magic,
+				tuxonice_signature, sizeof(tuxonice_signature));
+
+		break;
+	case NO_IMAGE_SIGNATURE:
+		if (!swap_header_page.pointer->tuxonice_sig_data.orig_sig_type)
+			orig_sig = "SWAP-SPACE";
+		else
+			orig_sig = "SWAPSPACE2";
+
+		memcpy(swap_header_page.pointer->swh.magic.magic, orig_sig, 10);
+		memcpy(swap_header_page.ptr, no_image_signature_contents,
+				sizeof(no_image_signature_contents));
+		break;
+	case TRIED_RESUME:
+		swap_header_page.pointer->tuxonice_sig_data.resume_attempted =1;
+		break;
+	case NO_TRIED_RESUME:
+		swap_header_page.pointer->tuxonice_sig_data.resume_attempted =0;
+		break;
 	}
 
-	if (current_type & 1)
-		current_header[0] = 'Z';
-	else
-		current_header[0] = 'z';
-	*header_ptr = bdev;
-	/* prev is the first/last swap page of the resume area */
-	*headerblock_ptr = (unsigned long) block;
-	return 0;
+	result = toi_bio_ops.bdev_page_io(WRITE, resume_block_device,
+		resume_firstblock, virt_to_page(swap_header_page.address));
+
+	toi_free_page(38, swap_header_page.address);
+
+	return result;
 }
 
 static int __toi_swap_allocate_storage(int main_storage_requested,
@@ -510,6 +584,8 @@ static void toi_swap_cleanup(int ending_cycle)
 		disable_swapfile();
 
 	close_bdevs();
+
+	forget_signatures();
 }
 
 static int toi_swap_release_storage(void)
@@ -669,6 +745,13 @@ static int toi_swap_write_header_init(void)
 	 * next header page by the time we go to use it.
 	 */
 
+	result = toi_bio_ops.rw_header_chunk(WRITE, &toi_swapops,
+			(char *) &no_image_signature_contents,
+			sizeof(struct tuxonice_sig_data));
+
+	if (result)
+		return result;
+
 	/* Forward one page will be done prior to the read */
 	for (i = 0; i < MAX_SWAPFILES; i++) {
 		si = get_swap_info_struct(i);
@@ -699,39 +782,14 @@ static int toi_swap_write_header_init(void)
 
 static int toi_swap_write_header_cleanup(void)
 {
-	int result;
-	struct swap_info_struct *si;
-	unsigned long sig_page = toi_get_zeroed_page(38, TOI_ATOMIC_GFP);
-
 	/* Write any unsaved data */
 	if (toi_writer_buffer_posn)
 		toi_bio_ops.write_header_chunk_finish();
 
 	toi_bio_ops.finish_all_io();
 
-	toi_extent_state_goto_start(&toi_writer_posn);
-	toi_bio_ops.forward_one_page(1);
-
-	/* Adjust swap header */
-	result = toi_bio_ops.bdev_page_io(READ, resume_block_device,
-			resume_firstblock, virt_to_page(sig_page));
-	if (result)
-		goto out;
-
-	si = get_swap_info_struct(toi_writer_posn.current_chain);
-	result = prepare_signature(si->bdev->bd_dev,
-			toi_writer_posn.current_offset,
-		((union swap_header *) sig_page)->magic.magic);
-
-	if (!result)
-		result = toi_bio_ops.bdev_page_io(WRITE, resume_block_device,
-			resume_firstblock, virt_to_page(sig_page));
-
-out:
-	toi_bio_ops.finish_all_io();
-	toi_free_page(38, sig_page);
-
-	return result;
+	/* Set signature to save we have an image */
+	return write_modified_signature(IMAGE_SIGNATURE);
 }
 
 /* ------------------------- HEADER READING ------------------------- */
@@ -756,6 +814,7 @@ out:
 static int toi_swap_read_header_init(void)
 {
 	int i, result = 0;
+	toi_writer_buffer_posn = 0;
 
 	if (!header_dev_t) {
 		printk(KERN_INFO "read_header_init called when we haven't "
@@ -788,10 +847,15 @@ static int toi_swap_read_header_init(void)
 	if (result)
 		return result;
 
-	memcpy(&toi_writer_posn_save, toi_writer_buffer,
+	memcpy(&no_image_signature_contents, toi_writer_buffer,
+			sizeof(no_image_signature_contents));
+
+	toi_writer_buffer_posn = sizeof(no_image_signature_contents);
+
+	memcpy(&toi_writer_posn_save, toi_writer_buffer + toi_writer_buffer_posn,
 			sizeof(toi_writer_posn_save));
 
-	toi_writer_buffer_posn = sizeof(toi_writer_posn_save);
+	toi_writer_buffer_posn += sizeof(toi_writer_posn_save);
 
 	memcpy(&devinfo, toi_writer_buffer + toi_writer_buffer_posn,
 			sizeof(devinfo));
@@ -837,61 +901,6 @@ static int toi_swap_read_header_cleanup(void)
 {
 	toi_bio_ops.rw_cleanup(READ);
 	return 0;
-}
-
-/* toi_swap_remove_image
- *
- */
-static int toi_swap_remove_image(void)
-{
-	union p_diskpage cur;
-	int result = 0, io_result;
-	char newsig[11];
-
-	cur.address = toi_get_zeroed_page(31, TOI_ATOMIC_GFP);
-	if (!cur.address) {
-		printk(KERN_INFO "Unable to allocate a page for restoring "
-				"the swap signature.\n");
-		return -ENOMEM;
-	}
-
-	/*
-	 * If nr_hibernates == 0, we must be booting, so no swap pages
-	 * will be recorded as used yet.
-	 */
-
-	if (nr_hibernates > 0)
-		toi_swap_release_storage();
-
-	/*
-	 * We don't do a sanity check here: we want to restore the swap
-	 * whatever version of kernel made the hibernate image.
-	 *
-	 * We need to write swap, but swap may not be enabled so
-	 * we write the device directly
-	 */
-
-	result = toi_bio_ops.bdev_page_io(READ, resume_block_device,
-			resume_firstblock, virt_to_page(cur.pointer));
-	if (result)
-		goto out;
-
-	result = parse_signature(cur.pointer->swh.magic.magic, 1);
-
-	if (result < 5)
-		goto out;
-
-	strncpy(newsig, cur.pointer->swh.magic.magic, 10);
-	newsig[10] = 0;
-
-	io_result = toi_bio_ops.bdev_page_io(WRITE, resume_block_device,
-			resume_firstblock, virt_to_page(cur.pointer));
-	if (io_result)
-		result = io_result;
-out:
-	toi_bio_ops.finish_all_io();
-	toi_free_page(31, cur.address);
-	return result;
 }
 
 /*
@@ -966,103 +975,105 @@ static int toi_swap_storage_needed(void)
 
 /*
  * Image_exists
+ *
+ * Returns -1 if don't know, otherwise 0 (no) or 1 (yes).
  */
-static int toi_swap_image_exists(void)
+static int toi_swap_image_exists(int quiet)
 {
-	int signature_found, result;
-	union p_diskpage diskpage;
+	int signature_found;
 
 	if (!resume_swap_dev_t) {
-		printk(KERN_INFO "Not even trying to read header "
+		if (!quiet)
+			printk(KERN_INFO "Not even trying to read header "
 				"because resume_swap_dev_t is not set.\n");
-		return 0;
+		return -1;
 	}
 
 	if (!resume_block_device &&
 	    IS_ERR(resume_block_device =
 			open_bdev(MAX_SWAPFILES, resume_swap_dev_t, 1))) {
-		printk(KERN_INFO "Failed to open resume dev_t (%x).\n",
+		if (!quiet)
+			printk(KERN_INFO "Failed to open resume dev_t (%x).\n",
 				resume_swap_dev_t);
-		return 0;
+		return -1;
 	}
 
-	diskpage.address = toi_get_zeroed_page(32, TOI_ATOMIC_GFP);
+	signature_found = parse_signature();
 
-	result = toi_bio_ops.bdev_page_io(READ, resume_block_device,
-			resume_firstblock, virt_to_page(diskpage.ptr));
-	toi_bio_ops.finish_all_io();
-
-	signature_found = parse_signature(diskpage.pointer->swh.magic.magic, 0);
-	toi_free_page(32, diskpage.address);
-
-	if (result)
-		return result;
-
-	if (signature_found < 2)
-		printk(KERN_INFO "TuxOnIce: Normal swapspace found.\n");
-	else if (signature_found == -1)
-		printk(KERN_ERR "TuxOnIce: Unable to find a signature. Could "
-				"you have moved a swap file?\n");
-	else if (signature_found < 6)
-		printk(KERN_INFO "TuxOnIce: Detected another implementation's "
+	switch (signature_found) {
+	case -ENOMEM:
+		return -1;
+	case -1:
+		if (!quiet)
+			printk(KERN_ERR "TuxOnIce: Unable to find a signature."
+				" Could you have moved a swap file?\n");
+		return -1;
+	case 0:
+	case 1:
+		if (!quiet)
+			printk(KERN_INFO "TuxOnIce: Normal swapspace found.\n");
+		return 0;
+	case 2:
+	case 3:
+	case 4:
+		if (!quiet)
+			printk(KERN_INFO "TuxOnIce: Detected another "
+				"implementation's signature.\n");
+		return 0;
+	case 10:
+		if (!quiet)
+			printk(KERN_INFO "TuxOnIce: Detected TuxOnIce binary "
 				"signature.\n");
-	else if ((signature_found >> 1) != SIGNATURE_VER) {
-		if (!test_toi_state(TOI_NORESUME_SPECIFIED)) {
-			toi_early_boot_message(1, TOI_CONTINUE_REQ,
-			  "Found a different style hibernate image signature.");
-			set_toi_state(TOI_NORESUME_SPECIFIED);
-			printk(KERN_INFO "TuxOnIce: Dectected another "
-					"implementation's signature.\n");
-		}
-	} else
-		result = 1;
+		return 1;
+	}
 
-	return result;
+	BUG();
+	return 0;
+}
+
+/* toi_swap_remove_image
+ *
+ */
+static int toi_swap_remove_image(void)
+{
+	/*
+	 * If nr_hibernates == 0, we must be booting, so no swap pages
+	 * will be recorded as used yet.
+	 */
+
+	if (nr_hibernates)
+		toi_swap_release_storage();
+
+	/*
+	 * We don't do a sanity check here: we want to restore the swap
+	 * whatever version of kernel made the hibernate image.
+	 *
+	 * We need to write swap, but swap may not be enabled so
+	 * we write the device directly
+	 *
+	 * If we don't have an current_signature_page, we didn't
+	 * read an image header, so don't change anything.
+	 */
+
+	return toi_swap_image_exists(1) ?
+		write_modified_signature(NO_IMAGE_SIGNATURE) : 0;
 }
 
 /*
  * Mark resume attempted.
  *
- * Record that we tried to resume from this image.
+ * Record that we tried to resume from this image. We have already read the
+ * signature in. We just need to write the modified version.
  */
 static int toi_swap_mark_resume_attempted(int mark)
 {
-	union p_diskpage diskpage;
-	int signature_found, result;
-
 	if (!resume_swap_dev_t) {
 		printk(KERN_INFO "Not even trying to record attempt at resuming"
 				" because resume_swap_dev_t is not set.\n");
 		return -ENODEV;
 	}
 
-	diskpage.address = toi_get_zeroed_page(35, TOI_ATOMIC_GFP);
-	if (!diskpage.address)
-		return -ENOMEM;
-
-	result = toi_bio_ops.bdev_page_io(READ, resume_block_device,
-			resume_firstblock, virt_to_page(diskpage.ptr));
-	if (result)
-		goto out;
-
-	signature_found = parse_signature(diskpage.pointer->swh.magic.magic, 0);
-
-	switch (signature_found) {
-	case 12:
-	case 13:
-		diskpage.pointer->swh.magic.magic[5] &= ~0x80;
-		if (mark)
-			diskpage.pointer->swh.magic.magic[5] |= 0x80;
-		break;
-	}
-
-	result = toi_bio_ops.bdev_page_io(WRITE, resume_block_device,
-			resume_firstblock, virt_to_page(diskpage.ptr));
-
-out:
-	toi_bio_ops.finish_all_io();
-	toi_free_page(35, diskpage.address);
-	return result;
+	return write_modified_signature(mark ? TRIED_RESUME : NO_TRIED_RESUME);
 }
 
 /*
@@ -1085,7 +1096,6 @@ static int toi_swap_parse_sig_location(char *commandline,
 		int only_allocator, int quiet)
 {
 	char *thischar, *devstart, *colon = NULL;
-	union p_diskpage diskpage;
 	int signature_found, result = -EINVAL, temp_result;
 
 	if (strncmp(commandline, "swap:", 5)) {
@@ -1129,19 +1139,7 @@ static int toi_swap_parse_sig_location(char *commandline,
 	if (temp_result)
 		return -EINVAL;
 
-	diskpage.address = toi_get_zeroed_page(33, TOI_ATOMIC_GFP);
-	if (!diskpage.address) {
-		printk(KERN_ERR "TuxOnIce: SwapAllocator: Failed to allocate "
-					"a diskpage for I/O.\n");
-		return -ENOMEM;
-	}
-
-	toi_bio_ops.bdev_page_io(READ, resume_block_device,
-			resume_firstblock, virt_to_page(diskpage.ptr));
-
-	toi_bio_ops.finish_all_io();
-
-	signature_found = parse_signature(diskpage.pointer->swh.magic.magic, 0);
+	signature_found = toi_swap_image_exists(quiet);
 
 	if (signature_found != -1) {
 		result = 0;
@@ -1155,7 +1153,6 @@ static int toi_swap_parse_sig_location(char *commandline,
 		if (!quiet)
 			printk(KERN_ERR "TuxOnIce: SwapAllocator: No swap "
 				"signature found at %s.\n", devstart);
-	toi_free_page(33, (unsigned long) diskpage.address);
 	return result;
 }
 

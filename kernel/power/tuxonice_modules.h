@@ -127,7 +127,7 @@ struct toi_module_ops {
 	int (*parse_sig_location) (char *buffer, int only_writer, int quiet);
 
 	/* Determine whether image exists that we can restore */
-	int (*image_exists) (void);
+	int (*image_exists) (int quiet);
 
 	/* Mark the image as having tried to resume */
 	int (*mark_resume_attempted) (int);
