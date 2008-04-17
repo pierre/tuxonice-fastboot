@@ -369,9 +369,7 @@ static int toi_bio_memory_needed(void)
  */
 static int toi_bio_print_debug_stats(char *buffer, int size)
 {
-	int len = 0;
-
-	len = snprintf_used(buffer, size, "- Max outstanding reads %d. Max "
+	int len = snprintf_used(buffer, size, "- Max outstanding reads %d. Max "
 			"writes %d.\n", max_outstanding_reads,
 			max_outstanding_writes);
 
