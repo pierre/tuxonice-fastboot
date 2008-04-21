@@ -100,18 +100,19 @@
 #include <linux/moduleparam.h>
 #include <linux/if.h>
 #include <linux/rtnetlink.h>
-#include <linux/netdevice.h>
 #include <linux/ip.h>
 #include <linux/udp.h>
 #include <linux/in.h>
 #include <linux/if_arp.h>
 #include <linux/kthread.h>
 #include <linux/wait.h>
+#include <linux/netdevice.h>
 #include <net/ip.h>
 
 #include "tuxonice.h"
 #include "tuxonice_modules.h"
 #include "tuxonice_sysfs.h"
+#include "tuxonice_alloc.h"
 #include "tuxonice_io.h"
 
 #if 1
@@ -235,7 +236,7 @@ static char toi_cluster_iface[IFNAMSIZ] = CONFIG_TOI_DEFAULT_CLUSTER_INTERFACE;
 
 static int added_pack;
 
-static int others_have_image, num_others;
+static int others_have_image;
 
 /* Key used to allow multiple clusters on the same lan */
 static char toi_cluster_key[32] = CONFIG_TOI_DEFAULT_CLUSTER_KEY;
@@ -388,7 +389,7 @@ static int toi_recv(struct sk_buff *skb, struct net_device *dev,
 	if (dev != net_dev)
 		goto drop;
 
-	skb = skb_share_check(skb, GFP_ATOMIC));
+	skb = skb_share_check(skb, GFP_ATOMIC);
 	if (!skb)
 		return NET_RX_DROP;
 
@@ -560,8 +561,7 @@ static void toi_send_if(int message, unsigned long my_id)
 	/* Chain packet down the line... */
 	skb->dev = net_dev;
 	skb->protocol = htons(ETH_P_IP);
-	if ((net_dev->hard_header &&
-	     net_dev->hard_header(skb, net_dev, ntohs(skb->protocol),
+	if ((dev_hard_header(skb, net_dev, ntohs(skb->protocol),
 		     net_dev->broadcast, net_dev->dev_addr, skb->len) < 0) ||
 			dev_queue_xmit(skb) < 0)
 		printk(KERN_INFO "E");
@@ -893,8 +893,8 @@ static int toi_cluster_open_iface(void)
 
 	rtnl_lock();
 
-	for_each_netdev(dev) {
-		if (/* dev == &loopback_dev || */
+	for_each_netdev(&init_net, dev) {
+		if (/* dev == &init_net.loopback_dev || */
 		    strcmp(dev->name, toi_cluster_iface))
 			continue;
 
@@ -913,7 +913,7 @@ static int toi_cluster_open_iface(void)
 	dev_add_pack(&toi_cluster_packet_type);
 	added_pack = 1;
 
-	loopback_mode = (net_dev == &loopback_dev);
+	loopback_mode = (net_dev == init_net.loopback_dev);
 	num_local_nodes = loopback_mode ? 8 : 1;
 
 	PRINTK("Loopback mode is %s. Number of local nodes is %d.\n",
@@ -1032,14 +1032,16 @@ INIT int toi_cluster_init(void)
 		spin_lock_init(&node_array[i].receive_lock);
 
 		/* Set up sysfs entry */
-		node_array[i].sysfs_data.attr.name = toi_kzalloc(8, GFP_KERNEL);
+		node_array[i].sysfs_data.attr.name = toi_kzalloc(8,
+				sizeof(node_array[i].sysfs_data.attr.name),
+				GFP_KERNEL);
 		sprintf((char *) node_array[i].sysfs_data.attr.name, "node_%d",
 				i);
 		node_array[i].sysfs_data.attr.mode = SYSFS_RW;
 		node_array[i].sysfs_data.type = TOI_SYSFS_DATA_INTEGER;
 		node_array[i].sysfs_data.flags = 0;
 		node_array[i].sysfs_data.data.integer.variable =
-			&node_array[i].current_message;
+			(int *) &node_array[i].current_message;
 		node_array[i].sysfs_data.data.integer.minimum = 0;
 		node_array[i].sysfs_data.data.integer.maximum = INT_MAX;
 		node_array[i].sysfs_data.write_side_effect =

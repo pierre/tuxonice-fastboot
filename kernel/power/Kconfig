@@ -306,7 +306,7 @@ menuconfig TOI_CORE
 	menuconfig TOI_CLUSTER
 		tristate "Cluster support"
 		default n
-		depends on TOI_CORE && NET
+		depends on TOI_CORE && NET && BROKEN
 		---help---
 		  Support for linking multiple machines in a cluster so that they suspend
 		  and resume together.
