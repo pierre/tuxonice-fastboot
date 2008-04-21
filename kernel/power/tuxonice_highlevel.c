@@ -1144,7 +1144,7 @@ int toi_launch_userspace_program(char *command, int channel_no,
  */
 static struct toi_sysfs_data sysfs_params[] = {
 	{ TOI_ATTR("extra_pages_allowance", SYSFS_RW),
-	  SYSFS_INT(&extra_pd1_pages_allowance, MIN_EXTRA_PAGES_ALLOWANCE,
+	  SYSFS_INT(&extra_pd1_pages_allowance, 0,
 			  INT_MAX, 0)
 	},
 
