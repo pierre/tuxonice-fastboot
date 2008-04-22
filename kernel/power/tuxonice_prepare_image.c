@@ -823,6 +823,8 @@ static void update_image(void)
 	 * don't complain if we can't get the full amount we're after.
 	 */
 
+	storage_available = toiActiveAllocator->storage_available();
+
 	header_space_allocated = header_storage_needed();
 
 	toiActiveAllocator->reserve_header_space(header_space_allocated);
