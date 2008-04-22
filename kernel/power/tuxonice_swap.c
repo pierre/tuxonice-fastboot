@@ -79,10 +79,10 @@ static char swapfilename[32] = "";
 static int toi_swapon_status;
 
 /* Header Page Information */
-static int header_pages_reserved;
+static long header_pages_reserved;
 
 /* Swap Pages */
-static int swap_pages_allocated;
+static long swap_pages_allocated;
 
 /* User Specified Parameters. */
 
@@ -441,7 +441,7 @@ static int write_modified_signature(int modification)
 
 static void toi_swap_reserve_header_space(int request)
 {
-	header_pages_reserved = request;
+	header_pages_reserved = (long) request;
 }
 
 static void free_block_chains(void)
@@ -521,23 +521,31 @@ static int get_main_pool_phys_params(void)
 	return 0;
 }
 
-static int toi_swap_storage_allocated(void)
+static long raw_to_real(long raw)
 {
-	return swap_pages_allocated;
+	long result;
+
+	result = raw - (raw * (sizeof(unsigned long) + sizeof(int)) +
+		(PAGE_SIZE + sizeof(unsigned long) + sizeof(int) + 1)) /
+		(PAGE_SIZE + sizeof(unsigned long) + sizeof(int));
+
+	return result < 0 ? 0 : result;
 }
 
+static int toi_swap_storage_allocated(void)
+{
+	return (int) raw_to_real(swap_pages_allocated - header_pages_reserved);
+}
+
+/*
+ * We can't just remember the value from allocation time, because other
+ * processes might have allocated swap in the mean time.
+ */
 static int toi_swap_storage_available(void)
 {
-	int diff;
-
 	si_swapinfo(&swapinfo);
-	diff = (((int) swapinfo.freeswap + swap_pages_allocated) *
-			(sizeof(unsigned long) + sizeof(int)) /
-		(PAGE_SIZE + sizeof(unsigned long) + sizeof(int))) + 1;
-	if (swapinfo.freeswap)
-		return (int) swapinfo.freeswap + swap_pages_allocated - diff;
-	else
-		return 0;
+	return (int) raw_to_real((long) swapinfo.freeswap +
+			swap_pages_allocated - header_pages_reserved);
 }
 
 static int toi_swap_initialise(int starting_cycle)
@@ -690,7 +698,7 @@ static int toi_swap_allocate_storage(int request)
 	if (gotten < pages_to_get)
 		result = -ENOSPC;
 
-	swap_pages_allocated += gotten;
+	swap_pages_allocated += (long) gotten;
 
 	return result ? result : get_main_pool_phys_params();
 }
