@@ -362,7 +362,7 @@ long real_nr_free_pages(unsigned long zone_idx_mask)
  */
 static void get_extra_pd1_allowance(void)
 {
-	int orig_num_free = real_nr_free_pages(all_zones_mask), final;
+	long orig_num_free = real_nr_free_pages(all_zones_mask), final;
 
 	toi_prepare_status(CLEAR_BAR, "Finding allowance for drivers.");
 
