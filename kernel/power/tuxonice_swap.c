@@ -453,6 +453,22 @@ static void free_block_chains(void)
 			toi_put_extent_chain(&block_chain[i]);
 }
 
+static int add_blocks_to_extent_chain(int chain, int minimum, int maximum)
+{
+	if (test_action_state(TOI_TEST_BIO))
+		printk(KERN_INFO "Adding extent chain %d %d-%d.\n", chain,
+				minimum << devinfo[chain].bmap_shift,
+				maximum << devinfo[chain].bmap_shift);
+
+	if (toi_add_to_extent_chain(&block_chain[chain], minimum, maximum)) {
+		free_block_chains();
+		return -ENOMEM;
+	}
+
+	return 0;
+}
+
+
 static int get_main_pool_phys_params(void)
 {
 	struct extent *extentpointer = NULL;
@@ -475,42 +491,17 @@ static int get_main_pool_phys_params(void)
 			continue;
 		}
 
-		if (extent_min > -1) {
-			if (test_action_state(TOI_TEST_BIO))
-				printk(KERN_INFO
-					"Adding extent chain %d %d-%d.\n",
-					swapfilenum,
-					extent_min <<
-					 devinfo[last_chain].bmap_shift,
-					extent_max <<
-					 devinfo[last_chain].bmap_shift);
+		if (extent_min > -1 && add_blocks_to_extent_chain(swapfilenum,
+					extent_min, extent_max))
+			return -ENOMEM;
 
-			if (toi_add_to_extent_chain(
-				&block_chain[last_chain],
-				extent_min, extent_max)) {
-				free_block_chains();
-				return -ENOMEM;
-			}
-		}
 		extent_min = extent_max = new_sector;
 		last_chain = swapfilenum;
 	}
 
-	if (extent_min > -1) {
-		if (test_action_state(TOI_TEST_BIO))
-			printk(KERN_INFO "Adding extent chain %d %d-%d.\n",
-				last_chain,
-				extent_min <<
-					devinfo[last_chain].bmap_shift,
-				extent_max <<
-					devinfo[last_chain].bmap_shift);
-		if (toi_add_to_extent_chain(
-			&block_chain[last_chain],
-			extent_min, extent_max)) {
-			free_block_chains();
+	if (extent_min > -1 && add_blocks_to_extent_chain(last_chain,
+				extent_min, extent_max))
 			return -ENOMEM;
-		}
-	}
 
 	/* Apply header reservation */
 	toi_extent_state_goto_start(&toi_writer_posn);
