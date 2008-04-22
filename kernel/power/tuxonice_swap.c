@@ -439,36 +439,9 @@ static int write_modified_signature(int modification)
 	return result;
 }
 
-static int toi_swap_allocate_storage(int main_storage_requested);
-
-static int toi_swap_reserve_header_space(int request)
+static void toi_swap_reserve_header_space(int request)
 {
-	int i;
-
-	if (!swap_pages_allocated && toi_swap_allocate_storage(request)){
-		printk("Failed to allocate space for the header.\n");
-		return -ENOSPC;
-	}
-
-	toi_extent_state_goto_start(&toi_writer_posn);
-	toi_bio_ops.forward_one_page(1); /* To first page */
-
-	for (i = 0; i < request; i++) {
-		if (toi_bio_ops.forward_one_page(1)) {
-			printk(KERN_INFO "Out of space while seeking to "
-					"allocate header pages,\n");
-			header_pages_reserved = i;
-			return -ENOSPC;
-		}
-
-	}
-
 	header_pages_reserved = request;
-
-	/* The end of header pages will be the start of pageset 2;
-	 * we are now sitting on the first pageset2 page. */
-	toi_extent_state_save(&toi_writer_posn, &toi_writer_posn_save[2]);
-	return 0;
 }
 
 static void free_block_chains(void)
@@ -484,7 +457,7 @@ static int get_main_pool_phys_params(void)
 {
 	struct extent *extentpointer = NULL;
 	unsigned long address;
-	int extent_min = -1, extent_max = -1, last_chain = -1;
+	int extent_min = -1, extent_max = -1, last_chain = -1, i;
 
 	free_block_chains();
 
@@ -539,7 +512,22 @@ static int get_main_pool_phys_params(void)
 		}
 	}
 
-	return toi_swap_reserve_header_space(header_pages_reserved);
+	/* Apply header reservation */
+	toi_extent_state_goto_start(&toi_writer_posn);
+	toi_bio_ops.forward_one_page(1); /* To first page */
+
+	for (i = 0; i < header_pages_reserved; i++) {
+		if (toi_bio_ops.forward_one_page(1)) {
+			printk(KERN_INFO "Out of space while seeking to "
+					"allocate header pages,\n");
+			return -ENOSPC;
+		}
+	}
+
+	/* The end of header pages will be the start of pageset 2;
+	 * we are now sitting on the first pageset2 page. */
+	toi_extent_state_save(&toi_writer_posn, &toi_writer_posn_save[2]);
+	return 0;
 }
 
 static int toi_swap_storage_allocated(void)
@@ -1237,7 +1225,7 @@ static struct toi_module_ops toi_swapops = {
 	.storage_available 	= toi_swap_storage_available,
 	.storage_allocated	= toi_swap_storage_allocated,
 	.release_storage	= toi_swap_release_storage,
-	.allocate_header_space	= toi_swap_reserve_header_space,
+	.reserve_header_space	= toi_swap_reserve_header_space,
 	.allocate_storage	= toi_swap_allocate_storage,
 	.image_exists		= toi_swap_image_exists,
 	.mark_resume_attempted	= toi_swap_mark_resume_attempted,

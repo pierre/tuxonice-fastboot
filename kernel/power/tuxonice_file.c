@@ -79,7 +79,7 @@ struct toi_file_header {
 };
 
 /* Header Page Information */
-static int header_pages_allocated;
+static int header_pages_reserved;
 
 /* Main Storage Pages */
 static int main_pages_allocated, main_pages_requested;
@@ -191,8 +191,7 @@ static void __populate_block_list(int min, int max)
 
 static void populate_block_list(void)
 {
-	int i;
-	int extent_min = -1, extent_max = -1, got_header = 0;
+	int i, extent_min = -1, extent_max = -1, got_header = 0;
 
 	if (block_chain.first)
 		toi_put_extent_chain(&block_chain);
@@ -243,6 +242,21 @@ static void populate_block_list(void)
 
 	if (extent_min > -1)
 		__populate_block_list(extent_min, extent_max);
+
+	/* Apply header space reservation */
+	toi_extent_state_goto_start(&toi_writer_posn);
+	toi_bio_ops.forward_one_page(1); /* To first page */
+
+	for (i = 0; i < header_pages_reserved; i++) {
+		if (toi_bio_ops.forward_one_page(1)) {
+			printk(KERN_INFO "Out of space while seeking to "
+					"reserve header pages,\n");
+			return;
+		}
+	}
+
+	/* The end of header pages will be the start of pageset 2 */
+	toi_extent_state_save(&toi_writer_posn, &toi_writer_posn_save[2]);
 }
 
 static void toi_file_cleanup(int finishing_cycle)
@@ -423,7 +437,7 @@ static int toi_file_storage_allocated(void)
 	if (target_is_normal_file())
 		return (int) target_storage_available;
 	else
-		return header_pages_allocated + main_pages_requested;
+		return main_pages_requested;
 }
 
 static int toi_file_release_storage(void)
@@ -434,64 +448,25 @@ static int toi_file_release_storage(void)
 
 	toi_put_extent_chain(&block_chain);
 
-	header_pages_allocated = 0;
+	header_pages_reserved = 0;
 	main_pages_allocated = 0;
 	main_pages_requested = 0;
 	return 0;
 }
 
-static int __toi_file_allocate_storage(int main_storage_requested,
-		int header_storage);
-
-static int toi_file_allocate_header_space(int space_requested)
+static void toi_file_reserve_header_space(int request)
 {
-	int i;
-
-	if (!block_chain.first && __toi_file_allocate_storage(
-				main_pages_requested, space_requested)) {
-		printk("Failed to allocate space for the header.\n");
-		return -ENOSPC;
-	}
-
-	toi_extent_state_goto_start(&toi_writer_posn);
-	toi_bio_ops.forward_one_page(1); /* To first page */
-
-	for (i = 0; i < space_requested; i++) {
-		if (toi_bio_ops.forward_one_page(1)) {
-			printk(KERN_INFO "Out of space while seeking to "
-					"allocate header pages,\n");
-			header_pages_allocated = i;
-			return -ENOSPC;
-		}
-	}
-
-	header_pages_allocated = space_requested;
-
-	/* The end of header pages will be the start of pageset 2 */
-	toi_extent_state_save(&toi_writer_posn,
-			&toi_writer_posn_save[2]);
-	return 0;
+	header_pages_reserved = request;
 }
 
-static int toi_file_allocate_storage(int space_requested)
-{
-	if (__toi_file_allocate_storage(space_requested,
-				header_pages_allocated))
-		return -ENOSPC;
-
-	main_pages_requested = space_requested;
-	return -ENOSPC;
-}
-
-static int __toi_file_allocate_storage(int main_space_requested,
-		int header_space_requested)
+static int toi_file_allocate_storage(int main_space_requested)
 {
 	int result = 0;
 
 	int extra_pages = DIV_ROUND_UP(main_space_requested *
 			(sizeof(unsigned long) + sizeof(int)), PAGE_SIZE);
 	int pages_to_get = main_space_requested + extra_pages +
-		header_space_requested;
+		header_pages_reserved;
 	int blocks_to_get = pages_to_get - block_chain.size;
 
 	/* Only release_storage reduces the size */
@@ -507,15 +482,13 @@ static int __toi_file_allocate_storage(int main_space_requested,
 	if (block_chain.size < pages_to_get) {
 		printk("Block chain size (%d) < header pages (%d) + extra "
 			"pages (%d) + main pages (%d) (=%d pages).\n",
-			block_chain.size, header_pages_allocated, extra_pages,
+			block_chain.size, header_pages_reserved, extra_pages,
 			main_space_requested, pages_to_get);
 		result = -ENOSPC;
 	}
 
 	main_pages_requested = main_space_requested;
 	main_pages_allocated = main_space_requested + extra_pages;
-
-	toi_file_allocate_header_space(header_pages_allocated);
 	return result;
 }
 
@@ -1085,7 +1058,7 @@ static struct toi_module_ops toi_fileops = {
 	.storage_available 	= toi_file_storage_available,
 	.storage_allocated	= toi_file_storage_allocated,
 	.release_storage	= toi_file_release_storage,
-	.allocate_header_space	= toi_file_allocate_header_space,
+	.reserve_header_space	= toi_file_reserve_header_space,
 	.allocate_storage	= toi_file_allocate_storage,
 	.image_exists		= toi_file_image_exists,
 	.mark_resume_attempted	= toi_file_mark_resume_attempted,

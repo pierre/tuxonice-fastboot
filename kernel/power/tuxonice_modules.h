@@ -90,7 +90,7 @@ struct toi_module_ops {
 	 */
 
 	int (*storage_available) (void);
-	int (*allocate_header_space) (int space_requested);
+	void (*reserve_header_space) (int space_requested);
 	int (*allocate_storage) (int space_requested);
 	int (*storage_allocated) (void);
 	int (*release_storage) (void);

@@ -792,7 +792,8 @@ void toi_recalculate_image_contents(int atomic_copy)
  */
 static void update_image(void)
 {
-	int result, param_used, wanted, got;
+	int wanted, got;
+	long seek;
 
 	toi_recalculate_image_contents(0);
 
@@ -822,20 +823,15 @@ static void update_image(void)
 	 * don't complain if we can't get the full amount we're after.
 	 */
 
-	toiActiveAllocator->allocate_storage(
-		min(storage_available, main_storage_needed(0, 0)));
+	header_space_allocated = header_storage_needed();
+
+	toiActiveAllocator->reserve_header_space(header_space_allocated);
+
+	seek = min(storage_available, main_storage_needed(0, 0));
+
+	toiActiveAllocator->allocate_storage(seek);
 
 	main_storage_allocated = toiActiveAllocator->storage_allocated();
-
-	param_used = header_storage_needed();
-
-	result = toiActiveAllocator->allocate_header_space(param_used);
-
-	if (result)
-		toi_message(TOI_EAT_MEMORY, TOI_LOW, 1,
-			"Still need to get more storage space for header.\n");
-	else
-		header_space_allocated = param_used;
 
 	if (freeze_processes())
 		set_abort_result(TOI_FREEZING_FAILED);
