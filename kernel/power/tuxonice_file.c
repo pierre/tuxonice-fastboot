@@ -184,29 +184,28 @@ static int size_ignoring_ignored_pages(void)
 	return mappable;
 }
 
-static void __populate_block_list(int min, int max)
+static int __populate_block_list(int min, int max)
 {
 	if (test_action_state(TOI_TEST_BIO))
 		printk(KERN_INFO "Adding extent %d-%d.\n",
 			min << devinfo.bmap_shift,
 			((max + 1) << devinfo.bmap_shift) - 1);
 
-	toi_add_to_extent_chain(&block_chain, min, max);
+	return toi_add_to_extent_chain(&block_chain, min, max);
 }
 
-static void populate_block_list(void)
+static int populate_block_list(void)
 {
-	int i, extent_min = -1, extent_max = -1, got_header = 0;
+	int i, extent_min = -1, extent_max = -1, got_header = 0, result = 0;
 
 	if (block_chain.first)
 		toi_put_extent_chain(&block_chain);
 
 	if (!target_is_normal_file()) {
-		if (target_storage_available > 0)
+		return (target_storage_available > 0) ?
 			__populate_block_list(devinfo.blocks_per_page,
 				(target_storage_available + 1) *
-				devinfo.blocks_per_page - 1);
-		return;
+				devinfo.blocks_per_page - 1) : 0;
 	}
 
 	for (i = 0; i < (target_inode->i_size >> PAGE_SHIFT); i++) {
@@ -235,9 +234,12 @@ static void populate_block_list(void)
 		if (new_sector == extent_max + 1)
 			extent_max += devinfo.blocks_per_page;
 		else {
-			if (extent_min > -1)
-				__populate_block_list(extent_min,
+			if (extent_min > -1) {
+				result = __populate_block_list(extent_min,
 						extent_max);
+				if (result)
+					return result;
+			}
 
 			extent_min = new_sector;
 			extent_max = extent_min +
@@ -245,8 +247,11 @@ static void populate_block_list(void)
 		}
 	}
 
-	if (extent_min > -1)
-		__populate_block_list(extent_min, extent_max);
+	if (extent_min > -1) {
+		result = __populate_block_list(extent_min, extent_max);
+		if (result)
+			return result;
+	}
 
 	/* Apply header space reservation */
 	toi_extent_state_goto_start(&toi_writer_posn);
@@ -256,12 +261,14 @@ static void populate_block_list(void)
 		if (toi_bio_ops.forward_one_page(1)) {
 			printk(KERN_INFO "Out of space while seeking to "
 					"reserve header pages,\n");
-			return;
+			return -ENOSPC;
 		}
 	}
 
 	/* The end of header pages will be the start of pageset 2 */
 	toi_extent_state_save(&toi_writer_posn, &toi_writer_posn_save[2]);
+
+	return 0;
 }
 
 static void toi_file_cleanup(int finishing_cycle)
@@ -478,7 +485,10 @@ static int toi_file_allocate_storage(int main_space_requested)
 	if (blocks_to_get < 1)
 		return 0;
 
-	populate_block_list();
+	result = populate_block_list();
+
+	if (result)
+		return result;
 
 	toi_message(TOI_WRITER, TOI_MEDIUM, 0,
 		"Finished with block_chain.size == %d.\n",
