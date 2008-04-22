@@ -110,10 +110,15 @@ static void set_devinfo(struct block_device *bdev, int target_blkbits)
 	}
 }
 
-static int adjust_for_extra_pages(int unadjusted)
+static long raw_to_real(long raw)
 {
-	return (unadjusted << PAGE_SHIFT) / (PAGE_SIZE + sizeof(unsigned long)
-			+ sizeof(int));
+	long result;
+
+	result = raw - (raw * (sizeof(unsigned long) + sizeof(int)) +
+		(PAGE_SIZE + sizeof(unsigned long) + sizeof(int) + 1)) /
+		(PAGE_SIZE + sizeof(unsigned long) + sizeof(int));
+
+	return result < 0 ? 0 : result;
 }
 
 static int toi_file_storage_available(void)
@@ -144,7 +149,7 @@ static int toi_file_storage_available(void)
 			bdev->bd_disk->capacity) >> (PAGE_SHIFT - 9);
 	}
 
-	return adjust_for_extra_pages(result);
+	return raw_to_real(result);
 }
 
 static int has_contiguous_blocks(int page_num)
@@ -435,9 +440,9 @@ static int toi_file_storage_allocated(void)
 		return 0;
 
 	if (target_is_normal_file())
-		return (int) target_storage_available;
+		return (int) raw_to_real(target_storage_available);
 	else
-		return main_pages_requested;
+		return (int) raw_to_real(main_pages_requested);
 }
 
 static int toi_file_release_storage(void)
