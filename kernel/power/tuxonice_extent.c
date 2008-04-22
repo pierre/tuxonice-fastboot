@@ -100,7 +100,7 @@ int toi_add_to_extent_chain(struct extent_chain *chain,
 	if (!new_extent) {
 		printk(KERN_INFO "Error unable to append a new extent to the "
 				"chain.\n");
-		return 2;
+		return -ENOMEM;
 	}
 
 	chain->num_extents++;
