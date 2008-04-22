@@ -27,7 +27,7 @@
 #include "tuxonice_atomic_copy.h"
 #include "tuxonice_alloc.h"
 
-int extra_pd1_pages_used;
+long extra_pd1_pages_used;
 
 /**
  * free_pbe_list: Free page backup entries used by the atomic copy code.
@@ -194,7 +194,7 @@ void toi_copy_pageset1(void)
 
 int __toi_post_context_save(void)
 {
-	int old_ps1_size = pagedir1.size;
+	long old_ps1_size = pagedir1.size;
 
 	check_checksums();
 
@@ -205,8 +205,8 @@ int __toi_post_context_save(void)
 	extra_pd1_pages_used = pagedir1.size - old_ps1_size;
 
 	if (extra_pd1_pages_used > extra_pd1_pages_allowance) {
-		printk(KERN_INFO "Pageset1 has grown by %d pages. "
-			"extra_pages_allowance is currently only %d.\n",
+		printk(KERN_INFO "Pageset1 has grown by %ld pages. "
+			"extra_pages_allowance is currently only %lu.\n",
 			pagedir1.size - old_ps1_size,
 			extra_pd1_pages_allowance);
 		set_abort_result(TOI_EXTRA_PAGES_ALLOW_TOO_SMALL);

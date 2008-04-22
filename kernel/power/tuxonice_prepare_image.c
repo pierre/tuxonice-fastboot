@@ -39,9 +39,9 @@
 #include "tuxonice_sysfs.h"
 #include "tuxonice_alloc.h"
 
-static int num_nosave, header_space_allocated, main_storage_allocated,
+static long num_nosave, header_space_allocated, main_storage_allocated,
 	   storage_available;
-int extra_pd1_pages_allowance = DEFAULT_EXTRA_PAGES_ALLOWANCE;
+long extra_pd1_pages_allowance = DEFAULT_EXTRA_PAGES_ALLOWANCE;
 int image_size_limit;
 
 struct attention_list {
@@ -227,7 +227,7 @@ static void toi_mark_pages_for_pageset2(void)
  * the allocation and freeing of that memory.
  */
 
-static int extra_pages_allocated;
+static long extra_pages_allocated;
 
 struct extras {
 	struct page *page;
@@ -331,7 +331,7 @@ static int toi_allocate_extra_pagedir_memory(int extra_pages_needed)
  * real_nr_free_pages: Count pcp pages for a zone type or all zones
  * (-1 for all, otherwise zone_idx() result desired).
  */
-int real_nr_free_pages(unsigned long zone_idx_mask)
+long real_nr_free_pages(unsigned long zone_idx_mask)
 {
 	struct zone *zone;
 	int result = 0, cpu;
@@ -380,7 +380,7 @@ static void get_extra_pd1_allowance(void)
 
 	extra_pd1_pages_allowance = max(
 		orig_num_free - final + DEFAULT_EXTRA_PAGES_ALLOWANCE,
-		DEFAULT_EXTRA_PAGES_ALLOWANCE);
+		(long) DEFAULT_EXTRA_PAGES_ALLOWANCE);
 }
 
 /*
@@ -388,7 +388,7 @@ static void get_extra_pd1_allowance(void)
  * expected compression ratio and possibly also ignoring our
  * allowance for extra pages.
  */
-static int main_storage_needed(int use_ecr,
+static long main_storage_needed(int use_ecr,
 		int ignore_extra_pd1_allow)
 {
 	return ((pagedir1.size + pagedir2.size +
@@ -399,9 +399,9 @@ static int main_storage_needed(int use_ecr,
 /*
  * Storage needed for the image header, in bytes until the return.
  */
-static int header_storage_needed(void)
+static long header_storage_needed(void)
 {
-	int bytes = (int) sizeof(struct toi_header) +
+	long bytes = (int) sizeof(struct toi_header) +
 			toi_header_storage_for_modules() +
 			toi_pageflags_space_needed();
 
@@ -427,43 +427,43 @@ static int header_storage_needed(void)
  * => any_to_free function
  */
 
-static int highpages_ps1_to_free(void)
+static long highpages_ps1_to_free(void)
 {
-	return max_t(int, 0, DIV_ROUND_UP(get_highmem_size(pagedir1) -
+	return max_t(long, 0, DIV_ROUND_UP(get_highmem_size(pagedir1) -
 		get_highmem_size(pagedir2), 2) - real_nr_free_high_pages());
 }
 
-static int lowpages_ps1_to_free(void)
+static long lowpages_ps1_to_free(void)
 {
-	return max_t(int, 0, DIV_ROUND_UP(get_lowmem_size(pagedir1) +
+	return max_t(long, 0, DIV_ROUND_UP(get_lowmem_size(pagedir1) +
 		extra_pd1_pages_allowance + MIN_FREE_RAM +
 		toi_memory_for_modules(0) - get_lowmem_size(pagedir2) -
 		real_nr_free_low_pages() - extra_pages_allocated, 2));
 }
 
-static int current_image_size(void)
+static long current_image_size(void)
 {
 	return pagedir1.size + pagedir2.size + header_space_allocated;
 }
 
-static int storage_still_required(void)
+static long storage_still_required(void)
 {
-	return max_t(int, 0, main_storage_needed(1, 1) - storage_available);
+	return max_t(long, 0, main_storage_needed(1, 1) - storage_available);
 }
 
-static int ram_still_required(void)
+static long ram_still_required(void)
 {
-	return max_t(int, 0, MIN_FREE_RAM + toi_memory_for_modules(0) -
+	return max_t(long, 0, MIN_FREE_RAM + toi_memory_for_modules(0) -
 		real_nr_free_low_pages() + 2 * extra_pd1_pages_allowance);
 }
 
-static int any_to_free(int use_image_size_limit)
+static long any_to_free(int use_image_size_limit)
 {
-	int user_limit = (use_image_size_limit && image_size_limit > 0) ?
-		max_t(int, 0, current_image_size() - (image_size_limit << 8))
+	long user_limit = (use_image_size_limit && image_size_limit > 0) ?
+		max_t(long, 0, current_image_size() - (image_size_limit << 8))
 		: 0;
 
-	int storage_limit = storage_still_required(),
+	long storage_limit = storage_still_required(),
 	    ram_limit = ram_still_required();
 
 	return max(max(user_limit, storage_limit), ram_limit);
@@ -474,17 +474,17 @@ static int any_to_free(int use_image_size_limit)
  * Calculates the amount by which the image size needs to be reduced to meet
  * our constraints.
  */
-static int amount_needed(int use_image_size_limit)
+static long amount_needed(int use_image_size_limit)
 {
 	return max(highpages_ps1_to_free() + lowpages_ps1_to_free(),
 			any_to_free(use_image_size_limit));
 }
 
-static int image_not_ready(int use_image_size_limit)
+static long image_not_ready(int use_image_size_limit)
 {
 	toi_message(TOI_EAT_MEMORY, TOI_LOW, 1,
-		"Amount still needed (%d) > 0:%d. Header: %d < %d: %d,"
-		" Storage allocd: %d < %d: %d.\n",
+		"Amount still needed (%ld) > 0:%d. Header: %ld < %ld: %d,"
+		" Storage allocd: %ld < %ld: %d.\n",
 			amount_needed(use_image_size_limit),
 			(amount_needed(use_image_size_limit) > 0),
 			header_space_allocated, header_storage_needed(),
@@ -502,7 +502,7 @@ static int image_not_ready(int use_image_size_limit)
 
 static void display_failure_reason(int tries_exceeded)
 {
-	int storage_required = storage_still_required(),
+	long storage_required = storage_still_required(),
 	    ram_required = ram_still_required(),
 	    high_ps1 = highpages_ps1_to_free(),
 	    low_ps1 = lowpages_ps1_to_free();
@@ -522,31 +522,31 @@ static void display_failure_reason(int tries_exceeded)
 
 	if (header_space_allocated < header_storage_needed()) {
 		printk(KERN_INFO "- Insufficient header storage allocated. "
-				"Need %d, have %d.\n", header_storage_needed(),
+				"Need %ld, have %ld.\n", header_storage_needed(),
 				header_space_allocated);
 		set_abort_result(TOI_INSUFFICIENT_STORAGE);
 	}
 
 	if (storage_required) {
-		printk(KERN_INFO " - We need at least %d pages of storage "
-				"(ignoring the header), but only have %d.\n",
+		printk(KERN_INFO " - We need at least %ld pages of storage "
+				"(ignoring the header), but only have %ld.\n",
 				main_storage_needed(1, 1),
 				main_storage_allocated);
 		set_abort_result(TOI_INSUFFICIENT_STORAGE);
 	}
 
 	if (ram_required) {
-		printk(KERN_INFO " - We need %d more free pages of low "
+		printk(KERN_INFO " - We need %ld more free pages of low "
 				"memory.\n", ram_required);
 		printk(KERN_INFO "     Minimum free     : %8d\n", MIN_FREE_RAM);
-		printk(KERN_INFO "   + Reqd. by modules : %8d\n",
+		printk(KERN_INFO "   + Reqd. by modules : %8ld\n",
 				toi_memory_for_modules(0));
-		printk(KERN_INFO "   - Currently free   : %8d\n",
+		printk(KERN_INFO "   - Currently free   : %8ld\n",
 				real_nr_free_low_pages());
-		printk(KERN_INFO "   + 2 * extra allow  : %8d\n",
+		printk(KERN_INFO "   + 2 * extra allow  : %8ld\n",
 				2 * extra_pd1_pages_allowance);
 		printk(KERN_INFO "                      : ========\n");
-		printk(KERN_INFO "     Still needed     : %8d\n", ram_required);
+		printk(KERN_INFO "     Still needed     : %8ld\n", ram_required);
 
 		/* Print breakdown of memory needed for modules */
 		toi_memory_for_modules(1);
@@ -554,13 +554,13 @@ static void display_failure_reason(int tries_exceeded)
 	}
 
 	if (high_ps1) {
-		printk(KERN_INFO "- We need to free %d highmem pageset 1 "
+		printk(KERN_INFO "- We need to free %ld highmem pageset 1 "
 				"pages.\n", high_ps1);
 		set_abort_result(TOI_UNABLE_TO_FREE_ENOUGH_MEMORY);
 	}
 
 	if (low_ps1) {
-		printk(KERN_INFO " - We need to free %d lowmem pageset 1 "
+		printk(KERN_INFO " - We need to free %ld lowmem pageset 1 "
 				"pages.\n", low_ps1);
 		set_abort_result(TOI_UNABLE_TO_FREE_ENOUGH_MEMORY);
 	}
@@ -570,8 +570,9 @@ static void display_stats(int always, int sub_extra_pd1_allow)
 {
 	char buffer[255];
 	snprintf(buffer, 254,
-		"Free:%d(%d). Sets:%d(%d),%d(%d). Header:%d/%d. Nosave:%d-%d"
-		"=%d. Storage:%u/%u(%u=>%u). Needed:%d,%d,%d(%d,%d,%d,%d)\n",
+		"Free:%ld(%ld). Sets:%ld(%ld),%ld(%ld). Header:%ld/%ld. "
+		"Nosave:%ld-%ld=%ld. Storage:%lu/%lu(%lu=>%lu). "
+		"Needed:%ld,%ld,%ld(%d,%ld,%ld,%ld)\n",
 
 		/* Free */
 		real_nr_free_pages(all_zones_mask),
@@ -598,7 +599,7 @@ static void display_stats(int always, int sub_extra_pd1_allow)
 		lowpages_ps1_to_free(), highpages_ps1_to_free(),
 		any_to_free(1),
 		MIN_FREE_RAM, toi_memory_for_modules(0),
-		extra_pd1_pages_allowance, image_size_limit << 8);
+		extra_pd1_pages_allowance, ((long) image_size_limit) << 8);
 
 	if (always)
 		printk(buffer);
@@ -761,7 +762,7 @@ static void flag_image_pages(int atomic_copy)
 		return;
 
 	toi_message(TOI_EAT_MEMORY, TOI_MEDIUM, 0,
-		"Count data pages: Set1 (%d) + Set2 (%d) + Nosave (%d) + "
+		"Count data pages: Set1 (%d) + Set2 (%d) + Nosave (%ld) + "
 		"NumFree (%d) = %d.\n",
 		pagedir1.size, pagedir2.size, num_nosave, num_free,
 		pagedir1.size + pagedir2.size + num_nosave + num_free);
@@ -878,7 +879,7 @@ static int attempt_to_freeze(void)
  */
 static void eat_memory(void)
 {
-	int amount_wanted = 0;
+	long amount_wanted = 0;
 	int did_eat_memory = 0;
 
 	/*
@@ -918,13 +919,13 @@ static void eat_memory(void)
 		int zone_idx;
 
 		toi_prepare_status(CLEAR_BAR,
-				"Seeking to free %dMB of memory.",
+				"Seeking to free %ldMB of memory.",
 				MB(amount_wanted));
 
 		thaw_kernel_threads();
 
 		for (zone_idx = 0; zone_idx < MAX_NR_ZONES; zone_idx++) {
-			unsigned long zone_type_free = max_t(int,
+			unsigned long zone_type_free = max_t(long,
 					(zone_idx == ZONE_HIGHMEM) ?
 					highpages_ps1_to_free() :
 					lowpages_ps1_to_free(), amount_wanted);
@@ -943,7 +944,7 @@ static void eat_memory(void)
 				toi_recalculate_image_contents(0);
 
 				amount_wanted = amount_needed(1);
-				zone_type_free = max_t(int,
+				zone_type_free = max_t(long,
 					(zone_idx == ZONE_HIGHMEM) ?
 					highpages_ps1_to_free() :
 					lowpages_ps1_to_free(), amount_wanted);
@@ -1002,6 +1003,8 @@ int toi_prepare_image(void)
 	storage_available = toiActiveAllocator->storage_available();
 
 	if (!storage_available) {
+		printk(KERN_INFO "No storage available. Didn't try to prepare "
+				"an image.\n");
 		display_failure_reason(0);
 		set_abort_result(TOI_NOSTORAGE_AVAILABLE);
 		return 1;

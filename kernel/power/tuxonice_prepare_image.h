@@ -11,10 +11,10 @@
 
 extern int toi_prepare_image(void);
 extern void toi_recalculate_image_contents(int storage_available);
-extern int real_nr_free_pages(unsigned long zone_idx_mask);
+extern long real_nr_free_pages(unsigned long zone_idx_mask);
 extern int image_size_limit;
 extern void toi_free_extra_pagedir_memory(void);
-extern int extra_pd1_pages_allowance;
+extern long extra_pd1_pages_allowance;
 extern void free_attention_list(void);
 
 #define MIN_FREE_RAM 100

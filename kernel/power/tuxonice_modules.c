@@ -28,7 +28,7 @@ int toiNumAllocators, toi_num_modules;
  * kernel. We can exclude data for pageset2 because it will be
  * available anyway once the kernel is copied back.
  */
-int toi_header_storage_for_modules(void)
+long toi_header_storage_for_modules(void)
 {
 	struct toi_module_ops *this_module;
 	int bytes = 0;
@@ -58,9 +58,9 @@ int toi_header_storage_for_modules(void)
  * doing their work during the cycle.
  */
 
-int toi_memory_for_modules(int print_parts)
+long toi_memory_for_modules(int print_parts)
 {
-	int bytes = 0, result;
+	long bytes = 0, result;
 	struct toi_module_ops *this_module;
 
 	if (print_parts)
@@ -80,9 +80,9 @@ int toi_memory_for_modules(int print_parts)
 		}
 	}
 
-	result = ((bytes + PAGE_SIZE - 1) >> PAGE_SHIFT);
+	result = DIV_ROUND_UP(bytes, PAGE_SIZE);
 	if (print_parts)
-		printk(KERN_INFO " => %d bytes, %d pages.\n", bytes, result);
+		printk(KERN_INFO " => %ld bytes, %ld pages.\n", bytes, result);
 
 	return result;
 }

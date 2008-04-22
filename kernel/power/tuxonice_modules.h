@@ -154,8 +154,8 @@ extern struct toi_module_ops *toi_get_next_filter(struct toi_module_ops *);
 extern int toi_register_module(struct toi_module_ops *module);
 extern void toi_move_module_tail(struct toi_module_ops *module);
 
-extern int toi_header_storage_for_modules(void);
-extern int toi_memory_for_modules(int print_parts);
+extern long toi_header_storage_for_modules(void);
+extern long toi_memory_for_modules(int print_parts);
 extern int toi_expected_compression_ratio(void);
 
 extern int toi_print_module_debug_info(char *buffer, int buffer_size);

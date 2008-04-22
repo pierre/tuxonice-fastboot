@@ -335,7 +335,7 @@ static int get_toi_debug_info(const char *buffer, int count)
 		SNPRINTF(".\n");
 	} else
 		SNPRINTF("- No I/O speed stats available.\n");
-	SNPRINTF("- Extra pages    : %d used/%d.\n",
+	SNPRINTF("- Extra pages    : %ld used/%ld.\n",
 			extra_pd1_pages_used, extra_pd1_pages_allowance);
 
 	return len;
@@ -1144,8 +1144,8 @@ int toi_launch_userspace_program(char *command, int channel_no,
  */
 static struct toi_sysfs_data sysfs_params[] = {
 	{ TOI_ATTR("extra_pages_allowance", SYSFS_RW),
-	  SYSFS_INT(&extra_pd1_pages_allowance, 0,
-			  INT_MAX, 0)
+	  SYSFS_LONG(&extra_pd1_pages_allowance, 0,
+			LONG_MAX, 0)
 	},
 
 	{ TOI_ATTR("image_exists", SYSFS_RW),
