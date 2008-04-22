@@ -439,9 +439,33 @@ static int write_modified_signature(int modification)
 	return result;
 }
 
+static int apply_header_reservation(void)
+{
+	int i;
+
+	toi_extent_state_goto_start(&toi_writer_posn);
+	toi_bio_ops.forward_one_page(1); /* To first page */
+
+	for (i = 0; i < header_pages_reserved; i++) {
+		if (toi_bio_ops.forward_one_page(1)) {
+			printk(KERN_INFO "Out of space while seeking to "
+					"allocate header pages,\n");
+			return -ENOSPC;
+		}
+	}
+
+	/* The end of header pages will be the start of pageset 2;
+	 * we are now sitting on the first pageset2 page. */
+	toi_extent_state_save(&toi_writer_posn, &toi_writer_posn_save[2]);
+	return 0;
+}
+
 static void toi_swap_reserve_header_space(int request)
 {
 	header_pages_reserved = (long) request;
+
+	/* If we've already allocated storage (hence ignoring return value): */
+	apply_header_reservation();
 }
 
 static void free_block_chains(void)
@@ -473,7 +497,7 @@ static int get_main_pool_phys_params(void)
 {
 	struct extent *extentpointer = NULL;
 	unsigned long address;
-	int extent_min = -1, extent_max = -1, last_chain = -1, i;
+	int extent_min = -1, extent_max = -1, last_chain = -1;
 
 	free_block_chains();
 
@@ -503,22 +527,7 @@ static int get_main_pool_phys_params(void)
 				extent_min, extent_max))
 			return -ENOMEM;
 
-	/* Apply header reservation */
-	toi_extent_state_goto_start(&toi_writer_posn);
-	toi_bio_ops.forward_one_page(1); /* To first page */
-
-	for (i = 0; i < header_pages_reserved; i++) {
-		if (toi_bio_ops.forward_one_page(1)) {
-			printk(KERN_INFO "Out of space while seeking to "
-					"allocate header pages,\n");
-			return -ENOSPC;
-		}
-	}
-
-	/* The end of header pages will be the start of pageset 2;
-	 * we are now sitting on the first pageset2 page. */
-	toi_extent_state_save(&toi_writer_posn, &toi_writer_posn_save[2]);
-	return 0;
+	return apply_header_reservation();
 }
 
 static long raw_to_real(long raw)
