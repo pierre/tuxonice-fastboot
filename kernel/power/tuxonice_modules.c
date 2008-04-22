@@ -72,9 +72,9 @@ long toi_memory_for_modules(int print_parts)
 		if (this_module->memory_needed) {
 			this = this_module->memory_needed();
 			if (print_parts)
-				printk(KERN_INFO "%10d bytes (%5d pages) for "
-						"module '%s'.\n",
-						this, this >> PAGE_SHIFT,
+				printk(KERN_INFO "%10d bytes (%5ld pages) for "
+						"module '%s'.\n", this,
+						DIV_ROUND_UP(this, PAGE_SIZE),
 						this_module->name);
 			bytes += this;
 		}
