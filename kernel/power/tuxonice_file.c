@@ -66,6 +66,7 @@ static sector_t target_firstblock, target_header_start;
 static int target_storage_available;
 static int target_claim;
 
+/* Old signatures */
 static char HaveImage[] = "HaveImage\n";
 static char NoImage[] =   "TuxOnIce\n";
 #define sig_size (sizeof(HaveImage) + 1)
