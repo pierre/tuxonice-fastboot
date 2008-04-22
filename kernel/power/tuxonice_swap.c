@@ -79,10 +79,10 @@ static char swapfilename[32] = "";
 static int toi_swapon_status;
 
 /* Header Page Information */
-static int header_pages_allocated;
+static int header_pages_reserved;
 
 /* Swap Pages */
-static int main_pages_allocated, main_pages_requested;
+static int swap_pages_allocated;
 
 /* User Specified Parameters. */
 
@@ -439,15 +439,13 @@ static int write_modified_signature(int modification)
 	return result;
 }
 
-static int __toi_swap_allocate_storage(int main_storage_requested,
-		int header_storage);
+static int toi_swap_allocate_storage(int main_storage_requested);
 
-static int toi_swap_allocate_header_space(int space_requested)
+static int toi_swap_reserve_header_space(int request)
 {
 	int i;
 
-	if (!swapextents.size && __toi_swap_allocate_storage(
-				main_pages_requested, space_requested)) {
+	if (!swap_pages_allocated && toi_swap_allocate_storage(request)){
 		printk("Failed to allocate space for the header.\n");
 		return -ENOSPC;
 	}
@@ -455,17 +453,17 @@ static int toi_swap_allocate_header_space(int space_requested)
 	toi_extent_state_goto_start(&toi_writer_posn);
 	toi_bio_ops.forward_one_page(1); /* To first page */
 
-	for (i = 0; i < space_requested; i++) {
+	for (i = 0; i < request; i++) {
 		if (toi_bio_ops.forward_one_page(1)) {
 			printk(KERN_INFO "Out of space while seeking to "
 					"allocate header pages,\n");
-			header_pages_allocated = i;
+			header_pages_reserved = i;
 			return -ENOSPC;
 		}
 
 	}
 
-	header_pages_allocated = space_requested;
+	header_pages_reserved = request;
 
 	/* The end of header pages will be the start of pageset 2;
 	 * we are now sitting on the first pageset2 page. */
@@ -541,12 +539,12 @@ static int get_main_pool_phys_params(void)
 		}
 	}
 
-	return toi_swap_allocate_header_space(header_pages_allocated);
+	return toi_swap_reserve_header_space(header_pages_reserved);
 }
 
 static int toi_swap_storage_allocated(void)
 {
-	return main_pages_requested + header_pages_allocated;
+	return swap_pages_allocated;
 }
 
 static int toi_swap_storage_available(void)
@@ -554,11 +552,11 @@ static int toi_swap_storage_available(void)
 	int diff;
 
 	si_swapinfo(&swapinfo);
-	diff = (((int) swapinfo.freeswap + main_pages_allocated) *
+	diff = (((int) swapinfo.freeswap + swap_pages_allocated) *
 			(sizeof(unsigned long) + sizeof(int)) /
 		(PAGE_SIZE + sizeof(unsigned long) + sizeof(int))) + 1;
 	if (swapinfo.freeswap)
-		return (int) swapinfo.freeswap + main_pages_allocated - diff;
+		return (int) swapinfo.freeswap + swap_pages_allocated - diff;
 	else
 		return 0;
 }
@@ -594,8 +592,8 @@ static int toi_swap_release_storage(void)
 	    test_toi_state(TOI_NOW_RESUMING))
 		return 0;
 
-	header_pages_allocated = 0;
-	main_pages_allocated = 0;
+	header_pages_reserved = 0;
+	swap_pages_allocated = 0;
 
 	if (swapextents.first) {
 		/* Free swap entries */
@@ -613,17 +611,6 @@ static int toi_swap_release_storage(void)
 	return 0;
 }
 
-static int toi_swap_allocate_storage(int space_requested)
-{
-	if (!__toi_swap_allocate_storage(space_requested,
-				header_pages_allocated)) {
-		main_pages_requested = space_requested;
-		return 0;
-	}
-
-	return -ENOSPC;
-}
-
 static void free_swap_range(unsigned long min, unsigned long max)
 {
 	int j;
@@ -635,19 +622,20 @@ static void free_swap_range(unsigned long min, unsigned long max)
 /*
  * Round robin allocation (where swap storage has the same priority).
  * could make this very inefficient, so we track extents allocated on
- * a per-swapfiles basis.
+ * a per-swapfile basis.
+ *
+ * We ignore here the fact that some space is for the header and doesn't
+ * have the overhead. It will only rarely make a 1 page difference.
  */
-static int __toi_swap_allocate_storage(int main_space_requested,
-		int header_space_requested)
+static int toi_swap_allocate_storage(int request)
 {
 	int i, result = 0, to_add[MAX_SWAPFILES], pages_to_get, extra_pages,
 	    gotten = 0;
 	unsigned long extent_min[MAX_SWAPFILES], extent_max[MAX_SWAPFILES];
 
-	extra_pages = DIV_ROUND_UP(main_space_requested * (sizeof(unsigned long)
+	extra_pages = DIV_ROUND_UP(request * (sizeof(unsigned long)
 			       + sizeof(int)), PAGE_SIZE);
-	pages_to_get = main_space_requested + extra_pages +
-		header_space_requested - swapextents.size;
+	pages_to_get = request + extra_pages - swapextents.size;
 
 	if (pages_to_get < 1)
 		return 0;
@@ -723,7 +711,7 @@ static int __toi_swap_allocate_storage(int main_space_requested,
 	if (gotten < pages_to_get)
 		result = -ENOSPC;
 
-	main_pages_allocated += gotten;
+	swap_pages_allocated += gotten;
 
 	return result ? result : get_main_pool_phys_params();
 }
@@ -1249,7 +1237,7 @@ static struct toi_module_ops toi_swapops = {
 	.storage_available 	= toi_swap_storage_available,
 	.storage_allocated	= toi_swap_storage_allocated,
 	.release_storage	= toi_swap_release_storage,
-	.allocate_header_space	= toi_swap_allocate_header_space,
+	.allocate_header_space	= toi_swap_reserve_header_space,
 	.allocate_storage	= toi_swap_allocate_storage,
 	.image_exists		= toi_swap_image_exists,
 	.mark_resume_attempted	= toi_swap_mark_resume_attempted,
