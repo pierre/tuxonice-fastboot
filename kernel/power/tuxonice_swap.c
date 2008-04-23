@@ -515,7 +515,7 @@ static int get_main_pool_phys_params(void)
 			continue;
 		}
 
-		if (extent_min > -1 && add_blocks_to_extent_chain(swapfilenum,
+		if (extent_min > -1 && add_blocks_to_extent_chain(last_chain,
 					extent_min, extent_max))
 			return -ENOMEM;
 
