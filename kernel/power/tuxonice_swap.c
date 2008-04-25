@@ -434,6 +434,8 @@ static int write_modified_signature(int modification)
 	result = toi_bio_ops.bdev_page_io(WRITE, resume_block_device,
 		resume_firstblock, virt_to_page(swap_header_page.address));
 
+	memcpy(current_signature_page, swap_header_page.ptr, PAGE_SIZE);
+
 	toi_free_page(38, swap_header_page.address);
 
 	return result;
