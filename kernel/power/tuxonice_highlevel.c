@@ -553,7 +553,6 @@ static int do_post_image_write(void)
 	if (alt_resume_param[0])
 		do_toi_step(STEP_RESUME_ALT_IMAGE);
 
-	toi_cond_pause(1, "About to power down or reboot.");
 	toi_power_down();
 
 	/* If we return, it's because we hibernated to ram */
