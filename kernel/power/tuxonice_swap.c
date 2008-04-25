@@ -439,20 +439,22 @@ static int write_modified_signature(int modification)
 	return result;
 }
 
+/*
+ * apply_header_reservation
+ *
+ * Use 0 (READ) to forward_one_page so it doesn't complain if we haven't
+ * allocated storage yet.
+ */
 static int apply_header_reservation(void)
 {
 	int i;
 
 	toi_extent_state_goto_start(&toi_writer_posn);
-	toi_bio_ops.forward_one_page(1); /* To first page */
+	toi_bio_ops.forward_one_page(0); /* To first page */
 
-	for (i = 0; i < header_pages_reserved; i++) {
-		if (toi_bio_ops.forward_one_page(1)) {
-			printk(KERN_INFO "Out of space while seeking to "
-					"allocate header pages,\n");
+	for (i = 0; i < header_pages_reserved; i++)
+		if (toi_bio_ops.forward_one_page(0))
 			return -ENOSPC;
-		}
-	}
 
 	/* The end of header pages will be the start of pageset 2;
 	 * we are now sitting on the first pageset2 page. */
