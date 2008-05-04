@@ -124,7 +124,7 @@ static int toi_checksum_initialise(int starting_cycle)
 		if (!page)
 			return 1;
 		this->buf = page_address(page);
-		sg_set_buf(&this->sg[0], this->buf, PAGE_SIZE);
+		sg_init_one(&this->sg[0], this->buf, PAGE_SIZE);
 	}
 	return 0;
 }
