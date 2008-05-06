@@ -4,7 +4,6 @@ EXTRA_CFLAGS	+=	-DDEBUG
 endif
 
 obj-y				:= main.o
-obj-$(CONFIG_PM_LEGACY)		+= pm.o
 
 tuxonice_core-objs := tuxonice_modules.o tuxonice_sysfs.o tuxonice_highlevel.o \
 		tuxonice_io.o tuxonice_pagedir.o tuxonice_prepare_image.o \

@@ -116,6 +116,7 @@
 
 #include <linux/capability.h>
 #include <linux/file.h>
+#include <linux/fdtable.h>
 #include <linux/fs.h>
 #include <linux/init.h>
 #include <linux/module.h>
@@ -236,6 +237,7 @@ void __locks_copy_lock(struct file_lock *new, const struct file_lock *fl)
 	new->fl_ops = NULL;
 	new->fl_lmops = NULL;
 }
+EXPORT_SYMBOL(__locks_copy_lock);
 
 void locks_copy_lock(struct file_lock *new, struct file_lock *fl)
 {

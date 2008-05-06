@@ -118,7 +118,6 @@ config DEBUG_NX_TEST
 config 4KSTACKS
 	bool "Use 4Kb for kernel stacks instead of 8Kb"
 	depends on X86_32
-	default y
 	help
 	  If you say Y here the kernel will use a 4Kb stacksize for the
 	  kernel stack attached to each process/thread. This facilitates
@@ -256,4 +255,18 @@ config CPA_DEBUG
 	help
 	  Do change_page_attr() self-tests every 30 seconds.
 
+config OPTIMIZE_INLINING
+	bool "Allow gcc to uninline functions marked 'inline'"
+	depends on BROKEN
+	help
+	  This option determines if the kernel forces gcc to inline the functions
+	  developers have marked 'inline'. Doing so takes away freedom from gcc to
+	  do what it thinks is best, which is desirable for the gcc 3.x series of
+	  compilers. The gcc 4.x series have a rewritten inlining algorithm and
+	  disabling this option will generate a smaller kernel there. Hopefully
+	  this algorithm is so good that allowing gcc4 to make the decision can
+	  become the default in the future, until then this option is there to
+	  test gcc for this.
+
 endmenu
+

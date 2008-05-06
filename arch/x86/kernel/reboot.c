@@ -9,6 +9,7 @@
 #include <asm/desc.h>
 #include <asm/hpet.h>
 #include <asm/pgtable.h>
+#include <asm/proto.h>
 #include <asm/reboot_fixups.h>
 #include <asm/reboot.h>
 
@@ -148,7 +149,6 @@ static struct dmi_system_id __initdata reboot_dmi_table[] = {
 		.matches = {
 			DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
 			DMI_MATCH(DMI_PRODUCT_NAME, "OptiPlex 745"),
-			DMI_MATCH(DMI_BOARD_NAME, "0WF810"),
 		},
 	},
 	{       /* Handle problems with rebooting on Dell Optiplex 745's DFF*/
@@ -399,7 +399,7 @@ static void native_machine_emergency_restart(void)
 	}
 }
 
-static void native_machine_shutdown(void)
+void native_machine_shutdown(void)
 {
 	/* Stop the cpus and apics */
 #ifdef CONFIG_SMP
@@ -470,7 +470,10 @@ struct machine_ops machine_ops = {
 	.shutdown = native_machine_shutdown,
 	.emergency_restart = native_machine_emergency_restart,
 	.restart = native_machine_restart,
-	.halt = native_machine_halt
+	.halt = native_machine_halt,
+#ifdef CONFIG_KEXEC
+	.crash_shutdown = native_machine_crash_shutdown,
+#endif
 };
 
 void machine_power_off(void)
@@ -498,3 +501,9 @@ void machine_halt(void)
 	machine_ops.halt();
 }
 
+#ifdef CONFIG_KEXEC
+void machine_crash_shutdown(struct pt_regs *regs)
+{
+	machine_ops.crash_shutdown(regs);
+}
+#endif
