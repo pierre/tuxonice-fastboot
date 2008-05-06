@@ -33,7 +33,7 @@ static void drop_pagecache_sb(struct super_block *sb)
 	iput(toput_inode);
 }
 
-static void drop_pagecache(void)
+void drop_pagecache(void)
 {
 	struct super_block *sb;
 
