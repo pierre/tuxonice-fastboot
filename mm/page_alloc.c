@@ -1758,15 +1758,15 @@ static unsigned int nr_free_zone_pages(int offset)
 
 static unsigned int nr_unallocated_zone_pages(int offset)
 {
-	/* Just pick one node, since fallback list is circular */
-	pg_data_t *pgdat = NODE_DATA(numa_node_id());
-	unsigned int sum = 0;
-
-	struct zonelist *zonelist = pgdat->node_zonelists + offset;
-	struct zone **zonep = zonelist->zones;
+	struct zoneref *z;
 	struct zone *zone;
 
-	for (zone = *zonep++; zone; zone = *zonep++) {
+	/* Just pick one node, since fallback list is circular */
+	unsigned int sum = 0;
+
+	struct zonelist *zonelist = node_zonelist(numa_node_id(), GFP_KERNEL);
+
+	for_each_zone_zonelist(zone, z, zonelist, offset) {
 		unsigned long high = zone->pages_high;
 		unsigned long left = zone_page_state(zone, NR_FREE_PAGES);
 		if (left > high)
