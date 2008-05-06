@@ -604,6 +604,7 @@ asmlinkage void __init start_kernel(void)
 	timekeeping_init();
 	time_init();
 	dyn_pageflags_init();
+	sched_clock_init();
 	profile_init();
 	if (!irqs_disabled())
 		printk("start_kernel(): bug: interrupts were enabled early\n");
