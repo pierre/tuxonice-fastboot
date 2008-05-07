@@ -1263,6 +1263,7 @@ static __init int core_load(void)
 	int i,
 	    numfiles = sizeof(sysfs_params) / sizeof(struct toi_sysfs_data);
 
+	printk("TuxOnIce " TOI_CORE_VERSION " (http://tuxonice.net)\n");
 	strncpy(pre_hibernate_command, CONFIG_TOI_DEFAULT_PRE_HIBERNATE, 255);
 	strncpy(post_hibernate_command, CONFIG_TOI_DEFAULT_POST_HIBERNATE, 255);
 
