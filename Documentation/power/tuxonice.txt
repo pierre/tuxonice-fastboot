@@ -46,7 +46,11 @@
    
    Being able to save the state of your system and quickly restore it improves
    your productivity - you get a useful system in far less time than through
-   the normal boot process.
+   the normal boot process. You also get to be completely 'green', using zero
+   power, or as close to that as possible (the computer may still provide
+   minimal power to some devices, so they can initiate a power on, but that
+   will be the same amount of power as would be used if you told the computer
+   to shutdown.
    
 3. What do you need to use it?
 
@@ -248,24 +252,26 @@
 
    The version in the vanilla kernel has a number of drawbacks. The most
    serious of these are:
-	- it has a maximum image size of 1/2 total memory.
+	- it has a maximum image size of 1/2 total memory;
 	- it doesn't allocate storage until after it has snapshotted memory.
 	  This means that you can't be sure hibernating will work until you
-	  see it start to write the image.
-	- it performs all of it's I/O synchronously.
-	- it does not allow you to press escape to cancel a cycle
+	  see it start to write the image;
+	- it does not allow you to press escape to cancel a cycle;
+	- it does not allow you to press escape to cancel resuming;
 	- it does not allow you to automatically swapon a file when
-	  starting a cycle.
-	- it does not allow you to use multiple swap partitions.
-	- it does not allow you to use swapfiles.
-	- it does not allow you to use ordinary files.
+	  starting a cycle;
+	- it does not allow you to use multiple swap partitions or files;
+	- it does not allow you to use ordinary files;
 	- it just invalidates an image and continues to boot if you
-	  accidentally boot the wrong kernel after hibernating.
-	- it doesn't support any sort of nice display while hibernating
+	  accidentally boot the wrong kernel after hibernating;
+	- it doesn't support any sort of nice display while hibernating;
 	- it is moving toward requiring that you have an initrd/initramfs
 	  to ever have a hope of resuming (uswsusp). While uswsusp will
 	  address some of the concerns above, it won't address all of them,
-          and will be more complicated to get set up.
+          and will be more complicated to get set up;
+        - it doesn't have support for suspend-to-both (write a hibernation
+	  image, then suspend to ram; I think this is known as ReadySafe
+	  under M$).
 
 5. How do you use it?
 
