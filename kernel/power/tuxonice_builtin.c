@@ -173,6 +173,7 @@ struct toi_boot_kernel_data toi_bkd __nosavedata
 #ifdef CONFIG_TOI_REPLACE_SWSUSP
 	(1 << TOI_REPLACE_SWSUSP) |
 #endif
+	(1 << TOI_NO_FLUSHER_THREAD) |
 	(1 << TOI_PAGESET2_FULL) | (1 << TOI_LATE_CPU_HOTPLUG),
 };
 EXPORT_SYMBOL_GPL(toi_bkd);
