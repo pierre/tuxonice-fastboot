@@ -173,9 +173,6 @@ static void throttle_if_memory_low(void)
 		do_bio_wait(8);
 		free_pages = nr_unallocated_buffer_pages();
 	}
-
-	wait_event(num_in_progress_wait,
-		atomic_read(&toi_io_in_progress) < target_outstanding_io);
 }
 
 /**
