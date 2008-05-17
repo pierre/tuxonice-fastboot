@@ -413,13 +413,6 @@
    The maximum size of hibernation image written to disk, measured in megabytes
    (1024*1024).
 
-   - interface_version:
-
-   The value returned by this file can be used by scripts and configuration
-   tools to determine what entries should be looked for. The value is
-   incremented whenever an entry in /sys/power/tuxonice is obsoleted or 
-   added.
-
    - last_result:
 
    The result of the last hibernation cycle, as defined in
@@ -517,13 +510,6 @@
    This option tells you the resume= options to use for swap devices you
    currently have activated. It is particularly useful when you only want to
    use a swap file to store your image. See above for further details.
-
-   - toggle_process_nofreeze
-
-   This entry can be used to toggle the NOFREEZE flag on a process, to allow it
-   to run during hibernating. It should be used with extreme caution. There are
-   strict limitations on what a process running during hibernation can do. This
-   is really only intended for use by TuxOnice's helpers (userui in particular).
 
    - userui_program
 
