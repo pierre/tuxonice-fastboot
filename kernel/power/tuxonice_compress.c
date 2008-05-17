@@ -344,8 +344,13 @@ static void toi_compress_load_config_info(char *buffer, int size)
 	toi_expected_compression = *((unsigned long *) (buffer + 2 *
 				sizeof(unsigned long)));
 	namelen = *((unsigned long *) (buffer + 3 * sizeof(unsigned long)));
-	strncpy(toi_compressor_name, buffer + 4 * sizeof(unsigned long),
+	if (strncmp(toi_compressor_name, buffer + 4 * sizeof(unsigned long),
+				namelen)) {
+		toi_compress_cleanup(1);
+		strncpy(toi_compressor_name, buffer + 4 * sizeof(unsigned long),
 			namelen);
+		toi_compress_crypto_prepare();
+	}
 	return;
 }
 
