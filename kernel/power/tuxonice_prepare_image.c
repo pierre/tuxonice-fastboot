@@ -41,7 +41,7 @@
 
 static long num_nosave, header_space_allocated, main_storage_allocated,
 	   storage_available;
-long extra_pd1_pages_allowance = DEFAULT_EXTRA_PAGES_ALLOWANCE;
+long extra_pd1_pages_allowance = CONFIG_TOI_DEFAULT_EXTRA_PAGES_ALLOWANCE;
 int image_size_limit;
 
 struct attention_list {
@@ -379,8 +379,8 @@ static void get_extra_pd1_allowance(void)
 	resume_console();
 
 	extra_pd1_pages_allowance = max(
-		orig_num_free - final + DEFAULT_EXTRA_PAGES_ALLOWANCE,
-		(long) DEFAULT_EXTRA_PAGES_ALLOWANCE);
+		orig_num_free - final + MIN_EXTRA_PAGES_ALLOWANCE,
+		(long) MIN_EXTRA_PAGES_ALLOWANCE);
 }
 
 /*

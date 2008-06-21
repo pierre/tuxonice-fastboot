@@ -18,7 +18,7 @@ extern long extra_pd1_pages_allowance;
 extern void free_attention_list(void);
 
 #define MIN_FREE_RAM 100
-#define DEFAULT_EXTRA_PAGES_ALLOWANCE 500
+#define MIN_EXTRA_PAGES_ALLOWANCE 500
 
 #define all_zones_mask ((unsigned long) ((1 << MAX_NR_ZONES) - 1))
 #ifdef CONFIG_HIGHMEM
