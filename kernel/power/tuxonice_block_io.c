@@ -90,10 +90,10 @@ static int extra_page_forward;
 
 static int current_stream;
 /* 0 = Header, 1 = Pageset1, 2 = Pageset2, 3 = End of PS1 */
-struct extent_iterate_saved_state toi_writer_posn_save[4];
+struct hibernate_extent_iterate_saved_state toi_writer_posn_save[4];
 
 /* Pointer to current entry being loaded/saved. */
-struct extent_iterate_state toi_writer_posn;
+struct hibernate_extent_iterate_state toi_writer_posn;
 
 /* Not static, so that the allocators can setup and complete
  * writing the header */
@@ -425,7 +425,7 @@ static void dump_block_chains(void)
 	int i;
 
 	for (i = 0; i < toi_writer_posn.num_chains; i++) {
-		struct extent *this;
+		struct hibernate_extent *this;
 
 		this = (toi_writer_posn.chains + i)->first;
 
@@ -435,8 +435,8 @@ static void dump_block_chains(void)
 		printk(KERN_INFO "Chain %d:", i);
 
 		while (this) {
-			printk(" [%lu-%lu]%s", this->minimum,
-					this->maximum, this->next ? "," : "");
+			printk(" [%lu-%lu]%s", this->start,
+					this->end, this->next ? "," : "");
 			this = this->next;
 		}
 

@@ -21,38 +21,31 @@
  *
  * Returns a free extent. May fail, returning NULL instead.
  */
-static struct extent *toi_get_extent(void)
+static struct hibernate_extent *toi_get_extent(void)
 {
-	struct extent *result;
-
-	result = toi_kzalloc(2, sizeof(struct extent), TOI_ATOMIC_GFP);
-	if (!result)
-		return NULL;
-
-	result->minimum = result->maximum = 0;
-	result->next = NULL;
-
-	return result;
+	return (struct hibernate_extent *) toi_kzalloc(2,
+			sizeof(struct hibernate_extent), TOI_ATOMIC_GFP);
 }
 
 /* toi_put_extent_chain.
  *
  * Frees a whole chain of extents.
  */
-void toi_put_extent_chain(struct extent_chain *chain)
+void toi_put_extent_chain(struct hibernate_extent_chain *chain)
 {
-	struct extent *this;
+	struct hibernate_extent *this;
 
 	this = chain->first;
 
 	while (this) {
-		struct extent *next = this->next;
+		struct hibernate_extent *next = this->next;
 		toi_kfree(2, this);
 		chain->num_extents--;
 		this = next;
 	}
 
-	chain->first = chain->last_touched = NULL;
+	chain->first = NULL;
+	chain->last_touched = NULL;
 	chain->size = 0;
 }
 
@@ -61,64 +54,61 @@ void toi_put_extent_chain(struct extent_chain *chain)
  *
  * Add an extent to an existing chain.
  */
-int toi_add_to_extent_chain(struct extent_chain *chain,
-		unsigned long minimum, unsigned long maximum)
+int toi_add_to_extent_chain(struct hibernate_extent_chain *chain,
+		unsigned long start, unsigned long end)
 {
-	struct extent *new_extent = NULL, *start_at;
+	struct hibernate_extent *new_ext = NULL, *cur_ext = NULL;
 
 	/* Find the right place in the chain */
-	start_at = (chain->last_touched &&
-		    (chain->last_touched->minimum < minimum)) ?
-		chain->last_touched : NULL;
+	if (chain->last_touched && chain->last_touched->start < start)
+		cur_ext = chain->last_touched;
+	else if (chain->first && chain->first->start < start)
+		cur_ext = chain->first;
 
-	if (!start_at && chain->first && chain->first->minimum < minimum)
-		start_at = chain->first;
+	if (cur_ext) {
+		while (cur_ext->next && cur_ext->next->start < start)
+			cur_ext = cur_ext->next;
 
-	while (start_at && start_at->next && start_at->next->minimum < minimum)
-		start_at = start_at->next;
+		if (cur_ext->end == (start - 1)) {
+			struct hibernate_extent *next_ext = cur_ext->next;
+			cur_ext->end = end;
 
-	if (start_at && start_at->maximum == (minimum - 1)) {
-		start_at->maximum = maximum;
+			/* Merge with the following one? */
+			if (next_ext && cur_ext->end + 1 == next_ext->start) {
+				cur_ext->end = next_ext->end;
+				cur_ext->next = next_ext->next;
+				toi_kfree(2, next_ext);
+				chain->num_extents--;
+			}
 
-		/* Merge with the following one? */
-		if (start_at->next &&
-		    start_at->maximum + 1 == start_at->next->minimum) {
-			struct extent *to_free = start_at->next;
-			start_at->maximum = start_at->next->maximum;
-			start_at->next = start_at->next->next;
-			chain->num_extents--;
-			toi_kfree(2, to_free);
+			chain->last_touched = cur_ext;
+			chain->size += (end - start + 1);
+
+			return 0;
 		}
-
-		chain->last_touched = start_at;
-		chain->size += (maximum - minimum + 1);
-
-		return 0;
 	}
 
-	new_extent = toi_get_extent();
-	if (!new_extent) {
+	new_ext = toi_get_extent();
+	if (!new_ext) {
 		printk(KERN_INFO "Error unable to append a new extent to the "
 				"chain.\n");
 		return -ENOMEM;
 	}
 
 	chain->num_extents++;
-	chain->size += (maximum - minimum + 1);
-	new_extent->minimum = minimum;
-	new_extent->maximum = maximum;
-	new_extent->next = NULL;
+	chain->size += (end - start + 1);
+	new_ext->start = start;
+	new_ext->end = end;
 
-	chain->last_touched = new_extent;
+	chain->last_touched = new_ext;
 
-	if (start_at) {
-		struct extent *next = start_at->next;
-		start_at->next = new_extent;
-		new_extent->next = next;
+	if (cur_ext) {
+		new_ext->next = cur_ext->next;
+		cur_ext->next = new_ext;
 	} else {
 		if (chain->first)
-			new_extent->next = chain->first;
-		chain->first = new_extent;
+			new_ext->next = chain->first;
+		chain->first = new_ext;
 	}
 
 	return 0;
@@ -129,9 +119,9 @@ int toi_add_to_extent_chain(struct extent_chain *chain,
  * Write a chain in the image.
  */
 int toi_serialise_extent_chain(struct toi_module_ops *owner,
-		struct extent_chain *chain)
+		struct hibernate_extent_chain *chain)
 {
-	struct extent *this;
+	struct hibernate_extent *this;
 	int ret, i = 0;
 
 	ret = toiActiveAllocator->rw_header_chunk(WRITE, owner, (char *) chain,
@@ -162,9 +152,9 @@ int toi_serialise_extent_chain(struct toi_module_ops *owner,
  *
  * Read back a chain saved in the image.
  */
-int toi_load_extent_chain(struct extent_chain *chain)
+int toi_load_extent_chain(struct hibernate_extent_chain *chain)
 {
-	struct extent *this, *last = NULL;
+	struct hibernate_extent *this, *last = NULL;
 	int i, ret;
 
 	ret = toiActiveAllocator->rw_header_chunk_noreadahead(READ, NULL,
@@ -175,7 +165,7 @@ int toi_load_extent_chain(struct extent_chain *chain)
 	}
 
 	for (i = 0; i < chain->num_extents; i++) {
-		this = toi_kzalloc(3, sizeof(struct extent), TOI_ATOMIC_GFP);
+		this = toi_kzalloc(3, sizeof(struct hibernate_extent), TOI_ATOMIC_GFP);
 		if (!this) {
 			printk(KERN_INFO "Failed to allocate a new extent.\n");
 			return -ENOMEM;
@@ -204,18 +194,18 @@ int toi_load_extent_chain(struct extent_chain *chain)
  * When using compression and expected_compression > 0, we let the image size
  * be larger than storage, so we can validly run out of data to return.
  */
-unsigned long toi_extent_state_next(struct extent_iterate_state *state)
+unsigned long toi_extent_state_next(struct hibernate_extent_iterate_state *state)
 {
 	if (state->current_chain == state->num_chains)
 		return 0;
 
 	if (state->current_extent) {
-		if (state->current_offset == state->current_extent->maximum) {
+		if (state->current_offset == state->current_extent->end) {
 			if (state->current_extent->next) {
 				state->current_extent =
 					state->current_extent->next;
 				state->current_offset =
-					state->current_extent->minimum;
+					state->current_extent->start;
 			} else {
 				state->current_extent = NULL;
 				state->current_offset = 0;
@@ -235,7 +225,7 @@ unsigned long toi_extent_state_next(struct extent_iterate_state *state)
 		if (!state->current_extent)
 			continue;
 
-		state->current_offset = state->current_extent->minimum;
+		state->current_offset = state->current_extent->start;
 	}
 
 	return state->current_offset;
@@ -245,7 +235,7 @@ unsigned long toi_extent_state_next(struct extent_iterate_state *state)
  *
  * Find the first valid value in a group of chains.
  */
-void toi_extent_state_goto_start(struct extent_iterate_state *state)
+void toi_extent_state_goto_start(struct hibernate_extent_iterate_state *state)
 {
 	state->current_chain = -1;
 	state->current_extent = NULL;
@@ -254,14 +244,14 @@ void toi_extent_state_goto_start(struct extent_iterate_state *state)
 
 /* toi_extent_start_save
  *
- * Given a state and a struct extent_state_store, save the current
+ * Given a state and a struct hibernate_extent_state_store, save the current
  * position in a format that can be used with relocated chains (at
  * resume time).
  */
-void toi_extent_state_save(struct extent_iterate_state *state,
-		struct extent_iterate_saved_state *saved_state)
+void toi_extent_state_save(struct hibernate_extent_iterate_state *state,
+		struct hibernate_extent_iterate_saved_state *saved_state)
 {
-	struct extent *extent;
+	struct hibernate_extent *extent;
 
 	saved_state->chain_num = state->current_chain;
 	saved_state->extent_num = 0;
@@ -282,8 +272,8 @@ void toi_extent_state_save(struct extent_iterate_state *state,
  *
  * Restore the position saved by extent_state_save.
  */
-void toi_extent_state_restore(struct extent_iterate_state *state,
-		struct extent_iterate_saved_state *saved_state)
+void toi_extent_state_restore(struct hibernate_extent_iterate_state *state,
+		struct hibernate_extent_iterate_saved_state *saved_state)
 {
 	int posn = saved_state->extent_num;
 

@@ -89,7 +89,7 @@ static int main_pages_allocated, main_pages_requested;
 static struct toi_bdev_info devinfo;
 
 /* Extent chain for blocks */
-static struct extent_chain block_chain;
+static struct hibernate_extent_chain block_chain;
 
 /* Signature operations */
 enum {
@@ -751,7 +751,7 @@ static int toi_file_storage_needed(void)
 	return sig_size + strlen(toi_file_target) + 1 +
 		sizeof(toi_writer_posn_save) +
 		sizeof(devinfo) +
-		sizeof(struct extent_chain) - 2 * sizeof(void *) +
+		sizeof(struct hibernate_extent_chain) - 2 * sizeof(void *) +
 		(2 * sizeof(unsigned long) * block_chain.num_extents);
 }
 

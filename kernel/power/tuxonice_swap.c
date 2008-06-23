@@ -67,8 +67,8 @@ static char no_image_signature_contents[sizeof(struct tuxonice_sig_data)];
 static struct toi_bdev_info devinfo[MAX_SWAPFILES];
 
 /* Extent chains for swap & blocks */
-struct extent_chain swapextents;
-struct extent_chain block_chain[MAX_SWAPFILES];
+struct hibernate_extent_chain swapextents;
+struct hibernate_extent_chain block_chain[MAX_SWAPFILES];
 
 static dev_t header_dev_t;
 static struct block_device *header_block_device;
@@ -481,14 +481,14 @@ static void free_block_chains(void)
 			toi_put_extent_chain(&block_chain[i]);
 }
 
-static int add_blocks_to_extent_chain(int chain, int minimum, int maximum)
+static int add_blocks_to_extent_chain(int chain, int start, int end)
 {
 	if (test_action_state(TOI_TEST_BIO))
 		printk(KERN_INFO "Adding extent chain %d %d-%d.\n", chain,
-				minimum << devinfo[chain].bmap_shift,
-				maximum << devinfo[chain].bmap_shift);
+				start << devinfo[chain].bmap_shift,
+				end << devinfo[chain].bmap_shift);
 
-	if (toi_add_to_extent_chain(&block_chain[chain], minimum, maximum)) {
+	if (toi_add_to_extent_chain(&block_chain[chain], start, end)) {
 		free_block_chains();
 		return -ENOMEM;
 	}
@@ -499,14 +499,14 @@ static int add_blocks_to_extent_chain(int chain, int minimum, int maximum)
 
 static int get_main_pool_phys_params(void)
 {
-	struct extent *extentpointer = NULL;
+	struct hibernate_extent *extentpointer = NULL;
 	unsigned long address;
 	int extent_min = -1, extent_max = -1, last_chain = -1;
 
 	free_block_chains();
 
 	toi_extent_for_each(&swapextents, extentpointer, address) {
-		swp_entry_t swap_address = extent_val_to_swap_entry(address);
+		swp_entry_t swap_address = (swp_entry_t) { address };
 		pgoff_t offset = swp_offset(swap_address);
 		unsigned swapfilenum = swp_type(swap_address);
 		struct swap_info_struct *sis =
@@ -597,11 +597,11 @@ static int toi_swap_release_storage(void)
 
 	if (swapextents.first) {
 		/* Free swap entries */
-		struct extent *extentpointer;
+		struct hibernate_extent *extentpointer;
 		unsigned long extentvalue;
 		toi_extent_for_each(&swapextents, extentpointer,
 				extentvalue)
-			swap_free(extent_val_to_swap_entry(extentvalue));
+			swap_free((swp_entry_t) { extentvalue } );
 
 		toi_put_extent_chain(&swapextents);
 
@@ -616,7 +616,7 @@ static void free_swap_range(unsigned long min, unsigned long max)
 	int j;
 
 	for (j = min; j <= max; j++)
-		swap_free(extent_val_to_swap_entry(j));
+		swap_free((swp_entry_t) { j });
 }
 
 /*
@@ -661,7 +661,7 @@ static int toi_swap_allocate_storage(int request)
 			break;
 
 		swapfilenum = swp_type(entry);
-		new_value = swap_entry_to_extent_val(entry);
+		new_value = entry.val;
 
 		if (!to_add[swapfilenum]) {
 			to_add[swapfilenum] = 1;
