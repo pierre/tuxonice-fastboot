@@ -148,13 +148,14 @@ void toi_finish_anything(int hibernate_or_resume)
 int toi_start_anything(int hibernate_or_resume)
 {
 	if (atomic_add_return(1, &actions_running) != 1) {
+		int result = 0;
 		if (hibernate_or_resume) {
 			printk(KERN_INFO "Can't start a cycle when actions are "
 					"already running.\n");
-			atomic_dec(&actions_running);
-			return -EBUSY;
-		} else
-			return 0;
+			result = -EBUSY;
+		}
+		atomic_dec(&actions_running);
+		return result;
 	}
 
 	oldfs = get_fs();
