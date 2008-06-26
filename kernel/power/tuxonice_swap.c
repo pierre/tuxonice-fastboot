@@ -342,7 +342,7 @@ static int parse_signature(void)
 		if (!memcmp(sigs[type], swap_header, strlen(sigs[type])))
 			return type;
 
-	if (memcmp(tuxonice_signature, swap_header, 1))
+	if (memcmp(tuxonice_signature, swap_header, sizeof(tuxonice_signature)))
 		return -1;
 
 	header_dev_t = sig->device;

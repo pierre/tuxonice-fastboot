@@ -679,7 +679,8 @@ static int toi_file_signature_op(int op)
 		if (result == -1)
 			goto out;
 
-		strcpy(header->sig, tuxonice_signature);
+		memcpy(header->sig, tuxonice_signature,
+				sizeof(tuxonice_signature));
 		header->resumed_before = 0;
 		header->have_image = 0;
 		result = changed = 1;
