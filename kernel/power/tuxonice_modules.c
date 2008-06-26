@@ -342,8 +342,11 @@ int toi_initialise_modules(int starting_cycle, int early)
 				"Initialising module %s.\n",
 				this_module->name);
 			result = this_module->initialise(starting_cycle);
-			if (result)
+			if (result) {
+				toi_cleanup_modules(starting_cycle);
 				return result;
+			}
+			this_module->initialised = 1;
 		}
 	}
 
@@ -360,7 +363,7 @@ void toi_cleanup_modules(int finishing_cycle)
 	struct toi_module_ops *this_module;
 
 	list_for_each_entry(this_module, &toi_modules, module_list) {
-		if (!this_module->enabled)
+		if (!this_module->enabled || !this_module->initialised)
 			continue;
 		if (this_module->cleanup) {
 			toi_message(TOI_MEMORY, TOI_MEDIUM, 1,
@@ -368,6 +371,7 @@ void toi_cleanup_modules(int finishing_cycle)
 				this_module->name);
 			this_module->cleanup(finishing_cycle);
 		}
+		this_module->initialised = 0;
 	}
 }
 

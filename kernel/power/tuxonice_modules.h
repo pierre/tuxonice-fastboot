@@ -47,7 +47,7 @@ struct toi_module_ops {
 	char *shared_directory;
 	struct kobject *dir_kobj;
 	struct module *module;
-	int enabled, early;
+	int enabled, early, initialised;
 	struct list_head module_list;
 
 	/* List of filters or allocators */

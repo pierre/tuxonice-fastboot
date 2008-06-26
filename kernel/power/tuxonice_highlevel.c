@@ -94,7 +94,7 @@ struct pagedir pagedir2 = {2};
 
 static int get_pmsem = 0, got_pmsem;
 static mm_segment_t oldfs;
-static atomic_t actions_running;
+static DEFINE_MUTEX(tuxonice_in_use);
 static int block_dump_save;
 static char pre_hibernate_command[256];
 static char post_hibernate_command[256];
@@ -118,12 +118,8 @@ unsigned long boot_kernel_data_buffer;
  */
 void toi_finish_anything(int hibernate_or_resume)
 {
-	if (!atomic_dec_and_test(&actions_running))
-		return;
-
 	toi_cleanup_modules(hibernate_or_resume);
 	toi_put_modules();
-	set_fs(oldfs);
 	if (hibernate_or_resume) {
 		block_dump = block_dump_save;
 		set_cpus_allowed(current, CPU_MASK_ALL);
@@ -134,6 +130,9 @@ void toi_finish_anything(int hibernate_or_resume)
 			toi_launch_userspace_program(post_hibernate_command,
 					0, UMH_WAIT_PROC);
 	}
+
+	set_fs(oldfs);
+	mutex_unlock(&tuxonice_in_use);
 }
 
 /**
@@ -147,16 +146,7 @@ void toi_finish_anything(int hibernate_or_resume)
  */
 int toi_start_anything(int hibernate_or_resume)
 {
-	if (atomic_add_return(1, &actions_running) != 1) {
-		int result = 0;
-		if (hibernate_or_resume) {
-			printk(KERN_INFO "Can't start a cycle when actions are "
-					"already running.\n");
-			result = -EBUSY;
-		}
-		atomic_dec(&actions_running);
-		return result;
-	}
+	mutex_lock(&tuxonice_in_use);
 
 	oldfs = get_fs();
 	set_fs(KERNEL_DS);
@@ -169,7 +159,7 @@ int toi_start_anything(int hibernate_or_resume)
 			printk("Pre-hibernate command '%s' returned %d. "
 					"Aborting.\n", pre_hibernate_command,
 					result);
-			goto out_err;
+			goto prehibernate_err;
 		}
 	}
 
@@ -178,7 +168,7 @@ int toi_start_anything(int hibernate_or_resume)
 
 	if (toi_get_modules()) {
 		printk("TuxOnIce: Get modules failed!\n");
-		goto out_err;
+		goto getmodules_err;
 	}
 
 	if (hibernate_or_resume) {
@@ -189,20 +179,26 @@ int toi_start_anything(int hibernate_or_resume)
 	}
 
 	if (toi_initialise_modules_early(hibernate_or_resume))
-		goto out_err;
+		goto early_init_err;
 
 	if (!toiActiveAllocator)
 		toi_attempt_to_parse_resume_device(!hibernate_or_resume);
 
 	if (toi_initialise_modules_late(hibernate_or_resume))
-		goto out_err;
+		goto late_init_err;
 
 	return 0;
 
-out_err:
-	if (hibernate_or_resume)
+late_init_err:
+	toi_cleanup_modules(hibernate_or_resume);
+early_init_err:
+	if (hibernate_or_resume) {
 		block_dump_save = block_dump;
-	toi_finish_anything(hibernate_or_resume);
+		set_cpus_allowed(current, CPU_MASK_ALL);
+	}
+getmodules_err:
+prehibernate_err:
+	set_fs(oldfs);
 	return -EBUSY;
 }
 
@@ -1015,7 +1011,7 @@ int _toi_try_hibernate(int have_pmsem)
 {
 	int result = 0, sys_power_disk = 0;
 
-	if (!atomic_read(&actions_running)) {
+	if (!mutex_is_locked(&tuxonice_in_use)) {
 		/* Came in via /sys/power/disk */
 		if (toi_start_anything(SYSFS_HIBERNATING))
 			return -EBUSY;
