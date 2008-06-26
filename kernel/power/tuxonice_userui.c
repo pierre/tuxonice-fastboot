@@ -660,6 +660,7 @@ static __init int toi_user_ui_init(void)
  */
 static __exit void toi_user_ui_exit(void)
 {
+	toi_netlink_close_complete(&ui_helper_data);
 	toi_remove_ui_ops(&my_ui_ops);
 	toi_unregister_module(&userui_ops);
 }

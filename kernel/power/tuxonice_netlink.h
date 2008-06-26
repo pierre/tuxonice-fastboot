@@ -46,6 +46,7 @@ int toi_netlink_setup(struct user_helper_data *uhd);
 void toi_netlink_close(struct user_helper_data *uhd);
 void toi_send_netlink_message(struct user_helper_data *uhd,
 		int type, void *params, size_t len);
+void toi_netlink_close_complete(struct user_helper_data *uhd);
 #else
 static inline int toi_netlink_setup(struct user_helper_data *uhd)
 {
@@ -55,4 +56,6 @@ static inline int toi_netlink_setup(struct user_helper_data *uhd)
 static inline void toi_netlink_close(struct user_helper_data *uhd) { };
 static inline void toi_send_netlink_message(struct user_helper_data *uhd,
 		int type, void *params, size_t len) { };
+static inline void toi_netlink_close_complete(struct user_helper_data *uhd)
+	{ };
 #endif

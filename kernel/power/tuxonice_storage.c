@@ -288,5 +288,6 @@ int toi_usm_init(void)
 
 void toi_usm_exit(void)
 {
+	toi_netlink_close_complete(&usm_helper_data);
 	toi_unregister_module(&usm_ops);
 }

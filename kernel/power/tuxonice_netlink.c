@@ -185,6 +185,7 @@ void toi_netlink_close_complete(struct user_helper_data *uhd)
 
 	uhd->pid = -1;
 }
+EXPORT_SYMBOL_GPL(toi_netlink_close_complete);
 
 static int toi_nl_gen_rcv_msg(struct user_helper_data *uhd,
 		struct sk_buff *skb, struct nlmsghdr *nlh)
@@ -296,6 +297,9 @@ EXPORT_SYMBOL_GPL(toi_netlink_close);
 
 int toi_netlink_setup(struct user_helper_data *uhd)
 {
+	/* In case userui didn't cleanup properly on us */
+	toi_netlink_close_complete(uhd);
+
 	if (netlink_prepare(uhd) < 0) {
 		printk(KERN_INFO "Netlink prepare failed.\n");
 		return 1;
