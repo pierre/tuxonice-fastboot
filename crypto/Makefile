@@ -70,7 +70,7 @@ obj-$(CONFIG_CRYPTO_CRC32C) += crc32c.o
 obj-$(CONFIG_CRYPTO_LZF) += lzf.o
 obj-$(CONFIG_CRYPTO_AUTHENC) += authenc.o
 obj-$(CONFIG_CRYPTO_LZO) += lzo.o
-obj-$(CONFIG_CRYPTO_PRNG) += prng.o
+
 obj-$(CONFIG_CRYPTO_TEST) += tcrypt.o
 
 #
