@@ -310,7 +310,7 @@ int toi_go_atomic(pm_message_t state, int suspend_time)
 
 	if (suspend_time && toi_platform_pre_snapshot()) {
 		set_abort_result(TOI_PRE_SNAPSHOT_FAILED);
-		toi_end_atomic(ATOMIC_STEP_DEVICE_RESUME, suspend_time);
+		toi_end_atomic(ATOMIC_STEP_PLATFORM_FINISH, suspend_time);
 		return 1;
 	}
 
@@ -365,6 +365,7 @@ void toi_end_atomic(int stage, int suspend_time)
 	case ATOMIC_STEP_CPU_HOTPLUG:
 		if (test_action_state(TOI_LATE_CPU_HOTPLUG))
 			enable_nonboot_cpus();
+	case ATOMIC_STEP_PLATFORM_FINISH:
 		toi_platform_finish();
 	case ATOMIC_STEP_DEVICE_RESUME:
 		device_resume();
