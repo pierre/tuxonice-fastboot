@@ -198,6 +198,7 @@ early_init_err:
 getmodules_err:
 prehibernate_err:
 	set_fs(oldfs);
+	mutex_unlock(&tuxonice_in_use);
 	return -EBUSY;
 }
 
