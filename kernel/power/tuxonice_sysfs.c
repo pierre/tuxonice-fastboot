@@ -109,8 +109,8 @@ static ssize_t toi_attr_store(struct kobject *kobj, struct attribute *attr,
 	switch (sysfs_data->type) {
 	case TOI_SYSFS_DATA_CUSTOM:
 		if (sysfs_data->data.special.write_sysfs)
-			result = (sysfs_data->data.special.write_sysfs)
-				(my_buf, count);
+			result = (sysfs_data->data.special.write_sysfs)(my_buf,
+					count);
 		break;
 	case TOI_SYSFS_DATA_BIT:
 		{
@@ -165,8 +165,7 @@ static ssize_t toi_attr_store(struct kobject *kobj, struct attribute *attr,
 				assigned_temp_buffer = 1;
 			}
 			strncpy(variable, my_buf, copy_len);
-			if ((copy_len) &&
-				 (my_buf[copy_len - 1] == '\n'))
+			if (copy_len && my_buf[copy_len - 1] == '\n')
 				variable[count - 1] = 0;
 			variable[count] = 0;
 		}
