@@ -12,7 +12,6 @@ int toi_pm_state_finish(void);
 void toi_power_down(void);
 extern unsigned long toi_poweroff_method;
 extern int toi_platform_prepare(void);
-extern void toi_platform_end(void);
 int toi_poweroff_init(void);
 void toi_poweroff_exit(void);
 void toi_check_resleep(void);
