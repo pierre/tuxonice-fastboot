@@ -630,10 +630,15 @@ static int toi_rw_cleanup(int writing)
 	int i;
 
 	if (writing) {
+		int result;
+
 		if (toi_writer_buffer_posn)
 			toi_bio_queue_write(&toi_writer_buffer);
 
-		toi_bio_queue_flush_pages(0);
+		result = toi_bio_queue_flush_pages(0);
+
+		if (result)
+			return result;
 
 		if (current_stream == 2)
 			toi_extent_state_save(&toi_writer_posn,
