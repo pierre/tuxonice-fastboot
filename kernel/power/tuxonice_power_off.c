@@ -57,13 +57,18 @@ static void __toi_power_down(int method)
 		break;
 	case 3:
 		error = pm_notifier_call_chain(PM_SUSPEND_PREPARE);
-		if (!error)
-			error = suspend_devices_and_enter(PM_SUSPEND_MEM);
-		pm_notifier_call_chain(PM_POST_SUSPEND);
 		if (!error) {
-			did_suspend_to_both = 1;
-			return;
+			error = suspend_devices_and_enter(PM_SUSPEND_MEM);
+			if (!error)
+				did_suspend_to_both = 1;
 		}
+		pm_notifier_call_chain(PM_POST_SUSPEND);
+
+		/* Success - we're now post-resume-from-ram */
+		if (did_suspend_to_both)
+			return;
+
+		/* Failed to suspend to ram - do normal power off */
 		break;
 	case 4:
 		/* 
