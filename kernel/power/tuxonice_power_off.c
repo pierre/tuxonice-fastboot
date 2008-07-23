@@ -66,8 +66,11 @@ static void __toi_power_down(int method)
 		}
 		break;
 	case 4:
-		if (!hibernation_platform_enter())
-			return;
+		/* 
+		 * If succeeds, doesn't return. If fails, do a simple
+		 * powerdown.
+		 */
+		hibernation_platform_enter();
 		break;
 	case 5:
 		/* Historic entry only now */
