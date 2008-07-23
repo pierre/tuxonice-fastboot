@@ -335,6 +335,7 @@ int toi_go_atomic(pm_message_t state, int suspend_time)
 		return 1;
 	}
 
+	device_pm_lock();
 	local_irq_disable();
 
 	/* At this point, device_suspend() has been called, but *not*
