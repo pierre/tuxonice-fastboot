@@ -456,7 +456,7 @@ static int check_still_keeping_image(void)
  */
 static int toi_init(void)
 {
-	int result;
+	int result, i, j;
 
 	toi_result = 0;
 
@@ -464,8 +464,9 @@ static int toi_init(void)
 
 	nr_hibernates++;
 
-	toi_bkd.toi_io_time[0][0] = toi_bkd.toi_io_time[0][1] =
-		toi_bkd.toi_io_time[1][0] =	toi_bkd.toi_io_time[1][1] = 0;
+	for (i = 0; i < 2; i++)
+		for (j = 0; j < 2; j++)
+			toi_bkd.toi_io_time[i][j] = 0;
 
 	if (!test_toi_state(TOI_CAN_HIBERNATE) ||
 	    allocate_bitmaps())
