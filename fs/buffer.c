@@ -247,6 +247,12 @@ void thaw_bdev(struct block_device *bdev, struct super_block *sb)
 }
 EXPORT_SYMBOL(thaw_bdev);
 
+#if 0
+#define FS_PRINTK(fmt, args...) printk(fmt, ## args)
+#else
+#define FS_PRINTK(fmt, args...)
+#endif
+
 /* #define DEBUG_FS_FREEZING */
 
 /**
@@ -264,12 +270,10 @@ void freeze_filesystems(int which)
 	 * frozen in the right order (eg. loopback on ext3).
 	 */
 	list_for_each_entry_reverse(sb, &super_blocks, s_list) {
-#ifdef DEBUG_FS_FREEZING
-		printk(KERN_INFO "Considering %s.%s: (root %p, bdev %x)",
+		FS_PRINTK(KERN_INFO "Considering %s.%s: (root %p, bdev %x)",
 			sb->s_type->name ? sb->s_type->name : "?",
 			sb->s_subtype ? sb->s_subtype : "", sb->s_root,
 			sb->s_bdev ? sb->s_bdev->bd_dev : 0);
-#endif
 
 		if (sb->s_type->fs_flags & FS_IS_FUSE &&
 		    sb->s_frozen == SB_UNFROZEN &&
@@ -285,20 +289,14 @@ void freeze_filesystems(int which)
 		    (sb->s_flags & MS_RDONLY) ||
 		    (sb->s_flags & MS_FROZEN) ||
 		    !(which & FS_FREEZER_NORMAL)) {
-#ifdef DEBUG_FS_FREEZING
-			printk(KERN_INFO "Nope.\n");
-#endif
+			FS_PRINTK(KERN_INFO "Nope.\n");
 			continue;
 		}
 
-#ifdef DEBUG_FS_FREEZING
-		printk(KERN_INFO "Freezing %x... ", sb->s_bdev->bd_dev);
-#endif
+		FS_PRINTK(KERN_INFO "Freezing %x... ", sb->s_bdev->bd_dev);
 		freeze_bdev(sb->s_bdev);
 		sb->s_flags |= MS_FROZEN;
-#ifdef DEBUG_FS_FREEZING
-		printk(KERN_INFO "Done.\n");
-#endif
+		FS_PRINTK(KERN_INFO "Done.\n");
 	}
 
 	lockdep_on();
