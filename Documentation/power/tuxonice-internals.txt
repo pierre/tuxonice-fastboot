@@ -131,7 +131,7 @@
     that changes in number or fragmentation of the pages to be saved don't
     feedback via changes in the amount of memory needed for metadata). The
     recursiveness is thus limited to any extra slab pages allocated to store the
-    extents that record storage used, and he effects of seeking to free memory.
+    extents that record storage used, and the effects of seeking to free memory.
 
     d. Write the image.
 
@@ -397,6 +397,11 @@
     implements on the incoming data, completely consuming the incoming data and
     feeding output in a similar manner to the next module. A module may buffer
     its output.
+
+    All routines are SMP safe, and the final result of the transformations is
+    written with an index (provided by the core) and size of the output by the
+    writer. As a result, we can have multithreaded I/O without needing to
+    worry about the sequence in which pages are written (or read).
 
     During reading, the pipeline works in the reverse direction. The core code
     calls the first module with the address of a buffer which should be filled.
