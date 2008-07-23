@@ -5,7 +5,6 @@
  */
 #include <linux/module.h>
 #include <linux/resume-trace.h>
-#include <linux/syscalls.h>
 #include <linux/kernel.h>
 #include <linux/swap.h>
 #include <linux/syscalls.h>
