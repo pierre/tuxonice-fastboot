@@ -167,7 +167,7 @@ static int has_contiguous_blocks(int page_num)
 		last = this;
 	}
 
-	return (j == devinfo.blocks_per_page);
+	return j == devinfo.blocks_per_page;
 }
 
 static int size_ignoring_ignored_pages(void)

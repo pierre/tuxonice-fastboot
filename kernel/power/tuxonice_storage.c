@@ -176,7 +176,7 @@ static void usm_load_config_info(char *buf, int size)
 static int usm_memory_needed(void)
 {
 	/* ball park figure of 32 pages */
-	return (32 * PAGE_SIZE);
+	return 32 * PAGE_SIZE;
 }
 
 /* toi_prepare_usm
@@ -201,7 +201,7 @@ int toi_prepare_usm(void)
 
 	toi_activate_storage(0);
 
-	return (usm_helper_data.pid != -1);
+	return usm_helper_data.pid != -1;
 }
 
 void toi_cleanup_usm(void)

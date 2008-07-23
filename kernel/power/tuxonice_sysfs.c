@@ -13,7 +13,6 @@
 
 #include <linux/suspend.h>
 #include <linux/module.h>
-#include <asm/uaccess.h>
 
 #include "tuxonice_sysfs.h"
 #include "tuxonice.h"

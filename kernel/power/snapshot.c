@@ -50,7 +50,6 @@ EXPORT_SYMBOL_GPL(resume_attempted);
 
 #ifdef CONFIG_TOI
 #include "tuxonice_pagedir.h"
-int toi_post_context_save(void);
 #endif
 
 /* Pointer to an auxiliary buffer (1 page) */

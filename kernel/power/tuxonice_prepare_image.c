@@ -391,9 +391,9 @@ static void get_extra_pd1_allowance(void)
 static long main_storage_needed(int use_ecr,
 		int ignore_extra_pd1_allow)
 {
-	return ((pagedir1.size + pagedir2.size +
+	return (pagedir1.size + pagedir2.size +
 	  (ignore_extra_pd1_allow ? 0 : extra_pd1_pages_allowance)) *
-	 (use_ecr ? toi_expected_compression_ratio() : 100) / 100);
+	 (use_ecr ? toi_expected_compression_ratio() : 100) / 100;
 }
 
 /*
@@ -495,9 +495,9 @@ static long image_not_ready(int use_image_size_limit)
 
 	toi_cond_pause(0, NULL);
 
-	return ((amount_needed(use_image_size_limit) > 0) ||
+	return (amount_needed(use_image_size_limit) > 0) ||
 		header_space_allocated < header_storage_needed() ||
-		 main_storage_allocated < main_storage_needed(1, 1));
+		 main_storage_allocated < main_storage_needed(1, 1);
 }
 
 static void display_failure_reason(int tries_exceeded)
@@ -522,7 +522,8 @@ static void display_failure_reason(int tries_exceeded)
 
 	if (header_space_allocated < header_storage_needed()) {
 		printk(KERN_INFO "- Insufficient header storage allocated. "
-				"Need %ld, have %ld.\n", header_storage_needed(),
+				"Need %ld, have %ld.\n",
+				header_storage_needed(),
 				header_space_allocated);
 		set_abort_result(TOI_INSUFFICIENT_STORAGE);
 	}
@@ -546,7 +547,8 @@ static void display_failure_reason(int tries_exceeded)
 		printk(KERN_INFO "   + 2 * extra allow  : %8ld\n",
 				2 * extra_pd1_pages_allowance);
 		printk(KERN_INFO "                      : ========\n");
-		printk(KERN_INFO "     Still needed     : %8ld\n", ram_required);
+		printk(KERN_INFO "     Still needed     : %8ld\n",
+				ram_required);
 
 		/* Print breakdown of memory needed for modules */
 		toi_memory_for_modules(1);
@@ -671,7 +673,7 @@ static int size_of_free_region(struct page *page)
 	while (this_pfn <= end_pfn && PageNosaveFree(pfn_to_page(this_pfn)))
 		this_pfn++;
 
-	return (this_pfn - orig_pfn);
+	return this_pfn - orig_pfn;
 }
 
 /* flag_image_pages

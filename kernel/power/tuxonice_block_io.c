@@ -355,8 +355,8 @@ static int toi_bdev_page_io(int writing, struct block_device *bdev,
  */
 static int toi_bio_memory_needed(void)
 {
-	return (target_outstanding_io * (PAGE_SIZE + sizeof(struct request) +
-				sizeof(struct bio)));
+	return target_outstanding_io * (PAGE_SIZE + sizeof(struct request) +
+				sizeof(struct bio));
 }
 
 /*
@@ -383,7 +383,7 @@ static int toi_bio_print_debug_stats(char *buffer, int size)
 	len += snprintf_used(buffer + len, size - len,
 		"  Mutex contention while reading:\n  Contended      Free\n");
 
-	for (i = 0; i < NR_CPUS; i++)
+	for_each_online_cpu(i)
 		len += snprintf_used(buffer + len, size - len,
 		"  %9lu %9lu\n",
 		mutex_times[0][0][i], mutex_times[0][1][i]);
@@ -391,7 +391,7 @@ static int toi_bio_print_debug_stats(char *buffer, int size)
 	len += snprintf_used(buffer + len, size - len,
 		"  Mutex contention while writing:\n  Contended      Free\n");
 
-	for (i = 0; i < NR_CPUS; i++)
+	for_each_online_cpu(i)
 		len += snprintf_used(buffer + len, size - len,
 		"  %9lu %9lu\n",
 		mutex_times[1][0][i], mutex_times[1][1][i]);
@@ -762,7 +762,8 @@ static int toi_bio_get_next_page_read(int no_readahead)
 	 * extents out of the first page.
 	 */
 	if (unlikely(no_readahead && toi_start_one_readahead(0))) {
-		printk("No readahead and toi_start_one_readahead returned non-zero.\n");
+		printk(KERN_INFO "No readahead and toi_start_one_readahead "
+				"returned non-zero.\n");
 		return -EIO;
 	}
 
@@ -848,7 +849,8 @@ static void toi_bio_get_new_page(char **full_buffer)
  * @buffer: The start of the buffer to write or fill.
  * @buffer_size: The size of the buffer to write or fill.
  */
-static int toi_rw_buffer(int writing, char *buffer, int buffer_size, int no_readahead)
+static int toi_rw_buffer(int writing, char *buffer, int buffer_size,
+		int no_readahead)
 {
 	int bytes_left = buffer_size;
 
@@ -905,7 +907,8 @@ static int toi_bio_read_page(unsigned long *pfn, struct page *buffer_page,
 
 	/* Only call start_new_readahead if we don't have a dedicated thread */
 	if (current == toi_queue_flusher && toi_start_new_readahead(0)) {
-		printk("Queue flusher and toi_start_one_readahead returned non-zero.\n");
+		printk(KERN_INFO "Queue flusher and toi_start_one_readahead "
+				"returned non-zero.\n");
 		return -EIO;
 	}
 
@@ -951,7 +954,8 @@ static int toi_bio_write_page(unsigned long pfn, struct page *buffer_page,
 	if (toi_rw_buffer(WRITE, (char *) &pfn, sizeof(unsigned long), 0) ||
 	    toi_rw_buffer(WRITE, (char *) &buf_size, sizeof(int), 0) ||
 	    toi_rw_buffer(WRITE, buffer_virt, buf_size, 0)) {
-		printk("toi_rw_buffer returned non-zero to toi_bio_write_page.\n");
+		printk(KERN_INFO "toi_rw_buffer returned non-zero to "
+				"toi_bio_write_page.\n");
 		result = -EIO;
 	}
 
@@ -1004,7 +1008,8 @@ static int _toi_rw_header_chunk(int writing, struct toi_module_ops *owner,
 		result = toi_start_new_readahead(0);
 
 	if (!result)
-		result = toi_rw_buffer(writing, buffer, buffer_size, no_readahead);
+		result = toi_rw_buffer(writing, buffer, buffer_size,
+				no_readahead);
 
 	return result;
 }
@@ -1087,7 +1092,7 @@ static int toi_bio_initialise(int starting_cycle)
 
 		for (i = 0; i < 2; i++)
 			for (j = 0; j < 2; j++)
-				for (k = 0; k < NR_CPUS; k++)
+				for_each_online_cpu(k)
 					mutex_times[i][j][k] = 0;
 		}
 #endif

@@ -165,7 +165,8 @@ int toi_load_extent_chain(struct hibernate_extent_chain *chain)
 	}
 
 	for (i = 0; i < chain->num_extents; i++) {
-		this = toi_kzalloc(3, sizeof(struct hibernate_extent), TOI_ATOMIC_GFP);
+		this = toi_kzalloc(3, sizeof(struct hibernate_extent),
+				TOI_ATOMIC_GFP);
 		if (!this) {
 			printk(KERN_INFO "Failed to allocate a new extent.\n");
 			return -ENOMEM;

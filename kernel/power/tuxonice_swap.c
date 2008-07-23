@@ -29,7 +29,7 @@ static struct toi_module_ops toi_swapops;
 
 /* --- Struct of pages stored on disk */
 
-struct tuxonice_sig_data {
+struct sig_data {
 	dev_t device;
 	unsigned long sector;
 	int resume_attempted;
@@ -38,7 +38,7 @@ struct tuxonice_sig_data {
 
 union diskpage {
 	union swap_header swh;	/* swh.magic is the only member used */
-	struct tuxonice_sig_data tuxonice_sig_data;
+	struct sig_data sig_data;
 };
 
 union p_diskpage {
@@ -61,7 +61,7 @@ enum {
  * swap header page looked like at the start of hibernating.
  */
 static char *current_signature_page;
-static char no_image_signature_contents[sizeof(struct tuxonice_sig_data)];
+static char no_image_signature_contents[sizeof(struct sig_data)];
 
 /* Devices used for swap */
 static struct toi_bdev_info devinfo[MAX_SWAPFILES];
@@ -307,7 +307,8 @@ static int get_current_signature(void)
 	if (current_signature_page)
 		return 0;
 
-	current_signature_page = (char *) toi_get_zeroed_page(38, TOI_ATOMIC_GFP);
+	current_signature_page = (char *) toi_get_zeroed_page(38,
+			TOI_ATOMIC_GFP);
 	if (!current_signature_page)
 		return -ENOMEM;
 
@@ -320,7 +321,7 @@ static int get_current_signature(void)
 static int parse_signature(void)
 {
 	union p_diskpage swap_header_page;
-	struct tuxonice_sig_data *sig;
+	struct sig_data *sig;
 	int type;
 	char *swap_header;
 	const char *sigs[] = {
@@ -335,7 +336,7 @@ static int parse_signature(void)
 	}
 
 	swap_header_page = (union p_diskpage) current_signature_page;
-	sig = (struct tuxonice_sig_data *) current_signature_page;
+	sig = (struct sig_data *) current_signature_page;
 	swap_header = swap_header_page.pointer->swh.magic.magic;
 
 	for (type = 0; type < 5; type++)
@@ -401,12 +402,11 @@ static int write_modified_signature(int modification)
 		si = get_swap_info_struct(toi_writer_posn.current_chain);
 
 		/* Prepare the signature */
-		swap_header_page.pointer->tuxonice_sig_data.device =
-			si->bdev->bd_dev;
-		swap_header_page.pointer->tuxonice_sig_data.sector =
+		swap_header_page.pointer->sig_data.device = si->bdev->bd_dev;
+		swap_header_page.pointer->sig_data.sector =
 			toi_writer_posn.current_offset;
-		swap_header_page.pointer->tuxonice_sig_data.resume_attempted =0;
-		swap_header_page.pointer->tuxonice_sig_data.orig_sig_type =
+		swap_header_page.pointer->sig_data.resume_attempted = 0;
+		swap_header_page.pointer->sig_data.orig_sig_type =
 			parse_signature();
 
 		memcpy(swap_header_page.pointer->swh.magic.magic,
@@ -414,7 +414,7 @@ static int write_modified_signature(int modification)
 
 		break;
 	case NO_IMAGE_SIGNATURE:
-		if (!swap_header_page.pointer->tuxonice_sig_data.orig_sig_type)
+		if (!swap_header_page.pointer->sig_data.orig_sig_type)
 			orig_sig = "SWAP-SPACE";
 		else
 			orig_sig = "SWAPSPACE2";
@@ -424,10 +424,10 @@ static int write_modified_signature(int modification)
 				sizeof(no_image_signature_contents));
 		break;
 	case TRIED_RESUME:
-		swap_header_page.pointer->tuxonice_sig_data.resume_attempted =1;
+		swap_header_page.pointer->sig_data.resume_attempted = 1;
 		break;
 	case NO_TRIED_RESUME:
-		swap_header_page.pointer->tuxonice_sig_data.resume_attempted =0;
+		swap_header_page.pointer->sig_data.resume_attempted = 0;
 		break;
 	}
 
@@ -601,7 +601,7 @@ static int toi_swap_release_storage(void)
 		unsigned long extentvalue;
 		toi_extent_for_each(&swapextents, extentpointer,
 				extentvalue)
-			swap_free((swp_entry_t) { extentvalue } );
+			swap_free((swp_entry_t) { extentvalue });
 
 		toi_put_extent_chain(&swapextents);
 
@@ -735,7 +735,7 @@ static int toi_swap_write_header_init(void)
 
 	result = toi_bio_ops.rw_header_chunk(WRITE, &toi_swapops,
 			(char *) &no_image_signature_contents,
-			sizeof(struct tuxonice_sig_data));
+			sizeof(struct sig_data));
 
 	if (result)
 		return result;
@@ -840,8 +840,8 @@ static int toi_swap_read_header_init(void)
 
 	toi_writer_buffer_posn = sizeof(no_image_signature_contents);
 
-	memcpy(&toi_writer_posn_save, toi_writer_buffer + toi_writer_buffer_posn,
-			sizeof(toi_writer_posn_save));
+	memcpy(&toi_writer_posn_save, toi_writer_buffer +
+			toi_writer_buffer_posn, sizeof(toi_writer_posn_save));
 
 	toi_writer_buffer_posn += sizeof(toi_writer_posn_save);
 

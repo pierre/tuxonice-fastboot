@@ -1122,8 +1122,8 @@ static int __read_pageset1(void)
 
 	result = toiActiveAllocator->read_header_init();
 	if (result) {
-		printk("TuxOnIce: Failed to initialise, reading the image "
-				"header.\n");
+		printk(KERN_INFO "TuxOnIce: Failed to initialise, reading the "
+				"image header.\n");
 		goto out_remove_image;
 	}
 

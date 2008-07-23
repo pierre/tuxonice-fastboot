@@ -74,7 +74,6 @@
 #include <linux/cpu.h>
 #include <linux/console.h>
 #include <linux/writeback.h>
-#include <asm/uaccess.h>
 
 #include "tuxonice_modules.h"
 #include "tuxonice_sysfs.h"
@@ -156,9 +155,9 @@ int toi_start_anything(int hibernate_or_resume)
 		int result = toi_launch_userspace_program(pre_hibernate_command,
 				0, UMH_WAIT_PROC);
 		if (result) {
-			printk("Pre-hibernate command '%s' returned %d. "
-					"Aborting.\n", pre_hibernate_command,
-					result);
+			printk(KERN_INFO "Pre-hibernate command '%s' returned "
+					"%d. Aborting.\n",
+					pre_hibernate_command, result);
 			goto prehibernate_err;
 		}
 	}
@@ -287,8 +286,9 @@ static int io_MB_per_second(int write)
  * Fill a (usually PAGE_SIZEd) buffer with the debugging info that we will
  * either printk or return via sysfs.
  */
-#define SNPRINTF(a...) 	len += snprintf_used(((char *)buffer) + len, \
-		count - len - 1, ## a)
+#define SNPRINTF(a...) 	do { len += snprintf_used(((char *) buffer) + len, \
+		count - len - 1, ## a); } while (0)
+
 static int get_toi_debug_info(const char *buffer, int count)
 {
 	int len = 0;
@@ -1260,7 +1260,8 @@ static __init int core_load(void)
 	int i,
 	    numfiles = sizeof(sysfs_params) / sizeof(struct toi_sysfs_data);
 
-	printk("TuxOnIce " TOI_CORE_VERSION " (http://tuxonice.net)\n");
+	printk(KERN_INFO "TuxOnIce " TOI_CORE_VERSION
+			" (http://tuxonice.net)\n");
 	strncpy(pre_hibernate_command, CONFIG_TOI_DEFAULT_PRE_HIBERNATE, 255);
 	strncpy(post_hibernate_command, CONFIG_TOI_DEFAULT_POST_HIBERNATE, 255);
 
