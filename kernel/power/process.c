@@ -299,5 +299,5 @@ void thaw_kernel_threads(void)
 	freezer_state = FREEZER_USERSPACE_FROZEN;
 	printk(KERN_INFO "Restarting normal filesystems.\n");
 	thaw_filesystems(FS_FREEZER_NORMAL);
-	thaw_tasks(FREEZER_KERNEL_THREADS);
+	thaw_tasks(true);
 }
