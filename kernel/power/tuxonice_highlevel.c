@@ -631,8 +631,7 @@ Failed:
 			return 1;
 	}
 
-	toi_update_status(pagedir2.size,
-			pagedir1.size + pagedir2.size,
+	toi_update_status(pagedir2.size, pagedir1.size + pagedir2.size,
 			NULL);
 
 	if (test_result_state(TOI_ABORTED))
@@ -640,8 +639,7 @@ Failed:
 
 	toi_cond_pause(1, "About to write pageset1.");
 
-	toi_message(TOI_ANY_SECTION, TOI_LOW, 1,
-			"-- Writing pageset1\n");
+	toi_message(TOI_ANY_SECTION, TOI_LOW, 1, "-- Writing pageset1\n");
 
 	temp_result = write_pageset(&pagedir1);
 
