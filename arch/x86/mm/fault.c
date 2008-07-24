@@ -26,7 +26,6 @@
 #include <linux/kprobes.h>
 #include <linux/uaccess.h>
 #include <linux/kdebug.h>
-#include <linux/suspend.h>
 
 #include <asm/system.h>
 #include <asm/desc.h>
@@ -60,11 +59,6 @@ static inline int kmmio_fault(struct pt_regs *regs, unsigned long addr)
 #endif
 	return 0;
 }
-
-#ifdef CONFIG_X86_32
-int toi_faulted;
-EXPORT_SYMBOL_GPL(toi_faulted);
-#endif
 
 static inline int notify_page_fault(struct pt_regs *regs)
 {
@@ -612,22 +606,6 @@ void __kprobes do_page_fault(struct pt_regs *regs, unsigned long error_code)
 	address = read_cr2();
 
 	si_code = SEGV_MAPERR;
-
-	/* During a TuxOnIce atomic copy, with DEBUG_SLAB, we will
-	 * get page faults where slab has been unmapped. Map them
-	 * temporarily and set the variable that tells TuxOnIce to
-	 * unmap afterwards.
-	 */
-
-#ifdef CONFIG_DEBUG_PAGEALLOC /* X86_32 only */
-	if (unlikely(toi_running && !toi_faulted)) {
-		struct page *page = NULL;
-		toi_faulted = 1;
-		page = virt_to_page(address);
-		kernel_map_pages(page, 1, 1);
-		return;
-	}
-#endif
 
 	if (notify_page_fault(regs))
 		return;

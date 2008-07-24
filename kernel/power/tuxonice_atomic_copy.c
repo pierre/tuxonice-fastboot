@@ -147,7 +147,8 @@ void toi_copy_pageset1(void)
 	for (i = 0; i < pagedir1.size; i++) {
 		unsigned long *origvirt, *copyvirt;
 		struct page *origpage, *copypage;
-		int loop = (PAGE_SIZE / sizeof(unsigned long)) - 1;
+		int loop = (PAGE_SIZE / sizeof(unsigned long)) - 1,
+		    was_present;
 
 		origpage = pfn_to_page(source_index);
 		copypage = pfn_to_page(dest_index);
@@ -160,20 +161,20 @@ void toi_copy_pageset1(void)
 			kmap_atomic(copypage, KM_USER1) :
 			page_address(copypage);
 
+		was_present = kernel_page_present(origpage);
+		if (!was_present)
+			kernel_map_pages(origpage, 1, 1);
+
 		while (loop >= 0) {
 			*(copyvirt + loop) = *(origvirt + loop);
 			loop--;
 		}
 
+		if (!was_present)
+			kernel_map_pages(origpage, 1, 0);
+
 		if (PageHighMem(origpage))
 			kunmap_atomic(origvirt, KM_USER0);
-		else if (toi_faulted) {
-			printk(KERN_INFO "%p (%lu) being unmapped after "
-				"faulting during atomic copy.\n", origpage,
-				source_index);
-			kernel_map_pages(origpage, 1, 0);
-			clear_toi_fault();
-		}
 
 		if (PageHighMem(copypage))
 			kunmap_atomic(copyvirt, KM_USER1);
