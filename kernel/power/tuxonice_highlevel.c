@@ -610,7 +610,7 @@ static int __save_image(void)
 		did_copy = 1;
 
 	/* We return here at resume time too! */
-	toi_end_atomic(ATOMIC_ALL_STEPS, toi_in_hibernate);
+	toi_end_atomic(ATOMIC_ALL_STEPS, toi_in_hibernate, temp_result);
 
 Failed:
 	if (toi_activate_storage(1))

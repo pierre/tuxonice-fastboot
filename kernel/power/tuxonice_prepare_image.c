@@ -368,14 +368,16 @@ static void get_extra_pd1_allowance(void)
 
 	suspend_console();
 	device_suspend(PMSG_FREEZE);
+	device_pm_lock();
 	local_irq_disable(); /* irqs might have been re-enabled on us */
 	device_power_down(PMSG_FREEZE);
 
 	final = real_nr_free_pages(all_zones_mask);
 
-	device_power_up();
+	device_power_up(PMSG_THAW);
 	local_irq_enable();
-	device_resume();
+	device_pm_unlock();
+	device_resume(PMSG_THAW);
 	resume_console();
 
 	extra_pd1_pages_allowance = max(

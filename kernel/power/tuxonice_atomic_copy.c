@@ -264,7 +264,7 @@ int toi_atomic_restore(void)
 	if (add_boot_kernel_data_pbe())
 		goto Failed;
 
-	if (toi_go_atomic(PMSG_PRETHAW, 0))
+	if (toi_go_atomic(PMSG_QUIESCE, 0))
 		goto Failed;
 
 	/* We'll ignore saved state, but this gets preempt count (etc) right */
@@ -297,7 +297,7 @@ int toi_go_atomic(pm_message_t state, int suspend_time)
 
 	if (suspend_time && toi_platform_begin()) {
 		set_abort_result(TOI_PLATFORM_PREP_FAILED);
-		toi_end_atomic(ATOMIC_STEP_PLATFORM_END, suspend_time);
+		toi_end_atomic(ATOMIC_STEP_PLATFORM_END, suspend_time, 0);
 		return 1;
 	}
 
@@ -305,19 +305,19 @@ int toi_go_atomic(pm_message_t state, int suspend_time)
 
 	if (device_suspend(state)) {
 		set_abort_result(TOI_DEVICE_REFUSED);
-		toi_end_atomic(ATOMIC_STEP_RESUME_CONSOLE, suspend_time);
+		toi_end_atomic(ATOMIC_STEP_RESUME_CONSOLE, suspend_time, 1);
 		return 1;
 	}
 
 	if (suspend_time && toi_platform_pre_snapshot()) {
 		set_abort_result(TOI_PRE_SNAPSHOT_FAILED);
-		toi_end_atomic(ATOMIC_STEP_PLATFORM_FINISH, suspend_time);
+		toi_end_atomic(ATOMIC_STEP_PLATFORM_FINISH, suspend_time, 0);
 		return 1;
 	}
 
 	if (!suspend_time && toi_platform_pre_restore()) {
 		set_abort_result(TOI_PRE_RESTORE_FAILED);
-		toi_end_atomic(ATOMIC_STEP_DEVICE_RESUME, suspend_time);
+		toi_end_atomic(ATOMIC_STEP_DEVICE_RESUME, suspend_time, 0);
 		return 1;
 	}
 
@@ -325,14 +325,14 @@ int toi_go_atomic(pm_message_t state, int suspend_time)
 		if (disable_nonboot_cpus()) {
 			set_abort_result(TOI_CPU_HOTPLUG_FAILED);
 			toi_end_atomic(ATOMIC_STEP_CPU_HOTPLUG,
-					suspend_time);
+					suspend_time, 0);
 			return 1;
 		}
 	}
 
 	if (suspend_time && arch_prepare_suspend()) {
 		set_abort_result(TOI_ARCH_PREPARE_FAILED);
-		toi_end_atomic(ATOMIC_STEP_CPU_HOTPLUG, suspend_time);
+		toi_end_atomic(ATOMIC_STEP_CPU_HOTPLUG, suspend_time, 0);
 		return 1;
 	}
 
@@ -348,29 +348,32 @@ int toi_go_atomic(pm_message_t state, int suspend_time)
 
 	if (device_power_down(state)) {
 		set_abort_result(TOI_DEVICE_REFUSED);
-		toi_end_atomic(ATOMIC_STEP_IRQS, suspend_time);
+		toi_end_atomic(ATOMIC_STEP_IRQS, suspend_time, 0);
 		return 1;
 	}
 
 	return 0;
 }
 
-void toi_end_atomic(int stage, int suspend_time)
+void toi_end_atomic(int stage, int suspend_time, int error)
 {
 	switch (stage) {
 	case ATOMIC_ALL_STEPS:
 		if (!suspend_time)
 			toi_platform_leave();
-		device_power_up();
+		device_power_up(error ? PMSG_RECOVER :
+			(suspend_time ? PMSG_THAW : PMSG_RESTORE));
 	case ATOMIC_STEP_IRQS:
 		local_irq_enable();
+		device_pm_unlock();
 	case ATOMIC_STEP_CPU_HOTPLUG:
 		if (test_action_state(TOI_LATE_CPU_HOTPLUG))
 			enable_nonboot_cpus();
 	case ATOMIC_STEP_PLATFORM_FINISH:
 		toi_platform_finish();
 	case ATOMIC_STEP_DEVICE_RESUME:
-		device_resume();
+		device_resume(error ? PMSG_RECOVER :
+			(suspend_time ? PMSG_THAW : PMSG_RESTORE));
 	case ATOMIC_STEP_RESUME_CONSOLE:
 		resume_console();
 	case ATOMIC_STEP_PLATFORM_END:
