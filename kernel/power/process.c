@@ -75,7 +75,6 @@ void refrigerator(void)
 	pr_debug("%s left refrigerator\n", current->comm);
 	__set_current_state(save);
 }
-EXPORT_SYMBOL(refrigerator);
 
 static void fake_signal_wake_up(struct task_struct *p)
 {
@@ -293,6 +292,8 @@ void thaw_processes(void)
 	schedule();
 	printk("done.\n");
 }
+
+EXPORT_SYMBOL(refrigerator);
 
 void thaw_kernel_threads(void)
 {
