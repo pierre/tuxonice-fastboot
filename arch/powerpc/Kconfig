@@ -111,6 +111,7 @@ config PPC
 	select HAVE_DYNAMIC_FTRACE
 	select HAVE_FTRACE
 	select HAVE_IDE
+	select HAVE_IOREMAP_PROT
 	select HAVE_KPROBES
 	select HAVE_ARCH_KGDB
 	select HAVE_KRETPROBES
@@ -843,6 +844,7 @@ source "crypto/Kconfig"
 config PPC_CLOCK
 	bool
 	default n
+	select HAVE_CLK
 
 config PPC_LIB_RHEAP
 	bool
