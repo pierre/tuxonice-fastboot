@@ -199,7 +199,7 @@ static void toi_mark_pages_for_pageset2(void)
 	else {
 		read_lock(&tasklist_lock);
 		for_each_process(p) {
-			if (!p->mm || (p->flags & PF_BORROWED_MM))
+			if (!p->mm || (p->flags & PF_KTHREAD))
 				continue;
 
 			toi_mark_task_as_pageset(p, PAGESET2);

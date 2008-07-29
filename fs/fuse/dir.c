@@ -278,7 +278,7 @@ int fuse_lookup_name(struct super_block *sb, u64 nodeid, struct qstr *name,
 	if (IS_ERR(req))
 		goto out;
 
-	FUSE_MIGHT_FREEZE(dir->i_sb, "fuse_lookup");
+	FUSE_MIGHT_FREEZE(sb, "fuse_lookup");
 
 	forget_req = fuse_get_req(fc);
 	err = PTR_ERR(forget_req);
