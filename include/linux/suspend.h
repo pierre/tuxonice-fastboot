@@ -278,6 +278,8 @@ static inline void register_nosave_region_late(unsigned long b, unsigned long e)
 }
 #endif
 
+extern struct mutex pm_mutex;
+
 enum {
 	TOI_CAN_HIBERNATE,
 	TOI_CAN_RESUME,

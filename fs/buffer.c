@@ -791,7 +791,7 @@ static int __set_page_dirty(struct page *page,
 	if (TestSetPageDirty(page))
 		return 0;
 
-	write_lock_irq(&mapping->tree_lock);
+	spin_lock_irq(&mapping->tree_lock);
 	if (page->mapping) {	/* Race with truncate? */
 		WARN_ON_ONCE(warn && !PageUptodate(page));
 
@@ -804,7 +804,7 @@ static int __set_page_dirty(struct page *page,
 		radix_tree_tag_set(&mapping->page_tree,
 				page_index(page), PAGECACHE_TAG_DIRTY);
 	}
-	write_unlock_irq(&mapping->tree_lock);
+	spin_unlock_irq(&mapping->tree_lock);
 	__mark_inode_dirty(mapping->host, I_DIRTY_PAGES);
 
 	return 1;
@@ -1299,8 +1299,7 @@ void __brelse(struct buffer_head * buf)
 		put_bh(buf);
 		return;
 	}
-	printk(KERN_ERR "VFS: brelse: Trying to free free buffer\n");
-	WARN_ON(1);
+	WARN(1, KERN_ERR "VFS: brelse: Trying to free free buffer\n");
 }
 
 /*
@@ -3357,7 +3356,7 @@ int bh_submit_read(struct buffer_head *bh)
 EXPORT_SYMBOL(bh_submit_read);
 
 static void
-init_buffer_head(struct kmem_cache *cachep, void *data)
+init_buffer_head(void *data)
 {
 	struct buffer_head *bh = data;
 

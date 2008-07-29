@@ -922,20 +922,26 @@ found:
 	error = 1;
 	if (!inode)
 		goto out;
-	/* Precharge page while we can wait, compensate afterwards */
+	/* Precharge page using GFP_KERNEL while we can wait */
 	error = mem_cgroup_cache_charge(page, current->mm, GFP_KERNEL);
 	if (error)
 		goto out;
 	error = radix_tree_preload(GFP_KERNEL);
-	if (error)
-		goto uncharge;
+	if (error) {
+		mem_cgroup_uncharge_cache_page(page);
+		goto out;
+	}
 	error = 1;
 
 	spin_lock(&info->lock);
 	ptr = shmem_swp_entry(info, idx, NULL);
-	if (ptr && ptr->val == entry.val)
-		error = add_to_page_cache(page, inode->i_mapping,
+	if (ptr && ptr->val == entry.val) {
+		error = add_to_page_cache_locked(page, inode->i_mapping,
 						idx, GFP_NOWAIT);
+		/* does mem_cgroup_uncharge_cache_page on error */
+	} else	/* we must compensate for our precharge above */
+		mem_cgroup_uncharge_cache_page(page);
+
 	if (error == -EEXIST) {
 		struct page *filepage = find_get_page(inode->i_mapping, idx);
 		error = 1;
@@ -961,8 +967,6 @@ found:
 		shmem_swp_unmap(ptr);
 	spin_unlock(&info->lock);
 	radix_tree_preload_end();
-uncharge:
-	mem_cgroup_uncharge_page(page);
 out:
 	unlock_page(page);
 	page_cache_release(page);
@@ -1297,8 +1301,8 @@ repeat:
 			SetPageUptodate(filepage);
 			set_page_dirty(filepage);
 			swap_free(swap);
-		} else if (!(error = add_to_page_cache(
-				swappage, mapping, idx, GFP_NOWAIT))) {
+		} else if (!(error = add_to_page_cache_locked(swappage, mapping,
+					idx, GFP_NOWAIT))) {
 			info->flags |= SHMEM_PAGEIN;
 			shmem_swp_set(info, entry, 0);
 			shmem_swp_unmap(entry);
@@ -1311,17 +1315,14 @@ repeat:
 			shmem_swp_unmap(entry);
 			spin_unlock(&info->lock);
 			unlock_page(swappage);
+			page_cache_release(swappage);
 			if (error == -ENOMEM) {
 				/* allow reclaim from this memory cgroup */
-				error = mem_cgroup_cache_charge(swappage,
-					current->mm, gfp & ~__GFP_HIGHMEM);
-				if (error) {
-					page_cache_release(swappage);
+				error = mem_cgroup_shrink_usage(current->mm,
+								gfp);
+				if (error)
 					goto failed;
-				}
-				mem_cgroup_uncharge_page(swappage);
 			}
-			page_cache_release(swappage);
 			goto repeat;
 		}
 	} else if (sgp == SGP_READ && !filepage) {
@@ -1358,6 +1359,8 @@ repeat:
 		}
 
 		if (!filepage) {
+			int ret;
+
 			spin_unlock(&info->lock);
 			filepage = shmem_alloc_page(gfp, info, idx);
 			if (!filepage) {
@@ -1386,10 +1389,18 @@ repeat:
 				swap = *entry;
 				shmem_swp_unmap(entry);
 			}
-			if (error || swap.val || 0 != add_to_page_cache_lru(
-					filepage, mapping, idx, GFP_NOWAIT)) {
+			ret = error || swap.val;
+			if (ret)
+				mem_cgroup_uncharge_cache_page(filepage);
+			else
+				ret = add_to_page_cache_lru(filepage, mapping,
+						idx, GFP_NOWAIT);
+			/*
+			 * At add_to_page_cache_lru() failure, uncharge will
+			 * be done automatically.
+			 */
+			if (ret) {
 				spin_unlock(&info->lock);
-				mem_cgroup_uncharge_page(filepage);
 				page_cache_release(filepage);
 				shmem_unacct_blocks(info->flags, 1);
 				shmem_free_blocks(inode, 1);
@@ -1398,7 +1409,6 @@ repeat:
 					goto failed;
 				goto repeat;
 			}
-			mem_cgroup_uncharge_page(filepage);
 			info->flags |= SHMEM_PAGEIN;
 		}
 
@@ -2342,7 +2352,7 @@ static void shmem_destroy_inode(struct inode *inode)
 	kmem_cache_free(shmem_inode_cachep, SHMEM_I(inode));
 }
 
-static void init_once(struct kmem_cache *cachep, void *foo)
+static void init_once(void *foo)
 {
 	struct shmem_inode_info *p = (struct shmem_inode_info *) foo;
 

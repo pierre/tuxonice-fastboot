@@ -1026,7 +1026,6 @@ static void __init report_hugepages(void)
 	}
 }
 
-#ifdef CONFIG_SYSCTL
 #ifdef CONFIG_HIGHMEM
 static void try_to_free_low(struct hstate *h, unsigned long count)
 {
@@ -1386,6 +1385,7 @@ static unsigned int cpuset_mems_nr(unsigned int *array)
 	return nr;
 }
 
+#ifdef CONFIG_SYSCTL
 int hugetlb_sysctl_handler(struct ctl_table *table, int write,
 			   struct file *file, void __user *buffer,
 			   size_t *length, loff_t *ppos)
