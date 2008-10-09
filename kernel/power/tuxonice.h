@@ -97,6 +97,7 @@ enum {
 	TOI_NOTIFIERS_PREPARE_FAILED,
 	TOI_PRE_SNAPSHOT_FAILED,
 	TOI_PRE_RESTORE_FAILED,
+	TOI_NUM_RESULT_STATES	/* Used in printing debug info only */
 };
 
 extern unsigned long toi_result;

@@ -107,6 +107,34 @@ int do_toi_step(int step);
 
 unsigned long boot_kernel_data_buffer;
 
+static char* result_strings[] = {
+	"Hiberation was aborted",
+	"The user requested that we cancel the hibernation",
+	"No storage was available",
+	"Insufficient storage was available",
+	"Freezing filesystems and/or tasks failed",
+	"A pre-existing image was used",
+	"We would free memory, but image size limit doesn't allow this",
+	"Unable to free enough memory to hibernate",
+	"Unable to obtain the Power Management Semaphore",
+	"A device suspend/resume returned an error",
+	"The extra pages allowance is too small",
+	"We were unable to successfully prepare an image",
+	"TuxOnIce module initialisation failed",
+	"TuxOnIce module cleanup failed",
+	"I/O errors were encountered",
+	"Ran out of memory",
+	"An error was encountered while reading the image",
+	"Platform preparation failed",
+	"CPU Hotplugging failed",
+	"Architecture specific preparation failed",
+	"Pages needed resaving, but we were told to abort if this happens",
+	"We can't hibernate at the moment (invalid resume= or filewriter target?)",
+	"A hibernation preparation notifier chain member cancelled the hibernation",
+	"Pre-snapshot preparation failed",
+	"Post-snapshot cleanup failed",
+};
+
 /**
  * toi_finish_anything - Cleanup after doing anything.
  *
@@ -293,7 +321,7 @@ static int io_MB_per_second(int write)
 
 static int get_toi_debug_info(const char *buffer, int count)
 {
-	int len = 0;
+	int len = 0, i, first_result = 1;
 
 	SNPRINTF("TuxOnIce debugging info:\n");
 	SNPRINTF("- TuxOnIce core  : " TOI_CORE_VERSION "\n");
@@ -337,6 +365,18 @@ static int get_toi_debug_info(const char *buffer, int count)
 	SNPRINTF("- Extra pages    : %ld used/%ld.\n",
 			extra_pd1_pages_used, extra_pd1_pages_allowance);
 
+	for (i = 0; i < TOI_NUM_RESULT_STATES; i++)
+		if (test_result_state(i)) {
+			SNPRINTF("%s: %s.\n", first_result ? 
+					"- Result         " :
+					"                 ",
+					result_strings[i]);
+			first_result = 0;
+		}
+	if (first_result)
+		SNPRINTF("- Result         : %s.\n", nr_hibernates ?
+			"Succeeded" :
+			"No hibernation attempts so far");
 	return len;
 }
 
