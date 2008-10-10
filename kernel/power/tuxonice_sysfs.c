@@ -37,8 +37,10 @@ static ssize_t toi_attr_show(struct kobject *kobj, struct attribute *attr,
 {
 	struct toi_sysfs_data *sysfs_data = to_sysfs_data(attr);
 	int len = 0;
+	int full_prep = sysfs_data->flags & SYSFS_NEEDS_SM_FOR_READ ||
+		sysfs_data->read_side_effect;
 
-	if (toi_start_anything(0))
+	if (full_prep && toi_start_anything(0))
 		return -EBUSY;
 
 	if (sysfs_data->flags & SYSFS_NEEDS_SM_FOR_READ)
@@ -79,7 +81,8 @@ static ssize_t toi_attr_show(struct kobject *kobj, struct attribute *attr,
 	if (sysfs_data->flags & SYSFS_NEEDS_SM_FOR_READ)
 		toi_cleanup_usm();
 
-	toi_finish_anything(0);
+	if (full_prep)
+		toi_finish_anything(0);
 
 	return len;
 }
