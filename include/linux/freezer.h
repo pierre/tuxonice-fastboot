@@ -135,7 +135,7 @@ extern int freezer_state;
 
 static inline int freezer_is_on(void)
 {
-	return (freezer_state == FREEZER_FULLY_ON);
+	return freezer_state == FREEZER_FULLY_ON;
 }
 
 extern void thaw_kernel_threads(void);
