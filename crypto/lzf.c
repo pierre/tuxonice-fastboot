@@ -58,7 +58,7 @@
 #include <linux/crypto.h>
 #include <linux/err.h>
 #include <linux/vmalloc.h>
-#include <asm/string.h>
+#include <linux/string.h>
 
 struct lzf_ctx {
 	void *hbuf;
