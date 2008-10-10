@@ -173,7 +173,7 @@ static int nl_ready(struct user_helper_data *uhd, int version)
 void toi_netlink_close_complete(struct user_helper_data *uhd)
 {
 	if (uhd->nl) {
-		sock_release(uhd->nl->sk_socket);
+		netlink_kernel_release(uhd->nl);
 		uhd->nl = NULL;
 	}
 
