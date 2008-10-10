@@ -74,7 +74,6 @@
 #include <linux/cpu.h>
 #include <linux/console.h>
 #include <linux/writeback.h>
-#include <asm/uaccess.h>
 
 #include "tuxonice_modules.h"
 #include "tuxonice_sysfs.h"
