@@ -686,6 +686,9 @@ int software_resume(void)
 	return error;
 }
 
+late_initcall(software_resume);
+
+
 static const char * const hibernation_modes[] = {
 	[HIBERNATION_PLATFORM]	= "platform",
 	[HIBERNATION_SHUTDOWN]	= "shutdown",
