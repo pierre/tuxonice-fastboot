@@ -50,7 +50,7 @@ static inline void inc_pr_index(void)
 
 #define TARGET_OUTSTANDING_IO 16384
 
-#define MEASURE_MUTEX_CONTENTION
+//#define MEASURE_MUTEX_CONTENTION
 #ifndef MEASURE_MUTEX_CONTENTION
 #define my_mutex_lock(index, the_lock) mutex_lock(the_lock)
 #define my_mutex_unlock(index, the_lock) mutex_unlock(the_lock)
