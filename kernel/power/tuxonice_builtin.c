@@ -315,8 +315,22 @@ int toi_try_hibernate(int have_pmsem)
 	return toi_core_fns->try_hibernate(have_pmsem);
 }
 
+static int num_resume_calls = 0;
+#ifdef CONFIG_TOI_IGNORE_LATE_INITCALL
+static int ignore_late_initcall = 1;
+#else
+static int ignore_late_initcall = 0;
+#endif
+
 void toi_try_resume(void)
 {
+	/* Don't let it wrap around eventually */
+	if (num_resume_calls < 2)
+		num_resume_calls++;
+
+	if (num_resume_calls == 1 && ignore_late_initcall)
+		return;
+
 	if (toi_core_fns)
 		toi_core_fns->try_resume();
 	else
@@ -398,3 +412,16 @@ static int __init toi_wait_setup(char *str)
 }
 
 __setup("toi_wait", toi_wait_setup);
+
+static int __init toi_ignore_late_initcall_setup(char *str)
+{
+	int value;
+
+	if (sscanf(str, "=%d", &value))
+		ignore_late_initcall = value;
+
+	return 1;
+}
+
+__setup("toi_initramfs_resume_only", toi_ignore_late_initcall_setup);
+

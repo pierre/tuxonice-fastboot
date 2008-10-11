@@ -304,6 +304,27 @@ menuconfig TOI_CORE
 		  the swap and file allocators are compiled in, the swap allocator will be
 		  used by default.
 
+	config TOI_IGNORE_LATE_INITCALL
+		bool "Wait for initrd/ramfs to run, by default"
+		default n
+		depends on TOI_CORE
+		---help---
+		  When booting, TuxOnIce can check for an image and start to resume prior
+		  to any initrd/ramfs running (via a late initcall).
+
+		  If you don't have an initrd/ramfs, this is what you want to happen - 
+		  otherwise you won't be able to safely resume. You should set this option
+		  to 'No'.
+
+		  If, however, you want your initrd/ramfs to run anyway before resuming,
+		  you need to tell TuxOnIce to ignore that earlier opportunity to resume.
+		  This can be done either by using this compile time option, or by
+		  overriding this option with the boot-time parameter toi_initramfs_resume_only=1.
+
+		  Note that if TuxOnIce can't resume at the earlier opportunity, the
+		  value of this option won't matter - the initramfs/initrd (if any) will
+		  run anyway.
+
 	menuconfig TOI_CLUSTER
 		tristate "Cluster support"
 		default n
