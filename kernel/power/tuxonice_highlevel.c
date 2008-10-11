@@ -155,7 +155,7 @@ void toi_finish_anything(int hibernate_or_resume)
 		if (hibernate_or_resume == SYSFS_HIBERNATE &&
 				strlen(post_hibernate_command))
 			toi_launch_userspace_program(post_hibernate_command,
-					0, UMH_WAIT_PROC);
+					0, UMH_WAIT_PROC, 0);
 	}
 
 	set_fs(oldfs);
@@ -181,7 +181,7 @@ int toi_start_anything(int hibernate_or_resume)
 	if (hibernate_or_resume == SYSFS_HIBERNATE &&
 			strlen(pre_hibernate_command)) {
 		int result = toi_launch_userspace_program(pre_hibernate_command,
-				0, UMH_WAIT_PROC);
+				0, UMH_WAIT_PROC, 0);
 		if (result) {
 			printk(KERN_INFO "Pre-hibernate command '%s' returned "
 					"%d. Aborting.\n",
@@ -1106,7 +1106,7 @@ out:
  * channel_no: If !0, -c <channel_no> is added to args (userui).
  */
 int toi_launch_userspace_program(char *command, int channel_no,
-		enum umh_wait wait)
+		enum umh_wait wait, int debug)
 {
 	int retval;
 	static char *envp[] = {
@@ -1133,8 +1133,8 @@ int toi_launch_userspace_program(char *command, int channel_no,
 		}
 	}
 
-	/* Up to 7 args supported */
-	while (arg < 7) {
+	/* Up to 6 args supported */
+	while (arg < 6) {
 		sscanf(orig_posn, "%s", test_read);
 		size = strlen(test_read);
 		if (!(size))
@@ -1151,6 +1151,11 @@ int toi_launch_userspace_program(char *command, int channel_no,
 		argv[arg] = channel;
 	} else
 		arg--;
+
+	if (debug) {
+		argv[++arg] = toi_kzalloc(5, 8, TOI_ATOMIC_GFP);
+		strcpy(argv[arg], "--debug");
+	}
 
 	retval = call_usermodehelper(argv[0], argv, envp, wait);
 

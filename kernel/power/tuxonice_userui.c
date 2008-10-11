@@ -595,6 +595,11 @@ static struct toi_sysfs_data sysfs_params[] = {
 	  SYSFS_STRING(ui_helper_data.program, 255, 0),
 	  .write_side_effect = set_ui_program_set,
 	},
+
+	{ TOI_ATTR("debug", SYSFS_RW),
+	  SYSFS_INT(&ui_helper_data.debug, 0, 1, 0)
+	},
+
 #endif
 };
 

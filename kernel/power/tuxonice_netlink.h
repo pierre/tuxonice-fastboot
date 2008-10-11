@@ -37,8 +37,9 @@ struct user_helper_data {
 	char *name;
 	struct user_helper_data *next;
 	struct completion wait_for_process;
-	int interface_version;
+	unsigned int interface_version;
 	int must_init;
+	int debug;
 };
 
 #ifdef CONFIG_NET

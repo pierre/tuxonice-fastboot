@@ -78,6 +78,10 @@ void toi_send_netlink_message(struct user_helper_data *uhd,
 	if (uhd->pid == -1)
 		return;
 
+	if (uhd->debug)
+		printk(KERN_ERR "toi_send_netlink_message: Send "
+				"message type %d.\n", type);
+
 	skb = toi_get_skb(uhd);
 	if (!skb) {
 		printk(KERN_INFO "toi_netlink: Can't allocate skb!\n");
@@ -113,6 +117,10 @@ void toi_send_netlink_message(struct user_helper_data *uhd,
 nlmsg_failure:
 	if (skb)
 		put_skb(uhd, skb);
+
+	if (uhd->debug)
+		printk(KERN_ERR "toi_send_netlink_message: Failed to send "
+				"message type %d.\n", type);
 }
 EXPORT_SYMBOL_GPL(toi_send_netlink_message);
 
@@ -131,6 +139,9 @@ static void send_whether_debugging(struct user_helper_data *uhd)
 static int nl_set_nofreeze(struct user_helper_data *uhd, int pid)
 {
 	struct task_struct *t;
+
+	if (uhd->debug)
+		printk(KERN_ERR "nl_set_nofreeze for pid %d.\n", pid);
 
 	read_lock(&tasklist_lock);
 	t = find_task_by_pid_type_ns(PIDTYPE_PID, pid, &init_pid_ns);
@@ -190,17 +201,19 @@ EXPORT_SYMBOL_GPL(toi_netlink_close_complete);
 static int toi_nl_gen_rcv_msg(struct user_helper_data *uhd,
 		struct sk_buff *skb, struct nlmsghdr *nlh)
 {
-	int type;
+	int type = nlh->nlmsg_type;
 	int *data;
 	int err;
+
+	if (uhd->debug)
+		printk(KERN_ERR "toi_user_rcv_skb: Received message %d.\n",
+				type);
 
 	/* Let the more specific handler go first. It returns
 	 * 1 for valid messages that it doesn't know. */
 	err = uhd->rcv_msg(skb, nlh);
 	if (err != 1)
 		return err;
-
-	type = nlh->nlmsg_type;
 
 	/* Only allow one task to receive NOFREEZE privileges */
 	if (type == NETLINK_MSG_NOFREEZE_ME && uhd->pid != -1) {
@@ -306,7 +319,7 @@ int toi_netlink_setup(struct user_helper_data *uhd)
 	}
 
 	if (toi_launch_userspace_program(uhd->program, uhd->netlink_id,
-				UMH_WAIT_EXEC) < 0) {
+				UMH_WAIT_EXEC, uhd->debug) < 0) {
 		printk(KERN_INFO "Launch userspace program failed.\n");
 		toi_netlink_close_complete(uhd);
 		return 1;
