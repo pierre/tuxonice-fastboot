@@ -180,7 +180,18 @@ static void throttle_if_memory_low(void)
  */
 static void toi_finish_all_io(void)
 {
-	wait_event(num_in_progress_wait, !atomic_read(&toi_io_in_progress));
+	int orig = atomic_read(&toi_io_in_progress);
+
+	while (orig) {
+		int new = orig > 2560 ? orig - 2560 : 0,	/* 10 MB */
+		    mb = MB(orig);
+		if (mb)
+			toi_prepare_status(DONT_CLEAR_BAR,
+				"Waiting on I/O completion (%d MB)", mb);
+		wait_event(num_in_progress_wait,
+			atomic_read(&toi_io_in_progress) <= new);
+		orig = atomic_read(&toi_io_in_progress);
+	}
 }
 
 /**
