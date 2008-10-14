@@ -328,8 +328,10 @@ void toi_try_resume(void)
 	if (num_resume_calls < 2)
 		num_resume_calls++;
 
-	if (num_resume_calls == 1 && ignore_late_initcall)
+	if (num_resume_calls == 1 && ignore_late_initcall) {
+		printk(KERN_INFO "TuxOnIce: Ignoring late initcall, as requested.\n");
 		return;
+	}
 
 	if (toi_core_fns)
 		toi_core_fns->try_resume();
