@@ -74,6 +74,7 @@
 #include <linux/cpu.h>
 #include <linux/console.h>
 #include <linux/writeback.h>
+#include <linux/uaccess.h> /* for get/set_fs & KERNEL_DS on i386 */
 
 #include "tuxonice_modules.h"
 #include "tuxonice_sysfs.h"
