@@ -203,13 +203,11 @@ EXPORT_SYMBOL_GPL(pm_notifier_call_chain);
 EXPORT_SYMBOL_GPL(init_swsusp_header);
 
 #ifdef CONFIG_ARCH_HIBERNATION_HEADER
-EXPORT_SYMBOL_GPL(arch_hibernation_header_save);
 EXPORT_SYMBOL_GPL(arch_hibernation_header_restore);
 #endif
 
 #ifdef CONFIG_TOI_CORE_EXPORTS
 #ifdef CONFIG_X86_64
-EXPORT_SYMBOL_GPL(restore_processor_state);
 EXPORT_SYMBOL_GPL(save_processor_state);
 #endif
 
@@ -223,23 +221,17 @@ EXPORT_SYMBOL_GPL(next_zone);
 EXPORT_SYMBOL_GPL(freeze_processes);
 EXPORT_SYMBOL_GPL(thaw_processes);
 EXPORT_SYMBOL_GPL(thaw_kernel_threads);
-EXPORT_SYMBOL_GPL(shrink_all_memory);
 EXPORT_SYMBOL_GPL(shrink_one_zone);
 EXPORT_SYMBOL_GPL(saveable_page);
-EXPORT_SYMBOL_GPL(swsusp_arch_suspend);
 EXPORT_SYMBOL_GPL(swsusp_arch_resume);
-EXPORT_SYMBOL_GPL(pm_prepare_console);
 EXPORT_SYMBOL_GPL(follow_page);
-EXPORT_SYMBOL_GPL(machine_halt);
 EXPORT_SYMBOL_GPL(block_dump);
 EXPORT_SYMBOL_GPL(unlink_lru_lists);
 EXPORT_SYMBOL_GPL(relink_lru_lists);
-EXPORT_SYMBOL_GPL(machine_power_off);
 EXPORT_SYMBOL_GPL(suspend_devices_and_enter);
 EXPORT_SYMBOL_GPL(first_online_pgdat);
 EXPORT_SYMBOL_GPL(next_online_pgdat);
 EXPORT_SYMBOL_GPL(machine_restart);
-EXPORT_SYMBOL_GPL(saved_command_line);
 EXPORT_SYMBOL_GPL(tasklist_lock);
 #ifdef CONFIG_PM_SLEEP_SMP
 EXPORT_SYMBOL_GPL(disable_nonboot_cpus);
@@ -267,15 +259,8 @@ EXPORT_SYMBOL_GPL(swap_free);
 EXPORT_SYMBOL_GPL(get_swap_info_struct);
 #endif
 
-#ifdef CONFIG_TOI_FILE_EXPORTS
-/* TuxOnice file allocator specific support */
-EXPORT_SYMBOL_GPL(sys_unlink);
-EXPORT_SYMBOL_GPL(sys_mknod);
-#endif
-
 /* Swap or file */
 #if defined(CONFIG_TOI_FILE_EXPORTS) || defined(CONFIG_TOI_SWAP_EXPORTS)
-EXPORT_SYMBOL_GPL(bio_set_pages_dirty);
 EXPORT_SYMBOL_GPL(name_to_dev_t);
 #endif
 

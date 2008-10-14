@@ -203,9 +203,6 @@ static struct toi_sysfs_data sysfs_params[] = {
 	  SYSFS_BIT(&toi_bkd.toi_action, TOI_LOGALL, 0)
 	},
 #endif
-	{ TOI_ATTR("pm_prepare_console", SYSFS_RW),
-	  SYSFS_BIT(&toi_bkd.toi_action, TOI_PM_PREPARE_CONSOLE, 0)
-	}
 };
 
 static struct toi_module_ops userui_ops = {
