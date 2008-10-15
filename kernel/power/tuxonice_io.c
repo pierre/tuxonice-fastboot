@@ -712,7 +712,7 @@ int write_pageset(struct pagedir *pagedir)
 		else
 			pageflags = &pageset1_copy_map;
 	} else {
-		toi_prepare_status(CLEAR_BAR, "Writing caches...");
+		toi_prepare_status(DONT_CLEAR_BAR, "Writing caches...");
 		pageflags = &pageset2_map;
 	}
 
@@ -761,7 +761,7 @@ static int read_pageset(struct pagedir *pagedir, int overwrittenpagesonly)
 	struct dyn_pageflags *pageflags;
 
 	if (pagedir->id == 1) {
-		toi_prepare_status(CLEAR_BAR,
+		toi_prepare_status(DONT_CLEAR_BAR,
 				"Reading kernel & process data...");
 		pageflags = &pageset1_map;
 	} else {
@@ -1260,7 +1260,7 @@ static int __read_pageset1(void)
 	toi_cond_pause(1, "About to read pageset 1.");
 
 	if (read_pageset(&pagedir1, 0)) {
-		toi_prepare_status(CLEAR_BAR, "Failed to read pageset 1.");
+		toi_prepare_status(DONT_CLEAR_BAR, "Failed to read pageset 1.");
 		result = -EIO;
 		printk(KERN_INFO "TuxOnIce: Failed to get load pageset1.\n");
 		goto out_reset_console;
@@ -1373,7 +1373,6 @@ int read_pageset2(int overwrittenpagesonly)
 
 	result = read_pageset(&pagedir2, overwrittenpagesonly);
 
-	toi_update_status(100, 100, NULL);
 	toi_cond_pause(1, "Pagedir 2 read.");
 
 	return result;

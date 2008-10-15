@@ -966,9 +966,6 @@ static void eat_memory(void)
 		restore_toi_state(orig_state);
 		toi_recalculate_image_contents(0);
 	}
-
-	/* Blank out image size display */
-	toi_update_status(100, 100, NULL);
 }
 
 /* toi_prepare_image
