@@ -596,8 +596,8 @@ static int do_post_image_write(void)
 	toi_power_down();
 
 	/* Ensure platform_leave is called */
-	toi_go_atomic(PMSG_PRETHAW, 0);
-	toi_end_atomic(ATOMIC_ALL_STEPS, 0);
+	toi_go_atomic(PMSG_QUIESCE, 0);
+	toi_end_atomic(ATOMIC_ALL_STEPS, 0, 0);
 
 	/* If we return, it's because we hibernated to ram */
 	if (read_pageset2(1))
@@ -717,8 +717,8 @@ abort_reloading_pagedir_two:
 				"a hibernate failed.");
 
 	/* Ensure platform_leave is called */
-	toi_go_atomic(PMSG_PRETHAW, 0);
-	toi_end_atomic(ATOMIC_ALL_STEPS, 0);
+	toi_go_atomic(PMSG_QUIESCE, 0);
+	toi_end_atomic(ATOMIC_ALL_STEPS, 0, 0);
 	
 	return 1;
 }
