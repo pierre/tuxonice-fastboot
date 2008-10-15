@@ -38,7 +38,7 @@ char alt_resume_param[256];
 
 /* Variables shared between threads and updated under the mutex */
 static int io_write, io_finish_at, io_base, io_barmax, io_pageset, io_result;
-static int io_index, io_nextupdate, io_pc, io_pc_step;
+static int io_index, io_nextupdate, io_pc, io_pc_step, first_to_finish;
 static unsigned long pfn, other_pfn;
 static DEFINE_MUTEX(io_mutex);
 static DEFINE_PER_CPU(struct page *, last_sought);
@@ -375,7 +375,7 @@ static struct page *copy_page_from_orig_page(struct page *orig_page)
 static int worker_rw_loop(void *data)
 {
 	unsigned long orig_pfn, write_pfn;
-	int result, my_io_index = 0, temp;
+	int result, my_io_index = 0, temp, last_worker, i_finished_first = 0;
 	struct toi_module_ops *first_filter = toi_get_next_filter(NULL);
 	struct page *buffer = toi_alloc_page(28, TOI_ATOMIC_GFP);
 
@@ -541,11 +541,24 @@ static int worker_rw_loop(void *data)
 	} while (atomic_read(&io_count) >= atomic_read(&toi_io_workers) &&
 		!(io_write && test_result_state(TOI_ABORTED)));
 
-	if (atomic_dec_and_test(&toi_io_workers)) {
-		toi_bio_queue_flusher_should_finish = 1;
-		wake_up(&toi_io_queue_flusher);
+	last_worker = atomic_dec_and_test(&toi_io_workers);
+	if (!first_to_finish) {
+		first_to_finish = 1;
+		i_finished_first = 1;
 	}
 	mutex_unlock(&io_mutex);
+
+	if (last_worker) {
+		toi_bio_queue_flusher_should_finish = 1;
+		wake_up(&toi_io_queue_flusher);
+	} else {
+		/* Yes, there's still I/O above, but it's the last
+		 * pages being submitted, so switch to displaying
+		 * how much I/O we're waiting on.
+		 */
+		if (i_finished_first)
+			toiActiveAllocator->finish_all_io();
+	}
 
 	toi__free_page(28, buffer);
 
@@ -599,6 +612,7 @@ static int do_rw_loop(int write, int finish_at, struct dyn_pageflags *pageflags,
 	io_result = 0;
 	io_nextupdate = base + 1;
 	toi_bio_queue_flusher_should_finish = 0;
+	first_to_finish = 0;
 
 	for_each_online_cpu(cpu) {
 		per_cpu(last_sought, cpu) = NULL;
