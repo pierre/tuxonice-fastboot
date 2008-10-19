@@ -146,7 +146,7 @@ static int toi_file_storage_available(void)
 
 		result = (bdev->bd_part ?
 			bdev->bd_part->nr_sects :
-			bdev->bd_disk->capacity) >> (PAGE_SHIFT - 9);
+			get_capacity(bdev->bd_disk)) >> (PAGE_SHIFT - 9);
 	}
 
 	return raw_to_real(result);
