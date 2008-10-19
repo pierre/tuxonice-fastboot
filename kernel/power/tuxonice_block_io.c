@@ -183,13 +183,15 @@ static void toi_finish_all_io(void)
 	int orig = atomic_read(&toi_io_in_progress);
 
 	while (orig) {
-		int new = orig > 2560 ? orig - 2560 : 0,	/* 10 MB */
+		int new_min = orig > 2560 ? orig - 2560 : 0,	/* 10 MB */
+		    new_max = orig + 2560,
 		    mb = MB(orig);
 		if (mb)
 			toi_prepare_status(DONT_CLEAR_BAR,
 				"Waiting on I/O completion (%d MB)", mb);
 		wait_event(num_in_progress_wait,
-			atomic_read(&toi_io_in_progress) <= new);
+			atomic_read(&toi_io_in_progress) <= new_min ||
+			atomic_read(&toi_io_in_progress) >= new_max);
 		orig = atomic_read(&toi_io_in_progress);
 	}
 }
