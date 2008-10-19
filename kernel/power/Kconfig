@@ -386,7 +386,7 @@ menuconfig TOI_CORE
 
 	config TOI_CHECKSUM
 		bool "Checksum pageset2"
-		default y
+		default n
 		depends on TOI_CORE
 		select CRYPTO
 		select CRYPTO_ALGAPI
