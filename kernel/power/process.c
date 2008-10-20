@@ -16,7 +16,7 @@
 #include <linux/buffer_head.h>
 
 int freezer_state;
-EXPORT_IF_TOI_MODULAR(freezer_state);
+EXPORT_SYMBOL_GPL(freezer_state);
 
 /* 
  * Timeout for stopping processes
