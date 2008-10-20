@@ -972,7 +972,7 @@ out:
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(do_toi_step);
+EXPORT_IF_TOI_MODULAR(do_toi_step);
 
 /* -- Functions for kickstarting a hibernate or resume --- */
 

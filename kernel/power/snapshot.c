@@ -46,7 +46,7 @@ static void swsusp_unset_page_forbidden(struct page *);
  */
 struct pbe *restore_pblist;
 int resume_attempted;
-EXPORT_SYMBOL_GPL(resume_attempted);
+EXPORT_IF_TOI_MODULAR(resume_attempted);
 
 #ifdef CONFIG_TOI
 #include "tuxonice_pagedir.h"
@@ -574,7 +574,7 @@ static unsigned long memory_bm_next_pfn(struct memory_bitmap *bm)
 }
 
 LIST_HEAD(nosave_regions);
-EXPORT_SYMBOL_GPL(nosave_regions);
+EXPORT_IF_TOI_MODULAR(nosave_regions);
 
 /**
  *	register_nosave_region - register a range of page frames the contents

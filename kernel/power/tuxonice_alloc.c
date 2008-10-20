@@ -221,7 +221,7 @@ void toi_alloc_print_debug_stats(void)
 				toi_alloc_desc[i]);
 		}
 }
-EXPORT_SYMBOL_GPL(toi_alloc_print_debug_stats);
+EXPORT_IF_TOI_MODULAR(toi_alloc_print_debug_stats);
 
 static int toi_alloc_initialise(int starting_cycle)
 {

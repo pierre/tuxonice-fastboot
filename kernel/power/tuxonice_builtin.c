@@ -175,7 +175,7 @@ struct toi_boot_kernel_data toi_bkd __nosavedata
 	(1 << TOI_NO_FLUSHER_THREAD) |
 	(1 << TOI_PAGESET2_FULL) | (1 << TOI_LATE_CPU_HOTPLUG),
 };
-EXPORT_SYMBOL_GPL(toi_bkd);
+EXPORT_IF_TOI_MODULAR(toi_bkd);
 
 struct block_device *toi_open_by_devnum(dev_t dev, unsigned mode)
 {
@@ -187,23 +187,23 @@ struct block_device *toi_open_by_devnum(dev_t dev, unsigned mode)
 		err = blkdev_get(bdev, mode, flags);
 	return err ? ERR_PTR(err) : bdev;
 }
-EXPORT_SYMBOL_GPL(toi_open_by_devnum);
+EXPORT_IF_TOI_MODULAR(toi_open_by_devnum);
 
-EXPORT_SYMBOL_GPL(toi_wait_for_keypress_dev_console);
-EXPORT_SYMBOL_GPL(hibernation_platform_enter);
-EXPORT_SYMBOL_GPL(platform_begin);
-EXPORT_SYMBOL_GPL(platform_pre_snapshot);
-EXPORT_SYMBOL_GPL(platform_leave);
-EXPORT_SYMBOL_GPL(platform_end);
-EXPORT_SYMBOL_GPL(platform_finish);
-EXPORT_SYMBOL_GPL(platform_pre_restore);
-EXPORT_SYMBOL_GPL(platform_restore_cleanup);
-EXPORT_SYMBOL_GPL(power_kobj);
-EXPORT_SYMBOL_GPL(pm_notifier_call_chain);
-EXPORT_SYMBOL_GPL(init_swsusp_header);
+EXPORT_IF_TOI_MODULAR(toi_wait_for_keypress_dev_console);
+EXPORT_IF_TOI_MODULAR(hibernation_platform_enter);
+EXPORT_IF_TOI_MODULAR(platform_begin);
+EXPORT_IF_TOI_MODULAR(platform_pre_snapshot);
+EXPORT_IF_TOI_MODULAR(platform_leave);
+EXPORT_IF_TOI_MODULAR(platform_end);
+EXPORT_IF_TOI_MODULAR(platform_finish);
+EXPORT_IF_TOI_MODULAR(platform_pre_restore);
+EXPORT_IF_TOI_MODULAR(platform_restore_cleanup);
+EXPORT_IF_TOI_MODULAR(power_kobj);
+EXPORT_IF_TOI_MODULAR(pm_notifier_call_chain);
+EXPORT_IF_TOI_MODULAR(init_swsusp_header);
 
 #ifdef CONFIG_ARCH_HIBERNATION_HEADER
-EXPORT_SYMBOL_GPL(arch_hibernation_header_restore);
+EXPORT_IF_TOI_MODULAR(arch_hibernation_header_restore);
 #endif
 
 #ifdef CONFIG_TOI_CORE_EXPORTS
@@ -244,7 +244,7 @@ int toi_wait = CONFIG_TOI_DEFAULT_WAIT;
 #ifdef CONFIG_TOI_USERUI_EXPORTS
 EXPORT_SYMBOL_GPL(kmsg_redirect);
 #endif
-EXPORT_SYMBOL_GPL(toi_wait);
+EXPORT_IF_TOI_MODULAR(toi_wait);
 
 #if defined(CONFIG_TOI_USERUI_EXPORTS) || defined(CONFIG_TOI_CORE_EXPORTS)
 EXPORT_SYMBOL_GPL(console_printk);
@@ -269,18 +269,18 @@ EXPORT_SYMBOL_GPL(name_to_dev_t);
 EXPORT_SYMBOL_GPL(resume_file);
 #endif
 struct toi_core_fns *toi_core_fns;
-EXPORT_SYMBOL_GPL(toi_core_fns);
+EXPORT_IF_TOI_MODULAR(toi_core_fns);
 
 DECLARE_DYN_PAGEFLAGS(pageset1_map);
 DECLARE_DYN_PAGEFLAGS(pageset1_copy_map);
-EXPORT_SYMBOL_GPL(pageset1_map);
-EXPORT_SYMBOL_GPL(pageset1_copy_map);
+EXPORT_IF_TOI_MODULAR(pageset1_map);
+EXPORT_IF_TOI_MODULAR(pageset1_copy_map);
 
 unsigned long toi_result;
 struct pagedir pagedir1 = {1};
 
-EXPORT_SYMBOL_GPL(toi_result);
-EXPORT_SYMBOL_GPL(pagedir1);
+EXPORT_IF_TOI_MODULAR(toi_result);
+EXPORT_IF_TOI_MODULAR(pagedir1);
 
 unsigned long toi_get_nonconflicting_page(void)
 {
@@ -344,26 +344,26 @@ int toi_lowlevel_builtin(void)
 	return error;
 }
 
-EXPORT_SYMBOL_GPL(toi_lowlevel_builtin);
+EXPORT_IF_TOI_MODULAR(toi_lowlevel_builtin);
 
 unsigned long toi_compress_bytes_in, toi_compress_bytes_out;
-EXPORT_SYMBOL_GPL(toi_compress_bytes_in);
-EXPORT_SYMBOL_GPL(toi_compress_bytes_out);
+EXPORT_IF_TOI_MODULAR(toi_compress_bytes_in);
+EXPORT_IF_TOI_MODULAR(toi_compress_bytes_out);
 
 unsigned long toi_state = ((1 << TOI_BOOT_TIME) |
 		(1 << TOI_IGNORE_LOGLEVEL) |
 		(1 << TOI_IO_STOPPED));
-EXPORT_SYMBOL_GPL(toi_state);
+EXPORT_IF_TOI_MODULAR(toi_state);
 
 /* The number of hibernates we have started (some may have been cancelled) */
 unsigned int nr_hibernates;
-EXPORT_SYMBOL_GPL(nr_hibernates);
+EXPORT_IF_TOI_MODULAR(nr_hibernates);
 
 int toi_running;
-EXPORT_SYMBOL_GPL(toi_running);
+EXPORT_IF_TOI_MODULAR(toi_running);
 
 int toi_in_hibernate __nosavedata;
-EXPORT_SYMBOL_GPL(toi_in_hibernate);
+EXPORT_IF_TOI_MODULAR(toi_in_hibernate);
 
 __nosavedata struct pbe *restore_highmem_pblist;
 

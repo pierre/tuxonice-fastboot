@@ -942,7 +942,7 @@ void suspend_console(void)
 	acquire_console_sem();
 	console_suspended = 1;
 }
-EXPORT_SYMBOL(suspend_console);
+EXPORT_IF_TOI_MODULAR(suspend_console);
 
 void resume_console(void)
 {
@@ -951,7 +951,7 @@ void resume_console(void)
 	console_suspended = 0;
 	release_console_sem();
 }
-EXPORT_SYMBOL(resume_console);
+EXPORT_IF_TOI_MODULAR(resume_console);
 
 /**
  * acquire_console_sem - lock the console system for exclusive use.

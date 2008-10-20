@@ -23,7 +23,7 @@
 #include "tuxonice_modules.h"
 
 unsigned long toi_poweroff_method; /* 0 - Kernel power off */
-EXPORT_SYMBOL_GPL(toi_poweroff_method);
+EXPORT_IF_TOI_MODULAR(toi_poweroff_method);
 
 int wake_delay;
 static char lid_state_file[256], wake_alarm_dir[256];
@@ -228,7 +228,7 @@ void toi_power_down(void)
 
 	toi_check_resleep();
 }
-EXPORT_SYMBOL_GPL(toi_power_down);
+EXPORT_IF_TOI_MODULAR(toi_power_down);
 
 static struct toi_sysfs_data sysfs_params[] = {
 #if defined(CONFIG_ACPI)
