@@ -606,7 +606,7 @@ static void display_stats(int always, int sub_extra_pd1_allow)
 		extra_pd1_pages_allowance, ((long) image_size_limit) << 8);
 
 	if (always)
-		printk(buffer);
+		printk("%s", buffer);
 	else
 		toi_message(TOI_EAT_MEMORY, TOI_MEDIUM, 1, buffer);
 }

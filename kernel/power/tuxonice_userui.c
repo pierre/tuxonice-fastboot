@@ -491,7 +491,7 @@ static int userui_user_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 		toi_bkd.toi_default_console_level = (*data);
 		return 0;
 	case USERUI_MSG_PRINTK:
-		printk((char *) data);
+		printk("%s", (char *) data);
 		return 0;
 	}
 
