@@ -23,6 +23,7 @@
 #include <linux/pm.h>
 #include <linux/resume-trace.h>
 #include <linux/rwsem.h>
+#include <linux/suspend.h>
 
 #include "../base.h"
 #include "power.h"
@@ -54,7 +55,7 @@ void device_pm_lock(void)
 {
 	mutex_lock(&dpm_list_mtx);
 }
-EXPORT_SYMBOL(device_pm_lock);
+EXPORT_IF_TOI_MODULAR(device_pm_lock);
 
 /**
  *	device_pm_unlock - unlock the list of active devices used by the PM core
@@ -63,7 +64,7 @@ void device_pm_unlock(void)
 {
 	mutex_unlock(&dpm_list_mtx);
 }
-EXPORT_SYMBOL(device_pm_unlock);
+EXPORT_IF_TOI_MODULAR(device_pm_unlock);
 
 /**
  *	device_pm_add - add a device to the list of active devices
