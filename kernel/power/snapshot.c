@@ -1264,7 +1264,7 @@ char *check_swsusp_image_kernel(struct swsusp_info *info)
 		return "machine";
 	return NULL;
 }
-EXPORT_SYMBOL_GPL(check_swsusp_image_kernel);
+EXPORT_IF_TOI_MODULAR(check_swsusp_image_kernel);
 #endif /* CONFIG_ARCH_HIBERNATION_HEADER */
 
 unsigned long snapshot_get_image_size(void)
