@@ -181,8 +181,6 @@ void thaw_processes(void)
 	printk("done.\n");
 }
 
-EXPORT_SYMBOL(refrigerator);
-
 void thaw_kernel_threads(void)
 {
 	freezer_state = FREEZER_USERSPACE_FROZEN;

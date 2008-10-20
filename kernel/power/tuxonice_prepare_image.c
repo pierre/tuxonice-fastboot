@@ -114,18 +114,16 @@ static void pageset2_full(void)
 {
 	struct zone *zone;
 	unsigned long flags;
+	int i;
 
 	for_each_zone(zone) {
 		spin_lock_irqsave(&zone->lru_lock, flags);
-		if (zone_page_state(zone, NR_INACTIVE)) {
-			struct page *page;
-			list_for_each_entry(page, &zone->inactive_list, lru)
-				SetPagePageset2(page);
-		}
-		if (zone_page_state(zone, NR_ACTIVE)) {
-			struct page *page;
-			list_for_each_entry(page, &zone->active_list, lru)
-				SetPagePageset2(page);
+		for_each_lru(i) {
+			if (zone_page_state(zone, NR_LRU_BASE + i)) {
+				struct page *page;
+				list_for_each_entry(page, &zone->lru[i].list, lru)
+					SetPagePageset2(page);
+			}
 		}
 		spin_unlock_irqrestore(&zone->lru_lock, flags);
 	}
@@ -915,8 +913,6 @@ static void eat_memory(void)
 
 	if (amount_wanted > 0 && !test_result_state(TOI_ABORTED) &&
 			image_size_limit != -1) {
-		struct zone *zone;
-		int zone_idx;
 
 		toi_prepare_status(CLEAR_BAR,
 				"Seeking to free %ldMB of memory.",
@@ -924,35 +920,13 @@ static void eat_memory(void)
 
 		thaw_kernel_threads();
 
-		for (zone_idx = 0; zone_idx < MAX_NR_ZONES; zone_idx++) {
-			unsigned long zone_type_free = max_t(long,
-					(zone_idx == ZONE_HIGHMEM) ?
-					highpages_ps1_to_free() :
-					lowpages_ps1_to_free(), amount_wanted);
+		shrink_all_memory(amount_wanted);
 
-			if (zone_type_free < 0)
-				break;
+		did_eat_memory = 1;
 
-			for_each_zone(zone) {
-				if (zone_idx(zone) != zone_idx)
-					continue;
+		toi_recalculate_image_contents(0);
 
-				shrink_one_zone(zone, zone_type_free, 3);
-
-				did_eat_memory = 1;
-
-				toi_recalculate_image_contents(0);
-
-				amount_wanted = amount_needed(1);
-				zone_type_free = max_t(long,
-					(zone_idx == ZONE_HIGHMEM) ?
-					highpages_ps1_to_free() :
-					lowpages_ps1_to_free(), amount_wanted);
-
-				if (zone_type_free < 0)
-					break;
-			}
-		}
+		amount_wanted = amount_needed(1);
 
 		toi_cond_pause(0, NULL);
 
@@ -960,12 +934,8 @@ static void eat_memory(void)
 			set_abort_result(TOI_FREEZING_FAILED);
 	}
 
-	if (did_eat_memory) {
-		unsigned long orig_state = get_toi_state();
-		/* Freeze_processes will call sys_sync too */
-		restore_toi_state(orig_state);
+	if (did_eat_memory)
 		toi_recalculate_image_contents(0);
-	}
 }
 
 /* toi_prepare_image
@@ -1037,10 +1007,8 @@ int toi_prepare_image(void)
 			display_failure_reason(tries > MAX_TRIES);
 			abort_hibernate(TOI_UNABLE_TO_PREPARE_IMAGE,
 				"Unable to successfully prepare the image.\n");
-		} else {
-			unlink_lru_lists();
+		} else
 			toi_cond_pause(1, "Image preparation complete.");
-		}
 	}
 
 	return result ? result : allocate_checksum_pages();

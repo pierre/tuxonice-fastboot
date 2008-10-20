@@ -395,7 +395,6 @@ static void do_cleanup(int get_debug_info)
 
 	if (get_debug_info)
 		toi_prepare_status(DONT_CLEAR_BAR, "Cleaning up...");
-	relink_lru_lists();
 
 	free_checksum_pages();
 
