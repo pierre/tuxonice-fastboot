@@ -46,7 +46,6 @@
 #include <linux/page-isolation.h>
 #include <linux/page_cgroup.h>
 #include <linux/debugobjects.h>
-#include <linux/suspend.h>
 
 #include <asm/tlbflush.h>
 #include <asm/div64.h>
