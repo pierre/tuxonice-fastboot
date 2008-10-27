@@ -339,12 +339,6 @@ static inline void check_resume_attempted(void)
 #define resume_attempted (0)
 #endif
 
-#ifdef CONFIG_PRINTK_NOSAVE
-#define POSS_NOSAVE __nosavedata
-#else
-#define POSS_NOSAVE
-#endif
-
 #if defined(CONFIG_TOI_EXPORTS) || defined(CONFIG_TOI_CORE_EXPORTS)
 #define EXPORT_IF_TOI_MODULAR(symbol) EXPORT_SYMBOL_GPL(symbol)
 #else
