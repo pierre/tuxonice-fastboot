@@ -280,7 +280,7 @@ void freeze_filesystems(int which)
 		    which & FS_FREEZER_FUSE) {
 			sb->s_frozen = SB_FREEZE_TRANS;
 			sb->s_flags |= MS_FROZEN;
-			printk("Fuse filesystem done.\n");
+			FS_PRINTK("Fuse filesystem done.\n");
 			continue;
 		}
 
