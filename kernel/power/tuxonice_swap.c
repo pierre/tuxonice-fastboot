@@ -123,7 +123,7 @@ static void close_bdev(int i)
 	if (!this)
 		return;
 
-	blkdev_put(this->bdev);
+	blkdev_put(this->bdev, FMODE_READ | FMODE_NDELAY);
 	toi_kfree(8, this);
 	bdevs_opened[i] = NULL;
 }
@@ -186,7 +186,7 @@ static struct block_device *open_bdev(int index, dev_t device, int display_errs)
 	if (!this) {
 		printk(KERN_WARNING "TuxOnIce: Failed to allocate memory for "
 				"opening a bdev.");
-		blkdev_put(bdev);
+		blkdev_put(bdev, FMODE_READ | FMODE_NDELAY);
 		return ERR_PTR(-ENOMEM);
 	}
 

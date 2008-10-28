@@ -283,7 +283,8 @@ static void toi_file_cleanup(int finishing_cycle)
 		}
 
 		if (used_devt) {
-			blkdev_put(toi_file_target_bdev);
+			blkdev_put(toi_file_target_bdev,
+					FMODE_READ | FMODE_NDELAY);
 			used_devt = 0;
 		}
 		toi_file_target_bdev = NULL;
