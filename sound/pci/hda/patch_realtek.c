@@ -307,6 +307,13 @@ struct alc_spec {
 	/* for PLL fix */
 	hda_nid_t pll_nid;
 	unsigned int pll_coef_idx, pll_coef_bit;
+
+#ifdef SND_HDA_NEEDS_RESUME
+#define ALC_MAX_PINS	16
+	unsigned int num_pins;
+	hda_nid_t pin_nids[ALC_MAX_PINS];
+	unsigned int pin_cfgs[ALC_MAX_PINS];
+#endif
 };
 
 /*
@@ -2778,6 +2785,64 @@ static void alc_free(struct hda_codec *codec)
 	codec->spec = NULL; /* to be sure */
 }
 
+#ifdef SND_HDA_NEEDS_RESUME
+static void store_pin_configs(struct hda_codec *codec)
+{
+	struct alc_spec *spec = codec->spec;
+	hda_nid_t nid, end_nid;
+
+	end_nid = codec->start_nid + codec->num_nodes;
+	for (nid = codec->start_nid; nid < end_nid; nid++) {
+		unsigned int wid_caps = get_wcaps(codec, nid);
+		unsigned int wid_type =
+			(wid_caps & AC_WCAP_TYPE) >> AC_WCAP_TYPE_SHIFT;
+		if (wid_type != AC_WID_PIN)
+			continue;
+		if (spec->num_pins >= ARRAY_SIZE(spec->pin_nids))
+			break;
+		spec->pin_nids[spec->num_pins] = nid;
+		spec->pin_cfgs[spec->num_pins] =
+			snd_hda_codec_read(codec, nid, 0,
+					   AC_VERB_GET_CONFIG_DEFAULT, 0);
+		spec->num_pins++;
+	}
+}
+
+static void resume_pin_configs(struct hda_codec *codec)
+{
+	struct alc_spec *spec = codec->spec;
+	int i;
+
+	for (i = 0; i < spec->num_pins; i++) {
+		hda_nid_t pin_nid = spec->pin_nids[i];
+		unsigned int pin_config = spec->pin_cfgs[i];
+		snd_hda_codec_write(codec, pin_nid, 0,
+				    AC_VERB_SET_CONFIG_DEFAULT_BYTES_0,
+				    pin_config & 0x000000ff);
+		snd_hda_codec_write(codec, pin_nid, 0,
+				    AC_VERB_SET_CONFIG_DEFAULT_BYTES_1,
+				    (pin_config & 0x0000ff00) >> 8);
+		snd_hda_codec_write(codec, pin_nid, 0,
+				    AC_VERB_SET_CONFIG_DEFAULT_BYTES_2,
+				    (pin_config & 0x00ff0000) >> 16);
+		snd_hda_codec_write(codec, pin_nid, 0,
+				    AC_VERB_SET_CONFIG_DEFAULT_BYTES_3,
+				    pin_config >> 24);
+	}
+}
+
+static int alc_resume(struct hda_codec *codec)
+{
+	resume_pin_configs(codec);
+	codec->patch_ops.init(codec);
+	snd_hda_codec_resume_amp(codec);
+	snd_hda_codec_resume_cache(codec);
+	return 0;
+}
+#else
+#define store_pin_configs(codec)
+#endif
+
 /*
  */
 static struct hda_codec_ops alc_patch_ops = {
@@ -2786,6 +2851,9 @@ static struct hda_codec_ops alc_patch_ops = {
 	.init = alc_init,
 	.free = alc_free,
 	.unsol_event = alc_unsol_event,
+#ifdef SND_HDA_NEEDS_RESUME
+	.resume = alc_resume,
+#endif
 #ifdef CONFIG_SND_HDA_POWER_SAVE
 	.check_power_status = alc_check_power_status,
 #endif
@@ -3832,6 +3900,7 @@ static int alc880_parse_auto_config(struct hda_codec *codec)
 	spec->num_mux_defs = 1;
 	spec->input_mux = &spec->private_imux;
 
+	store_pin_configs(codec);
 	return 1;
 }
 
@@ -4996,7 +5065,7 @@ static struct hda_verb alc260_test_init_verbs[] = {
  */
 
 static int alc260_add_playback_controls(struct alc_spec *spec, hda_nid_t nid,
-					const char *pfx)
+					const char *pfx, int *vol_bits)
 {
 	hda_nid_t nid_vol;
 	unsigned long vol_val, sw_val;
@@ -5018,10 +5087,14 @@ static int alc260_add_playback_controls(struct alc_spec *spec, hda_nid_t nid,
 	} else
 		return 0; /* N/A */
 
-	snprintf(name, sizeof(name), "%s Playback Volume", pfx);
-	err = add_control(spec, ALC_CTL_WIDGET_VOL, name, vol_val);
-	if (err < 0)
-		return err;
+	if (!(*vol_bits & (1 << nid_vol))) {
+		/* first control for the volume widget */
+		snprintf(name, sizeof(name), "%s Playback Volume", pfx);
+		err = add_control(spec, ALC_CTL_WIDGET_VOL, name, vol_val);
+		if (err < 0)
+			return err;
+		*vol_bits |= (1 << nid_vol);
+	}
 	snprintf(name, sizeof(name), "%s Playback Switch", pfx);
 	err = add_control(spec, ALC_CTL_WIDGET_MUTE, name, sw_val);
 	if (err < 0)
@@ -5035,6 +5108,7 @@ static int alc260_auto_create_multi_out_ctls(struct alc_spec *spec,
 {
 	hda_nid_t nid;
 	int err;
+	int vols = 0;
 
 	spec->multiout.num_dacs = 1;
 	spec->multiout.dac_nids = spec->private_dac_nids;
@@ -5042,21 +5116,22 @@ static int alc260_auto_create_multi_out_ctls(struct alc_spec *spec,
 
 	nid = cfg->line_out_pins[0];
 	if (nid) {
-		err = alc260_add_playback_controls(spec, nid, "Front");
+		err = alc260_add_playback_controls(spec, nid, "Front", &vols);
 		if (err < 0)
 			return err;
 	}
 
 	nid = cfg->speaker_pins[0];
 	if (nid) {
-		err = alc260_add_playback_controls(spec, nid, "Speaker");
+		err = alc260_add_playback_controls(spec, nid, "Speaker", &vols);
 		if (err < 0)
 			return err;
 	}
 
 	nid = cfg->hp_pins[0];
 	if (nid) {
-		err = alc260_add_playback_controls(spec, nid, "Headphone");
+		err = alc260_add_playback_controls(spec, nid, "Headphone",
+						   &vols);
 		if (err < 0)
 			return err;
 	}
@@ -5244,6 +5319,7 @@ static int alc260_parse_auto_config(struct hda_codec *codec)
 	}
 	spec->num_mixers++;
 
+	store_pin_configs(codec);
 	return 1;
 }
 
@@ -10307,6 +10383,7 @@ static int alc262_parse_auto_config(struct hda_codec *codec)
 	if (err < 0)
 		return err;
 
+	store_pin_configs(codec);
 	return 1;
 }
 
@@ -11441,6 +11518,7 @@ static int alc268_parse_auto_config(struct hda_codec *codec)
 	if (err < 0)
 		return err;
 
+	store_pin_configs(codec);
 	return 1;
 }
 
@@ -12224,6 +12302,7 @@ static int alc269_parse_auto_config(struct hda_codec *codec)
 	spec->mixers[spec->num_mixers] = alc269_capture_mixer;
 	spec->num_mixers++;
 
+	store_pin_configs(codec);
 	return 1;
 }
 
@@ -13310,6 +13389,7 @@ static int alc861_parse_auto_config(struct hda_codec *codec)
 	spec->mixers[spec->num_mixers] = alc861_capture_mixer;
 	spec->num_mixers++;
 
+	store_pin_configs(codec);
 	return 1;
 }
 
@@ -14421,6 +14501,7 @@ static int alc861vd_parse_auto_config(struct hda_codec *codec)
 	if (err < 0)
 		return err;
 
+	store_pin_configs(codec);
 	return 1;
 }
 
@@ -16252,6 +16333,8 @@ static int alc662_parse_auto_config(struct hda_codec *codec)
 
 	spec->mixers[spec->num_mixers] = alc662_capture_mixer;
 	spec->num_mixers++;
+
+	store_pin_configs(codec);
 	return 1;
 }
 
