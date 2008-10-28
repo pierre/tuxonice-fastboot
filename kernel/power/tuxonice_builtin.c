@@ -177,14 +177,12 @@ struct toi_boot_kernel_data toi_bkd __nosavedata
 };
 EXPORT_IF_TOI_MODULAR(toi_bkd);
 
-struct block_device *toi_open_by_devnum(dev_t dev, unsigned mode)
+struct block_device *toi_open_by_devnum(dev_t dev, fmode_t mode)
 {
 	struct block_device *bdev = bdget(dev);
 	int err = -ENOMEM;
-	int flags = mode & FMODE_WRITE ? O_RDWR : O_RDONLY;
-	flags |= O_NONBLOCK;
 	if (bdev)
-		err = blkdev_get(bdev, mode, flags);
+		err = blkdev_get(bdev, mode);
 	return err ? ERR_PTR(err) : bdev;
 }
 EXPORT_IF_TOI_MODULAR(toi_open_by_devnum);

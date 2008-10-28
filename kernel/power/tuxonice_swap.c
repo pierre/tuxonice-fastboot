@@ -170,7 +170,7 @@ static struct block_device *open_bdev(int index, dev_t device, int display_errs)
 		close_bdev(index);
 	}
 
-	bdev = toi_open_by_devnum(device, FMODE_READ);
+	bdev = toi_open_by_devnum(device, FMODE_READ | FMODE_NDELAY);
 
 	if (IS_ERR(bdev) || !bdev) {
 		if (display_errs)
