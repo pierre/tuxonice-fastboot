@@ -261,4 +261,10 @@ struct nosave_region {
 	unsigned long end_pfn;
 };
 
+#ifndef PHYS_PFN_OFFSET
+#define PHYS_PFN_OFFSET 0
+#endif
+
+#define ZONE_START(thiszone) ((thiszone)->zone_start_pfn - PHYS_PFN_OFFSET)
+
 #endif

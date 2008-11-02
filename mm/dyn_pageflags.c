@@ -69,9 +69,15 @@ static int dyn_pageflags_debug;
 #endif
 #endif
 
+#ifndef PHYS_PFN_OFFSET
+#define PHYS_PFN_OFFSET 0
+#endif
+
 #define BIT_NUM_MASK ((sizeof(unsigned long) << 3) - 1)
 #define PAGE_NUM_MASK (~((1 << (PAGE_SHIFT + 3)) - 1))
 #define UL_NUM_MASK (~(BIT_NUM_MASK | PAGE_NUM_MASK))
+
+#define ZONE_START(thiszone) ((thiszone)->zone_start_pfn - PHYS_PFN_OFFSET)
 
 /*
  * PAGENUMBER gives the index of the page within the zone.
@@ -95,7 +101,7 @@ static int dyn_pageflags_debug;
 #define GET_BIT_AND_UL(pageflags, page) \
 	struct zone *zone = page_zone(page); \
 	unsigned long pfn = page_to_pfn(page); \
-	unsigned long zone_pfn = pfn - zone->zone_start_pfn; \
+	unsigned long zone_pfn = pfn - ZONE_START(zone); \
 	int node = page_to_nid(page); \
 	int zone_num = zone_idx(zone); \
 	int pagenum = PAGENUMBER(zone_pfn) + 2; \
@@ -331,7 +337,7 @@ static int resize_zone_bitmap(struct dyn_pageflags *pagemap, struct zone *zone,
 			memcpy(new_ptr + 2 + copy_offset, old_ptr + 2,
 					sizeof(unsigned long) * to_copy);
 
-		new_ptr[0] = (void *) zone->zone_start_pfn;
+		new_ptr[0] = (void *) ZONE_START(zone);
 		new_ptr[1] = (void *) new_pages;
 	}
 
@@ -377,13 +383,13 @@ int check_dyn_pageflag_zone(struct dyn_pageflags *pagemap, struct zone *zone,
 	new_pages = force_free_all ? 0 : pages_for_span(zone->spanned_pages);
 
 	if (old_pages == new_pages &&
-	    (!old_pages || (unsigned long) old_ptr[0] == zone->zone_start_pfn))
+	    (!old_pages || (unsigned long) old_ptr[0] == ZONE_START(zone)))
 		return 0;
 
 	if (old_pages &&
-	    (unsigned long) old_ptr[0] != zone->zone_start_pfn)
+	    (unsigned long) old_ptr[0] != ZONE_START(zone))
 		copy_offset = pages_for_span((unsigned long) old_ptr[0] -
-							zone->zone_start_pfn);
+							ZONE_START(zone));
 
 	/* New/expanded zone? */
 	return resize_zone_bitmap(pagemap, zone, old_pages, new_pages,
@@ -601,7 +607,7 @@ unsigned long get_next_bit_on(struct dyn_pageflags *pageflags,
 	zone = page_zone(page);
 	node = zone->zone_pgdat->node_id;
 	zone_num = zone_idx(zone);
-	zone_offset = counter - zone->zone_start_pfn;
+	zone_offset = counter - ZONE_START(zone);
 
 	if (first)
 		goto test;
@@ -647,7 +653,7 @@ test:
 
 	} while (!ul || !test_bit(pagebit, ul));
 
-	return zone->zone_start_pfn + zone_offset;
+	return ZONE_START(zone) + zone_offset;
 }
 EXPORT_IF_TOI_MODULAR(get_next_bit_on);
 
