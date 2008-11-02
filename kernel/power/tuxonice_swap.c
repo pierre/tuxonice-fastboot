@@ -1264,6 +1264,7 @@ static __init int toi_swap_load(void)
 	toi_swapops.rw_header_chunk_noreadahead =
 		toi_bio_ops.rw_header_chunk_noreadahead;
 	toi_swapops.io_flusher = toi_bio_ops.io_flusher;
+	toi_swapops.monitor_outstanding_io = toi_bio_ops.monitor_outstanding_io;
 	toi_swapops.finish_all_io = toi_bio_ops.finish_all_io;
 
 	return toi_register_module(&toi_swapops);

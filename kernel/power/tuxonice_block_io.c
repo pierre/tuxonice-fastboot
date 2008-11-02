@@ -75,6 +75,7 @@ static int target_outstanding_io = 1024;
 static int max_outstanding_writes, max_outstanding_reads;
 
 static struct page *bio_queue_head, *bio_queue_tail;
+static atomic_t toi_bio_queue_size;
 static DEFINE_SPINLOCK(bio_queue_lock);
 
 static int free_mem_throttle;
@@ -106,6 +107,9 @@ DEFINE_MUTEX(toi_bio_mutex);
 
 static struct task_struct *toi_queue_flusher;
 static int toi_bio_queue_flush_pages(int dedicated_thread);
+
+#define TOTAL_OUTSTANDING_IO (atomic_read(&toi_io_in_progress) + \
+	       atomic_read(&toi_bio_queue_size))
 
 /**
  * set_throttle: Set the point where we pause to avoid oom.
@@ -176,24 +180,33 @@ static void throttle_if_memory_low(void)
 }
 
 /**
- * toi_finish_all_io: Complete all outstanding i/o.
+ * toi_monitor_outstanding_io: Show the user how much I/O we're waiting for.
  */
-static void toi_finish_all_io(void)
+static void toi_monitor_outstanding_io(void)
 {
-	int orig = atomic_read(&toi_io_in_progress);
+	int orig = TOTAL_OUTSTANDING_IO, step = orig / 5;
 
 	while (orig) {
-		int new_min = orig > 2560 ? orig - 2560 : 0,	/* 10 MB */
-		    new_max = orig + 2560,
+		int new_min = orig > step ? orig - step : 0,
+		    new_max = orig + step,
 		    mb = MB(orig);
 		if (mb)
 			toi_prepare_status(DONT_CLEAR_BAR,
 				"Waiting on I/O completion (%d MB)", mb);
 		wait_event(num_in_progress_wait,
-			atomic_read(&toi_io_in_progress) <= new_min ||
-			atomic_read(&toi_io_in_progress) >= new_max);
-		orig = atomic_read(&toi_io_in_progress);
+			TOTAL_OUTSTANDING_IO <= new_min ||
+			TOTAL_OUTSTANDING_IO >= new_max);
+		orig = TOTAL_OUTSTANDING_IO;
 	}
+}
+
+/**
+ * toi_finish_all_io: Wait for all outstanding i/o to complete.
+ */
+static void toi_finish_all_io(void)
+{
+	toi_bio_queue_flush_pages(0);
+	wait_event(num_in_progress_wait, !TOTAL_OUTSTANDING_IO);
 }
 
 /**
@@ -626,6 +639,7 @@ static void toi_bio_queue_write(char **full_buffer)
 		bio_queue_tail->private = (unsigned long) page;
 
 	bio_queue_tail = page;
+	atomic_inc(&toi_bio_queue_size);
 
 	spin_unlock_irqrestore(&bio_queue_lock, flags);
 	wake_up(&toi_io_queue_flusher);
@@ -826,6 +840,7 @@ top:
 		bio_queue_head = (struct page *) page->private;
 		if (bio_queue_tail == page)
 			bio_queue_tail = NULL;
+		atomic_dec(&toi_bio_queue_size);
 		spin_unlock_irqrestore(&bio_queue_lock, flags);
 		result = toi_bio_rw_page(WRITE, page, 0, 11);
 		if (result)
@@ -1135,6 +1150,7 @@ static void toi_bio_cleanup(int finishing_cycle)
 struct toi_bio_ops toi_bio_ops = {
 	.bdev_page_io = toi_bdev_page_io,
 	.finish_all_io = toi_finish_all_io,
+	.monitor_outstanding_io	= toi_monitor_outstanding_io,
 	.forward_one_page = go_next_page,
 	.set_extra_page_forward = set_extra_page_forward,
 	.set_devinfo = toi_set_devinfo,

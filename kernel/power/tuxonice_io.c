@@ -541,6 +541,10 @@ static int worker_rw_loop(void *data)
 	} while (atomic_read(&io_count) >= atomic_read(&toi_io_workers) &&
 		!(io_write && test_result_state(TOI_ABORTED)));
 
+	printk("Thread %d exited with %d to do, %d workers.\n",
+			smp_processor_id(), atomic_read(&io_count),
+			atomic_read(&toi_io_workers));
+
 	last_worker = atomic_dec_and_test(&toi_io_workers);
 	if (!first_to_finish) {
 		first_to_finish = 1;
@@ -551,13 +555,15 @@ static int worker_rw_loop(void *data)
 	if (last_worker) {
 		toi_bio_queue_flusher_should_finish = 1;
 		wake_up(&toi_io_queue_flusher);
+		toiActiveAllocator->finish_all_io();
 	} else {
 		/* Yes, there's still I/O above, but it's the last
 		 * pages being submitted, so switch to displaying
 		 * how much I/O we're waiting on.
 		 */
-		if (i_finished_first)
-			toiActiveAllocator->finish_all_io();
+		if (i_finished_first &&
+		    toiActiveAllocator->monitor_outstanding_io)
+			toiActiveAllocator->monitor_outstanding_io();
 	}
 
 	toi__free_page(28, buffer);

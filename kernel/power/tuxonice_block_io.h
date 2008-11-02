@@ -29,6 +29,7 @@ struct toi_bio_ops {
 			struct page *page);
 	void (*check_io_stats) (void);
 	void (*reset_io_stats) (void);
+	void (*monitor_outstanding_io) (void);
 	void (*finish_all_io) (void);
 	int (*forward_one_page) (int writing);
 	void (*set_extra_page_forward) (void);

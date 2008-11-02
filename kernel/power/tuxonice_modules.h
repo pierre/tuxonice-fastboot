@@ -126,6 +126,9 @@ struct toi_module_ops {
 	/* Attempt to parse an image location */
 	int (*parse_sig_location) (char *buffer, int only_writer, int quiet);
 
+	/* Monitor outstanding I/O */
+	void (*monitor_outstanding_io) (void);
+
 	/* Flush outstanding I/O */
 	void (*finish_all_io) (void);
 
