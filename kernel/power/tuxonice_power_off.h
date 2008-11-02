@@ -32,3 +32,4 @@ extern int platform_restore_cleanup(int platform_mode);
 #define toi_platform_finish() platform_finish(platform_test())
 #define toi_platform_pre_restore() platform_pre_restore(platform_test())
 #define toi_platform_restore_cleanup() platform_restore_cleanup(platform_test())
+#define toi_platform_recover() platform_recover(platform_test())

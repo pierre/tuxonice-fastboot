@@ -191,6 +191,7 @@ EXPORT_IF_TOI_MODULAR(toi_wait_for_keypress_dev_console);
 EXPORT_IF_TOI_MODULAR(hibernation_platform_enter);
 EXPORT_IF_TOI_MODULAR(platform_begin);
 EXPORT_IF_TOI_MODULAR(platform_pre_snapshot);
+EXPORT_IF_TOI_MODULAR(platform_recover);
 EXPORT_IF_TOI_MODULAR(platform_leave);
 EXPORT_IF_TOI_MODULAR(platform_end);
 EXPORT_IF_TOI_MODULAR(platform_finish);

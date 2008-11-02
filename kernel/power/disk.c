@@ -188,7 +188,7 @@ void platform_restore_cleanup(int platform_mode)
  *	devices.
  */
 
-static void platform_recover(int platform_mode)
+void platform_recover(int platform_mode)
 {
 	if (platform_mode && hibernation_ops && hibernation_ops->recover)
 		hibernation_ops->recover();
