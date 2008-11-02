@@ -212,7 +212,8 @@ int toi_register_module(struct toi_module_ops *module)
 	list_add_tail(&module->module_list, &toi_modules);
 	toi_num_modules++;
 
-	if (!module->directory && !module->shared_directory)
+	if ((!module->directory && !module->shared_directory) ||
+			!module->sysfs_data || !module->num_sysfs_entries)
 		return 0;
 
 	/*
