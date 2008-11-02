@@ -541,10 +541,6 @@ static int worker_rw_loop(void *data)
 	} while (atomic_read(&io_count) >= atomic_read(&toi_io_workers) &&
 		!(io_write && test_result_state(TOI_ABORTED)));
 
-	printk("Thread %d exited with %d to do, %d workers.\n",
-			smp_processor_id(), atomic_read(&io_count),
-			atomic_read(&toi_io_workers));
-
 	last_worker = atomic_dec_and_test(&toi_io_workers);
 	if (!first_to_finish) {
 		first_to_finish = 1;
