@@ -55,4 +55,4 @@ extern struct toi_bio_ops toi_bio_ops;
 extern char *toi_writer_buffer;
 extern int toi_writer_buffer_posn;
 extern struct hibernate_extent_iterate_saved_state toi_writer_posn_save[4];
-extern struct hibernate_extent_iterate_state toi_writer_posn;
+extern struct toi_extent_iterate_state toi_writer_posn;

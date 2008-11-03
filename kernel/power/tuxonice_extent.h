@@ -27,7 +27,7 @@ struct hibernate_extent_chain {
 	struct hibernate_extent *first, *last_touched;
 };
 
-struct hibernate_extent_iterate_state {
+struct toi_extent_iterate_state {
 	struct hibernate_extent_chain *chains;
 	int num_chains;
 	int current_chain;
@@ -63,10 +63,10 @@ int toi_serialise_extent_chain(struct toi_module_ops *owner,
 		struct hibernate_extent_chain *chain);
 int toi_load_extent_chain(struct hibernate_extent_chain *chain);
 
-void toi_extent_state_save(struct hibernate_extent_iterate_state *state,
+void toi_extent_state_save(struct toi_extent_iterate_state *state,
 		struct hibernate_extent_iterate_saved_state *saved_state);
-void toi_extent_state_restore(struct hibernate_extent_iterate_state *state,
+void toi_extent_state_restore(struct toi_extent_iterate_state *state,
 		struct hibernate_extent_iterate_saved_state *saved_state);
-void toi_extent_state_goto_start(struct hibernate_extent_iterate_state *state);
-unsigned long toi_extent_state_next(struct hibernate_extent_iterate_state *state);
+void toi_extent_state_goto_start(struct toi_extent_iterate_state *state);
+unsigned long toi_extent_state_next(struct toi_extent_iterate_state *state);
 #endif

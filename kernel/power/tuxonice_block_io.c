@@ -94,7 +94,7 @@ static int current_stream;
 struct hibernate_extent_iterate_saved_state toi_writer_posn_save[4];
 
 /* Pointer to current entry being loaded/saved. */
-struct hibernate_extent_iterate_state toi_writer_posn;
+struct toi_extent_iterate_state toi_writer_posn;
 
 /* Not static, so that the allocators can setup and complete
  * writing the header */

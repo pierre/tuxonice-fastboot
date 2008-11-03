@@ -195,7 +195,7 @@ int toi_load_extent_chain(struct hibernate_extent_chain *chain)
  * When using compression and expected_compression > 0, we let the image size
  * be larger than storage, so we can validly run out of data to return.
  */
-unsigned long toi_extent_state_next(struct hibernate_extent_iterate_state *state)
+unsigned long toi_extent_state_next(struct toi_extent_iterate_state *state)
 {
 	if (state->current_chain == state->num_chains)
 		return 0;
@@ -236,7 +236,7 @@ unsigned long toi_extent_state_next(struct hibernate_extent_iterate_state *state
  *
  * Find the first valid value in a group of chains.
  */
-void toi_extent_state_goto_start(struct hibernate_extent_iterate_state *state)
+void toi_extent_state_goto_start(struct toi_extent_iterate_state *state)
 {
 	state->current_chain = -1;
 	state->current_extent = NULL;
@@ -249,7 +249,7 @@ void toi_extent_state_goto_start(struct hibernate_extent_iterate_state *state)
  * position in a format that can be used with relocated chains (at
  * resume time).
  */
-void toi_extent_state_save(struct hibernate_extent_iterate_state *state,
+void toi_extent_state_save(struct toi_extent_iterate_state *state,
 		struct hibernate_extent_iterate_saved_state *saved_state)
 {
 	struct hibernate_extent *extent;
@@ -273,7 +273,7 @@ void toi_extent_state_save(struct hibernate_extent_iterate_state *state,
  *
  * Restore the position saved by extent_state_save.
  */
-void toi_extent_state_restore(struct hibernate_extent_iterate_state *state,
+void toi_extent_state_restore(struct toi_extent_iterate_state *state,
 		struct hibernate_extent_iterate_saved_state *saved_state)
 {
 	int posn = saved_state->extent_num;
