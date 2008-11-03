@@ -34,6 +34,13 @@ config PM_VERBOSE
 	---help---
 	This option enables verbose messages from the Power Management code.
 
+config FS_FREEZER_DEBUG
+	bool "Filesystem freezer debugging"
+	depends on PM_DEBUG
+	default n
+	---help---
+	This option enables debugging of the filesystem freezing code.
+
 config CAN_PM_TRACE
 	def_bool y
 	depends on PM_DEBUG && PM_SLEEP && EXPERIMENTAL

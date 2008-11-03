@@ -246,7 +246,7 @@ void thaw_bdev(struct block_device *bdev, struct super_block *sb)
 }
 EXPORT_SYMBOL(thaw_bdev);
 
-#if 0
+#ifdef CONFIG_FS_FREEZER_DEBUG
 #define FS_PRINTK(fmt, args...) printk(fmt, ## args)
 #else
 #define FS_PRINTK(fmt, args...)
