@@ -205,66 +205,51 @@ EXPORT_IF_TOI_MODULAR(init_swsusp_header);
 EXPORT_IF_TOI_MODULAR(arch_hibernation_header_restore);
 #endif
 
-#ifdef CONFIG_TOI_CORE_EXPORTS
 #ifdef CONFIG_X86_64
-EXPORT_SYMBOL_GPL(save_processor_state);
+EXPORT_IF_TOI_MODULAR(save_processor_state);
 #endif
 
-EXPORT_SYMBOL_GPL(drop_pagecache);
-EXPORT_SYMBOL_GPL(restore_pblist);
-EXPORT_SYMBOL_GPL(pm_mutex);
-EXPORT_SYMBOL_GPL(pm_restore_console);
-EXPORT_SYMBOL_GPL(super_blocks);
-EXPORT_SYMBOL_GPL(next_zone);
+EXPORT_IF_TOI_MODULAR(drop_pagecache);
+EXPORT_IF_TOI_MODULAR(restore_pblist);
+EXPORT_IF_TOI_MODULAR(pm_mutex);
+EXPORT_IF_TOI_MODULAR(pm_restore_console);
+EXPORT_IF_TOI_MODULAR(super_blocks);
+EXPORT_IF_TOI_MODULAR(next_zone);
 
-EXPORT_SYMBOL_GPL(freeze_processes);
-EXPORT_SYMBOL_GPL(thaw_processes);
-EXPORT_SYMBOL_GPL(thaw_kernel_threads);
-EXPORT_SYMBOL_GPL(shrink_all_memory);
-EXPORT_SYMBOL_GPL(saveable_page);
-EXPORT_SYMBOL_GPL(swsusp_arch_resume);
-EXPORT_SYMBOL_GPL(follow_page);
-EXPORT_SYMBOL_GPL(block_dump);
-EXPORT_SYMBOL_GPL(suspend_devices_and_enter);
-EXPORT_SYMBOL_GPL(first_online_pgdat);
-EXPORT_SYMBOL_GPL(next_online_pgdat);
-EXPORT_SYMBOL_GPL(machine_restart);
-EXPORT_SYMBOL_GPL(tasklist_lock);
+EXPORT_IF_TOI_MODULAR(freeze_processes);
+EXPORT_IF_TOI_MODULAR(thaw_processes);
+EXPORT_IF_TOI_MODULAR(thaw_kernel_threads);
+EXPORT_IF_TOI_MODULAR(shrink_all_memory);
+EXPORT_IF_TOI_MODULAR(saveable_page);
+EXPORT_IF_TOI_MODULAR(swsusp_arch_resume);
+EXPORT_IF_TOI_MODULAR(follow_page);
+EXPORT_IF_TOI_MODULAR(block_dump);
+EXPORT_IF_TOI_MODULAR(suspend_devices_and_enter);
+EXPORT_IF_TOI_MODULAR(first_online_pgdat);
+EXPORT_IF_TOI_MODULAR(next_online_pgdat);
+EXPORT_IF_TOI_MODULAR(machine_restart);
+EXPORT_IF_TOI_MODULAR(tasklist_lock);
 #ifdef CONFIG_PM_SLEEP_SMP
-EXPORT_SYMBOL_GPL(disable_nonboot_cpus);
-EXPORT_SYMBOL_GPL(enable_nonboot_cpus);
-#endif
+EXPORT_IF_TOI_MODULAR(disable_nonboot_cpus);
+EXPORT_IF_TOI_MODULAR(enable_nonboot_cpus);
 #endif
 
 int toi_wait = CONFIG_TOI_DEFAULT_WAIT;
 
-#ifdef CONFIG_TOI_USERUI_EXPORTS
-EXPORT_SYMBOL_GPL(kmsg_redirect);
-#endif
+EXPORT_IF_TOI_MODULAR(kmsg_redirect);
 EXPORT_IF_TOI_MODULAR(toi_wait);
 
-#if defined(CONFIG_TOI_USERUI_EXPORTS) || defined(CONFIG_TOI_CORE_EXPORTS)
-EXPORT_SYMBOL_GPL(console_printk);
-#endif
-#ifdef CONFIG_TOI_SWAP_EXPORTS	/* TuxOnIce swap specific */
-EXPORT_SYMBOL_GPL(sys_swapon);
-EXPORT_SYMBOL_GPL(sys_swapoff);
-EXPORT_SYMBOL_GPL(si_swapinfo);
-EXPORT_SYMBOL_GPL(map_swap_page);
-EXPORT_SYMBOL_GPL(get_swap_page);
-EXPORT_SYMBOL_GPL(swap_free);
-EXPORT_SYMBOL_GPL(get_swap_info_struct);
-#endif
+EXPORT_IF_TOI_MODULAR(console_printk);
+EXPORT_IF_TOI_MODULAR(sys_swapon);
+EXPORT_IF_TOI_MODULAR(sys_swapoff);
+EXPORT_IF_TOI_MODULAR(si_swapinfo);
+EXPORT_IF_TOI_MODULAR(map_swap_page);
+EXPORT_IF_TOI_MODULAR(get_swap_page);
+EXPORT_IF_TOI_MODULAR(swap_free);
+EXPORT_IF_TOI_MODULAR(get_swap_info_struct);
+EXPORT_IF_TOI_MODULAR(name_to_dev_t);
+EXPORT_IF_TOI_MODULAR(resume_file);
 
-/* Swap or file */
-#if defined(CONFIG_TOI_FILE_EXPORTS) || defined(CONFIG_TOI_SWAP_EXPORTS)
-EXPORT_SYMBOL_GPL(name_to_dev_t);
-#endif
-
-#if defined(CONFIG_TOI_FILE_EXPORTS) || defined(CONFIG_TOI_SWAP_EXPORTS) || \
-	defined(CONFIG_TOI_CORE_EXPORTS)
-EXPORT_SYMBOL_GPL(resume_file);
-#endif
 struct toi_core_fns *toi_core_fns;
 EXPORT_IF_TOI_MODULAR(toi_core_fns);
 
@@ -297,11 +282,11 @@ int toi_try_hibernate(int have_pmsem)
 	return toi_core_fns->try_hibernate(have_pmsem);
 }
 
-static int num_resume_calls = 0;
+static int num_resume_calls;
 #ifdef CONFIG_TOI_IGNORE_LATE_INITCALL
 static int ignore_late_initcall = 1;
 #else
-static int ignore_late_initcall = 0;
+static int ignore_late_initcall;
 #endif
 
 void toi_try_resume(void)
@@ -364,21 +349,13 @@ EXPORT_IF_TOI_MODULAR(toi_in_hibernate);
 
 __nosavedata struct pbe *restore_highmem_pblist;
 
-#ifdef CONFIG_TOI_CORE_EXPORTS
 #ifdef CONFIG_HIGHMEM
-EXPORT_SYMBOL_GPL(nr_free_highpages);
-EXPORT_SYMBOL_GPL(saveable_highmem_page);
-EXPORT_SYMBOL_GPL(restore_highmem_pblist);
+EXPORT_IF_TOI_MODULAR(nr_free_highpages);
+EXPORT_IF_TOI_MODULAR(saveable_highmem_page);
+EXPORT_IF_TOI_MODULAR(restore_highmem_pblist);
 #endif
-#endif
-
-#if defined(CONFIG_TOI_CORE_EXPORTS) || defined(CONFIG_TOI_PAGEFLAGS_EXPORTS)
-EXPORT_SYMBOL_GPL(max_pfn);
-#endif
-
-#if defined(CONFIG_TOI_EXPORTS) || defined(CONFIG_TOI_CORE_EXPORTS)
-EXPORT_SYMBOL_GPL(snprintf_used);
-#endif
+EXPORT_IF_TOI_MODULAR(max_pfn);
+EXPORT_IF_TOI_MODULAR(snprintf_used);
 
 static int __init toi_wait_setup(char *str)
 {

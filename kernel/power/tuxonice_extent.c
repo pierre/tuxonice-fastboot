@@ -291,13 +291,11 @@ void toi_extent_state_restore(struct toi_extent_iterate_state *state,
 		state->current_extent = state->current_extent->next;
 }
 
-#ifdef CONFIG_TOI_EXPORTS
-EXPORT_SYMBOL_GPL(toi_add_to_extent_chain);
-EXPORT_SYMBOL_GPL(toi_put_extent_chain);
-EXPORT_SYMBOL_GPL(toi_load_extent_chain);
-EXPORT_SYMBOL_GPL(toi_serialise_extent_chain);
-EXPORT_SYMBOL_GPL(toi_extent_state_save);
-EXPORT_SYMBOL_GPL(toi_extent_state_restore);
-EXPORT_SYMBOL_GPL(toi_extent_state_goto_start);
-EXPORT_SYMBOL_GPL(toi_extent_state_next);
-#endif
+EXPORT_IF_TOI_MODULAR(toi_add_to_extent_chain);
+EXPORT_IF_TOI_MODULAR(toi_put_extent_chain);
+EXPORT_IF_TOI_MODULAR(toi_load_extent_chain);
+EXPORT_IF_TOI_MODULAR(toi_serialise_extent_chain);
+EXPORT_IF_TOI_MODULAR(toi_extent_state_save);
+EXPORT_IF_TOI_MODULAR(toi_extent_state_restore);
+EXPORT_IF_TOI_MODULAR(toi_extent_state_goto_start);
+EXPORT_IF_TOI_MODULAR(toi_extent_state_next);

@@ -339,7 +339,7 @@ static inline void check_resume_attempted(void)
 #define resume_attempted (0)
 #endif
 
-#if defined(CONFIG_TOI_EXPORTS) || defined(CONFIG_TOI_CORE_EXPORTS)
+#if defined(CONFIG_TOI_EXPORTS)
 #define EXPORT_IF_TOI_MODULAR(symbol) EXPORT_SYMBOL_GPL(symbol)
 #else
 #define EXPORT_IF_TOI_MODULAR(symbol)

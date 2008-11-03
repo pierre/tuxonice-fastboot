@@ -281,13 +281,12 @@ void toi_alloc_exit(void)
 {
 	toi_unregister_module(&toi_alloc_ops);
 }
-#ifdef CONFIG_TOI_EXPORTS
-EXPORT_SYMBOL_GPL(toi_kzalloc);
-EXPORT_SYMBOL_GPL(toi_get_free_pages);
-EXPORT_SYMBOL_GPL(toi_get_zeroed_page);
-EXPORT_SYMBOL_GPL(toi_kfree);
-EXPORT_SYMBOL_GPL(toi_free_page);
-EXPORT_SYMBOL_GPL(toi__free_page);
-EXPORT_SYMBOL_GPL(toi_alloc_page);
-#endif
+
+EXPORT_IF_TOI_MODULAR(toi_kzalloc);
+EXPORT_IF_TOI_MODULAR(toi_get_free_pages);
+EXPORT_IF_TOI_MODULAR(toi_get_zeroed_page);
+EXPORT_IF_TOI_MODULAR(toi_kfree);
+EXPORT_IF_TOI_MODULAR(toi_free_page);
+EXPORT_IF_TOI_MODULAR(toi__free_page);
+EXPORT_IF_TOI_MODULAR(toi_alloc_page);
 #endif

@@ -1166,13 +1166,12 @@ static __init int toi_block_io_load(void)
 	return toi_register_module(&toi_blockwriter_ops);
 }
 
-#if defined(CONFIG_TOI_FILE_EXPORTS) || defined(CONFIG_TOI_SWAP_EXPORTS)
-EXPORT_SYMBOL_GPL(toi_writer_posn);
-EXPORT_SYMBOL_GPL(toi_writer_posn_save);
-EXPORT_SYMBOL_GPL(toi_writer_buffer);
-EXPORT_SYMBOL_GPL(toi_writer_buffer_posn);
-EXPORT_SYMBOL_GPL(toi_bio_ops);
-#endif
+EXPORT_IF_TOI_MODULAR(toi_writer_posn);
+EXPORT_IF_TOI_MODULAR(toi_writer_posn_save);
+EXPORT_IF_TOI_MODULAR(toi_writer_buffer);
+EXPORT_IF_TOI_MODULAR(toi_writer_buffer_posn);
+EXPORT_IF_TOI_MODULAR(toi_bio_ops);
+
 #ifdef MODULE
 static __exit void toi_block_io_unload(void)
 {

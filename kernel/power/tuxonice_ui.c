@@ -250,9 +250,7 @@ void toi_ui_exit(void)
 	toi_unregister_module(&userui_ops);
 }
 
-#ifdef CONFIG_TOI_EXPORTS
-EXPORT_SYMBOL_GPL(toi_current_ui);
-EXPORT_SYMBOL_GPL(toi_early_boot_message);
-EXPORT_SYMBOL_GPL(toi_register_ui_ops);
-EXPORT_SYMBOL_GPL(toi_remove_ui_ops);
-#endif
+EXPORT_IF_TOI_MODULAR(toi_current_ui);
+EXPORT_IF_TOI_MODULAR(toi_early_boot_message);
+EXPORT_IF_TOI_MODULAR(toi_register_ui_ops);
+EXPORT_IF_TOI_MODULAR(toi_remove_ui_ops);

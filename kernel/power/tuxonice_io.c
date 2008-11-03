@@ -1432,11 +1432,8 @@ int image_exists_write(const char *buffer, int count)
 	return count;
 }
 
-#ifdef CONFIG_TOI_EXPORTS
-EXPORT_SYMBOL_GPL(toi_attempt_to_parse_resume_device);
-EXPORT_SYMBOL_GPL(attempt_to_parse_resume_device2);
-EXPORT_SYMBOL_GPL(toi_io_workers);
-EXPORT_SYMBOL_GPL(toi_io_queue_flusher);
-EXPORT_SYMBOL_GPL(toi_bio_queue_flusher_should_finish);
-#endif
-
+EXPORT_IF_TOI_MODULAR(toi_attempt_to_parse_resume_device);
+EXPORT_IF_TOI_MODULAR(attempt_to_parse_resume_device2);
+EXPORT_IF_TOI_MODULAR(toi_io_workers);
+EXPORT_IF_TOI_MODULAR(toi_io_queue_flusher);
+EXPORT_IF_TOI_MODULAR(toi_bio_queue_flusher_should_finish);

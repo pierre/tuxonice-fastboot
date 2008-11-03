@@ -424,41 +424,12 @@ menuconfig TOI_CORE
 		help
 		  Test pageflags.
 
-config TOI_PAGEFLAGS_EXPORTS
-	bool
-	depends on TOI_PAGEFLAGS_TEST=m
-	default y
-
-config TOI_USERUI_EXPORTS
-	bool
-	depends on TOI_USERUI=m
-	default y
-
-config TOI_SWAP_EXPORTS
-	bool
-	depends on TOI_SWAP=m
-	default y
-
-config TOI_FILE_EXPORTS
-	bool
-	depends on TOI_FILE=m
-	default y
-
-config TOI_CRYPTO_EXPORTS
-	bool
-	depends on TOI_CRYPTO=m
-	default y
-
-config TOI_CORE_EXPORTS
-	bool
-	depends on TOI_CORE=m
-	default y
-
 config TOI_EXPORTS
 	bool
-	depends on TOI_SWAP_EXPORTS || TOI_FILE_EXPORTS || \
-		TOI_CRYPTO_EXPORTS || TOI_CLUSTER=m || \
-		TOI_USERUI_EXPORTS || TOI_PAGEFLAGS_EXPORTS
+	depends on TOI_SWAP=m || TOI_FILE=m || \
+		TOI_CRYPTO=m || TOI_CLUSTER=m || \
+		TOI_USERUI=m || TOI_PAGEFLAGS=m || \
+		TOI_CORE=m
 	default y
 
 config TOI

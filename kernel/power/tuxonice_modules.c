@@ -458,9 +458,7 @@ void toi_put_modules(void)
 		module_put(this_module->module);
 }
 
-#ifdef CONFIG_TOI_EXPORTS
-EXPORT_SYMBOL_GPL(toi_register_module);
-EXPORT_SYMBOL_GPL(toi_unregister_module);
-EXPORT_SYMBOL_GPL(toi_get_next_filter);
-EXPORT_SYMBOL_GPL(toiActiveAllocator);
-#endif
+EXPORT_IF_TOI_MODULAR(toi_register_module);
+EXPORT_IF_TOI_MODULAR(toi_unregister_module);
+EXPORT_IF_TOI_MODULAR(toi_get_next_filter);
+EXPORT_IF_TOI_MODULAR(toiActiveAllocator);

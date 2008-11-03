@@ -1372,9 +1372,7 @@ module_exit(core_unload);
 late_initcall(core_load);
 #endif
 
-#ifdef CONFIG_TOI_EXPORTS
-EXPORT_SYMBOL_GPL(tuxonice_signature);
-EXPORT_SYMBOL_GPL(pagedir2);
-EXPORT_SYMBOL_GPL(toi_fail_num);
-EXPORT_SYMBOL_GPL(do_check_can_resume);
-#endif
+EXPORT_IF_TOI_MODULAR(tuxonice_signature);
+EXPORT_IF_TOI_MODULAR(pagedir2);
+EXPORT_IF_TOI_MODULAR(toi_fail_num);
+EXPORT_IF_TOI_MODULAR(do_check_can_resume);

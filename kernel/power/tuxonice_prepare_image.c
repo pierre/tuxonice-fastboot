@@ -1014,6 +1014,4 @@ int toi_prepare_image(void)
 	return result ? result : allocate_checksum_pages();
 }
 
-#ifdef CONFIG_TOI_EXPORTS
-EXPORT_SYMBOL_GPL(real_nr_free_pages);
-#endif
+EXPORT_IF_TOI_MODULAR(real_nr_free_pages);

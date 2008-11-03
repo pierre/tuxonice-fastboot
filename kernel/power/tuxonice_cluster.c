@@ -720,7 +720,7 @@ void toi_initiate_cluster_hibernate(void)
 	if (toi_in_hibernate)
 		result = do_toi_step(STEP_HIBERNATE_POWERDOWN);
 }
-EXPORT_SYMBOL_GPL(toi_initiate_cluster_hibernate);
+EXPORT_IF_TOI_MODULAR(toi_initiate_cluster_hibernate);
 
 /* toi_cluster_print_debug_stats
  *
