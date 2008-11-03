@@ -24,33 +24,9 @@
 #include "tuxonice_alloc.h"
 #include "tuxonice_io.h"
 
-
-#if 0
-static int pr_index;
-
-static inline void reset_pr_index(void)
-{
-	pr_index = 0;
-}
-
-#define PR_DEBUG(a, b...) do { \
-	if (pr_index < 20) \
-		printk(a, ##b); \
-} while (0)
-
-static inline void inc_pr_index(void)
-{
-	pr_index++;
-}
-#else
-#define PR_DEBUG(a, b...) do { } while (0)
-#define reset_pr_index() do { } while (0)
-#define inc_pr_index do { } while (0)
-#endif
-
 #define TARGET_OUTSTANDING_IO 16384
 
-//#define MEASURE_MUTEX_CONTENTION
+/* #define MEASURE_MUTEX_CONTENTION */
 #ifndef MEASURE_MUTEX_CONTENTION
 #define my_mutex_lock(index, the_lock) mutex_lock(the_lock)
 #define my_mutex_unlock(index, the_lock) mutex_unlock(the_lock)
@@ -605,7 +581,6 @@ static int toi_rw_init(int writing, int stream_number)
 
 	current_stream = stream_number;
 
-	reset_pr_index();
 	more_readahead = 1;
 
 	return toi_writer_buffer ? 0 : -ENOMEM;
@@ -936,8 +911,6 @@ static int toi_bio_read_page(unsigned long *pfn, struct page *buffer_page,
 	int result = 0;
 	char *buffer_virt = kmap(buffer_page);
 
-	inc_pr_index;
-
 	/* Only call start_new_readahead if we don't have a dedicated thread */
 	if (current == toi_queue_flusher && toi_start_new_readahead(0)) {
 		printk(KERN_INFO "Queue flusher and toi_start_one_readahead "
@@ -952,8 +925,7 @@ static int toi_bio_read_page(unsigned long *pfn, struct page *buffer_page,
 	    toi_rw_buffer(READ, buffer_virt, *buf_size, 0)) {
 		abort_hibernate(TOI_FAILED_IO, "Read of data failed.");
 		result = 1;
-	} else
-		PR_DEBUG("%d: PFN %ld, %d bytes.\n", pr_index, *pfn, *buf_size);
+	}
 
 	my_mutex_unlock(0, &toi_bio_mutex);
 	kunmap(buffer_page);
@@ -976,8 +948,6 @@ static int toi_bio_write_page(unsigned long pfn, struct page *buffer_page,
 	char *buffer_virt;
 	int result = 0, result2 = 0;
 
-	inc_pr_index;
-
 	if (unlikely(test_action_state(TOI_TEST_FILTER_SPEED)))
 		return 0;
 
@@ -991,9 +961,6 @@ static int toi_bio_write_page(unsigned long pfn, struct page *buffer_page,
 				"toi_bio_write_page.\n");
 		result = -EIO;
 	}
-
-	PR_DEBUG("%d: Index %ld, %d bytes. Result %d.\n", pr_index, pfn,
-			buf_size, result);
 
 	kunmap(buffer_page);
 	my_mutex_unlock(1, &toi_bio_mutex);
