@@ -46,7 +46,7 @@ static void __toi_power_down(int method)
 	int error;
 
 	toi_cond_pause(1, test_action_state(TOI_REBOOT) ? "Ready to reboot." :
-			""Powering down.");
+			"Powering down.");
 
 	if (test_result_state(TOI_ABORTED))
 		return;
