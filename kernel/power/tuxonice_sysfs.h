@@ -44,9 +44,8 @@ struct toi_sysfs_data {
 		} special;
 	} data;
 
-	/* Side effects routines. Used, eg, for reparsing the
+	/* Side effects routine. Used, eg, for reparsing the
 	 * resume= entry when it changes */
-	void (*read_side_effect) (void);
 	void (*write_side_effect) (void);
 	struct list_head sysfs_data_list;
 };
@@ -61,45 +60,57 @@ enum {
 	TOI_SYSFS_DATA_STRING
 };
 
-#define TOI_ATTR(_name, _mode)      \
-	.attr = {.name  = _name , .mode   = _mode }
-
-#define SYSFS_BIT(_ul, _bit, _flags) \
-	.type = TOI_SYSFS_DATA_BIT, \
-	.flags = _flags, \
-	.data = { .bit = { .bit_vector = _ul, .bit = _bit } }
-
-#define SYSFS_INT(_int, _min, _max, _flags) \
-	.type = TOI_SYSFS_DATA_INTEGER, \
-	.flags = _flags, \
-	.data = { .integer = { .variable = _int, .minimum = _min, \
-			.maximum = _max } }
-
-#define SYSFS_UL(_ul, _min, _max, _flags) \
-	.type = TOI_SYSFS_DATA_UL, \
-	.flags = _flags, \
-	.data = { .ul = { .variable = _ul, .minimum = _min, \
-			.maximum = _max } }
-
-#define SYSFS_LONG(_long, _min, _max, _flags) \
-	.type = TOI_SYSFS_DATA_LONG, \
-	.flags = _flags, \
-	.data = { .a_long = { .variable = _long, .minimum = _min, \
-			.maximum = _max } }
-
-#define SYSFS_STRING(_string, _max_len, _flags) \
-	.type = TOI_SYSFS_DATA_STRING, \
-	.flags = _flags, \
-	.data = { .string = { .variable = _string, .max_length = _max_len } }
-
-#define SYSFS_CUSTOM(_read, _write, _flags) \
-	.type = TOI_SYSFS_DATA_CUSTOM, \
-	.flags = _flags, \
-	.data = { .special = { .read_sysfs = _read, .write_sysfs = _write } }
-
 #define SYSFS_WRITEONLY 0200
 #define SYSFS_READONLY 0444
 #define SYSFS_RW 0644
+
+#define SYSFS_BIT(_name, _mode, _ul, _bit, _flags) { \
+	.attr = {.name  = _name , .mode   = _mode }, \
+	.type = TOI_SYSFS_DATA_BIT, \
+	.flags = _flags, \
+	.data = { .bit = { .bit_vector = _ul, .bit = _bit } } }
+
+#define SYSFS_INT(_name, _mode, _int, _min, _max, _flags, _wse) { \
+	.attr = {.name  = _name , .mode   = _mode }, \
+	.type = TOI_SYSFS_DATA_INTEGER, \
+	.flags = _flags, \
+	.data = { .integer = { .variable = _int, .minimum = _min, \
+			.maximum = _max } }, \
+	.write_side_effect = _wse }
+
+#define SYSFS_UL(_name, _mode, _ul, _min, _max, _flags) { \
+	.attr = {.name  = _name , .mode   = _mode }, \
+	.type = TOI_SYSFS_DATA_UL, \
+	.flags = _flags, \
+	.data = { .ul = { .variable = _ul, .minimum = _min, \
+			.maximum = _max } } }
+
+#define SYSFS_LONG(_name, _mode, _long, _min, _max, _flags) { \
+	.attr = {.name  = _name , .mode   = _mode }, \
+	.type = TOI_SYSFS_DATA_LONG, \
+	.flags = _flags, \
+	.data = { .a_long = { .variable = _long, .minimum = _min, \
+			.maximum = _max } } }
+
+#define SYSFS_STRING(_name, _mode, _string, _max_len, _flags, _wse) { \
+	.attr = {.name  = _name , .mode   = _mode }, \
+	.type = TOI_SYSFS_DATA_STRING, \
+	.flags = _flags, \
+	.data = { .string = { .variable = _string, .max_length = _max_len } }, \
+	.write_side_effect = _wse }
+
+#define SYSFS_CUSTOM(_name, _mode, _read, _write, _flags, _wse) { \
+	.attr = {.name  = _name , .mode   = _mode }, \
+	.type = TOI_SYSFS_DATA_CUSTOM, \
+	.flags = _flags, \
+	.data = { .special = { .read_sysfs = _read, .write_sysfs = _write } }, \
+	.write_side_effect = _wse }
+
+#define SYSFS_NONE(_name, _wse) { \
+	.attr = {.name  = _name , .mode   = SYSFS_WRITEONLY }, \
+	.type = TOI_SYSFS_DATA_NONE, \
+	.write_side_effect = _wse, \
+}
 
 /* Flags */
 #define SYSFS_NEEDS_SM_FOR_READ 1

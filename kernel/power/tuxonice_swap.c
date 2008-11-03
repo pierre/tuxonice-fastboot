@@ -1206,20 +1206,11 @@ static int header_locations_read_sysfs(const char *page, int count)
 }
 
 static struct toi_sysfs_data sysfs_params[] = {
-	{
-	 TOI_ATTR("swapfilename", SYSFS_RW),
-	 SYSFS_STRING(swapfilename, 255, 0)
-	},
-
-	{
-	 TOI_ATTR("headerlocations", SYSFS_READONLY),
-	 SYSFS_CUSTOM(header_locations_read_sysfs, NULL, 0)
-	},
-
-	{ TOI_ATTR("enabled", SYSFS_RW),
-	  SYSFS_INT(&toi_swapops.enabled, 0, 1, 0),
-	  .write_side_effect		= attempt_to_parse_resume_device2,
-	}
+	SYSFS_STRING("swapfilename", SYSFS_RW, swapfilename, 255, 0, NULL),
+	SYSFS_CUSTOM("headerlocations", SYSFS_READONLY,
+			header_locations_read_sysfs, NULL, 0, NULL),
+	SYSFS_INT("enabled", SYSFS_RW, &toi_swapops.enabled, 0, 1, 0,
+			attempt_to_parse_resume_device2),
 };
 
 static struct toi_module_ops toi_swapops = {

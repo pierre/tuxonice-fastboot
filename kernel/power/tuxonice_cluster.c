@@ -957,36 +957,17 @@ static void node_write_side_effect(void)
  * data for our sysfs entries.
  */
 static struct toi_sysfs_data sysfs_params[] = {
-	{
-		TOI_ATTR("interface", SYSFS_RW),
-		SYSFS_STRING(toi_cluster_iface, IFNAMSIZ, 0)
-	},
-
-	{
-		TOI_ATTR("enabled", SYSFS_RW),
-		SYSFS_INT(&toi_cluster_ops.enabled, 0, 1, 0),
-		.write_side_effect = write_side_effect,
-	},
-
-	{
-		TOI_ATTR("cluster_name", SYSFS_RW),
-		SYSFS_STRING(toi_cluster_key, 32, 0)
-	},
-
-	{
-		TOI_ATTR("pre-hibernate-script", SYSFS_RW),
-		SYSFS_STRING(pre_hibernate_script, 256, 0)
-	},
-
-	{
-		TOI_ATTR("post-hibernate-script", SYSFS_RW),
-		SYSFS_STRING(post_hibernate_script, 256, 0)
-	},
-
-	{
-		TOI_ATTR("continue_delay", SYSFS_RW),
-		SYSFS_UL(&continue_delay, HZ / 2, 60 * HZ, 0)
-	}
+	SYSFS_STRING("interface", SYSFS_RW, toi_cluster_iface, IFNAMSIZ, 0,
+			NULL),
+	SYSFS_INT("enabled", SYSFS_RW, &toi_cluster_ops.enabled, 0, 1, 0,
+			write_side_effect),
+	SYSFS_STRING("cluster_name", SYSFS_RW, toi_cluster_key, 32, 0, NULL),
+	SYSFS_STRING("pre-hibernate-script", SYSFS_RW, pre_hibernate_script,
+			256, 0, NULL),
+	SYSFS_STRING("post-hibernate-script", SYSFS_RW, post_hibernate_script,
+			256, 0, STRING),
+	SYSFS_UL("continue_delay", SYSFS_RW, &continue_delay, HZ / 2, 60 * HZ,
+			0)
 };
 
 /*

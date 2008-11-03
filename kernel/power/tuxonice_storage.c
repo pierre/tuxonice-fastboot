@@ -232,23 +232,12 @@ static void storage_manager_activate(void)
  */
 
 static struct toi_sysfs_data sysfs_params[] = {
-	{ TOI_ATTR("simulate_atomic_copy", SYSFS_RW),
-	  .type				= TOI_SYSFS_DATA_NONE,
-	  .write_side_effect		= storage_manager_simulate,
-	},
-
-	{ TOI_ATTR("enabled", SYSFS_RW),
-	  SYSFS_INT(&usm_ops.enabled, 0, 1, 0)
-	},
-
-	{ TOI_ATTR("program", SYSFS_RW),
-	  SYSFS_STRING(usm_helper_data.program, 254, 0)
-	},
-
-	{ TOI_ATTR("activate_storage", SYSFS_RW),
-	  SYSFS_INT(&storage_manager_action, 0, 1, 0),
-	  .write_side_effect		= storage_manager_activate,
-	}
+	SYSFS_NONE("simulate_atomic_copy", storage_manager_simulate),
+	SYSFS_INT("enabled", SYSFS_RW, &usm_ops.enabled, 0, 1, 0, NULL),
+	SYSFS_STRING("program", SYSFS_RW, usm_helper_data.program, 254, 0,
+		NULL),
+	SYSFS_INT("activate_storage", SYSFS_RW , &storage_manager_action, 0, 1,
+			0, storage_manager_activate)
 };
 
 static struct toi_module_ops usm_ops = {

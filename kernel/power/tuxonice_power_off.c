@@ -234,32 +234,14 @@ EXPORT_IF_TOI_MODULAR(toi_power_down);
 
 static struct toi_sysfs_data sysfs_params[] = {
 #if defined(CONFIG_ACPI)
-	{
-	 TOI_ATTR("lid_file", SYSFS_RW),
-	 SYSFS_STRING(lid_state_file, 256, 0),
-	},
-
-	{
-	  TOI_ATTR("wake_delay", SYSFS_RW),
-	  SYSFS_INT(&wake_delay, 0, INT_MAX, 0)
-	},
-
-	{
-	  TOI_ATTR("wake_alarm_dir", SYSFS_RW),
-	  SYSFS_STRING(wake_alarm_dir, 256, 0)
-	},
-
-	{ TOI_ATTR("post_wake_state", SYSFS_RW),
-	  SYSFS_INT(&post_wake_state, -1, 5, 0)
-	},
-
-	{ TOI_ATTR("powerdown_method", SYSFS_RW),
-	  SYSFS_UL(&toi_poweroff_method, 0, 5, 0)
-	},
-
-	{ TOI_ATTR("did_suspend_to_both", SYSFS_READONLY),
-	  SYSFS_INT(&did_suspend_to_both, 0, 0, 0)
-	},
+	SYSFS_STRING("lid_file", SYSFS_RW, lid_state_file, 256, 0, NULL),
+	SYSFS_INT("wake_delay", SYSFS_RW, &wake_delay, 0, INT_MAX, 0, NULL),
+	SYSFS_STRING("wake_alarm_dir", SYSFS_RW, wake_alarm_dir, 256, 0, NULL),
+	SYSFS_INT("post_wake_state", SYSFS_RW, &post_wake_state, -1, 5, 0,
+			NULL),
+	SYSFS_UL("powerdown_method", SYSFS_RW, &toi_poweroff_method, 0, 5, 0),
+	SYSFS_INT("did_suspend_to_both", SYSFS_READONLY, &did_suspend_to_both,
+		0, 0, 0, NULL)
 #endif
 };
 

@@ -37,8 +37,7 @@ static ssize_t toi_attr_show(struct kobject *kobj, struct attribute *attr,
 {
 	struct toi_sysfs_data *sysfs_data = to_sysfs_data(attr);
 	int len = 0;
-	int full_prep = sysfs_data->flags & SYSFS_NEEDS_SM_FOR_READ ||
-		sysfs_data->read_side_effect;
+	int full_prep = sysfs_data->flags & SYSFS_NEEDS_SM_FOR_READ;
 
 	if (full_prep && toi_start_anything(0))
 		return -EBUSY;
@@ -74,9 +73,6 @@ static ssize_t toi_attr_show(struct kobject *kobj, struct attribute *attr,
 			sysfs_data->data.string.variable);
 		break;
 	}
-	/* Side effect routine? */
-	if (sysfs_data->read_side_effect)
-		sysfs_data->read_side_effect();
 
 	if (sysfs_data->flags & SYSFS_NEEDS_SM_FOR_READ)
 		toi_cleanup_usm();
@@ -215,16 +211,10 @@ struct kobject *tuxonice_kobj;
  */
 
 static struct toi_sysfs_data sysfs_params[] = {
-	{ TOI_ATTR("do_hibernate", SYSFS_WRITEONLY),
-	  SYSFS_CUSTOM(NULL, NULL, SYSFS_HIBERNATING),
-	  .write_side_effect = toi_main_wrapper
-	},
-
-	{ TOI_ATTR("do_resume", SYSFS_WRITEONLY),
-	  SYSFS_CUSTOM(NULL, NULL, SYSFS_RESUMING),
-	  .write_side_effect = __toi_try_resume
-	},
-
+	SYSFS_CUSTOM("do_hibernate", SYSFS_WRITEONLY, NULL, NULL,
+		SYSFS_HIBERNATING, toi_main_wrapper),
+	SYSFS_CUSTOM("do_resume", SYSFS_WRITEONLY, NULL, NULL,
+		SYSFS_RESUMING, __toi_try_resume)
 };
 
 void remove_toi_sysdir(struct kobject *kobj)

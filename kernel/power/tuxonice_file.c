@@ -1050,17 +1050,10 @@ static int toi_file_initialise(int starting_cycle)
 
 static struct toi_sysfs_data sysfs_params[] = {
 
-	{
-	 TOI_ATTR("target", SYSFS_RW),
-	 SYSFS_STRING(toi_file_target, 256, SYSFS_NEEDS_SM_FOR_WRITE),
-	 .write_side_effect		= test_toi_file_target,
-	},
-
-	{
-	  TOI_ATTR("enabled", SYSFS_RW),
-	  SYSFS_INT(&toi_fileops.enabled, 0, 1, 0),
-	  .write_side_effect		= attempt_to_parse_resume_device2,
-	}
+	SYSFS_STRING("target", SYSFS_RW, toi_file_target, 256,
+		SYSFS_NEEDS_SM_FOR_WRITE, test_toi_file_target),
+	SYSFS_INT("enabled", SYSFS_RW, &toi_fileops.enabled, 0, 1, 0,
+		attempt_to_parse_resume_device2)
 };
 
 static struct toi_module_ops toi_fileops = {

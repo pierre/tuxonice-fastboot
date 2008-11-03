@@ -244,17 +244,11 @@ static int toi_alloc_initialise(int starting_cycle)
 }
 
 static struct toi_sysfs_data sysfs_params[] = {
-	{ TOI_ATTR("failure_test", SYSFS_RW),
-	  SYSFS_INT(&toi_fail_num, 0, 99, 0)
-	},
-
-	{ TOI_ATTR("find_max_mem_allocated", SYSFS_RW),
-	  SYSFS_BIT(&toi_bkd.toi_action, TOI_GET_MAX_MEM_ALLOCD, 0)
-	},
-
-	{ TOI_ATTR("enabled", SYSFS_RW),
-	  SYSFS_INT(&toi_alloc_ops.enabled, 0, 1, 0)
-	}
+	SYSFS_INT("failure_test", SYSFS_RW, &toi_fail_num, 0, 99, 0, NULL),
+	SYSFS_BIT("find_max_mem_allocated", SYSFS_RW, &toi_bkd.toi_action,
+			TOI_GET_MAX_MEM_ALLOCD, 0),
+	SYSFS_INT("enabled", SYSFS_RW, &toi_alloc_ops.enabled, 0, 1, 0,
+			NULL)
 };
 
 static struct toi_module_ops toi_alloc_ops = {

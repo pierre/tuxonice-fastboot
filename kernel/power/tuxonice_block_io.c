@@ -1133,9 +1133,8 @@ struct toi_bio_ops toi_bio_ops = {
 };
 
 static struct toi_sysfs_data sysfs_params[] = {
-	{ TOI_ATTR("target_outstanding_io", SYSFS_RW),
-	  SYSFS_INT(&target_outstanding_io, 0, TARGET_OUTSTANDING_IO, 0),
-	}
+	SYSFS_INT("target_outstanding_io", SYSFS_RW, &target_outstanding_io,
+			0, TARGET_OUTSTANDING_IO, 0, NULL),
 };
 
 static struct toi_module_ops toi_blockwriter_ops = {

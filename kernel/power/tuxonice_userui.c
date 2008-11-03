@@ -575,31 +575,16 @@ static void userui_cleanup_console(void)
 
 static struct toi_sysfs_data sysfs_params[] = {
 #if defined(CONFIG_NET) && defined(CONFIG_SYSFS)
-	{ TOI_ATTR("enable_escape", SYSFS_RW),
-	  SYSFS_BIT(&toi_bkd.toi_action, TOI_CAN_CANCEL, 0)
-	},
-
-	{ TOI_ATTR("pause_between_steps", SYSFS_RW),
-	  SYSFS_BIT(&toi_bkd.toi_action, TOI_PAUSE, 0)
-	},
-
-	{ TOI_ATTR("enabled", SYSFS_RW),
-	  SYSFS_INT(&userui_ops.enabled, 0, 1, 0)
-	},
-
-	{ TOI_ATTR("progress_granularity", SYSFS_RW),
-	  SYSFS_INT(&progress_granularity, 1, 2048, 0)
-	},
-
-	{ TOI_ATTR("program", SYSFS_RW),
-	  SYSFS_STRING(ui_helper_data.program, 255, 0),
-	  .write_side_effect = set_ui_program_set,
-	},
-
-	{ TOI_ATTR("debug", SYSFS_RW),
-	  SYSFS_INT(&ui_helper_data.debug, 0, 1, 0)
-	},
-
+	SYSFS_BIT("enable_escape", SYSFS_RW, &toi_bkd.toi_action,
+			TOI_CAN_CANCEL, 0),
+	SYSFS_BIT("pause_between_steps", SYSFS_RW, &toi_bkd.toi_action,
+			TOI_PAUSE, 0),
+	SYSFS_INT("enabled", SYSFS_RW, &userui_ops.enabled, 0, 1, 0, NULL),
+	SYSFS_INT("progress_granularity", SYSFS_RW, &progress_granularity, 1,
+			2048, 0, NULL),
+	SYSFS_STRING("program", SYSFS_RW, ui_helper_data.program, 255, 0,
+			set_ui_program_set),
+	SYSFS_INT("debug", SYSFS_RW, &ui_helper_data.debug, 0, 1, 0, NULL)
 #endif
 };
 

@@ -375,20 +375,11 @@ static int toi_compress_expected_ratio(void)
  * data for our sysfs entries.
  */
 static struct toi_sysfs_data sysfs_params[] = {
-	{
-		TOI_ATTR("expected_compression", SYSFS_RW),
-		SYSFS_INT(&toi_expected_compression, 0, 99, 0)
-	},
-
-	{
-		TOI_ATTR("enabled", SYSFS_RW),
-		SYSFS_INT(&toi_compression_ops.enabled, 0, 1, 0)
-	},
-
-	{
-		TOI_ATTR("algorithm", SYSFS_RW),
-		SYSFS_STRING(toi_compressor_name, 31, 0)
-	}
+	SYSFS_INT("expected_compression", SYSFS_RW, &toi_expected_compression,
+			0, 99, 0, NULL),
+	SYSFS_INT("enabled", SYSFS_RW, &toi_compression_ops.enabled, 0, 1, 0,
+			NULL),
+	SYSFS_STRING("algorithm", SYSFS_RW, toi_compressor_name, 31, 0, NULL),
 };
 
 /*

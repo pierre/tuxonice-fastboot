@@ -191,17 +191,12 @@ post_ask:
 
 static struct toi_sysfs_data sysfs_params[] = {
 #if defined(CONFIG_NET) && defined(CONFIG_SYSFS)
-	{ TOI_ATTR("default_console_level", SYSFS_RW),
-	  SYSFS_INT(&toi_bkd.toi_default_console_level, 0, 7, 0)
-	},
-
-	{ TOI_ATTR("debug_sections", SYSFS_RW),
-	  SYSFS_UL(&toi_bkd.toi_debug_state, 0, 1 << 30, 0)
-	},
-
-	{ TOI_ATTR("log_everything", SYSFS_RW),
-	  SYSFS_BIT(&toi_bkd.toi_action, TOI_LOGALL, 0)
-	},
+	SYSFS_INT("default_console_level", SYSFS_RW,
+			&toi_bkd.toi_default_console_level, 0, 7, 0, NULL),
+	SYSFS_UL("debug_sections", SYSFS_RW, &toi_bkd.toi_debug_state, 0,
+			1 << 30, 0),
+	SYSFS_BIT("log_everything", SYSFS_RW, &toi_bkd.toi_action, TOI_LOGALL,
+			0)
 #endif
 };
 

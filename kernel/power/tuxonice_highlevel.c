@@ -1192,105 +1192,54 @@ int toi_launch_userspace_program(char *command, int channel_no,
  * boot. Modules and the console code register their own entries separately.
  */
 static struct toi_sysfs_data sysfs_params[] = {
-	{ TOI_ATTR("extra_pages_allowance", SYSFS_RW),
-	  SYSFS_LONG(&extra_pd1_pages_allowance, 0,
-			LONG_MAX, 0)
-	},
-
-	{ TOI_ATTR("image_exists", SYSFS_RW),
-	  SYSFS_CUSTOM(image_exists_read, image_exists_write,
-			  SYSFS_NEEDS_SM_FOR_BOTH)
-	},
-
-	{ TOI_ATTR("resume", SYSFS_RW),
-	  SYSFS_STRING(resume_file, 255, SYSFS_NEEDS_SM_FOR_WRITE),
-	  .write_side_effect = attempt_to_parse_resume_device2,
-	},
-
-	{ TOI_ATTR("alt_resume_param", SYSFS_RW),
-	  SYSFS_STRING(alt_resume_param, 255, SYSFS_NEEDS_SM_FOR_WRITE),
-	  .write_side_effect = attempt_to_parse_alt_resume_param,
-	},
-	{ TOI_ATTR("debug_info", SYSFS_READONLY),
-	  SYSFS_CUSTOM(get_toi_debug_info, NULL, 0)
-	},
-
-	{ TOI_ATTR("ignore_rootfs", SYSFS_RW),
-	  SYSFS_BIT(&toi_bkd.toi_action, TOI_IGNORE_ROOTFS, 0)
-	},
-
-	{ TOI_ATTR("image_size_limit", SYSFS_RW),
-	  SYSFS_INT(&image_size_limit, -2, INT_MAX, 0)
-	},
-
-	{ TOI_ATTR("last_result", SYSFS_RW),
-	  SYSFS_UL(&toi_result, 0, 0, 0)
-	},
-
-	{ TOI_ATTR("no_multithreaded_io", SYSFS_RW),
-	  SYSFS_BIT(&toi_bkd.toi_action, TOI_NO_MULTITHREADED_IO, 0)
-	},
-
-	{ TOI_ATTR("no_flusher_thread", SYSFS_RW),
-	  SYSFS_BIT(&toi_bkd.toi_action, TOI_NO_FLUSHER_THREAD, 0)
-	},
-
-	{ TOI_ATTR("full_pageset2", SYSFS_RW),
-	  SYSFS_BIT(&toi_bkd.toi_action, TOI_PAGESET2_FULL, 0)
-	},
-
-	{ TOI_ATTR("reboot", SYSFS_RW),
-	  SYSFS_BIT(&toi_bkd.toi_action, TOI_REBOOT, 0)
-	},
-
-	{ TOI_ATTR("replace_swsusp", SYSFS_RW),
-	  SYSFS_BIT(&toi_bkd.toi_action, TOI_REPLACE_SWSUSP, 0)
-	},
-
-	{ TOI_ATTR("resume_commandline", SYSFS_RW),
-	  SYSFS_STRING(toi_bkd.toi_nosave_commandline, COMMAND_LINE_SIZE, 0)
-	},
-
-	{ TOI_ATTR("version", SYSFS_READONLY),
-	  SYSFS_STRING(TOI_CORE_VERSION, 0, 0)
-	},
-
-	{ TOI_ATTR("no_load_direct", SYSFS_RW),
-	  SYSFS_BIT(&toi_bkd.toi_action, TOI_NO_DIRECT_LOAD, 0)
-	},
-
-	{ TOI_ATTR("freezer_test", SYSFS_RW),
-	  SYSFS_BIT(&toi_bkd.toi_action, TOI_FREEZER_TEST, 0)
-	},
-
-	{ TOI_ATTR("test_bio", SYSFS_RW),
-	  SYSFS_BIT(&toi_bkd.toi_action, TOI_TEST_BIO, 0)
-	},
-
-	{ TOI_ATTR("test_filter_speed", SYSFS_RW),
-	  SYSFS_BIT(&toi_bkd.toi_action, TOI_TEST_FILTER_SPEED, 0)
-	},
-
-	{ TOI_ATTR("no_pageset2", SYSFS_RW),
-	  SYSFS_BIT(&toi_bkd.toi_action, TOI_NO_PAGESET2, 0)
-	},
-
-	{ TOI_ATTR("late_cpu_hotplug", SYSFS_RW),
-	  SYSFS_BIT(&toi_bkd.toi_action, TOI_LATE_CPU_HOTPLUG, 0)
-	},
-
-	{ TOI_ATTR("pre_hibernate_command", SYSFS_RW),
-	  SYSFS_STRING(pre_hibernate_command, 0, 255)
-	},
-
-	{ TOI_ATTR("post_hibernate_command", SYSFS_RW),
-	  SYSFS_STRING(post_hibernate_command, 0, 255)
-	},
-
+	SYSFS_LONG("extra_pages_allowance", SYSFS_RW,
+			&extra_pd1_pages_allowance, 0, LONG_MAX, 0),
+	SYSFS_CUSTOM("image_exists", SYSFS_RW, image_exists_read,
+			image_exists_write, SYSFS_NEEDS_SM_FOR_BOTH, NULL),
+	SYSFS_STRING("resume", SYSFS_RW, resume_file, 255,
+			SYSFS_NEEDS_SM_FOR_WRITE,
+			attempt_to_parse_resume_device2),
+	SYSFS_STRING("alt_resume_param", SYSFS_RW, alt_resume_param, 255,
+			SYSFS_NEEDS_SM_FOR_WRITE,
+			attempt_to_parse_alt_resume_param),
+	SYSFS_CUSTOM("debug_info", SYSFS_READONLY, get_toi_debug_info, NULL, 0,
+			NULL),
+	SYSFS_BIT("ignore_rootfs", SYSFS_RW, &toi_bkd.toi_action,
+			TOI_IGNORE_ROOTFS, 0),
+	SYSFS_INT("image_size_limit", SYSFS_RW, &image_size_limit, -2,
+			INT_MAX, 0, NULL),
+	SYSFS_UL("last_result", SYSFS_RW, &toi_result, 0, 0, 0),
+	SYSFS_BIT("no_multithreaded_io", SYSFS_RW, &toi_bkd.toi_action,
+			TOI_NO_MULTITHREADED_IO, 0),
+	SYSFS_BIT("no_flusher_thread", SYSFS_RW, &toi_bkd.toi_action,
+			TOI_NO_FLUSHER_THREAD, 0),
+	SYSFS_BIT("full_pageset2", SYSFS_RW, &toi_bkd.toi_action,
+			TOI_PAGESET2_FULL, 0),
+	SYSFS_BIT("reboot", SYSFS_RW, &toi_bkd.toi_action, TOI_REBOOT, 0),
+	SYSFS_BIT("replace_swsusp", SYSFS_RW, &toi_bkd.toi_action,
+			TOI_REPLACE_SWSUSP, 0),
+	SYSFS_STRING("resume_commandline", SYSFS_RW,
+			toi_bkd.toi_nosave_commandline, COMMAND_LINE_SIZE, 0,
+			NULL),
+	SYSFS_STRING("version", SYSFS_READONLY, TOI_CORE_VERSION, 0, 0, NULL),
+	SYSFS_BIT("no_load_direct", SYSFS_RW, &toi_bkd.toi_action,
+			TOI_NO_DIRECT_LOAD, 0),
+	SYSFS_BIT("freezer_test", SYSFS_RW, &toi_bkd.toi_action,
+			TOI_FREEZER_TEST, 0),
+	SYSFS_BIT("test_bio", SYSFS_RW, &toi_bkd.toi_action, TOI_TEST_BIO, 0),
+	SYSFS_BIT("test_filter_speed", SYSFS_RW, &toi_bkd.toi_action,
+			TOI_TEST_FILTER_SPEED, 0),
+	SYSFS_BIT("no_pageset2", SYSFS_RW, &toi_bkd.toi_action,
+			TOI_NO_PAGESET2, 0),
+	SYSFS_BIT("late_cpu_hotplug", SYSFS_RW, &toi_bkd.toi_action,
+			TOI_LATE_CPU_HOTPLUG, 0),
+	SYSFS_STRING("pre_hibernate_command", SYSFS_RW, pre_hibernate_command,
+			0, 255, NULL),
+	SYSFS_STRING("post_hibernate_command", SYSFS_RW, post_hibernate_command,
+			0, 255, NULL),
 #ifdef CONFIG_TOI_KEEP_IMAGE
-	{ TOI_ATTR("keep_image", SYSFS_RW),
-	  SYSFS_BIT(&toi_bkd.toi_action, TOI_KEEP_IMAGE, 0)
-	},
+	SYSFS_BIT("keep_image", SYSFS_RW , &toi_bkd.toi_action, TOI_KEEP_IMAGE,
+			0),
 #endif
 };
 

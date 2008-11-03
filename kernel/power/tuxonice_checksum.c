@@ -334,13 +334,10 @@ void check_checksums(void)
 }
 
 static struct toi_sysfs_data sysfs_params[] = {
-	{ TOI_ATTR("enabled", SYSFS_RW),
-	  SYSFS_INT(&toi_checksum_ops.enabled, 0, 1, 0)
-	},
-
-	{ TOI_ATTR("abort_if_resave_needed", SYSFS_RW),
-	  SYSFS_BIT(&toi_bkd.toi_action, TOI_ABORT_ON_RESAVE_NEEDED, 0)
-	}
+	SYSFS_INT("enabled", SYSFS_RW, &toi_checksum_ops.enabled, 0, 1, 0,
+			NULL),
+	SYSFS_BIT("abort_if_resave_needed", SYSFS_RW, &toi_bkd.toi_action,
+			TOI_ABORT_ON_RESAVE_NEEDED, 0)
 };
 
 /*
