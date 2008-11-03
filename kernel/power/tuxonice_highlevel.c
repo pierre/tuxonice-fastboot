@@ -989,8 +989,8 @@ void __toi_try_resume(void)
 	current->flags |= PF_MEMALLOC;
 
 	if (do_toi_step(STEP_RESUME_CAN_RESUME) &&
-	    !do_toi_step(STEP_RESUME_LOAD_PS1))
-	    do_toi_step(STEP_RESUME_DO_RESTORE);
+			!do_toi_step(STEP_RESUME_LOAD_PS1))
+		do_toi_step(STEP_RESUME_DO_RESTORE);
 
 	do_cleanup(0);
 
