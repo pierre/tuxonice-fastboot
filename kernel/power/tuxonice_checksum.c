@@ -247,18 +247,6 @@ int allocate_checksum_pages(void)
 	return 0;
 }
 
-#if 0
-static void print_checksum(char *buf, int size)
-{
-	int index;
-
-	for (index = 0; index < size; index++)
-		printk(KERN_INFO "%x ", buf[index]);
-
-	printk("\n");
-}
-#endif
-
 char *tuxonice_get_next_checksum(void)
 {
 	if (!toi_checksum_ops.enabled)
