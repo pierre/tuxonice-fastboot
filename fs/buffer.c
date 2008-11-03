@@ -257,7 +257,7 @@ EXPORT_SYMBOL(thaw_bdev);
 /**
  * freeze_filesystems - lock all filesystems and force them into a consistent
  * state
- * @which:	What combination of fuse & non-fuse to freeze. 
+ * @which:	What combination of fuse & non-fuse to freeze.
  */
 void freeze_filesystems(int which)
 {
@@ -304,7 +304,7 @@ void freeze_filesystems(int which)
 
 /**
  * thaw_filesystems - unlock all filesystems
- * @which:	What combination of fuse & non-fuse to thaw. 
+ * @which:	What combination of fuse & non-fuse to thaw.
  */
 void thaw_filesystems(int which)
 {
