@@ -176,9 +176,9 @@ static int lzf_compress(struct crypto_tfm *tfm, const u8 *in_data,
 				unsigned int maxlen = in_end - ip - len;
 				maxlen = maxlen > max_ref ? max_ref : maxlen;
 
-				do
+				do {
 					len++;
-				while (len < maxlen && ref[len] == ip[len]);
+				} while (len < maxlen && ref[len] == ip[len]);
 
 				if (op + lit + 1 + 3 >= out_end) {
 					*out_len = PAGE_SIZE;
