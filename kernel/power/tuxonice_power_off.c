@@ -45,12 +45,14 @@ static void __toi_power_down(int method)
 {
 	int error;
 
-	if (test_action_state(TOI_REBOOT)) {
-		toi_cond_pause(1, "Ready to reboot.");
-		kernel_restart(NULL);
-	}
+	toi_cond_pause(1, test_action_state(TOI_REBOOT) ? "Ready to reboot." :
+			""Powering down.");
 
-	toi_cond_pause(1, "Powering down.");
+	if (test_result_state(TOI_ABORTED))
+		return;
+
+	if (test_action_state(TOI_REBOOT))
+		kernel_restart(NULL);
 
 	switch (method) {
 	case 0:
