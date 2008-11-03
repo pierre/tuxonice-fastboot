@@ -246,8 +246,8 @@ static int toi_compress_read_page(unsigned long *index,
 		abort_hibernate(TOI_FAILED_IO,
 			"Decompression yielded %d bytes instead of %ld.\n",
 			outlen, PAGE_SIZE);
-		printk("Decompression yielded %d bytes instead of %ld.\n",
-			outlen, PAGE_SIZE);
+		printk(KERN_ERR "Decompression yielded %d bytes instead of "
+				"%ld.\n", outlen, PAGE_SIZE);
 		ret = -EIO;
 		*buf_size = outlen;
 	}

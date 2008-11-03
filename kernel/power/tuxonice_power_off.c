@@ -73,7 +73,7 @@ static void __toi_power_down(int method)
 		/* Failed to suspend to ram - do normal power off */
 		break;
 	case 4:
-		/* 
+		/*
 		 * If succeeds, doesn't return. If fails, do a simple
 		 * powerdown.
 		 */

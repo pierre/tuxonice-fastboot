@@ -788,7 +788,7 @@ static int toi_file_image_exists(int quiet)
 
 static int toi_file_mark_resume_attempted(int mark)
 {
-	return toi_file_signature_op(mark ? MARK_RESUME_ATTEMPTED:
+	return toi_file_signature_op(mark ? MARK_RESUME_ATTEMPTED :
 		UNMARK_RESUME_ATTEMPTED);
 }
 

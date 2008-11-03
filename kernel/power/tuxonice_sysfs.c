@@ -83,13 +83,12 @@ static ssize_t toi_attr_show(struct kobject *kobj, struct attribute *attr,
 	return len;
 }
 
-#define BOUND(_variable, _type) \
-	do { \
+#define BOUND(_variable, _type) do { \
 	if (*_variable < sysfs_data->data._type.minimum) \
 		*_variable = sysfs_data->data._type.minimum; \
 	else if (*_variable > sysfs_data->data._type.maximum) \
 		*_variable = sysfs_data->data._type.maximum; \
-	} while (0)
+} while (0)
 
 static ssize_t toi_attr_store(struct kobject *kobj, struct attribute *attr,
 		const char *my_buf, size_t count)

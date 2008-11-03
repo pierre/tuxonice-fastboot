@@ -154,7 +154,7 @@ static void set_ui_program_set(void)
 static int userui_memory_needed(void)
 {
 	/* ball park figure of 128 pages */
-	return (128 * PAGE_SIZE);
+	return 128 * PAGE_SIZE;
 }
 
 /**

@@ -107,7 +107,7 @@ int do_toi_step(int step);
 
 unsigned long boot_kernel_data_buffer;
 
-static char* result_strings[] = {
+static char *result_strings[] = {
 	"Hiberation was aborted",
 	"The user requested that we cancel the hibernation",
 	"No storage was available",
@@ -129,8 +129,10 @@ static char* result_strings[] = {
 	"CPU Hotplugging failed",
 	"Architecture specific preparation failed",
 	"Pages needed resaving, but we were told to abort if this happens",
-	"We can't hibernate at the moment (invalid resume= or filewriter target?)",
-	"A hibernation preparation notifier chain member cancelled the hibernation",
+	"We can't hibernate at the moment (invalid resume= or filewriter "
+		"target?)",
+	"A hibernation preparation notifier chain member cancelled the "
+		"hibernation",
 	"Pre-snapshot preparation failed",
 	"Post-snapshot cleanup failed",
 };
@@ -367,7 +369,7 @@ static int get_toi_debug_info(const char *buffer, int count)
 
 	for (i = 0; i < TOI_NUM_RESULT_STATES; i++)
 		if (test_result_state(i)) {
-			SNPRINTF("%s: %s.\n", first_result ? 
+			SNPRINTF("%s: %s.\n", first_result ?
 					"- Result         " :
 					"                 ",
 					result_strings[i]);
@@ -718,7 +720,7 @@ abort_reloading_pagedir_two:
 	/* Ensure platform_leave is called */
 	toi_go_atomic(PMSG_QUIESCE, 0);
 	toi_end_atomic(ATOMIC_ALL_STEPS, 0, 0);
-	
+
 	return 1;
 }
 

@@ -217,7 +217,7 @@ static int toi_nl_gen_rcv_msg(struct user_helper_data *uhd,
 
 	/* Only allow one task to receive NOFREEZE privileges */
 	if (type == NETLINK_MSG_NOFREEZE_ME && uhd->pid != -1) {
-		printk("Received extra nofreeze me requests.\n");
+		printk(KERN_INFO "Received extra nofreeze me requests.\n");
 		return -EBUSY;
 	}
 
