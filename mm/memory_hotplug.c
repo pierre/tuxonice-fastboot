@@ -11,6 +11,7 @@
 #include <linux/pagemap.h>
 #include <linux/bootmem.h>
 #include <linux/compiler.h>
+#include <linux/dyn_pageflags.h>
 #include <linux/module.h>
 #include <linux/pagevec.h>
 #include <linux/writeback.h>
