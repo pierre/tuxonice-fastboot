@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004-2007 Nigel Cunningham (nigel at tuxonice net)
+ * Copyright (C) 2004-2008 Nigel Cunningham (nigel at tuxonice net)
  */
 
 #ifndef KERNEL_POWER_POWER_H

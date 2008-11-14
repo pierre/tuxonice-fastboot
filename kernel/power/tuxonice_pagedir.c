@@ -4,7 +4,7 @@
  * Copyright (C) 1998-2001 Gabor Kuti <seasons@fornax.hu>
  * Copyright (C) 1998,2001,2002 Pavel Machek <pavel@suse.cz>
  * Copyright (C) 2002-2003 Florent Chabaud <fchabaud@free.fr>
- * Copyright (C) 2006-2007 Nigel Cunningham (nigel at tuxonice net)
+ * Copyright (C) 2006-2008 Nigel Cunningham (nigel at tuxonice net)
  *
  * This file is released under the GPLv2.
  *

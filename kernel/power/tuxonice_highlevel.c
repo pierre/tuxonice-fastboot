@@ -25,7 +25,7 @@
  * Copyright (C) 1998-2001 Gabor Kuti <seasons@fornax.hu><BR>
  * Copyright (C) 1998,2001,2002 Pavel Machek <pavel@suse.cz><BR>
  * Copyright (C) 2002-2003 Florent Chabaud <fchabaud@free.fr><BR>
- * Copyright (C) 2002-2007 Nigel Cunningham (nigel at tuxonice net)<BR>
+ * Copyright (C) 2002-2008 Nigel Cunningham (nigel at tuxonice net)<BR>
  *
  * \section Credits
  *

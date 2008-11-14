@@ -1,7 +1,7 @@
 /*
  * kernel/power/tuxonice_ui.h
  *
- * Copyright (C) 2004-2007 Nigel Cunningham (nigel at tuxonice net)
+ * Copyright (C) 2004-2008 Nigel Cunningham (nigel at tuxonice net)
  */
 
 enum {

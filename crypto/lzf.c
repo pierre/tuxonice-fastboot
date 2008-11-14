@@ -1,7 +1,7 @@
 /*
  * Cryptoapi LZF compression module.
  *
- * Copyright (c) 2004-2005 Nigel Cunningham <nigel at tuxonice net>
+ * Copyright (c) 2004-2008 Nigel Cunningham <nigel at tuxonice net>
  *
  * based on the deflate.c file:
  *

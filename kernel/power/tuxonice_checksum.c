@@ -1,7 +1,7 @@
 /*
  * kernel/power/tuxonice_checksum.c
  *
- * Copyright (C) 2006-2007 Nigel Cunningham (nigel at tuxonice net)
+ * Copyright (C) 2006-2008 Nigel Cunningham (nigel at tuxonice net)
  * Copyright (C) 2006 Red Hat, inc.
  *
  * This file is released under the GPLv2.

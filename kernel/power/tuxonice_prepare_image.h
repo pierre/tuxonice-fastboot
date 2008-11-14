@@ -1,7 +1,7 @@
 /*
  * kernel/power/tuxonice_prepare_image.h
  *
- * Copyright (C) 2003-2007 Nigel Cunningham (nigel at tuxonice net)
+ * Copyright (C) 2003-2008 Nigel Cunningham (nigel at tuxonice net)
  *
  * This file is released under the GPLv2.
  *

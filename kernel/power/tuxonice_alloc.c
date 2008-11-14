@@ -1,7 +1,7 @@
 /*
  * kernel/power/tuxonice_alloc.c
  *
- * Copyright (C) 2007 Nigel Cunningham (nigel at tuxonice net)
+ * Copyright (C) 2008 Nigel Cunningham (nigel at tuxonice net)
  *
  * This file is released under the GPLv2.
  *
