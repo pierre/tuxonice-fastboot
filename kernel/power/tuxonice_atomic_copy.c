@@ -308,7 +308,7 @@ int toi_go_atomic(pm_message_t state, int suspend_time)
 
 	if (device_suspend(state)) {
 		set_abort_result(TOI_DEVICE_REFUSED);
-		toi_end_atomic(ATOMIC_STEP_RESUME_CONSOLE, suspend_time, 1);
+		toi_end_atomic(ATOMIC_STEP_DEVICE_RESUME, suspend_time, 1);
 		return 1;
 	}
 
