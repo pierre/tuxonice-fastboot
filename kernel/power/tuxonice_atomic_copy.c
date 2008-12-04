@@ -364,8 +364,8 @@ void toi_end_atomic(int stage, int suspend_time, int error)
 	case ATOMIC_ALL_STEPS:
 		if (!suspend_time)
 			toi_platform_leave();
-		device_power_up(error ? PMSG_RECOVER :
-			(suspend_time ? PMSG_THAW : PMSG_RESTORE));
+		device_power_up(suspend_time ?
+			(error ? PMSG_RECOVER : PMSG_THAW) : PMSG_RESTORE);
 	case ATOMIC_STEP_IRQS:
 		local_irq_enable();
 		device_pm_unlock();
@@ -377,8 +377,8 @@ void toi_end_atomic(int stage, int suspend_time, int error)
 	case ATOMIC_STEP_DEVICE_RESUME:
 		if (suspend_time && error)
 			toi_platform_recover();
-		device_resume(error ? PMSG_RECOVER :
-			(suspend_time ? PMSG_THAW : PMSG_RESTORE));
+		device_resume(suspend_time ?
+			(error ? PMSG_RECOVER : PMSG_THAW) : PMSG_RESTORE);
 	case ATOMIC_STEP_RESUME_CONSOLE:
 		__ftrace_enabled_restore(ftrace_save);
 		resume_console();
