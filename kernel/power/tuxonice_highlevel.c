@@ -1012,7 +1012,7 @@ out:
 /**
  * _toi_try_hibernate: Try to start a hibernation cycle.
  *
- * have_pmsem: Whther the pm_sem is already taken.
+ * have_pmsem: Whether the pm_sem is already taken.
  *
  * Start a hibernation cycle, coming in from either
  * echo > /sys/power/tuxonice/do_suspend
