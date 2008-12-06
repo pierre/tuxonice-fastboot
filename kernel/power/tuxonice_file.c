@@ -301,11 +301,12 @@ static void toi_file_cleanup(int finishing_cycle)
 }
 
 /*
- * reopen_resume_devt
+ * reopen_resume_devt - reset the devinfo struct
  *
- * Having opened resume= once, we remember the major and
- * minor nodes and use them to reopen the bdev for checking
- * whether an image exists (possibly when starting a resume).
+ * Description:
+ *    Having opened resume= once, we remember the major and
+ *    minor nodes and use them to reopen the bdev for checking
+ *    whether an image exists (possibly when starting a resume).
  */
 static void reopen_resume_devt(void)
 {
@@ -501,10 +502,12 @@ static int toi_file_allocate_storage(int main_space_requested)
 		block_chain.size);
 
 	if (block_chain.size < pages_to_get) {
-		printk("Block chain size (%d) < header pages (%d) + extra "
-			"pages (%d) + main pages (%d) (=%d pages).\n",
-			block_chain.size, header_pages_reserved, extra_pages,
-			main_space_requested, pages_to_get);
+		printk(KERN_INFO "Block chain size (%d) < header pages (%d) + "
+				 "extra pages (%d) + main pages (%d) (=%d "
+				 "pages).\n",
+				 block_chain.size, header_pages_reserved,
+				 extra_pages, main_space_requested,
+				 pages_to_get);
 		result = -ENOSPC;
 	}
 
@@ -650,6 +653,16 @@ static int toi_file_read_header_cleanup(void)
 	return 0;
 }
 
+/**
+ * toi_file_signature_op - perform an operation on the file signature
+ * @op:	operation to perform
+ *
+ * Description:
+ *    op is either GET_IMAGE_EXISTS, INVALIDATE, MARK_RESUME_ATTEMPTED or
+ *    UNMARK_RESUME_ATTEMPTED.
+ *    If the signature is changed, an I/O operation is performed.
+ *    The signature exists iff toi_file_signature_op(GET_IMAGE_EXISTS)>-1.
+ */
 static int toi_file_signature_op(int op)
 {
 	char *cur;
@@ -661,8 +674,8 @@ static int toi_file_signature_op(int op)
 
 	cur = (char *) toi_get_zeroed_page(17, TOI_ATOMIC_GFP);
 	if (!cur) {
-		printk("Unable to allocate a page for reading the image "
-				"signature.\n");
+		printk(KERN_INFO "Unable to allocate a page for reading the "
+				 "image signature.\n");
 		return -ENOMEM;
 	}
 
@@ -715,11 +728,9 @@ out:
 	return result;
 }
 
-/* Print debug info
- *
- * Description:
+/*
+ * toi_file_print_debug_stats - print debug info
  */
-
 static int toi_file_print_debug_stats(char *buffer, int size)
 {
 	int len = 0;
@@ -759,8 +770,7 @@ static int toi_file_storage_needed(void)
 }
 
 /*
- * toi_file_remove_image
- *
+ * toi_file_remove_image - invalidate the image
  */
 static int toi_file_remove_image(void)
 {
@@ -769,24 +779,22 @@ static int toi_file_remove_image(void)
 }
 
 /*
- * Image_exists
- *
+ * toi_file_image_exists - test if an image exists
  */
-
 static int toi_file_image_exists(int quiet)
 {
 	if (!toi_file_target_bdev)
 		reopen_resume_devt();
-
 	return toi_file_signature_op(GET_IMAGE_EXISTS);
 }
 
 /*
- * Mark resume attempted.
+ * toi_file_mark_resume_attempted - mark resume attempted
+ * @mark:	attempted flag
  *
- * Record that we tried to resume from this image.
+ * Descrption:
+ *    Record that we tried to resume from this image.
  */
-
 static int toi_file_mark_resume_attempted(int mark)
 {
 	return toi_file_signature_op(mark ? MARK_RESUME_ATTEMPTED :
@@ -832,24 +840,39 @@ static void toi_file_set_resume_param(void)
 	toi_attempt_to_parse_resume_device(1);
 }
 
-static int __test_toi_file_target(char *target, int resume_time, int quiet)
+/*
+ * __test_toi_file_target - is the file target ready for hibernating?
+ * @target:		target file
+ * @resume_param: 	whether resume= has been specified
+ * @quiet:		quiet flag
+ *
+ * Description:
+ * 	Test wheter the file target can be used for hibernating: valid target
+ * 	and signature.
+ */
+static int __test_toi_file_target(char *target, int resume_param, int quiet)
 {
-	toi_file_get_target_info(target, 0, resume_time);
+	toi_file_get_target_info(target, 0, resume_param);
 	if (toi_file_signature_op(GET_IMAGE_EXISTS) > -1) {
 		if (!quiet)
 			printk(KERN_INFO "TuxOnIce: FileAllocator: File "
-					"signature found.\n");
-		if (!resume_time)
+					 "signature found.\n");
+		if (!resume_param)
 			toi_file_set_resume_param();
 
 		toi_bio_ops.set_devinfo(&devinfo);
 		toi_writer_posn.chains = &block_chain;
 		toi_writer_posn.num_chains = 1;
 
-		if (!resume_time)
+		if (!resume_param)
 			set_toi_state(TOI_CAN_HIBERNATE);
 		return 0;
 	}
+
+	/*
+	 * Target unaccessible or no signature found
+	 * Most errors have already been reported
+	 */
 
 	clear_toi_state(TOI_CAN_HIBERNATE);
 
@@ -858,15 +881,21 @@ static int __test_toi_file_target(char *target, int resume_time, int quiet)
 
 	if (*target)
 		printk(KERN_INFO "TuxOnIce: FileAllocator: Sorry. No signature "
-				"found at  %s.\n", target);
+				 "found at  %s.\n", target);
 	else
-		if (!resume_time)
+		if (!resume_param)
 			printk(KERN_INFO "TuxOnIce: FileAllocator: Sorry. "
-					"Target is not set for hibernating.\n");
+					 "Target is not set for hibernating.\n");
 
 	return 1;
 }
 
+/*
+ * test_toi_file_target - sysfs callback for /sys/power/tuxonince/file/target
+ *
+ * Description:
+ * 	Test wheter the target file is valid for hibernating.
+ */
 static void test_toi_file_target(void)
 {
 	setting_toi_file_target = 1;
@@ -948,7 +977,7 @@ static int toi_file_parse_sig_location(char *commandline,
 	 * given on the command line if we don't.
 	 */
 
-	if (!setting_toi_file_target)
+	if (!setting_toi_file_target) /* Concurrent write via /sys? */
 		__test_toi_file_target(toi_file_target, 1, 0);
 
 	if (colon)
@@ -960,15 +989,15 @@ static int toi_file_parse_sig_location(char *commandline,
 		target_blocksize = (int) simple_strtoul(at_symbol + 1, NULL, 0);
 		if (target_blocksize & (SECTOR_SIZE - 1)) {
 			printk(KERN_INFO "FileAllocator: Blocksizes are "
-					"multiples of %d.\n", SECTOR_SIZE);
+					 "multiples of %d.\n", SECTOR_SIZE);
 			result = -EINVAL;
 			goto out;
 		}
 	}
 
 	if (!quiet)
-		printk(KERN_INFO "TuxOnIce FileAllocator: Testing whether you"
-				" can resume:\n");
+		printk(KERN_INFO "TuxOnIce FileAllocator: Testing whether you "
+				 "can resume:\n");
 
 	toi_file_get_target_info(commandline, 0, 1);
 
@@ -981,7 +1010,7 @@ static int toi_file_parse_sig_location(char *commandline,
 	if (target_blocksize)
 		set_devinfo(toi_file_target_bdev, ffs(target_blocksize));
 
-	result = __test_toi_file_target(commandline, 1, 0);
+	result = __test_toi_file_target(commandline, 1, quiet);
 
 out:
 	if (result)
@@ -1012,13 +1041,10 @@ static int toi_file_save_config_info(char *buffer)
 	return strlen(toi_file_target) + 1;
 }
 
-/* toi_file_load_config_info
- *
- * Description:	Reload target's name.
- * Arguments:	Buffer:		Pointer to the start of the data.
- *		Size:		Number of bytes that were saved.
+/* toi_file_load_config_info - Reload target's name
+ * @buffer:	pointer to the start of the data
+ * @size:	number of bytes that were saved
  */
-
 static void toi_file_load_config_info(char *buffer, int size)
 {
 	strcpy(toi_file_target, buffer);
