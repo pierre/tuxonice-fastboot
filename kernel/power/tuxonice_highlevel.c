@@ -1039,7 +1039,6 @@ void _toi_try_resume(void)
 out:
 	toi_finish_anything(SYSFS_RESUMING);
 	lockdep_on();
-
 }
 
 /**
