@@ -62,12 +62,14 @@ extern struct ui_ops *toi_current_ui;
 	} while (0)
 
 #define toi_prepare_console(void) \
-	do { if (toi_current_ui) \
+	do { pm_prepare_console(); \
+	     if (toi_current_ui) \
 		(toi_current_ui->prepare)(); \
 	} while (0)
 
 #define toi_cleanup_console(void) \
-	do { if (toi_current_ui) \
+	do { pm_restore_console(); \
+	     if (toi_current_ui) \
 		(toi_current_ui->cleanup)(); \
 	} while (0)
 

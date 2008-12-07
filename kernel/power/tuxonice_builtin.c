@@ -212,6 +212,7 @@ EXPORT_IF_TOI_MODULAR(save_processor_state);
 EXPORT_IF_TOI_MODULAR(drop_pagecache);
 EXPORT_IF_TOI_MODULAR(restore_pblist);
 EXPORT_IF_TOI_MODULAR(pm_mutex);
+EXPORT_IF_TOI_MODULAR(pm_prepare_console);
 EXPORT_IF_TOI_MODULAR(pm_restore_console);
 EXPORT_IF_TOI_MODULAR(super_blocks);
 EXPORT_IF_TOI_MODULAR(next_zone);
