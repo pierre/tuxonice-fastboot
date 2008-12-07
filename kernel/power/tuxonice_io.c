@@ -867,6 +867,88 @@ static int write_module_configs(void)
 	return 0;
 }
 
+/* read_one_module_config()
+ *
+ * Description: Read the configuration for one module, and configure the module
+ * 		to match if it is loaded.
+ * Returns:	Int. Zero on success or an error code.
+ */
+
+static int read_one_module_config(struct toi_module_header *header)
+{
+	struct toi_module_ops *this_module;
+	int result, len;
+	char *buffer;
+
+	/* Find the module */
+	this_module = toi_find_module_given_name(header->name);
+
+	if (!this_module) {
+		if (header->enabled) {
+			toi_early_boot_message(1, TOI_CONTINUE_REQ,
+				"It looks like we need module %s for reading "
+				"the image but it hasn't been registered.\n",
+				header->name);
+			if (!(test_toi_state(TOI_CONTINUE_REQ)))
+				return -EINVAL;
+		} else
+			printk(KERN_INFO "Module %s configuration data found, "
+				"but the module hasn't registered. Looks like "
+				"it was disabled, so we're ignoring its data.",
+				header->name);
+	}
+
+	/* Get the length of the data (if any) */
+	result = toiActiveAllocator->rw_header_chunk(READ, NULL, (char *) &len,
+			sizeof(int));
+	if (result) {
+		printk("Failed to read the length of the module %s's"
+				" configuration data.\n",
+				header->name);
+		return -EINVAL;
+	}
+
+	/* Read any data and pass to the module (if we found one) */
+	if (!len)
+		return 0;
+
+	buffer = (char *) toi_get_zeroed_page(23, TOI_ATOMIC_GFP);
+
+	if (!buffer) {
+		printk("Failed to allocate a buffer for reloading module "
+				"configuration info.\n");
+		return -ENOMEM;
+	}
+
+	toiActiveAllocator->rw_header_chunk(READ, NULL, buffer, len);
+
+	if (!this_module)
+		goto out;
+
+	if (!this_module->save_config_info)
+		printk("Huh? Module %s appears to have a save_config_info, but"
+				" not a load_config_info function!\n",
+				this_module->name);
+	else
+		this_module->load_config_info(buffer, len);
+
+	/*
+	 * Now move this module to the tail of its lists. This will put it in
+	 * order. Any new modules will end up at the top of the lists. They
+	 * should have been set to disabled when loaded (people will
+	 * normally not edit an initrd to load a new module and then hibernate
+	 * without using it!).
+	 */
+
+	toi_move_module_tail(this_module);
+
+	this_module->enabled = header->enabled;
+
+out:
+	toi_free_page(23, (unsigned long) buffer);
+	return 0;
+}
+
 /* read_module_configs()
  *
  * Description:	Reload module configurations from the image header.
@@ -875,16 +957,9 @@ static int write_module_configs(void)
 
 static int read_module_configs(void)
 {
-	struct toi_module_ops *this_module;
-	char *buffer = (char *) toi_get_zeroed_page(23, TOI_ATOMIC_GFP);
-	int len, result = 0;
+	int result = 0;
 	struct toi_module_header toi_module_header;
-
-	if (!buffer) {
-		printk("Failed to allocate a buffer for reloading module "
-				"configuration info.\n");
-		return -ENOMEM;
-	}
+	struct toi_module_ops *this_module;
 
 	/* All modules are initially disabled. That way, if we have a module
 	 * loaded now that wasn't loaded when we hibernated, it won't be used
@@ -899,86 +974,15 @@ static int read_module_configs(void)
 			sizeof(toi_module_header));
 	if (result) {
 		printk("Failed to read the next module header.\n");
-		toi_free_page(23, (unsigned long) buffer);
 		return -EINVAL;
 	}
 
 	/* For each module (in registration order) */
 	while (toi_module_header.name[0]) {
+		result = read_one_module_config(&toi_module_header);
 
-		/* Find the module */
-		this_module =
-			toi_find_module_given_name(toi_module_header.name);
-
-		if (!this_module) {
-			/*
-			 * Is it used? Only need to worry about filters. The
-			 * active allocator must be loaded!
-			 */
-			if (toi_module_header.enabled) {
-				toi_early_boot_message(1, TOI_CONTINUE_REQ,
-					"It looks like we need module %s for "
-					"reading the image but it hasn't been "
-					"registered.\n",
-					toi_module_header.name);
-				if (!(test_toi_state(TOI_CONTINUE_REQ))) {
-					toi_free_page(23,
-							(unsigned long) buffer);
-					return -EINVAL;
-				}
-			} else
-				printk(KERN_INFO "Module %s configuration data "
-					"found, but the module hasn't "
-					"registered. Looks like it was "
-					"disabled, so we're ignoring its data.",
-					toi_module_header.name);
-		}
-
-		/* Get the length of the data (if any) */
-		result = toiActiveAllocator->rw_header_chunk(READ, NULL,
-				(char *) &len, sizeof(int));
-		if (result) {
-			printk("Failed to read the length of the module %s's"
-					" configuration data.\n",
-					toi_module_header.name);
-			toi_free_page(23, (unsigned long) buffer);
+		if (result)
 			return -EINVAL;
-		}
-
-		/* Read any data and pass to the module (if we found one) */
-		if (len) {
-			toiActiveAllocator->rw_header_chunk(READ, NULL,
-					buffer, len);
-			if (this_module) {
-				if (!this_module->save_config_info) {
-					printk("Huh? Module %s appears to have "
-						"a save_config_info, but not a "
-						"load_config_info function!\n",
-						this_module->name);
-				} else
-					this_module->load_config_info(buffer,
-							len);
-			}
-		}
-
-		if (this_module) {
-			/* Now move this module to the tail of its lists. This
-			 * will put it in order. Any new modules will end up at
-			 * the top of the lists. They should have been set to
-			 * disabled when loaded (people will normally not edit
-			 * an initrd to load a new module and then hibernate
-			 * without using it!).
-			 */
-
-			toi_move_module_tail(this_module);
-
-			/*
-			 * We apply the disabled state; modules don't need to
-			 * save whether they were disabled and if they do, we
-			 * override them anyway.
-			 */
-			this_module->enabled = toi_module_header.enabled;
-		}
 
 		/* Get the next module header */
 		result = toiActiveAllocator->rw_header_chunk(READ, NULL,
@@ -987,13 +991,10 @@ static int read_module_configs(void)
 
 		if (result) {
 			printk("Failed to read the next module header.\n");
-			toi_free_page(23, (unsigned long) buffer);
 			return -EINVAL;
 		}
-
 	}
 
-	toi_free_page(23, (unsigned long) buffer);
 	return 0;
 }
 
