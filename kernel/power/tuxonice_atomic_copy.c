@@ -297,7 +297,7 @@ int toi_go_atomic(pm_message_t state, int suspend_time)
 {
 	toi_prepare_status(DONT_CLEAR_BAR, "Doing atomic copy/restore.");
 
-	if (suspend_time && toi_platform_begin()) {
+	if (suspend_time && platform_begin(1)) {
 		set_abort_result(TOI_PLATFORM_PREP_FAILED);
 		toi_end_atomic(ATOMIC_STEP_PLATFORM_END, suspend_time, 0);
 		return 1;
@@ -312,13 +312,13 @@ int toi_go_atomic(pm_message_t state, int suspend_time)
 		return 1;
 	}
 
-	if (suspend_time && toi_platform_pre_snapshot()) {
+	if (suspend_time && platform_pre_snapshot(1)) {
 		set_abort_result(TOI_PRE_SNAPSHOT_FAILED);
 		toi_end_atomic(ATOMIC_STEP_PLATFORM_FINISH, suspend_time, 0);
 		return 1;
 	}
 
-	if (!suspend_time && toi_platform_pre_restore()) {
+	if (!suspend_time && platform_pre_restore(1)) {
 		set_abort_result(TOI_PRE_RESTORE_FAILED);
 		toi_end_atomic(ATOMIC_STEP_DEVICE_RESUME, suspend_time, 0);
 		return 1;
@@ -363,7 +363,7 @@ void toi_end_atomic(int stage, int suspend_time, int error)
 	switch (stage) {
 	case ATOMIC_ALL_STEPS:
 		if (!suspend_time)
-			toi_platform_leave();
+			platform_leave(1);
 		device_power_up(suspend_time ?
 			(error ? PMSG_RECOVER : PMSG_THAW) : PMSG_RESTORE);
 	case ATOMIC_STEP_IRQS:
@@ -373,17 +373,17 @@ void toi_end_atomic(int stage, int suspend_time, int error)
 		if (test_action_state(TOI_LATE_CPU_HOTPLUG))
 			enable_nonboot_cpus();
 	case ATOMIC_STEP_PLATFORM_FINISH:
-		toi_platform_finish();
+		platform_finish(1);
 	case ATOMIC_STEP_DEVICE_RESUME:
 		if (suspend_time && error)
-			toi_platform_recover();
+			platform_recover(1);
 		device_resume(suspend_time ?
 			(error ? PMSG_RECOVER : PMSG_THAW) : PMSG_RESTORE);
 	case ATOMIC_STEP_RESUME_CONSOLE:
 		__ftrace_enabled_restore(ftrace_save);
 		resume_console();
 	case ATOMIC_STEP_PLATFORM_END:
-		toi_platform_end();
+		platform_end(1);
 
 		toi_prepare_status(DONT_CLEAR_BAR, "Post atomic.");
 	}
