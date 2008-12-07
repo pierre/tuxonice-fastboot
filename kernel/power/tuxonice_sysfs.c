@@ -204,9 +204,6 @@ struct kobject *tuxonice_kobj;
  *
  * This array contains entries that are automatically registered at
  * boot. Modules and the console code register their own entries separately.
- *
- * NB: If you move do_hibernate, change toi_write_sysfs's test so that
- * toi_start_anything still gets a 1 when the user echos > do_hibernate!
  */
 
 static struct toi_sysfs_data sysfs_params[] = {
