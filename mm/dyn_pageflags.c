@@ -97,6 +97,14 @@ static int dyn_pageflags_debug;
 #define pages_for_span(span) \
 	(DIV_ROUND_UP(span, PAGE_SIZE << 3))
 
+static inline unsigned long **get_zone_array(struct dyn_pageflags *pageflags,
+		int node, int zone_num)
+{
+	return pageflags->bitmap && pageflags->bitmap[node] &&
+		pageflags->bitmap[node][zone_num] ?
+		pageflags->bitmap[node][zone_num] : NULL;
+}
+
 /* __maybe_unused for testing functions below */
 #define GET_BIT_AND_UL(pageflags, page) \
 	struct zone *zone = page_zone(page); \
@@ -106,10 +114,8 @@ static int dyn_pageflags_debug;
 	int zone_num = zone_idx(zone); \
 	int pagenum = PAGENUMBER(zone_pfn) + 2; \
 	int page_offset = PAGEINDEX(zone_pfn); \
-	unsigned long **zone_array = ((pageflags)->bitmap && \
-		(pageflags)->bitmap[node] && \
-		(pageflags)->bitmap[node][zone_num]) ? \
-			(pageflags)->bitmap[node][zone_num] : NULL; \
+	unsigned long **zone_array = get_zone_array(pageflags, node, \
+			zone_num); \
 	unsigned long __maybe_unused *ul = (zone_array && \
 		(unsigned long) zone_array[0] <= pfn && \
 		(unsigned long) zone_array[1] >= (pagenum-2) && \
@@ -630,8 +636,10 @@ test:
 		pagebit = PAGEBIT(zone_offset);
 
 		if (!pagebit || !ul) {
-			ul = pageflags->bitmap[node][zone_num]
-				[PAGENUMBER(zone_offset)+2];
+			unsigned long **zone_array = get_zone_array(pageflags,
+					node, zone_num);
+			ul = zone_array ?
+				zone_array[PAGENUMBER(zone_offset)+2] : NULL;
 			if (ul)
 				ul += PAGEINDEX(zone_offset);
 			else {
