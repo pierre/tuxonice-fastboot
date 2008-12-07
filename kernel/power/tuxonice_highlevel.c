@@ -1097,11 +1097,9 @@ int _toi_try_hibernate(int have_pmsem)
 	}
 
 	result = do_toi_step(STEP_HIBERNATE_SAVE_IMAGE);
-	if (result)
-		goto out;
 
 	/* This code runs at resume time too! */
-	if (toi_in_hibernate)
+	if (!result && toi_in_hibernate)
 		result = do_toi_step(STEP_HIBERNATE_POWERDOWN);
 out:
 	current->flags &= ~PF_MEMALLOC;
