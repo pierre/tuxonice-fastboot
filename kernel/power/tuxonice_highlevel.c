@@ -140,7 +140,7 @@ static char *result_strings[] = {
 /**
  * toi_finish_anything - Cleanup after doing anything.
  *
- * @toi_or_resume: Whether finishing a cycle or attempt at resuming.
+ * @hibernate_or_resume: Whether finishing a cycle or attempt at resuming.
  *
  * This is our basic clean-up routine, matching start_anything below. We
  * call cleanup routines, drop module references and restore process fs and
