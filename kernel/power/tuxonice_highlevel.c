@@ -254,7 +254,8 @@ static void mark_nosave_pages(void)
 		unsigned long pfn;
 
 		for (pfn = region->start_pfn; pfn < region->end_pfn; pfn++)
-			SetPageNosave(pfn_to_page(pfn));
+			if (pfn_valid(pfn))
+				SetPageNosave(pfn_to_page(pfn));
 	}
 }
 
