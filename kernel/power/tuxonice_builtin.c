@@ -230,6 +230,8 @@ EXPORT_IF_TOI_MODULAR(first_online_pgdat);
 EXPORT_IF_TOI_MODULAR(next_online_pgdat);
 EXPORT_IF_TOI_MODULAR(machine_restart);
 EXPORT_IF_TOI_MODULAR(tasklist_lock);
+EXPORT_IF_TOI_MODULAR(usermodehelper_disable);
+EXPORT_IF_TOI_MODULAR(usermodehelper_enable);
 #ifdef CONFIG_PM_SLEEP_SMP
 EXPORT_IF_TOI_MODULAR(disable_nonboot_cpus);
 EXPORT_IF_TOI_MODULAR(enable_nonboot_cpus);

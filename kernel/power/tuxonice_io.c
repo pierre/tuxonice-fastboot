@@ -20,6 +20,7 @@
 #include <linux/module.h>
 #include <linux/kthread.h>
 #include <linux/dyn_pageflags.h>
+#include <linux/cpu.h>
 #include <asm/tlbflush.h>
 
 #include "tuxonice.h"
@@ -1234,17 +1235,17 @@ static int __read_pageset1(void)
 	if (allocate_dyn_pageflags(&pageset1_map, 0) ||
 	    allocate_dyn_pageflags(&pageset1_copy_map, 0) ||
 	    allocate_dyn_pageflags(&io_map, 0))
-		goto out_reset_console;
+		goto out_thaw;
 
 	if (load_dyn_pageflags(&pageset1_map))
-		goto out_reset_console;
+		goto out_thaw;
 
 	/* Clean up after reading the header */
 	result = toiActiveAllocator->read_header_cleanup();
 	if (result) {
 		printk("TuxOnIce: Failed to cleanup after reading the image "
 				"header.\n");
-		goto out_reset_console;
+		goto out_thaw;
 	}
 
 	toi_cond_pause(1, "About to read pagedir.");
@@ -1256,7 +1257,7 @@ static int __read_pageset1(void)
 	if (toi_get_pageset1_load_addresses()) {
 		printk(KERN_INFO "TuxOnIce: Failed to get load addresses for "
 				"pageset1.\n");
-		goto out_reset_console;
+		goto out_thaw;
 	}
 
 	/* Read the original kernel back */
@@ -1266,7 +1267,7 @@ static int __read_pageset1(void)
 		toi_prepare_status(DONT_CLEAR_BAR, "Failed to read pageset 1.");
 		result = -EIO;
 		printk(KERN_INFO "TuxOnIce: Failed to get load pageset1.\n");
-		goto out_reset_console;
+		goto out_thaw;
 	}
 
 	toi_cond_pause(1, "About to restore original kernel.");
@@ -1280,6 +1281,10 @@ out:
 	toi_free_page(25, (unsigned long) header_buffer);
 	return result;
 
+out_thaw:
+	thaw_processes();
+	usermodehelper_enable();
+	enable_nonboot_cpus();
 out_reset_console:
 	toi_cleanup_console();
 

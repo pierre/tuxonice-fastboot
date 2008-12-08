@@ -134,7 +134,8 @@ static char *result_strings[] = {
 	"A hibernation preparation notifier chain member cancelled the "
 		"hibernation",
 	"Pre-snapshot preparation failed",
-	"Post-snapshot cleanup failed",
+	"Pre-restore preparation failed",
+	"Failed to disable usermode helpers",
 };
 
 /**
@@ -438,6 +439,7 @@ static void do_cleanup(int get_debug_info)
 			toiActiveAllocator->remove_image();
 
 	free_bitmaps();
+	usermodehelper_enable();
 
 	if (buffer && i) {
 		/* Printk can only handle 1023 bytes, including
@@ -525,6 +527,14 @@ static int toi_init(void)
 		return 1;
 	}
 	set_toi_state(TOI_NOTIFIERS_PREPARE);
+
+	result = usermodehelper_disable();
+	if (result) {
+		printk(KERN_ERR "TuxOnIce: Failed to disable usermode "
+				"helpers\n");
+		set_result_state(TOI_USERMODE_HELPERS_ERR);
+		return 1;
+	}
 
 	boot_kernel_data_buffer = toi_get_zeroed_page(37, TOI_ATOMIC_GFP);
 	if (!boot_kernel_data_buffer) {
@@ -910,14 +920,22 @@ int pre_resume_freeze(void)
 		}
 	}
 
+	if (usermodehelper_disable())
+		goto Finish;
+
 	toi_prepare_status(DONT_CLEAR_BAR,	"Freeze processes.");
 
 	if (freeze_processes()) {
 		printk("Some processes failed to stop.\n");
-		return 1;
+		goto Finish;
 	}
 
 	return 0;
+Finish:
+	thaw_processes();
+	usermodehelper_enable();
+	enable_nonboot_cpus();
+	return 1;
 }
 
 /**
