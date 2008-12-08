@@ -163,7 +163,7 @@ enum {
 struct toi_core_fns {
 	int (*post_context_save)(void);
 	unsigned long (*get_nonconflicting_page)(void);
-	int (*try_hibernate)(int have_pmsem);
+	int (*try_hibernate)(void);
 	void (*try_resume)(void);
 };
 
@@ -179,7 +179,7 @@ extern void toi_finish_anything(int toi_or_resume);
 extern int save_image_part1(void);
 extern int toi_atomic_restore(void);
 
-extern int _toi_try_hibernate(int have_pmsem);
+extern int _toi_try_hibernate(void);
 extern void __toi_try_resume(void);
 
 extern int __toi_post_context_save(void);

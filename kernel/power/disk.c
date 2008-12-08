@@ -513,7 +513,7 @@ int hibernate(void)
 
 #ifdef CONFIG_TOI
 	if (test_action_state(TOI_REPLACE_SWSUSP))
-		return toi_try_hibernate(1);
+		return toi_try_hibernate();
 #endif
 
 	mutex_lock(&pm_mutex);

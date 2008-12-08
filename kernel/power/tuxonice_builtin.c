@@ -277,12 +277,12 @@ int toi_post_context_save(void)
 	return toi_core_fns->post_context_save();
 }
 
-int toi_try_hibernate(int have_pmsem)
+int toi_try_hibernate(void)
 {
 	if (!toi_core_fns)
 		return -ENODEV;
 
-	return toi_core_fns->try_hibernate(have_pmsem);
+	return toi_core_fns->try_hibernate();
 }
 
 static int num_resume_calls;

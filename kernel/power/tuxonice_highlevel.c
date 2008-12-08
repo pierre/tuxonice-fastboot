@@ -92,7 +92,6 @@
 /*! Pageset metadata. */
 struct pagedir pagedir2 = {2};
 
-static int get_pmsem = 0, got_pmsem;
 static mm_segment_t oldfs;
 static DEFINE_MUTEX(tuxonice_in_use);
 static int block_dump_save;
@@ -160,6 +159,7 @@ void toi_finish_anything(int hibernate_or_resume)
 				strlen(post_hibernate_command))
 			toi_launch_userspace_program(post_hibernate_command,
 					0, UMH_WAIT_PROC, 0);
+		mutex_unlock(&pm_mutex);
 	}
 
 	set_fs(oldfs);
@@ -177,18 +177,22 @@ void toi_finish_anything(int hibernate_or_resume)
  */
 int toi_start_anything(int hibernate_or_resume)
 {
+	int starting_cycle = (hibernate_or_resume == SYSFS_HIBERNATE);
+
 	mutex_lock(&tuxonice_in_use);
 
 	oldfs = get_fs();
 	set_fs(KERNEL_DS);
 
-	if (hibernate_or_resume == SYSFS_HIBERNATE &&
-			strlen(pre_hibernate_command)) {
+	if (hibernate_or_resume)
+		mutex_lock(&pm_mutex);
+
+	if (starting_cycle && strlen(pre_hibernate_command)) {
 		int result = toi_launch_userspace_program(pre_hibernate_command,
 				0, UMH_WAIT_PROC, 0);
 		if (result) {
-			printk(KERN_INFO "Pre-hibernate command '%s' returned "
-					"%d. Aborting.\n",
+			printk(KERN_INFO "Pre-hibernate command '%s' returned"
+					" %d. Aborting.\n",
 					pre_hibernate_command, result);
 			goto prehibernate_err;
 		}
@@ -229,6 +233,8 @@ early_init_err:
 	}
 getmodules_err:
 prehibernate_err:
+	if (hibernate_or_resume)
+		mutex_unlock(&pm_mutex);
 	set_fs(oldfs);
 	mutex_unlock(&tuxonice_in_use);
 	return -EBUSY;
@@ -436,6 +442,11 @@ static void do_cleanup(int get_debug_info)
 	free_bitmaps();
 	usermodehelper_enable();
 
+	if (test_toi_state(TOI_NOTIFIERS_PREPARE)) {
+		pm_notifier_call_chain(PM_POST_HIBERNATION);
+		clear_toi_state(TOI_NOTIFIERS_PREPARE);
+	}
+
 	if (buffer && i) {
 		/* Printk can only handle 1023 bytes, including
 		 * its level mangling. */
@@ -455,11 +466,6 @@ static void do_cleanup(int get_debug_info)
 	clear_toi_state(TOI_IGNORE_LOGLEVEL);
 	clear_toi_state(TOI_TRYING_TO_RESUME);
 	clear_toi_state(TOI_NOW_RESUMING);
-
-	if (got_pmsem) {
-		mutex_unlock(&pm_mutex);
-		got_pmsem = 0;
-	}
 }
 
 /**
@@ -556,17 +562,6 @@ static int toi_init(void)
  */
 static int can_hibernate(void)
 {
-	if (get_pmsem) {
-		if (!mutex_trylock(&pm_mutex)) {
-			printk(KERN_INFO "TuxOnIce: Failed to obtain "
-					"pm_mutex.\n");
-			dump_stack();
-			set_abort_result(TOI_PM_SEM);
-			return 0;
-		}
-		got_pmsem = 1;
-	}
-
 	if (!test_toi_state(TOI_CAN_HIBERNATE))
 		toi_attempt_to_parse_resume_device(0);
 
@@ -577,10 +572,6 @@ static int can_hibernate(void)
 			"in lilo.conf or equivalent. (Where /dev/hda1 is your "
 			"swap partition).\n");
 		set_abort_result(TOI_CANT_SUSPEND);
-		if (!got_pmsem) {
-			mutex_unlock(&pm_mutex);
-			got_pmsem = 0;
-		}
 		return 0;
 	}
 
@@ -744,11 +735,6 @@ static int do_save_image(void)
 		do_cleanup(1);
 	return result;
 }
-
-	if (test_toi_state(TOI_NOTIFIERS_PREPARE)) {
-		pm_notifier_call_chain(PM_POST_HIBERNATION);
-		clear_toi_state(TOI_NOTIFIERS_PREPARE);
-	}
 
 /**
  * do_prepare_image: Try to prepare an image.
@@ -1042,10 +1028,6 @@ void _toi_try_resume(void)
 	if (toi_start_anything(SYSFS_RESUMING))
 		goto out;
 
-	/* Unlock will be done in do_cleanup */
-	mutex_lock(&pm_mutex);
-	got_pmsem = 1;
-
 	__toi_try_resume();
 
 	/*
@@ -1074,7 +1056,7 @@ out:
  * In the later case, we come in without pm_sem taken; in the
  * former, it has been taken.
  */
-int _toi_try_hibernate(int have_pmsem)
+int _toi_try_hibernate(void)
 {
 	int result = 0, sys_power_disk = 0;
 
@@ -1084,8 +1066,6 @@ int _toi_try_hibernate(int have_pmsem)
 			return -EBUSY;
 		sys_power_disk = 1;
 	}
-
-	get_pmsem = !have_pmsem;
 
 	if (strlen(alt_resume_param)) {
 		attempt_to_parse_alt_resume_param();
