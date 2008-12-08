@@ -1222,9 +1222,23 @@ static int __read_pageset1(void)
 
 	set_toi_state(TOI_NOW_RESUMING);
 
-	if (pre_resume_freeze())
-		goto out_reset_console;
+	if (!test_action_state(TOI_LATE_CPU_HOTPLUG)) {
+		toi_prepare_status(DONT_CLEAR_BAR, "Disable nonboot cpus.");
+		if (disable_nonboot_cpus()) {
+			set_abort_result(TOI_CPU_HOTPLUG_FAILED);
+			goto out_reset_console;
+		}
+	}
 
+	if (usermodehelper_disable())
+		goto out_enable_nonboot_cpus;
+
+	toi_prepare_status(DONT_CLEAR_BAR,	"Freeze processes.");
+
+	if (freeze_processes()) {
+		printk("Some processes failed to stop.\n");
+		goto out_thaw;
+	}
 	toi_cond_pause(1, "About to read original pageset1 locations.");
 
 	/*
@@ -1284,10 +1298,10 @@ out:
 out_thaw:
 	thaw_processes();
 	usermodehelper_enable();
+out_enable_nonboot_cpus:
 	enable_nonboot_cpus();
 out_reset_console:
 	toi_cleanup_console();
-
 out_remove_image:
 	free_dyn_pageflags(&pageset1_map);
 	free_dyn_pageflags(&pageset1_copy_map);

@@ -906,40 +906,6 @@ static void prepare_restore_load_alt_image(int prepare)
 }
 
 /**
- * pre_resume_freeze: Freeze the system, before doing an atomic restore.
- *
- * Hot unplug cpus (if we didn't do it early) and freeze processes, in
- * preparation for doing an atomic restore.
- */
-int pre_resume_freeze(void)
-{
-	if (!test_action_state(TOI_LATE_CPU_HOTPLUG)) {
-		toi_prepare_status(DONT_CLEAR_BAR, "Disable nonboot cpus.");
-		if (disable_nonboot_cpus()) {
-			set_abort_result(TOI_CPU_HOTPLUG_FAILED);
-			return 1;
-		}
-	}
-
-	if (usermodehelper_disable())
-		goto Finish;
-
-	toi_prepare_status(DONT_CLEAR_BAR,	"Freeze processes.");
-
-	if (freeze_processes()) {
-		printk("Some processes failed to stop.\n");
-		goto Finish;
-	}
-
-	return 0;
-Finish:
-	thaw_processes();
-	usermodehelper_enable();
-	enable_nonboot_cpus();
-	return 1;
-}
-
-/**
  * do_toi_step: Perform a step in hibernating or resuming.
  *
  * Perform a step in hibernating or resuming an image. This abstraction
