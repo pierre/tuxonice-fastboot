@@ -483,13 +483,13 @@ int allocate_dyn_pageflags(struct dyn_pageflags *pagemap, int sparse)
 	struct pglist_data *pgdat;
 	unsigned long flags;
 
+	spin_lock_irqsave(&pagemap->struct_lock, flags);
+
 	if (!sparse && (pagemap->sparse || !pagemap->initialised)) {
 		spin_lock_irqsave(&flags_list_lock, flags);
 		list_add(&pagemap->list, &flags_list);
 		spin_unlock_irqrestore(&flags_list_lock, flags);
 	}
-
-	spin_lock_irqsave(&pagemap->struct_lock, flags);
 
 	pagemap->initialised = 1;
 	pagemap->sparse = sparse;
