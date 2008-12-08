@@ -200,6 +200,7 @@ EXPORT_IF_TOI_MODULAR(platform_restore_cleanup);
 EXPORT_IF_TOI_MODULAR(power_kobj);
 EXPORT_IF_TOI_MODULAR(pm_notifier_call_chain);
 EXPORT_IF_TOI_MODULAR(init_swsusp_header);
+EXPORT_IF_TOI_MODULAR(snapshot_device_available);
 
 #ifdef CONFIG_ARCH_HIBERNATION_HEADER
 EXPORT_IF_TOI_MODULAR(arch_hibernation_header_restore);

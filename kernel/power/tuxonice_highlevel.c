@@ -160,6 +160,7 @@ void toi_finish_anything(int hibernate_or_resume)
 				strlen(post_hibernate_command))
 			toi_launch_userspace_program(post_hibernate_command,
 					0, UMH_WAIT_PROC, 0);
+		atomic_inc(&snapshot_device_available);
 		mutex_unlock(&pm_mutex);
 	}
 
@@ -185,8 +186,12 @@ int toi_start_anything(int hibernate_or_resume)
 	oldfs = get_fs();
 	set_fs(KERNEL_DS);
 
-	if (hibernate_or_resume)
+	if (hibernate_or_resume) {
 		mutex_lock(&pm_mutex);
+
+		if (!atomic_add_unless(&snapshot_device_available, -1, 0))
+			goto snapshotdevice_unavailable;
+	}
 
 	if (starting_cycle && strlen(pre_hibernate_command)) {
 		int result = toi_launch_userspace_program(pre_hibernate_command,
@@ -204,7 +209,7 @@ int toi_start_anything(int hibernate_or_resume)
 
 	if (toi_get_modules()) {
 		printk("TuxOnIce: Get modules failed!\n");
-		goto getmodules_err;
+		goto prehibernate_err;
 	}
 
 	if (hibernate_or_resume) {
@@ -220,20 +225,19 @@ int toi_start_anything(int hibernate_or_resume)
 	if (!toiActiveAllocator)
 		toi_attempt_to_parse_resume_device(!hibernate_or_resume);
 
-	if (toi_initialise_modules_late(hibernate_or_resume))
-		goto late_init_err;
+	if (!toi_initialise_modules_late(hibernate_or_resume))
+		return 0;
 
-	return 0;
-
-late_init_err:
 	toi_cleanup_modules(hibernate_or_resume);
 early_init_err:
 	if (hibernate_or_resume) {
 		block_dump_save = block_dump;
 		set_cpus_allowed(current, CPU_MASK_ALL);
 	}
-getmodules_err:
 prehibernate_err:
+	if (hibernate_or_resume)
+		atomic_inc(&snapshot_device_available);
+snapshotdevice_unavailable:
 	if (hibernate_or_resume)
 		mutex_unlock(&pm_mutex);
 	set_fs(oldfs);
