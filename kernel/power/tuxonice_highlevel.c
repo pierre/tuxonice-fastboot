@@ -135,6 +135,7 @@ static char *result_strings[] = {
 	"Pre-snapshot preparation failed",
 	"Pre-restore preparation failed",
 	"Failed to disable usermode helpers",
+	"Can't resume from alternate image",
 };
 
 /**
@@ -573,6 +574,17 @@ static int can_hibernate(void)
 			"swap partition).\n");
 		set_abort_result(TOI_CANT_SUSPEND);
 		return 0;
+	}
+
+	if (strlen(alt_resume_param)) {
+		attempt_to_parse_alt_resume_param();
+
+		if (!strlen(alt_resume_param)) {
+			printk(KERN_INFO "Alternate resume parameter now "
+					"invalid. Aborting.\n");
+			set_abort_result(TOI_CANT_USE_ALT_RESUME);
+			return 0;
+		}
 	}
 
 	return 1;
@@ -1065,16 +1077,6 @@ int _toi_try_hibernate(void)
 		if (toi_start_anything(SYSFS_HIBERNATING))
 			return -EBUSY;
 		sys_power_disk = 1;
-	}
-
-	if (strlen(alt_resume_param)) {
-		attempt_to_parse_alt_resume_param();
-
-		if (!strlen(alt_resume_param)) {
-			printk(KERN_INFO "Alternate resume parameter now "
-					"invalid. Aborting.\n");
-			goto out;
-		}
 	}
 
 	current->flags |= PF_MEMALLOC;
