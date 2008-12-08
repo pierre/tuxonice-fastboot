@@ -419,11 +419,6 @@ static void do_cleanup(int get_debug_info)
 		boot_kernel_data_buffer = 0;
 	}
 
-	if (test_toi_state(TOI_NOTIFIERS_PREPARE)) {
-		pm_notifier_call_chain(PM_POST_HIBERNATION);
-		clear_toi_state(TOI_NOTIFIERS_PREPARE);
-	}
-
 	thaw_processes();
 
 #ifdef CONFIG_TOI_KEEP_IMAGE
@@ -750,6 +745,10 @@ static int do_save_image(void)
 	return result;
 }
 
+	if (test_toi_state(TOI_NOTIFIERS_PREPARE)) {
+		pm_notifier_call_chain(PM_POST_HIBERNATION);
+		clear_toi_state(TOI_NOTIFIERS_PREPARE);
+	}
 
 /**
  * do_prepare_image: Try to prepare an image.
