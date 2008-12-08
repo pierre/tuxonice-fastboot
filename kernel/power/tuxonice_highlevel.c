@@ -613,10 +613,6 @@ static int do_post_image_write(void)
 	toi_go_atomic(PMSG_QUIESCE, 0);
 	toi_end_atomic(ATOMIC_ALL_STEPS, 0, 0);
 
-	/* If we return, it's because we hibernated to ram */
-	if (read_pageset2(1))
-		panic("Attempt to reload pagedir 2 failed. Try rebooting.");
-
 	barrier();
 	mb();
 	do_cleanup(1);

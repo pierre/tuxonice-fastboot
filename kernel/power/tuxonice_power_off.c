@@ -21,6 +21,7 @@
 #include "tuxonice_power_off.h"
 #include "tuxonice_sysfs.h"
 #include "tuxonice_modules.h"
+#include "tuxonice_io.h"
 
 unsigned long toi_poweroff_method; /* 0 - Kernel power off */
 EXPORT_IF_TOI_MODULAR(toi_poweroff_method);
@@ -49,7 +50,7 @@ static void __toi_power_down(int method)
 			"Powering down.");
 
 	if (test_result_state(TOI_ABORTED))
-		return;
+		goto out;
 
 	if (test_action_state(TOI_REBOOT))
 		kernel_restart(NULL);
@@ -58,6 +59,13 @@ static void __toi_power_down(int method)
 	case 0:
 		break;
 	case 3:
+		/*
+		 * Re-read the overwritten part of pageset2 to make post-resume
+		 * faster.
+		 */
+		if (read_pageset2(1))
+			panic("Attempt to reload pagedir 2 failed. Try rebooting.");
+
 		error = pm_notifier_call_chain(PM_SUSPEND_PREPARE);
 		if (!error) {
 			error = suspend_devices_and_enter(PM_SUSPEND_MEM);
@@ -89,13 +97,18 @@ static void __toi_power_down(int method)
 			"Falling back to alternate power off method.");
 
 	if (test_result_state(TOI_ABORTED))
-		return;
+		goto out;
 
 	kernel_power_off();
 	kernel_halt();
 	toi_cond_pause(1, "Powerdown failed.");
 	while (1)
 		cpu_relax();
+
+out:
+	if (read_pageset2(1))
+		panic("Attempt to reload pagedir 2 failed. Try rebooting.");
+	return;
 }
 
 #define CLOSE_FILE(file) \
