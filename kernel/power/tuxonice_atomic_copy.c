@@ -213,7 +213,7 @@ int __toi_post_context_save(void)
 			pagedir1.size - old_ps1_size,
 			extra_pd1_pages_allowance);
 		set_abort_result(TOI_EXTRA_PAGES_ALLOW_TOO_SMALL);
-		return -1;
+		return 1;
 	}
 
 	if (!test_action_state(TOI_TEST_FILTER_SPEED) &&
@@ -308,7 +308,7 @@ int toi_go_atomic(pm_message_t state, int suspend_time)
 
 	if (device_suspend(state)) {
 		set_abort_result(TOI_DEVICE_REFUSED);
-		toi_end_atomic(ATOMIC_STEP_DEVICE_RESUME, suspend_time, 1);
+		toi_end_atomic(ATOMIC_STEP_DEVICE_RESUME, suspend_time, 3);
 		return 1;
 	}
 
@@ -375,10 +375,12 @@ void toi_end_atomic(int stage, int suspend_time, int error)
 	case ATOMIC_STEP_PLATFORM_FINISH:
 		platform_finish(1);
 	case ATOMIC_STEP_DEVICE_RESUME:
-		if (suspend_time && error)
+		if (suspend_time && (error & 2)) {
 			platform_recover(1);
+		}
 		device_resume(suspend_time ?
-			(error ? PMSG_RECOVER : PMSG_THAW) : PMSG_RESTORE);
+			((error & 1) ? PMSG_RECOVER : PMSG_THAW) :
+			PMSG_RESTORE);
 	case ATOMIC_STEP_RESUME_CONSOLE:
 		__ftrace_enabled_restore(ftrace_save);
 		resume_console();
