@@ -609,10 +609,6 @@ static int do_post_image_write(void)
 
 	toi_power_down();
 
-	/* Ensure platform_leave is called */
-	toi_go_atomic(PMSG_QUIESCE, 0);
-	toi_end_atomic(ATOMIC_ALL_STEPS, 0, 0);
-
 	barrier();
 	mb();
 	do_cleanup(1);
@@ -725,10 +721,6 @@ abort_reloading_pagedir_two:
 	if (temp_result)
 		panic("Attempt to reload pagedir 2 while aborting "
 				"a hibernate failed.");
-
-	/* Ensure platform_leave is called */
-	toi_go_atomic(PMSG_QUIESCE, 0);
-	toi_end_atomic(ATOMIC_ALL_STEPS, 0, 0);
 
 	return 1;
 }
