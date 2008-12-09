@@ -42,7 +42,7 @@
 static long num_nosave, header_space_allocated, main_storage_allocated,
 	   storage_available;
 long extra_pd1_pages_allowance = CONFIG_TOI_DEFAULT_EXTRA_PAGES_ALLOWANCE;
-int image_size_limit;
+int image_size_limit, no_ps2_needed;
 
 struct attention_list {
 	struct task_struct *task;
@@ -187,10 +187,10 @@ static void toi_mark_pages_for_pageset2(void)
 	struct task_struct *p;
 	struct attention_list *this = attention_list;
 
-	if (test_action_state(TOI_NO_PAGESET2))
-		return;
-
 	clear_dyn_pageflags(&pageset2_map);
+
+	if (test_action_state(TOI_NO_PAGESET2) || no_ps2_needed)
+		return;
 
 	if (test_action_state(TOI_PAGESET2_FULL))
 		pageset2_full();
@@ -469,6 +469,13 @@ static long any_to_free(int use_image_size_limit)
 	return max(max(user_limit, storage_limit), ram_limit);
 }
 
+static int need_pageset2(void)
+{
+	return (real_nr_free_low_pages() + extra_pages_allocated -
+		2 * extra_pd1_pages_allowance - MIN_FREE_RAM -
+		 toi_memory_for_modules(0) - pagedir1.size) < pagedir2.size;
+}
+
 /* amount_needed
  *
  * Calculates the amount by which the image size needs to be reduced to meet
@@ -574,7 +581,7 @@ static void display_stats(int always, int sub_extra_pd1_allow)
 	snprintf(buffer, 254,
 		"Free:%ld(%ld). Sets:%ld(%ld),%ld(%ld). Header:%ld/%ld. "
 		"Nosave:%ld-%ld=%ld. Storage:%lu/%lu(%lu=>%lu). "
-		"Needed:%ld,%ld,%ld(%d,%ld,%ld,%ld)\n",
+		"Needed:%ld,%ld,%ld(%d,%ld,%ld,%ld) (PS2:%s)\n",
 
 		/* Free */
 		real_nr_free_pages(all_zones_mask),
@@ -601,7 +608,9 @@ static void display_stats(int always, int sub_extra_pd1_allow)
 		lowpages_ps1_to_free(), highpages_ps1_to_free(),
 		any_to_free(1),
 		MIN_FREE_RAM, toi_memory_for_modules(0),
-		extra_pd1_pages_allowance, ((long) image_size_limit) << 8);
+		extra_pd1_pages_allowance, ((long) image_size_limit) << 8,
+		
+		need_pageset2() ? "yes" : "no");
 
 	if (always)
 		printk("%s", buffer);
@@ -790,7 +799,7 @@ void toi_recalculate_image_contents(int atomic_copy)
  *
  * Allocate [more] memory and storage for the image.
  */
-static void update_image(void)
+static void update_image(int ps2_recalc)
 {
 	int wanted, got;
 	long seek;
@@ -809,6 +818,9 @@ static void update_image(void)
 			return;
 		}
 	}
+
+	if (ps2_recalc)
+		goto recalc;
 
 	thaw_kernel_threads();
 
@@ -838,6 +850,7 @@ static void update_image(void)
 	if (freeze_processes())
 		set_abort_result(TOI_FREEZING_FAILED);
 
+recalc:
 	toi_recalculate_image_contents(0);
 }
 
@@ -960,6 +973,7 @@ int toi_prepare_image(void)
 
 	header_space_allocated = 0;
 	main_storage_allocated = 0;
+	no_ps2_needed = 0;
 
 	if (attempt_to_freeze())
 		return 1;
@@ -992,7 +1006,7 @@ int toi_prepare_image(void)
 		if (test_result_state(TOI_ABORTED))
 			break;
 
-		update_image();
+		update_image(0);
 
 		tries++;
 
@@ -1007,8 +1021,21 @@ int toi_prepare_image(void)
 			display_failure_reason(tries > MAX_TRIES);
 			abort_hibernate(TOI_UNABLE_TO_PREPARE_IMAGE,
 				"Unable to successfully prepare the image.\n");
-		} else
+		} else {
+			/* Pageset 2 needed? */
+			printk("Pre disabling PS2.\n");
+			display_stats(1, 0);
+
+			if (!need_pageset2() &&
+				  test_action_state(TOI_NO_PS2_IF_UNNEEDED)) {
+				no_ps2_needed = 1;
+				update_image(1);
+				printk("After disabling PS2.\n");
+				display_stats(1, 0);
+			}
+
 			toi_cond_pause(1, "Image preparation complete.");
+		}
 	}
 
 	return result ? result : allocate_checksum_pages();

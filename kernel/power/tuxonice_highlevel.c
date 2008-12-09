@@ -1188,6 +1188,8 @@ static struct toi_sysfs_data sysfs_params[] = {
 			TOI_TEST_FILTER_SPEED, 0),
 	SYSFS_BIT("no_pageset2", SYSFS_RW, &toi_bkd.toi_action,
 			TOI_NO_PAGESET2, 0),
+	SYSFS_BIT("no_pageset2_if_unneeded", SYSFS_RW, &toi_bkd.toi_action,
+			TOI_NO_PS2_IF_UNNEEDED, 0),
 	SYSFS_BIT("late_cpu_hotplug", SYSFS_RW, &toi_bkd.toi_action,
 			TOI_LATE_CPU_HOTPLUG, 0),
 	SYSFS_STRING("pre_hibernate_command", SYSFS_RW, pre_hibernate_command,
