@@ -1023,15 +1023,10 @@ int toi_prepare_image(void)
 				"Unable to successfully prepare the image.\n");
 		} else {
 			/* Pageset 2 needed? */
-			printk("Pre disabling PS2.\n");
-			display_stats(1, 0);
-
 			if (!need_pageset2() &&
 				  test_action_state(TOI_NO_PS2_IF_UNNEEDED)) {
 				no_ps2_needed = 1;
 				update_image(1);
-				printk("After disabling PS2.\n");
-				display_stats(1, 0);
 			}
 
 			toi_cond_pause(1, "Image preparation complete.");
