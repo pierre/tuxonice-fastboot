@@ -40,6 +40,7 @@
 #include <linux/interrupt.h>
 #include <linux/device.h>
 #include <linux/sysdev.h>
+#include <linux/freezer.h>
 #include <linux/syscalls.h>
 #include <linux/suspend.h>
 #include <linux/cpu.h>
