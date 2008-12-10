@@ -7,7 +7,6 @@
 */
 
 #include "fuse_i.h"
-#include "fuse.h"
 
 #include <linux/init.h>
 #include <linux/module.h>
@@ -17,7 +16,6 @@
 #include <linux/pagemap.h>
 #include <linux/file.h>
 #include <linux/slab.h>
-#include <linux/freezer.h>
 
 MODULE_ALIAS_MISCDEV(FUSE_MINOR);
 
@@ -745,8 +743,6 @@ static ssize_t fuse_dev_read(struct kiocb *iocb, const struct iovec *iov,
 	if (!fc)
 		return -EPERM;
 
-	FUSE_MIGHT_FREEZE(file->f_mapping->host->i_sb, "fuse_dev_read");
-
  restart:
 	spin_lock(&fc->lock);
 	err = -EAGAIN;
@@ -872,9 +868,6 @@ static ssize_t fuse_dev_write(struct kiocb *iocb, const struct iovec *iov,
 	struct fuse_conn *fc = fuse_get_conn(iocb->ki_filp);
 	if (!fc)
 		return -EPERM;
-
-	FUSE_MIGHT_FREEZE(iocb->ki_filp->f_mapping->host->i_sb,
-			"fuse_dev_write");
 
 	fuse_copy_init(&cs, fc, 0, NULL, iov, nr_segs);
 	if (nbytes < sizeof(struct fuse_out_header))

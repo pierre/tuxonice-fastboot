@@ -308,6 +308,9 @@ extern unsigned long toi_state;
 #define test_toi_state(bit) (test_bit(bit, &toi_state))
 extern int toi_running;
 
+#define test_action_state(bit) (test_bit(bit, &toi_bkd.toi_action))
+extern int toi_try_hibernate(void);
+
 #else /* !CONFIG_TOI */
 
 #define toi_state		(0)
@@ -315,6 +318,10 @@ extern int toi_running;
 #define clear_toi_state(bit) do { } while (0)
 #define test_toi_state(bit) (0)
 #define toi_running (0)
+
+static inline int toi_try_hibernate(void) { return 0; }
+#define test_action_state(bit) (0)
+
 #endif /* CONFIG_TOI */
 
 #ifdef CONFIG_HIBERNATION
@@ -337,11 +344,5 @@ static inline void check_resume_attempted(void)
 #else
 #define check_resume_attempted() do { } while (0)
 #define resume_attempted (0)
-#endif
-
-#if defined(CONFIG_TOI_EXPORTS)
-#define EXPORT_IF_TOI_MODULAR(symbol) EXPORT_SYMBOL_GPL(symbol)
-#else
-#define EXPORT_IF_TOI_MODULAR(symbol)
 #endif
 #endif /* _LINUX_SUSPEND_H */

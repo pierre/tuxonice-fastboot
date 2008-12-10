@@ -9,7 +9,6 @@
  * using cryptoapi.
  */
 
-#include <linux/module.h>
 #include <linux/suspend.h>
 #include <linux/highmem.h>
 #include <linux/vmalloc.h>
@@ -272,14 +271,14 @@ static int toi_compress_print_debug_stats(char *buffer, int size)
 
 	/* Output the compression ratio achieved. */
 	if (*toi_compressor_name)
-		len = snprintf_used(buffer, size, "- Compressor is '%s'.\n",
+		len = scnprintf(buffer, size, "- Compressor is '%s'.\n",
 				toi_compressor_name);
 	else
-		len = snprintf_used(buffer, size, "- Compressor is not set.\n");
+		len = scnprintf(buffer, size, "- Compressor is not set.\n");
 
 	if (pages_in)
-		len += snprintf_used(buffer+len, size - len,
-		  "  Compressed %lu bytes into %lu (%d percent compression).\n",
+		len += scnprintf(buffer+len, size - len,
+		  "  Compressed %lu bytes into %lu (%ld percent compression).\n",
 		  toi_compress_bytes_in,
 		  toi_compress_bytes_out,
 		  (pages_in - pages_out) * 100 / pages_in);

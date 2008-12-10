@@ -68,7 +68,6 @@
  */
 
 #include <linux/suspend.h>
-#include <linux/module.h>
 #include <linux/freezer.h>
 #include <linux/utsrelease.h>
 #include <linux/cpu.h>
@@ -83,8 +82,6 @@
 #include "tuxonice_ui.h"
 #include "tuxonice_power_off.h"
 #include "tuxonice_storage.h"
-#include "tuxonice_checksum.h"
-#include "tuxonice_cluster.h"
 #include "tuxonice_builtin.h"
 #include "tuxonice_atomic_copy.h"
 #include "tuxonice_alloc.h"
@@ -331,7 +328,7 @@ static int io_MB_per_second(int write)
  * Fill a (usually PAGE_SIZEd) buffer with the debugging info that we will
  * either printk or return via sysfs.
  */
-#define SNPRINTF(a...) 	do { len += snprintf_used(((char *) buffer) + len, \
+#define SNPRINTF(a...) 	do { len += scnprintf(((char *) buffer) + len, \
 		count - len - 1, ## a); } while (0)
 
 static int get_toi_debug_info(const char *buffer, int count)
@@ -356,20 +353,20 @@ static int get_toi_debug_info(const char *buffer, int count)
 			count - len - 1);
 	if (toi_bkd.toi_io_time[0][1]) {
 		if ((io_MB_per_second(0) < 5) || (io_MB_per_second(1) < 5)) {
-			SNPRINTF("- I/O speed: Write %d KB/s",
+			SNPRINTF("- I/O speed: Write %ld KB/s",
 			  (KB((unsigned long) toi_bkd.toi_io_time[0][0]) * HZ /
 			  toi_bkd.toi_io_time[0][1]));
 			if (toi_bkd.toi_io_time[1][1])
-				SNPRINTF(", Read %d KB/s",
+				SNPRINTF(", Read %ld KB/s",
 				  (KB((unsigned long)
 				      toi_bkd.toi_io_time[1][0]) * HZ /
 				  toi_bkd.toi_io_time[1][1]));
 		} else {
-			SNPRINTF("- I/O speed: Write %d MB/s",
+			SNPRINTF("- I/O speed: Write %ld MB/s",
 			 (MB((unsigned long) toi_bkd.toi_io_time[0][0]) * HZ /
 			  toi_bkd.toi_io_time[0][1]));
 			if (toi_bkd.toi_io_time[1][1])
-				SNPRINTF(", Read %d MB/s",
+				SNPRINTF(", Read %ld MB/s",
 				 (MB((unsigned long)
 				     toi_bkd.toi_io_time[1][0]) * HZ /
 				  toi_bkd.toi_io_time[1][1]));
@@ -410,8 +407,6 @@ static void do_cleanup(int get_debug_info)
 
 	if (get_debug_info)
 		toi_prepare_status(DONT_CLEAR_BAR, "Cleaning up...");
-
-	free_checksum_pages();
 
 	if (get_debug_info)
 		buffer = (char *) toi_get_zeroed_page(20, TOI_ATOMIC_GFP);
@@ -947,7 +942,6 @@ out:
 
 	return 0;
 }
-EXPORT_IF_TOI_MODULAR(do_toi_step);
 
 /* -- Functions for kickstarting a hibernate or resume --- */
 
@@ -1038,11 +1032,6 @@ int _toi_try_hibernate(void)
 	}
 
 	current->flags |= PF_MEMALLOC;
-
-	if (test_toi_state(TOI_CLUSTER_MODE)) {
-		toi_initiate_cluster_hibernate();
-		goto out;
-	}
 
 	result = do_toi_step(STEP_HIBERNATE_PREPARE_IMAGE);
 	if (result)
@@ -1236,10 +1225,6 @@ static __init int core_load(void)
 
 	if (toi_alloc_init())
 		return 1;
-	if (toi_checksum_init())
-		return 1;
-	if (toi_cluster_init())
-		return 1;
 	if (toi_usm_init())
 		return 1;
 	if (toi_ui_init())
@@ -1250,37 +1235,4 @@ static __init int core_load(void)
 	return 0;
 }
 
-#ifdef MODULE
-/**
- * core_unload: Prepare to unload the core code.
- */
-static __exit void core_unload(void)
-{
-	int i,
-	    numfiles = sizeof(sysfs_params) / sizeof(struct toi_sysfs_data);
-
-	toi_alloc_exit();
-	toi_poweroff_exit();
-	toi_ui_exit();
-	toi_checksum_exit();
-	toi_cluster_exit();
-	toi_usm_exit();
-
-	for (i = 0; i < numfiles; i++)
-		toi_unregister_sysfs_file(tuxonice_kobj, &sysfs_params[i]);
-
-	toi_core_fns = NULL;
-
-	toi_sysfs_exit();
-}
-MODULE_LICENSE("GPL");
-module_init(core_load);
-module_exit(core_unload);
-#else
 late_initcall(core_load);
-#endif
-
-EXPORT_IF_TOI_MODULAR(tuxonice_signature);
-EXPORT_IF_TOI_MODULAR(pagedir2);
-EXPORT_IF_TOI_MODULAR(toi_fail_num);
-EXPORT_IF_TOI_MODULAR(do_check_can_resume);

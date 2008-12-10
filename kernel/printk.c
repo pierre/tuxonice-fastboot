@@ -32,8 +32,6 @@
 #include <linux/security.h>
 #include <linux/bootmem.h>
 #include <linux/syscalls.h>
-#include <linux/jiffies.h>
-#include <linux/suspend.h>
 
 #include <asm/uaccess.h>
 
@@ -899,7 +897,6 @@ void suspend_console(void)
 	acquire_console_sem();
 	console_suspended = 1;
 }
-EXPORT_IF_TOI_MODULAR(suspend_console);
 
 void resume_console(void)
 {
@@ -908,7 +905,6 @@ void resume_console(void)
 	console_suspended = 0;
 	release_console_sem();
 }
-EXPORT_IF_TOI_MODULAR(resume_console);
 
 /**
  * acquire_console_sem - lock the console system for exclusive use.

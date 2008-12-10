@@ -20,7 +20,6 @@
  *
  */
 
-#include <linux/module.h>
 #include <linux/highmem.h>
 #include <linux/freezer.h>
 #include <linux/hardirq.h>
@@ -35,7 +34,6 @@
 #include "tuxonice_prepare_image.h"
 #include "tuxonice_block_io.h"
 #include "tuxonice.h"
-#include "tuxonice_checksum.h"
 #include "tuxonice_sysfs.h"
 #include "tuxonice_alloc.h"
 
@@ -1033,7 +1031,5 @@ int toi_prepare_image(void)
 		}
 	}
 
-	return result ? result : allocate_checksum_pages();
+	return result;
 }
-
-EXPORT_IF_TOI_MODULAR(real_nr_free_pages);

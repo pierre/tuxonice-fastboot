@@ -368,11 +368,11 @@ static int toi_bio_memory_needed(void)
  */
 static int toi_bio_print_debug_stats(char *buffer, int size)
 {
-	int len = snprintf_used(buffer, size, "- Max outstanding reads %d. Max "
+	int len = scnprintf(buffer, size, "- Max outstanding reads %d. Max "
 			"writes %d.\n", max_outstanding_reads,
 			max_outstanding_writes);
 
-	len += snprintf_used(buffer + len, size - len,
+	len += scnprintf(buffer + len, size - len,
 		"  Memory_needed: %d x (%lu + %u + %u) = %d bytes.\n",
 		target_outstanding_io,
 		PAGE_SIZE, (unsigned int) sizeof(struct request),
@@ -382,26 +382,26 @@ static int toi_bio_print_debug_stats(char *buffer, int size)
 	{
 	int i;
 
-	len += snprintf_used(buffer + len, size - len,
+	len += scnprintf(buffer + len, size - len,
 		"  Mutex contention while reading:\n  Contended      Free\n");
 
 	for_each_online_cpu(i)
-		len += snprintf_used(buffer + len, size - len,
+		len += scnprintf(buffer + len, size - len,
 		"  %9lu %9lu\n",
 		mutex_times[0][0][i], mutex_times[0][1][i]);
 
-	len += snprintf_used(buffer + len, size - len,
+	len += scnprintf(buffer + len, size - len,
 		"  Mutex contention while writing:\n  Contended      Free\n");
 
 	for_each_online_cpu(i)
-		len += snprintf_used(buffer + len, size - len,
+		len += scnprintf(buffer + len, size - len,
 		"  %9lu %9lu\n",
 		mutex_times[1][0][i], mutex_times[1][1][i]);
 
 	}
 #endif
 
-	return len + snprintf_used(buffer + len, size - len,
+	return len + scnprintf(buffer + len, size - len,
 		"  Free mem throttle point reached %d.\n", free_mem_throttle);
 }
 
@@ -1165,23 +1165,4 @@ static __init int toi_block_io_load(void)
 	return toi_register_module(&toi_blockwriter_ops);
 }
 
-EXPORT_IF_TOI_MODULAR(toi_writer_posn);
-EXPORT_IF_TOI_MODULAR(toi_writer_posn_save);
-EXPORT_IF_TOI_MODULAR(toi_writer_buffer);
-EXPORT_IF_TOI_MODULAR(toi_writer_buffer_posn);
-EXPORT_IF_TOI_MODULAR(toi_bio_ops);
-
-#ifdef MODULE
-static __exit void toi_block_io_unload(void)
-{
-	toi_unregister_module(&toi_blockwriter_ops);
-}
-
-module_init(toi_block_io_load);
-module_exit(toi_block_io_unload);
-MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Nigel Cunningham");
-MODULE_DESCRIPTION("TuxOnIce block io functions");
-#else
 late_initcall(toi_block_io_load);
-#endif

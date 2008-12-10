@@ -9,7 +9,6 @@
  * pageflags, we use dynamically allocated bitmaps.
  */
 
-#include <linux/module.h>
 #include <linux/suspend.h>
 #include "tuxonice_modules.h"
 #include "tuxonice_extent.h"
@@ -290,12 +289,3 @@ void toi_extent_state_restore(struct toi_extent_iterate_state *state,
 	while (posn--)
 		state->current_extent = state->current_extent->next;
 }
-
-EXPORT_IF_TOI_MODULAR(toi_add_to_extent_chain);
-EXPORT_IF_TOI_MODULAR(toi_put_extent_chain);
-EXPORT_IF_TOI_MODULAR(toi_load_extent_chain);
-EXPORT_IF_TOI_MODULAR(toi_serialise_extent_chain);
-EXPORT_IF_TOI_MODULAR(toi_extent_state_save);
-EXPORT_IF_TOI_MODULAR(toi_extent_state_restore);
-EXPORT_IF_TOI_MODULAR(toi_extent_state_goto_start);
-EXPORT_IF_TOI_MODULAR(toi_extent_state_next);

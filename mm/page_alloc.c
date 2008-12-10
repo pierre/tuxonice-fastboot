@@ -1831,7 +1831,6 @@ unsigned int nr_unallocated_buffer_pages(void)
 {
 	return nr_unallocated_zone_pages(gfp_zone(GFP_USER));
 }
-EXPORT_IF_TOI_MODULAR(nr_unallocated_buffer_pages);
 
 /*
  * Amount of free RAM allocatable within all zones

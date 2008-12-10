@@ -30,7 +30,6 @@
  */
 
 #include <linux/suspend.h>
-#include <linux/module.h>
 #include <linux/blkdev.h>
 #include <linux/file.h>
 #include <linux/stat.h>
@@ -724,15 +723,15 @@ static int toi_file_print_debug_stats(char *buffer, int size)
 	int len = 0;
 
 	if (toiActiveAllocator != &toi_fileops) {
-		len = snprintf_used(buffer, size,
+		len = scnprintf(buffer, size,
 				"- FileAllocator inactive.\n");
 		return len;
 	}
 
-	len = snprintf_used(buffer, size, "- FileAllocator active.\n");
+	len = scnprintf(buffer, size, "- FileAllocator active.\n");
 
-	len += snprintf_used(buffer+len, size-len, "  Storage available for "
-			"image: %ld pages.\n",
+	len += scnprintf(buffer+len, size-len, "  Storage available for "
+			"image: %d pages.\n",
 			toi_file_storage_allocated());
 
 	return len;

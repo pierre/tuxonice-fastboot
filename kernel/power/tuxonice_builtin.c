@@ -3,7 +3,6 @@
  *
  * This file is released under the GPLv2.
  */
-#include <linux/module.h>
 #include <linux/resume-trace.h>
 #include <linux/kernel.h>
 #include <linux/swap.h>
@@ -30,7 +29,6 @@
 #include "tuxonice_modules.h"
 #include "tuxonice_builtin.h"
 #include "tuxonice_power_off.h"
-#include "power.h"
 
 /*
  * Highmem related functions (x86 only).
@@ -175,7 +173,6 @@ struct toi_boot_kernel_data toi_bkd __nosavedata
 	(1 << TOI_NO_FLUSHER_THREAD) |
 	(1 << TOI_PAGESET2_FULL) | (1 << TOI_LATE_CPU_HOTPLUG),
 };
-EXPORT_IF_TOI_MODULAR(toi_bkd);
 
 struct block_device *toi_open_by_devnum(dev_t dev, fmode_t mode)
 {
@@ -185,88 +182,16 @@ struct block_device *toi_open_by_devnum(dev_t dev, fmode_t mode)
 		err = blkdev_get(bdev, mode);
 	return err ? ERR_PTR(err) : bdev;
 }
-EXPORT_IF_TOI_MODULAR(toi_open_by_devnum);
-
-EXPORT_IF_TOI_MODULAR(toi_wait_for_keypress_dev_console);
-EXPORT_IF_TOI_MODULAR(hibernation_platform_enter);
-EXPORT_IF_TOI_MODULAR(platform_begin);
-EXPORT_IF_TOI_MODULAR(platform_pre_snapshot);
-EXPORT_IF_TOI_MODULAR(platform_recover);
-EXPORT_IF_TOI_MODULAR(platform_leave);
-EXPORT_IF_TOI_MODULAR(platform_end);
-EXPORT_IF_TOI_MODULAR(platform_finish);
-EXPORT_IF_TOI_MODULAR(platform_pre_restore);
-EXPORT_IF_TOI_MODULAR(platform_restore_cleanup);
-EXPORT_IF_TOI_MODULAR(power_kobj);
-EXPORT_IF_TOI_MODULAR(pm_notifier_call_chain);
-EXPORT_IF_TOI_MODULAR(init_swsusp_header);
-EXPORT_IF_TOI_MODULAR(snapshot_device_available);
-
-#ifdef CONFIG_ARCH_HIBERNATION_HEADER
-EXPORT_IF_TOI_MODULAR(arch_hibernation_header_restore);
-#endif
-
-#ifdef CONFIG_X86_64
-EXPORT_IF_TOI_MODULAR(save_processor_state);
-#endif
-
-EXPORT_IF_TOI_MODULAR(drop_pagecache);
-EXPORT_IF_TOI_MODULAR(restore_pblist);
-EXPORT_IF_TOI_MODULAR(pm_mutex);
-EXPORT_IF_TOI_MODULAR(pm_prepare_console);
-EXPORT_IF_TOI_MODULAR(pm_restore_console);
-EXPORT_IF_TOI_MODULAR(super_blocks);
-EXPORT_IF_TOI_MODULAR(next_zone);
-
-EXPORT_IF_TOI_MODULAR(freeze_processes);
-EXPORT_IF_TOI_MODULAR(thaw_processes);
-EXPORT_IF_TOI_MODULAR(thaw_kernel_threads);
-EXPORT_IF_TOI_MODULAR(shrink_all_memory);
-EXPORT_IF_TOI_MODULAR(saveable_page);
-EXPORT_IF_TOI_MODULAR(swsusp_arch_resume);
-EXPORT_IF_TOI_MODULAR(follow_page);
-EXPORT_IF_TOI_MODULAR(block_dump);
-EXPORT_IF_TOI_MODULAR(suspend_devices_and_enter);
-EXPORT_IF_TOI_MODULAR(first_online_pgdat);
-EXPORT_IF_TOI_MODULAR(next_online_pgdat);
-EXPORT_IF_TOI_MODULAR(machine_restart);
-EXPORT_IF_TOI_MODULAR(tasklist_lock);
-EXPORT_IF_TOI_MODULAR(usermodehelper_disable);
-EXPORT_IF_TOI_MODULAR(usermodehelper_enable);
-#ifdef CONFIG_PM_SLEEP_SMP
-EXPORT_IF_TOI_MODULAR(disable_nonboot_cpus);
-EXPORT_IF_TOI_MODULAR(enable_nonboot_cpus);
-#endif
 
 int toi_wait = CONFIG_TOI_DEFAULT_WAIT;
 
-EXPORT_IF_TOI_MODULAR(kmsg_redirect);
-EXPORT_IF_TOI_MODULAR(toi_wait);
-
-EXPORT_IF_TOI_MODULAR(console_printk);
-EXPORT_IF_TOI_MODULAR(sys_swapon);
-EXPORT_IF_TOI_MODULAR(sys_swapoff);
-EXPORT_IF_TOI_MODULAR(si_swapinfo);
-EXPORT_IF_TOI_MODULAR(map_swap_page);
-EXPORT_IF_TOI_MODULAR(get_swap_page);
-EXPORT_IF_TOI_MODULAR(swap_free);
-EXPORT_IF_TOI_MODULAR(get_swap_info_struct);
-EXPORT_IF_TOI_MODULAR(name_to_dev_t);
-EXPORT_IF_TOI_MODULAR(resume_file);
-
 struct toi_core_fns *toi_core_fns;
-EXPORT_IF_TOI_MODULAR(toi_core_fns);
 
 DECLARE_DYN_PAGEFLAGS(pageset1_map);
 DECLARE_DYN_PAGEFLAGS(pageset1_copy_map);
-EXPORT_IF_TOI_MODULAR(pageset1_map);
-EXPORT_IF_TOI_MODULAR(pageset1_copy_map);
 
 unsigned long toi_result;
 struct pagedir pagedir1 = {1};
-
-EXPORT_IF_TOI_MODULAR(toi_result);
-EXPORT_IF_TOI_MODULAR(pagedir1);
 
 unsigned long toi_get_nonconflicting_page(void)
 {
@@ -330,36 +255,19 @@ int toi_lowlevel_builtin(void)
 	return error;
 }
 
-EXPORT_IF_TOI_MODULAR(toi_lowlevel_builtin);
-
 unsigned long toi_compress_bytes_in, toi_compress_bytes_out;
-EXPORT_IF_TOI_MODULAR(toi_compress_bytes_in);
-EXPORT_IF_TOI_MODULAR(toi_compress_bytes_out);
 
 unsigned long toi_state = ((1 << TOI_BOOT_TIME) |
 		(1 << TOI_IGNORE_LOGLEVEL) |
 		(1 << TOI_IO_STOPPED));
-EXPORT_IF_TOI_MODULAR(toi_state);
 
 /* The number of hibernates we have started (some may have been cancelled) */
 unsigned int nr_hibernates;
-EXPORT_IF_TOI_MODULAR(nr_hibernates);
 
 int toi_running;
-EXPORT_IF_TOI_MODULAR(toi_running);
-
 int toi_in_hibernate __nosavedata;
-EXPORT_IF_TOI_MODULAR(toi_in_hibernate);
 
 __nosavedata struct pbe *restore_highmem_pblist;
-
-#ifdef CONFIG_HIGHMEM
-EXPORT_IF_TOI_MODULAR(nr_free_highpages);
-EXPORT_IF_TOI_MODULAR(saveable_highmem_page);
-EXPORT_IF_TOI_MODULAR(restore_highmem_pblist);
-#endif
-EXPORT_IF_TOI_MODULAR(max_pfn);
-EXPORT_IF_TOI_MODULAR(snprintf_used);
 
 static int __init toi_wait_setup(char *str)
 {

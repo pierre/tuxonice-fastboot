@@ -34,6 +34,7 @@
 
 #include "power.h"
 #include "tuxonice_builtin.h"
+#include "tuxonice_pagedir.h"
 
 static int swsusp_page_is_free(struct page *);
 static void swsusp_set_page_forbidden(struct page *);
@@ -46,11 +47,6 @@ static void swsusp_unset_page_forbidden(struct page *);
  */
 struct pbe *restore_pblist;
 int resume_attempted;
-EXPORT_IF_TOI_MODULAR(resume_attempted);
-
-#ifdef CONFIG_TOI
-#include "tuxonice_pagedir.h"
-#endif
 
 /* Pointer to an auxiliary buffer (1 page) */
 static void *buffer;
@@ -93,10 +89,8 @@ static void *get_image_page(gfp_t gfp_mask, int safe_needed)
 
 unsigned long get_safe_page(gfp_t gfp_mask)
 {
-#ifdef CONFIG_TOI
 	if (toi_running)
 		return toi_get_nonconflicting_page();
-#endif
 
 	return (unsigned long)get_image_page(gfp_mask, PG_SAFE);
 }
@@ -574,7 +568,6 @@ static unsigned long memory_bm_next_pfn(struct memory_bitmap *bm)
 }
 
 LIST_HEAD(nosave_regions);
-EXPORT_IF_TOI_MODULAR(nosave_regions);
 
 /**
  *	register_nosave_region - register a range of page frames the contents
@@ -1198,10 +1191,8 @@ asmlinkage int swsusp_save(void)
 {
 	unsigned int nr_pages, nr_highmem;
 
-#ifdef CONFIG_TOI
 	if (toi_running)
 		return toi_post_context_save();
-#endif
 
 	printk(KERN_INFO "PM: Creating hibernation image: \n");
 
@@ -1264,7 +1255,6 @@ char *check_swsusp_image_kernel(struct swsusp_info *info)
 		return "machine";
 	return NULL;
 }
-EXPORT_IF_TOI_MODULAR(check_swsusp_image_kernel);
 #endif /* CONFIG_ARCH_HIBERNATION_HEADER */
 
 unsigned long snapshot_get_image_size(void)

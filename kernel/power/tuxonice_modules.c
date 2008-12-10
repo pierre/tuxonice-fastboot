@@ -5,8 +5,8 @@
  *
  */
 
-#include <linux/suspend.h>
 #include <linux/module.h>
+#include <linux/suspend.h>
 #include "tuxonice.h"
 #include "tuxonice_modules.h"
 #include "tuxonice_sysfs.h"
@@ -457,8 +457,3 @@ void toi_put_modules(void)
 	list_for_each_entry(this_module, &toi_modules, module_list)
 		module_put(this_module->module);
 }
-
-EXPORT_IF_TOI_MODULAR(toi_register_module);
-EXPORT_IF_TOI_MODULAR(toi_unregister_module);
-EXPORT_IF_TOI_MODULAR(toi_get_next_filter);
-EXPORT_IF_TOI_MODULAR(toiActiveAllocator);

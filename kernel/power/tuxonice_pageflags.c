@@ -11,7 +11,6 @@
 
 #include <linux/kernel.h>
 #include <linux/mm.h>
-#include <linux/module.h>
 #include <linux/bitops.h>
 #include <linux/list.h>
 #include <linux/suspend.h>

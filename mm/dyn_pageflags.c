@@ -44,13 +44,10 @@ int test_dynpageflag(struct dyn_pageflags *bitmap, struct page *page);
 
 #include <linux/bootmem.h>
 #include <linux/dyn_pageflags.h>
-#include <linux/module.h>
 #include <linux/suspend.h>
 
 static LIST_HEAD(flags_list);
 static DEFINE_SPINLOCK(flags_list_lock);
-
-static void* (*dyn_allocator)(unsigned long size, unsigned long flags);
 
 static int dyn_pageflags_debug;
 
@@ -182,7 +179,6 @@ void dump_pagemap(struct dyn_pageflags *pagemap)
 out:
 	printk(KERN_INFO " --- Dump of bitmap %p finishes\n", pagemap);
 }
-EXPORT_IF_TOI_MODULAR(dump_pagemap);
 
 /**
  * clear_dyn_pageflags - Zero all pageflags in a bitmap.
@@ -211,7 +207,6 @@ void clear_dyn_pageflags(struct dyn_pageflags *pagemap)
 						PAGE_SIZE);
 	}
 }
-EXPORT_IF_TOI_MODULAR(clear_dyn_pageflags);
 
 /**
  * Allocators.
@@ -248,6 +243,9 @@ static void *normal_allocator(unsigned long size, unsigned long flags)
 	else
 		return kzalloc(size, flags);
 }
+
+static void* (*dyn_allocator)(unsigned long size, unsigned long flags) =
+	normal_allocator;
 
 /**
  * dyn_pageflags_init - Do the earliest initialisation.
@@ -460,7 +458,6 @@ void free_dyn_pageflags(struct dyn_pageflags *pagemap)
 		spin_unlock_irqrestore(&flags_list_lock, flags);
 	}
 }
-EXPORT_IF_TOI_MODULAR(free_dyn_pageflags);
 
 /**
  * allocate_dyn_pageflags - Allocate a bitmap.
@@ -521,7 +518,6 @@ out:
 	spin_unlock_irqrestore(&pagemap->struct_lock, flags);
 	return result;
 }
-EXPORT_IF_TOI_MODULAR(allocate_dyn_pageflags);
 
 /**
  * test_dynpageflag - Test a page in a bitmap.
@@ -537,7 +533,6 @@ int test_dynpageflag(struct dyn_pageflags *bitmap, struct page *page)
 	GET_BIT_AND_UL(bitmap, page);
 	return ul ? test_bit(bit, ul) : 0;
 }
-EXPORT_IF_TOI_MODULAR(test_dynpageflag);
 
 /**
  * set_dynpageflag - Set a bit in a bitmap.
@@ -569,7 +564,6 @@ void set_dynpageflag(struct dyn_pageflags *pageflags, struct page *page)
 	} else
 		set_bit(bit, ul);
 }
-EXPORT_IF_TOI_MODULAR(set_dynpageflag);
 
 /**
  * clear_dynpageflag - Clear a bit in a bitmap.
@@ -586,7 +580,6 @@ void clear_dynpageflag(struct dyn_pageflags *bitmap, struct page *page)
 	if (ul)
 		clear_bit(bit, ul);
 }
-EXPORT_IF_TOI_MODULAR(clear_dynpageflag);
 
 /**
  * get_next_bit_on - Get the next bit in a bitmap.
@@ -663,7 +656,6 @@ test:
 
 	return ZONE_START(zone) + zone_offset;
 }
-EXPORT_IF_TOI_MODULAR(get_next_bit_on);
 
 #ifdef SELF_TEST
 #include <linux/jiffies.h>

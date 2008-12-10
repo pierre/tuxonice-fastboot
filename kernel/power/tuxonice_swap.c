@@ -10,7 +10,6 @@
  */
 
 #include <linux/suspend.h>
-#include <linux/module.h>
 #include <linux/blkdev.h>
 #include <linux/swapops.h>
 #include <linux/swap.h>
@@ -916,21 +915,21 @@ static int toi_swap_print_debug_stats(char *buffer, int size)
 	struct sysinfo sysinfo;
 
 	if (toiActiveAllocator != &toi_swapops) {
-		len = snprintf_used(buffer, size,
+		len = scnprintf(buffer, size,
 				"- SwapAllocator inactive.\n");
 		return len;
 	}
 
-	len = snprintf_used(buffer, size, "- SwapAllocator active.\n");
+	len = scnprintf(buffer, size, "- SwapAllocator active.\n");
 	if (swapfilename[0])
-		len += snprintf_used(buffer+len, size-len,
+		len += scnprintf(buffer+len, size-len,
 			"  Attempting to automatically swapon: %s.\n",
 			swapfilename);
 
 	si_swapinfo(&sysinfo);
 
-	len += snprintf_used(buffer+len, size-len,
-			"  Swap available for image: %ld pages.\n",
+	len += scnprintf(buffer+len, size-len,
+			"  Swap available for image: %d pages.\n",
 			(int) sysinfo.freeswap + toi_swap_storage_allocated());
 
 	return len;

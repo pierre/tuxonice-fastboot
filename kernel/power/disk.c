@@ -27,7 +27,6 @@
 #include "power.h"
 
 #include "tuxonice.h"
-#include "tuxonice_builtin.h"
 
 static int noresume = 0;
 char resume_file[256] = CONFIG_PM_STD_PARTITION;
@@ -511,10 +510,8 @@ int hibernate(void)
 {
 	int error;
 
-#ifdef CONFIG_TOI
 	if (test_action_state(TOI_REPLACE_SWSUSP))
 		return toi_try_hibernate();
-#endif
 
 	mutex_lock(&pm_mutex);
 	/* The snapshot device should not be opened while we're running */
@@ -599,7 +596,6 @@ int software_resume(void)
 	unsigned int flags;
 	resume_attempted = 1;
 
-#ifdef CONFIG_TOI
 	/*
 	 * We can't know (until an image header - if any - is loaded), whether
 	 * we did override swsusp. We therefore ensure that both are tried.
@@ -607,7 +603,6 @@ int software_resume(void)
 	if (test_action_state(TOI_REPLACE_SWSUSP))
 		printk(KERN_INFO "Replacing swsusp.\n");
 		toi_try_resume();
-#endif
 
 	/*
 	 * name_to_dev_t() below takes a sysfs buffer mutex when sysfs
@@ -620,7 +615,6 @@ int software_resume(void)
 	 * here to avoid lockdep complaining.
 	 */
 	mutex_lock_nested(&pm_mutex, SINGLE_DEPTH_NESTING);
-
 	if (!swsusp_resume_device) {
 		if (!strlen(resume_file)) {
 			mutex_unlock(&pm_mutex);

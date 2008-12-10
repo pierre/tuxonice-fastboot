@@ -55,7 +55,6 @@ void device_pm_lock(void)
 {
 	mutex_lock(&dpm_list_mtx);
 }
-EXPORT_IF_TOI_MODULAR(device_pm_lock);
 
 /**
  *	device_pm_unlock - unlock the list of active devices used by the PM core
@@ -64,7 +63,6 @@ void device_pm_unlock(void)
 {
 	mutex_unlock(&dpm_list_mtx);
 }
-EXPORT_IF_TOI_MODULAR(device_pm_unlock);
 
 /**
  *	device_pm_add - add a device to the list of active devices

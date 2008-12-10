@@ -17,7 +17,6 @@
 #include <linux/utsname.h>
 #include <linux/mount.h>
 #include <linux/highmem.h>
-#include <linux/module.h>
 #include <linux/kthread.h>
 #include <linux/dyn_pageflags.h>
 #include <linux/cpu.h>
@@ -33,7 +32,6 @@
 #include "tuxonice_extent.h"
 #include "tuxonice_sysfs.h"
 #include "tuxonice_builtin.h"
-#include "tuxonice_checksum.h"
 #include "tuxonice_alloc.h"
 char alt_resume_param[256];
 
@@ -44,7 +42,6 @@ static unsigned long pfn, other_pfn;
 static DEFINE_MUTEX(io_mutex);
 static DEFINE_PER_CPU(struct page *, last_sought);
 static DEFINE_PER_CPU(struct page *, last_high_page);
-static DEFINE_PER_CPU(char *, checksum_locn);
 static DEFINE_PER_CPU(struct pbe *, last_low_page);
 static atomic_t io_count;
 atomic_t toi_io_workers;
@@ -394,7 +391,6 @@ static int worker_rw_loop(void *data)
 		 */
 		if (io_write) {
 			struct page *page;
-			char **my_checksum_locn = &__get_cpu_var(checksum_locn);
 
 			pfn = get_next_bit_on(&io_map, pfn);
 
@@ -427,15 +423,7 @@ static int worker_rw_loop(void *data)
 			}
 			page = pfn_to_page(pfn);
 
-			if (io_pageset == 2)
-				*my_checksum_locn =
-					tuxonice_get_next_checksum();
-
 			mutex_unlock(&io_mutex);
-
-			if (io_pageset == 2 &&
-			    tuxonice_calc_checksum(page, *my_checksum_locn))
-					return 1;
 
 			result = first_filter->write_page(write_pfn, page,
 					PAGE_SIZE);
@@ -1451,9 +1439,3 @@ int image_exists_write(const char *buffer, int count)
 
 	return count;
 }
-
-EXPORT_IF_TOI_MODULAR(toi_attempt_to_parse_resume_device);
-EXPORT_IF_TOI_MODULAR(attempt_to_parse_resume_device2);
-EXPORT_IF_TOI_MODULAR(toi_io_workers);
-EXPORT_IF_TOI_MODULAR(toi_io_queue_flusher);
-EXPORT_IF_TOI_MODULAR(toi_bio_queue_flusher_should_finish);

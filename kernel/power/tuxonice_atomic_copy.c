@@ -23,7 +23,6 @@
 #include "tuxonice_io.h"
 #include "tuxonice_prepare_image.h"
 #include "tuxonice_pageflags.h"
-#include "tuxonice_checksum.h"
 #include "tuxonice_builtin.h"
 #include "tuxonice_atomic_copy.h"
 #include "tuxonice_alloc.h"
@@ -198,10 +197,6 @@ void toi_copy_pageset1(void)
 int __toi_post_context_save(void)
 {
 	long old_ps1_size = pagedir1.size;
-
-	check_checksums();
-
-	free_checksum_pages();
 
 	toi_recalculate_image_contents(1);
 

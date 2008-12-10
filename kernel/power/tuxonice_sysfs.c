@@ -12,7 +12,6 @@
  */
 
 #include <linux/suspend.h>
-#include <linux/module.h>
 
 #include "tuxonice_sysfs.h"
 #include "tuxonice.h"
@@ -259,7 +258,6 @@ int toi_register_sysfs_file(
 
 	return result;
 }
-EXPORT_IF_TOI_MODULAR(toi_register_sysfs_file);
 
 /* toi_unregister_sysfs_file
  *
@@ -271,7 +269,6 @@ void toi_unregister_sysfs_file(struct kobject *kobj,
 {
 	sysfs_remove_file(kobj, &toi_sysfs_data->attr);
 }
-EXPORT_IF_TOI_MODULAR(toi_unregister_sysfs_file);
 
 void toi_cleanup_sysfs(void)
 {

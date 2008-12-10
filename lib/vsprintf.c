@@ -616,29 +616,6 @@ static char *pointer(const char *fmt, char *buf, char *end, void *ptr, int field
 	return number(buf, end, (unsigned long) ptr, 16, field_width, precision, flags);
 }
 
-/*
- * vsnprintf_used
- *
- * Functionality    : Print a string with parameters to a buffer of a
- *                    limited size. Unlike vsnprintf, we return the number
- *                    of bytes actually put in the buffer, not the number
- *                    that would have been put in if it was big enough.
- */
-int snprintf_used(char *buffer, int buffer_size, const char *fmt, ...)
-{
-	int result;
-	va_list args;
-
-	if (!buffer_size)
-		return 0;
-
-	va_start(args, fmt);
-	result = vsnprintf(buffer, buffer_size, fmt, args);
-	va_end(args);
-
-	return result > buffer_size ? buffer_size : result;
-}
-
 /**
  * vsnprintf - Format a string and place it in a buffer
  * @buf: The buffer to place the result into

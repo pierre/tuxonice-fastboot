@@ -68,7 +68,6 @@ enum {
 };
 
 #define clear_action_state(bit) (test_and_clear_bit(bit, &toi_bkd.toi_action))
-#define test_action_state(bit) (test_bit(bit, &toi_bkd.toi_action))
 
 /*		 == Result states == 		*/
 
