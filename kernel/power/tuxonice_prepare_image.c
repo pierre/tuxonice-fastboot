@@ -34,6 +34,7 @@
 #include "tuxonice_prepare_image.h"
 #include "tuxonice_block_io.h"
 #include "tuxonice.h"
+#include "tuxonice_checksum.h"
 #include "tuxonice_sysfs.h"
 #include "tuxonice_alloc.h"
 
@@ -1031,5 +1032,5 @@ int toi_prepare_image(void)
 		}
 	}
 
-	return result;
+	return result ? result : allocate_checksum_pages();
 }

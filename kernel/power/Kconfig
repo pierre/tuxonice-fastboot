@@ -343,6 +343,28 @@ menuconfig TOI_CORE
 		  /sys/power/tuxonice/debug_info (first number on the last line), adding
 		  a little extra because the value is not always the same.
 
+	config TOI_CHECKSUM
+		bool "Checksum pageset2"
+		default n
+		depends on TOI_CORE
+		select CRYPTO
+		select CRYPTO_ALGAPI
+		select CRYPTO_MD4
+		---help---
+		  Adds support for checksumming pageset2 pages, to ensure you really get an
+		  atomic copy. Since some filesystems (XFS especially) change metadata even
+		  when there's no other activity, we need this to check for pages that have
+		  been changed while we were saving the page cache. If your debugging output
+		  always says no pages were resaved, you may be able to safely disable this
+		  option.
+
+	config	TOI_PAGEFLAGS_TEST
+		tristate "Test pageflags"
+		default N
+		depends on TOI_CORE
+		help
+		  Test pageflags.
+
 config TOI
 	bool
 	depends on TOI_CORE!=n
