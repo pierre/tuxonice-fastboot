@@ -5591,6 +5591,8 @@ void md_done_sync(mddev_t *mddev, int blocks, int ok)
 	}
 }
 
+		while (freezer_is_on())
+			yield();
 
 /* md_write_start(mddev, bi)
  * If we need to update some array metadata (e.g. 'active' flag

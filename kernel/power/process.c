@@ -13,6 +13,9 @@
 #include <linux/module.h>
 #include <linux/syscalls.h>
 #include <linux/freezer.h>
+#include <linux/buffer_head.h>
+
+int freezer_state;
 
 /* 
  * Timeout for stopping processes
@@ -86,7 +89,8 @@ static int try_to_freeze_tasks(bool sig_only)
 		do_each_thread(g, p) {
 			task_lock(p);
 			if (freezing(p) && !freezer_should_skip(p))
-				printk(KERN_ERR " %s\n", p->comm);
+				printk(KERN_ERR " %s (%d) failed to freeze.\n",
+						p->comm, p->pid);
 			cancel_freezing(p);
 			task_unlock(p);
 		} while_each_thread(g, p);
@@ -106,17 +110,25 @@ int freeze_processes(void)
 {
 	int error;
 
-	printk("Freezing user space processes ... ");
+	printk(KERN_INFO "Stopping fuse filesystems.\n");
+	freeze_filesystems(FS_FREEZER_FUSE);
+	freezer_state = FREEZER_FILESYSTEMS_FROZEN;
+	printk(KERN_INFO "Freezing user space processes ... ");
 	error = try_to_freeze_tasks(true);
 	if (error)
 		goto Exit;
-	printk("done.\n");
+	printk(KERN_INFO "done.\n");
 
-	printk("Freezing remaining freezable tasks ... ");
+	sys_sync();
+	printk(KERN_INFO "Stopping normal filesystems.\n");
+	freeze_filesystems(FS_FREEZER_NORMAL);
+	freezer_state = FREEZER_USERSPACE_FROZEN;
+	printk(KERN_INFO "Freezing remaining freezable tasks ... ");
 	error = try_to_freeze_tasks(false);
 	if (error)
 		goto Exit;
 	printk("done.");
+	freezer_state = FREEZER_FULLY_ON;
  Exit:
 	BUG_ON(in_atomic());
 	printk("\n");
@@ -145,8 +157,24 @@ static void thaw_tasks(bool nosig_only)
 
 void thaw_processes(void)
 {
-	printk("Restarting tasks ... ");
-	thaw_tasks(true);
+	int old_state = freezer_state;
+
+	if (old_state == FREEZER_OFF)
+		return;
+
+	/*
+	 * Change state beforehand because thawed tasks might submit I/O
+	 * immediately.
+	 */
+	freezer_state = FREEZER_OFF;
+
+	printk(KERN_INFO "Restarting all filesystems ...\n");
+	thaw_filesystems(FS_FREEZER_ALL);
+
+	printk(KERN_INFO "Restarting tasks ... ");
+
+	if (old_state == FREEZER_FULLY_ON)
+		thaw_tasks(true);
 	thaw_tasks(false);
 	schedule();
 	printk("done.\n");
@@ -154,5 +182,8 @@ void thaw_processes(void)
 
 void thaw_kernel_threads(void)
 {
+	freezer_state = FREEZER_USERSPACE_FROZEN;
+	printk(KERN_INFO "Restarting normal filesystems.\n");
+	thaw_filesystems(FS_FREEZER_NORMAL);
 	thaw_tasks(true);
 }
