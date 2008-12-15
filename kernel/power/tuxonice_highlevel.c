@@ -85,6 +85,7 @@
 #include "tuxonice_builtin.h"
 #include "tuxonice_atomic_copy.h"
 #include "tuxonice_alloc.h"
+#include "tuxonice_cluster.h"
 
 /*! Pageset metadata. */
 struct pagedir pagedir2 = {2};
@@ -1033,6 +1034,11 @@ int _toi_try_hibernate(void)
 
 	current->flags |= PF_MEMALLOC;
 
+	if (test_toi_state(TOI_CLUSTER_MODE)) {
+		toi_initiate_cluster_hibernate();
+		goto out;
+	}
+
 	result = do_toi_step(STEP_HIBERNATE_PREPARE_IMAGE);
 	if (result)
 		goto out;
@@ -1230,6 +1236,8 @@ static __init int core_load(void)
 	if (toi_ui_init())
 		return 1;
 	if (toi_poweroff_init())
+		return 1;
+	if (toi_cluster_init())
 		return 1;
 
 	return 0;
