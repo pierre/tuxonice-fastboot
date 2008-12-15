@@ -68,14 +68,19 @@ static int extra_page_forward;
 static int current_stream;
 /* 0 = Header, 1 = Pageset1, 2 = Pageset2, 3 = End of PS1 */
 struct hibernate_extent_iterate_saved_state toi_writer_posn_save[4];
+EXPORT_SYMBOL_GPL(toi_writer_posn_save);
 
 /* Pointer to current entry being loaded/saved. */
 struct toi_extent_iterate_state toi_writer_posn;
+EXPORT_SYMBOL_GPL(toi_writer_posn);
 
 /* Not static, so that the allocators can setup and complete
  * writing the header */
 char *toi_writer_buffer;
+EXPORT_SYMBOL_GPL(toi_writer_buffer);
+
 int toi_writer_buffer_posn;
+EXPORT_SYMBOL_GPL(toi_writer_buffer_posn);
 
 static struct toi_bdev_info *toi_devinfo;
 
@@ -1131,6 +1136,7 @@ struct toi_bio_ops toi_bio_ops = {
 	.write_header_chunk_finish = write_header_chunk_finish,
 	.io_flusher = bio_io_flusher,
 };
+EXPORT_SYMBOL_GPL(toi_bio_ops);
 
 static struct toi_sysfs_data sysfs_params[] = {
 	SYSFS_INT("target_outstanding_io", SYSFS_RW, &target_outstanding_io,
@@ -1165,4 +1171,17 @@ static __init int toi_block_io_load(void)
 	return toi_register_module(&toi_blockwriter_ops);
 }
 
+#ifdef MODULE
+static __exit void toi_block_io_unload(void)
+{
+	toi_unregister_module(&toi_blockwriter_ops);
+}
+
+module_init(toi_block_io_load);
+module_exit(toi_block_io_unload);
+MODULE_LICENSE("GPL");
+MODULE_AUTHOR("Nigel Cunningham");
+MODULE_DESCRIPTION("TuxOnIce block io functions");
+#else
 late_initcall(toi_block_io_load);
+#endif

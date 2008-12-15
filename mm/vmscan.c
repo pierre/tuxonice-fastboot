@@ -2125,6 +2125,7 @@ out:
 
 	return ret;
 }
+EXPORT_SYMBOL_GPL(shrink_all_memory);
 #endif
 
 /* It's optimal to keep kswapds on the same CPUs as their memory, but

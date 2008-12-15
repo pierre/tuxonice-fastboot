@@ -3,6 +3,7 @@
  *
  * This file is released under the GPLv2.
  */
+#include <linux/module.h>
 #include <linux/resume-trace.h>
 #include <linux/kernel.h>
 #include <linux/swap.h>
@@ -162,6 +163,7 @@ out_close:
 
 	return key;
 }
+EXPORT_SYMBOL_GPL(toi_wait_for_keypress_dev_console);
 
 struct toi_boot_kernel_data toi_bkd __nosavedata
 		__attribute__((aligned(PAGE_SIZE))) = {
@@ -173,6 +175,7 @@ struct toi_boot_kernel_data toi_bkd __nosavedata
 	(1 << TOI_NO_FLUSHER_THREAD) |
 	(1 << TOI_PAGESET2_FULL) | (1 << TOI_LATE_CPU_HOTPLUG),
 };
+EXPORT_SYMBOL_GPL(toi_bkd);
 
 struct block_device *toi_open_by_devnum(dev_t dev, fmode_t mode)
 {
@@ -182,16 +185,25 @@ struct block_device *toi_open_by_devnum(dev_t dev, fmode_t mode)
 		err = blkdev_get(bdev, mode);
 	return err ? ERR_PTR(err) : bdev;
 }
+EXPORT_SYMBOL_GPL(toi_open_by_devnum);
 
 int toi_wait = CONFIG_TOI_DEFAULT_WAIT;
+EXPORT_SYMBOL_GPL(toi_wait);
 
 struct toi_core_fns *toi_core_fns;
+EXPORT_SYMBOL_GPL(toi_core_fns);
 
 DECLARE_DYN_PAGEFLAGS(pageset1_map);
+EXPORT_SYMBOL_GPL(pageset1_map);
+
 DECLARE_DYN_PAGEFLAGS(pageset1_copy_map);
+EXPORT_SYMBOL_GPL(pageset1_copy_map);
 
 unsigned long toi_result;
+EXPORT_SYMBOL_GPL(toi_result);
+
 struct pagedir pagedir1 = {1};
+EXPORT_SYMBOL_GPL(pagedir1);
 
 unsigned long toi_get_nonconflicting_page(void)
 {
@@ -254,20 +266,29 @@ int toi_lowlevel_builtin(void)
 
 	return error;
 }
+EXPORT_SYMBOL_GPL(toi_lowlevel_builtin);
 
 unsigned long toi_compress_bytes_in, toi_compress_bytes_out;
+EXPORT_SYMBOL_GPL(toi_compress_bytes_in);
+EXPORT_SYMBOL_GPL(toi_compress_bytes_out);
 
 unsigned long toi_state = ((1 << TOI_BOOT_TIME) |
 		(1 << TOI_IGNORE_LOGLEVEL) |
 		(1 << TOI_IO_STOPPED));
+EXPORT_SYMBOL_GPL(toi_state);
 
 /* The number of hibernates we have started (some may have been cancelled) */
 unsigned int nr_hibernates;
+EXPORT_SYMBOL_GPL(nr_hibernates);
 
 int toi_running;
+EXPORT_SYMBOL_GPL(toi_running);
+
 int toi_in_hibernate __nosavedata;
+EXPORT_SYMBOL_GPL(toi_in_hibernate);
 
 __nosavedata struct pbe *restore_highmem_pblist;
+EXPORT_SYMBOL_GPL(restore_highmem_pblist);
 
 static int __init toi_wait_setup(char *str)
 {
@@ -297,4 +318,3 @@ static int __init toi_ignore_late_initcall_setup(char *str)
 }
 
 __setup("toi_initramfs_resume_only", toi_ignore_late_initcall_setup);
-

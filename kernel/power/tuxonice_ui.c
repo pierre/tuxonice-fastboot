@@ -36,6 +36,7 @@
 
 static char local_printf_buf[1024];	/* Same as printk - should be safe */
 struct ui_ops *toi_current_ui;
+EXPORT_SYMBOL_GPL(toi_current_ui);
 
 /**
  * toi_wait_for_keypress - Wait for keypress via userui or /dev/console.
@@ -183,6 +184,7 @@ post_ask:
 	if (continue_req)
 		set_toi_state(TOI_CONTINUE_REQ);
 }
+EXPORT_SYMBOL_GPL(toi_early_boot_message);
 #undef say
 
 /*
@@ -222,6 +224,7 @@ int toi_register_ui_ops(struct ui_ops *this_ui)
 
 	return 0;
 }
+EXPORT_SYMBOL_GPL(toi_register_ui_ops);
 
 void toi_remove_ui_ops(struct ui_ops *this_ui)
 {
@@ -230,6 +233,7 @@ void toi_remove_ui_ops(struct ui_ops *this_ui)
 
 	toi_current_ui = NULL;
 }
+EXPORT_SYMBOL_GPL(toi_remove_ui_ops);
 
 /* toi_console_sysfs_init
  * Description: Boot time initialisation for user interface.

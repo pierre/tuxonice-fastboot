@@ -20,6 +20,7 @@
  *
  */
 
+#include <linux/module.h>
 #include <linux/highmem.h>
 #include <linux/freezer.h>
 #include <linux/hardirq.h>
@@ -350,6 +351,7 @@ long real_nr_free_pages(unsigned long zone_idx_mask)
 	}
 	return result;
 }
+EXPORT_SYMBOL_GPL(real_nr_free_pages);
 
 /*
  * Discover how much extra memory will be required by the drivers

@@ -48,6 +48,7 @@ static void __save_processor_state(struct saved_context *ctxt)
 	ctxt->cr3 = read_cr3();
 	ctxt->cr4 = read_cr4_safe();
 }
+EXPORT_SYMBOL_GPL(save_processor_state);
 
 /* Needed by apm.c */
 void save_processor_state(void)

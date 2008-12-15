@@ -8,6 +8,7 @@
 
 #include <linux/suspend.h>
 #include <linux/bootmem.h>
+#include <linux/module.h>
 
 #include <asm/system.h>
 #include <asm/page.h>
@@ -163,6 +164,7 @@ int swsusp_arch_resume(void)
 	restore_image();
 	return 0;
 }
+EXPORT_SYMBOL_GPL(swsusp_arch_resume);
 
 /*
  *	pfn_is_nosave - check if given pfn is in the 'nosave' section

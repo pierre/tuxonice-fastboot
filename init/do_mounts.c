@@ -141,6 +141,7 @@ fail:
 done:
 	return res;
 }
+EXPORT_SYMBOL_GPL(name_to_dev_t);
 
 static int __init root_dev_setup(char *line)
 {

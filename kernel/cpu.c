@@ -363,6 +363,7 @@ out_notify:
 
 	return ret;
 }
+EXPORT_SYMBOL_GPL(disable_nonboot_cpus);
 
 int __cpuinit cpu_up(unsigned int cpu)
 {
@@ -452,6 +453,7 @@ void __ref enable_nonboot_cpus(void)
 out:
 	cpu_maps_update_done();
 }
+EXPORT_SYMBOL_GPL(enable_nonboot_cpus);
 #endif /* CONFIG_PM_SLEEP_SMP */
 
 /**
