@@ -1253,6 +1253,7 @@ static __exit void core_unload(void)
 	toi_poweroff_exit();
 	toi_ui_exit();
 	toi_usm_exit();
+	toi_cluster_exit();
 
 	for (i = 0; i < numfiles; i++)
 		toi_unregister_sysfs_file(tuxonice_kobj, &sysfs_params[i]);
