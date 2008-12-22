@@ -273,12 +273,12 @@ int fuse_lookup_name(struct super_block *sb, u64 nodeid, struct qstr *name,
 	if (name->len > FUSE_NAME_MAX)
 		goto out;
 
+	FUSE_MIGHT_FREEZE(sb, "fuse_lookup_name");
+
 	req = fuse_get_req(fc);
 	err = PTR_ERR(req);
 	if (IS_ERR(req))
 		goto out;
-
-	FUSE_MIGHT_FREEZE(dir->i_sb, "fuse_lookup");
 
 	forget_req = fuse_get_req(fc);
 	err = PTR_ERR(forget_req);
@@ -337,6 +337,8 @@ static struct dentry *fuse_lookup(struct inode *dir, struct dentry *entry,
 	}
 	if (err)
 		goto out_err;
+
+	FUSE_MIGHT_FREEZE(dir->i_sb, "fuse_lookup");
 
 	err = -EIO;
 	if (inode && get_node_id(inode) == FUSE_ROOT_ID)
