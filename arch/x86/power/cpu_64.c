@@ -10,6 +10,7 @@
 
 #include <linux/smp.h>
 #include <linux/suspend.h>
+#include <linux/module.h>
 #include <asm/proto.h>
 #include <asm/page.h>
 #include <asm/pgtable.h>
@@ -76,6 +77,7 @@ void save_processor_state(void)
 {
 	__save_processor_state(&saved_context);
 }
+EXPORT_SYMBOL_GPL(save_processor_state);
 
 static void do_fpu_end(void)
 {

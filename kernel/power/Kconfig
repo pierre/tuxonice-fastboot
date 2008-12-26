@@ -180,7 +180,7 @@ config PM_STD_PARTITION
 	  device.
 
 menuconfig TOI_CORE
-	bool "Enhanced Hibernation (TuxOnIce)"
+	tristate "Enhanced Hibernation (TuxOnIce)"
 	depends on HIBERNATION
 	default y
 	---help---
@@ -193,7 +193,7 @@ menuconfig TOI_CORE
 		depends on TOI_CORE
 	
 	config TOI_FILE
-		bool "File Allocator"
+		tristate "File Allocator"
 		depends on TOI_CORE
 		default y
 		---help---
@@ -202,7 +202,7 @@ menuconfig TOI_CORE
 		  testing it.
 
 	config TOI_SWAP
-		bool "Swap Allocator"
+		tristate "Swap Allocator"
 		depends on TOI_CORE && SWAP
 		default y
 		---help---
@@ -232,7 +232,7 @@ menuconfig TOI_CORE
 		  hibernate script, this value should probably be blank.
 
 	config TOI_CRYPTO
-		bool "Compression support"
+		tristate "Compression support"
 		depends on TOI_CORE && CRYPTO
 		default y
 		---help---
@@ -247,7 +247,7 @@ menuconfig TOI_CORE
 		depends on TOI_CORE && !CRYPTO
 
 	config TOI_USERUI
-		bool "Userspace User Interface support"
+		tristate "Userspace User Interface support"
 		depends on TOI_CORE && NET && (VT || SERIAL_CONSOLE)
 		default y
 		---help---
@@ -346,6 +346,14 @@ menuconfig TOI_CORE
 config TOI
 	bool
 	depends on TOI_CORE!=n
+	default y
+
+config TOI_EXPORTS
+	bool
+	depends on TOI_SWAP=m || TOI_FILE=m || \
+		TOI_CRYPTO=m || TOI_CLUSTER=m || \
+		TOI_USERUI=m || TOI_PAGEFLAGS=m || \
+		TOI_CORE=m
 	default y
 
 config APM_EMULATION

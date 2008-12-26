@@ -46,7 +46,10 @@ static void swsusp_unset_page_forbidden(struct page *);
  * directly to their "original" page frames.
  */
 struct pbe *restore_pblist;
+EXPORT_SYMBOL_GPL(restore_pblist);
+
 int resume_attempted;
+EXPORT_SYMBOL_GPL(resume_attempted);
 
 /* Pointer to an auxiliary buffer (1 page) */
 static void *buffer;
@@ -568,6 +571,7 @@ static unsigned long memory_bm_next_pfn(struct memory_bitmap *bm)
 }
 
 LIST_HEAD(nosave_regions);
+EXPORT_SYMBOL_GPL(nosave_regions);
 
 /**
  *	register_nosave_region - register a range of page frames the contents
@@ -821,6 +825,7 @@ struct page *saveable_highmem_page(unsigned long pfn)
 
 	return page;
 }
+EXPORT_SYMBOL_GPL(saveable_highmem_page);
 
 /**
  *	count_highmem_pages - compute the total number of saveable highmem
@@ -877,6 +882,7 @@ struct page *saveable_page(unsigned long pfn)
 
 	return page;
 }
+EXPORT_SYMBOL_GPL(saveable_page);
 
 /**
  *	count_data_pages - compute the total number of saveable non-highmem
@@ -1255,6 +1261,7 @@ char *check_swsusp_image_kernel(struct swsusp_info *info)
 		return "machine";
 	return NULL;
 }
+EXPORT_SYMBOL_GPL(check_swsusp_image_kernel);
 #endif /* CONFIG_ARCH_HIBERNATION_HEADER */
 
 unsigned long snapshot_get_image_size(void)
@@ -1272,6 +1279,7 @@ int init_swsusp_header(struct swsusp_info *info)
 	info->size <<= PAGE_SHIFT;
 	return init_swsusp_header_complete(info);
 }
+EXPORT_SYMBOL_GPL(init_swsusp_header);
 
 /**
  *	pack_pfns - pfns corresponding to the set bits found in the bitmap @bm

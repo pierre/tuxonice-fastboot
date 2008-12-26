@@ -27,6 +27,7 @@
 #include "power.h"
 
 DEFINE_MUTEX(pm_mutex);
+EXPORT_SYMBOL_GPL(pm_mutex);
 
 unsigned int pm_flags;
 EXPORT_SYMBOL(pm_flags);
@@ -35,7 +36,8 @@ EXPORT_SYMBOL(pm_flags);
 
 /* Routines for PM-transition notifications */
 
-static BLOCKING_NOTIFIER_HEAD(pm_chain_head);
+BLOCKING_NOTIFIER_HEAD(pm_chain_head);
+EXPORT_SYMBOL_GPL(pm_chain_head);
 
 int register_pm_notifier(struct notifier_block *nb)
 {
@@ -205,6 +207,7 @@ void suspend_set_ops(struct platform_suspend_ops *ops)
 	suspend_ops = ops;
 	mutex_unlock(&pm_mutex);
 }
+EXPORT_SYMBOL_GPL(pm_notifier_call_chain);
 
 /**
  * suspend_valid_only_mem - generic memory-only valid callback
@@ -448,6 +451,7 @@ static int enter_state(suspend_state_t state)
 	mutex_unlock(&pm_mutex);
 	return error;
 }
+EXPORT_SYMBOL_GPL(suspend_devices_and_enter);
 
 
 /**
@@ -470,6 +474,7 @@ EXPORT_SYMBOL(pm_suspend);
 #endif /* CONFIG_SUSPEND */
 
 struct kobject *power_kobj;
+EXPORT_SYMBOL_GPL(power_kobj);
 
 /**
  *	state - control system power state.

@@ -9,6 +9,7 @@
  * pageflags, we use dynamically allocated bitmaps.
  */
 
+#include <linux/module.h>
 #include <linux/suspend.h>
 #include "tuxonice_modules.h"
 #include "tuxonice_extent.h"
@@ -47,6 +48,7 @@ void toi_put_extent_chain(struct hibernate_extent_chain *chain)
 	chain->last_touched = NULL;
 	chain->size = 0;
 }
+EXPORT_SYMBOL_GPL(toi_put_extent_chain);
 
 /*
  * toi_add_to_extent_chain
@@ -112,6 +114,7 @@ int toi_add_to_extent_chain(struct hibernate_extent_chain *chain,
 
 	return 0;
 }
+EXPORT_SYMBOL_GPL(toi_add_to_extent_chain);
 
 /* toi_serialise_extent_chain
  *
@@ -146,6 +149,7 @@ int toi_serialise_extent_chain(struct toi_module_ops *owner,
 
 	return ret;
 }
+EXPORT_SYMBOL_GPL(toi_serialise_extent_chain);
 
 /* toi_load_extent_chain
  *
@@ -185,6 +189,7 @@ int toi_load_extent_chain(struct hibernate_extent_chain *chain)
 	}
 	return 0;
 }
+EXPORT_SYMBOL_GPL(toi_load_extent_chain);
 
 /* toi_extent_state_next
  *
@@ -230,6 +235,7 @@ unsigned long toi_extent_state_next(struct toi_extent_iterate_state *state)
 
 	return state->current_offset;
 }
+EXPORT_SYMBOL_GPL(toi_extent_state_next);
 
 /* toi_extent_state_goto_start
  *
@@ -241,6 +247,7 @@ void toi_extent_state_goto_start(struct toi_extent_iterate_state *state)
 	state->current_extent = NULL;
 	state->current_offset = 0;
 }
+EXPORT_SYMBOL_GPL(toi_extent_state_goto_start);
 
 /* toi_extent_start_save
  *
@@ -267,6 +274,7 @@ void toi_extent_state_save(struct toi_extent_iterate_state *state,
 		extent = extent->next;
 	}
 }
+EXPORT_SYMBOL_GPL(toi_extent_state_save);
 
 /* toi_extent_start_restore
  *
@@ -289,3 +297,4 @@ void toi_extent_state_restore(struct toi_extent_iterate_state *state,
 	while (posn--)
 		state->current_extent = state->current_extent->next;
 }
+EXPORT_SYMBOL_GPL(toi_extent_state_restore);

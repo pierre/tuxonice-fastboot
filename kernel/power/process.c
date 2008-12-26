@@ -122,6 +122,7 @@ int freeze_processes(void)
 	printk("\n");
 	return error;
 }
+EXPORT_SYMBOL_GPL(freeze_processes);
 
 static void thaw_tasks(bool nosig_only)
 {
@@ -151,8 +152,15 @@ void thaw_processes(void)
 	schedule();
 	printk("done.\n");
 }
+EXPORT_SYMBOL_GPL(thaw_processes);
 
 void thaw_kernel_threads(void)
 {
 	thaw_tasks(true);
 }
+
+/*
+ * It's ugly putting this EXPORT down here, but it's necessary so that it
+ * doesn't matter whether the fs-freezing patch is applied or not.
+ */
+EXPORT_SYMBOL_GPL(thaw_kernel_threads);

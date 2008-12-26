@@ -187,6 +187,7 @@ int fg_console;
 int last_console;
 int want_console = -1;
 int kmsg_redirect;
+EXPORT_SYMBOL_GPL(kmsg_redirect);
 
 /*
  * For each existing display, we have a pointer to console currently visible

@@ -44,6 +44,7 @@ int test_dynpageflag(struct dyn_pageflags *bitmap, struct page *page);
 
 #include <linux/bootmem.h>
 #include <linux/dyn_pageflags.h>
+#include <linux/module.h>
 #include <linux/suspend.h>
 
 static LIST_HEAD(flags_list);
@@ -179,6 +180,7 @@ void dump_pagemap(struct dyn_pageflags *pagemap)
 out:
 	printk(KERN_INFO " --- Dump of bitmap %p finishes\n", pagemap);
 }
+EXPORT_SYMBOL_GPL(dump_pagemap);
 
 /**
  * clear_dyn_pageflags - Zero all pageflags in a bitmap.
@@ -207,6 +209,7 @@ void clear_dyn_pageflags(struct dyn_pageflags *pagemap)
 						PAGE_SIZE);
 	}
 }
+EXPORT_SYMBOL_GPL(clear_dyn_pageflags);
 
 /**
  * Allocators.
@@ -458,6 +461,7 @@ void free_dyn_pageflags(struct dyn_pageflags *pagemap)
 		spin_unlock_irqrestore(&flags_list_lock, flags);
 	}
 }
+EXPORT_SYMBOL_GPL(free_dyn_pageflags);
 
 /**
  * allocate_dyn_pageflags - Allocate a bitmap.
@@ -518,6 +522,7 @@ out:
 	spin_unlock_irqrestore(&pagemap->struct_lock, flags);
 	return result;
 }
+EXPORT_SYMBOL_GPL(allocate_dyn_pageflags);
 
 /**
  * test_dynpageflag - Test a page in a bitmap.
@@ -533,6 +538,7 @@ int test_dynpageflag(struct dyn_pageflags *bitmap, struct page *page)
 	GET_BIT_AND_UL(bitmap, page);
 	return ul ? test_bit(bit, ul) : 0;
 }
+EXPORT_SYMBOL_GPL(test_dynpageflag);
 
 /**
  * set_dynpageflag - Set a bit in a bitmap.
@@ -564,6 +570,7 @@ void set_dynpageflag(struct dyn_pageflags *pageflags, struct page *page)
 	} else
 		set_bit(bit, ul);
 }
+EXPORT_SYMBOL_GPL(set_dynpageflag);
 
 /**
  * clear_dynpageflag - Clear a bit in a bitmap.
@@ -580,6 +587,7 @@ void clear_dynpageflag(struct dyn_pageflags *bitmap, struct page *page)
 	if (ul)
 		clear_bit(bit, ul);
 }
+EXPORT_SYMBOL_GPL(clear_dynpageflag);
 
 /**
  * get_next_bit_on - Get the next bit in a bitmap.
@@ -656,6 +664,7 @@ test:
 
 	return ZONE_START(zone) + zone_offset;
 }
+EXPORT_SYMBOL_GPL(get_next_bit_on);
 
 #ifdef SELF_TEST
 #include <linux/jiffies.h>
