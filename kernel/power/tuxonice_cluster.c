@@ -96,6 +96,7 @@
  */
 
 #include <linux/suspend.h>
+#include <linux/module.h>
 #include <linux/moduleparam.h>
 #include <linux/if.h>
 #include <linux/rtnetlink.h>
@@ -719,6 +720,7 @@ void toi_initiate_cluster_hibernate(void)
 	if (toi_in_hibernate)
 		result = do_toi_step(STEP_HIBERNATE_POWERDOWN);
 }
+EXPORT_SYMBOL_GPL(toi_initiate_cluster_hibernate);
 
 /* toi_cluster_print_debug_stats
  *
@@ -1036,6 +1038,17 @@ INIT int toi_cluster_init(void)
 	return temp;
 }
 
+EXIT void toi_cluster_exit(void)
+{
+	int i;
+	toi_cluster_close_iface();
+
+	for (i = 0; i < MAX_LOCAL_NODES; i++)
+		toi_unregister_sysfs_file(toi_cluster_ops.dir_kobj,
+				&node_array[i].sysfs_data);
+	toi_unregister_module(&toi_cluster_ops);
+}
+
 static int __init toi_cluster_iface_setup(char *iface)
 {
 	toi_cluster_ops.enabled = (*iface &&
@@ -1046,3 +1059,11 @@ static int __init toi_cluster_iface_setup(char *iface)
 }
 
 __setup("toi_cluster=", toi_cluster_iface_setup);
+
+#ifdef MODULE
+MODULE_LICENSE("GPL");
+module_init(toi_cluster_init);
+module_exit(toi_cluster_exit);
+MODULE_AUTHOR("Nigel Cunningham");
+MODULE_DESCRIPTION("Cluster Support for TuxOnIce");
+#endif

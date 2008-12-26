@@ -321,7 +321,7 @@ menuconfig TOI_CORE
 		  run anyway.
 
 	menuconfig TOI_CLUSTER
-		bool "Cluster support"
+		tristate "Cluster support"
 		default n
 		depends on TOI_CORE && NET && BROKEN
 		---help---
