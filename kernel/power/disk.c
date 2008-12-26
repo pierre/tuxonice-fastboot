@@ -26,9 +26,10 @@
 
 #include "power.h"
 
+#include "tuxonice.h"
 
 static int noresume = 0;
-static char resume_file[256] = CONFIG_PM_STD_PARTITION;
+char resume_file[256] = CONFIG_PM_STD_PARTITION;
 dev_t swsusp_resume_device;
 sector_t swsusp_resume_block;
 
@@ -106,7 +107,7 @@ static int hibernation_test(int level) { return 0; }
  *	hibernation
  */
 
-static int platform_begin(int platform_mode)
+int platform_begin(int platform_mode)
 {
 	return (platform_mode && hibernation_ops) ?
 		hibernation_ops->begin() : 0;
@@ -117,7 +118,7 @@ static int platform_begin(int platform_mode)
  *	working state
  */
 
-static void platform_end(int platform_mode)
+void platform_end(int platform_mode)
 {
 	if (platform_mode && hibernation_ops)
 		hibernation_ops->end();
@@ -128,7 +129,7 @@ static void platform_end(int platform_mode)
  *	platform driver if so configured and return an error code if it fails
  */
 
-static int platform_pre_snapshot(int platform_mode)
+int platform_pre_snapshot(int platform_mode)
 {
 	return (platform_mode && hibernation_ops) ?
 		hibernation_ops->pre_snapshot() : 0;
@@ -139,7 +140,7 @@ static int platform_pre_snapshot(int platform_mode)
  *	of operation using the platform driver (called with interrupts disabled)
  */
 
-static void platform_leave(int platform_mode)
+void platform_leave(int platform_mode)
 {
 	if (platform_mode && hibernation_ops)
 		hibernation_ops->leave();
@@ -150,7 +151,7 @@ static void platform_leave(int platform_mode)
  *	using the platform driver (must be called after platform_prepare())
  */
 
-static void platform_finish(int platform_mode)
+void platform_finish(int platform_mode)
 {
 	if (platform_mode && hibernation_ops)
 		hibernation_ops->finish();
@@ -162,7 +163,7 @@ static void platform_finish(int platform_mode)
  *	called, platform_restore_cleanup() must be called.
  */
 
-static int platform_pre_restore(int platform_mode)
+int platform_pre_restore(int platform_mode)
 {
 	return (platform_mode && hibernation_ops) ?
 		hibernation_ops->pre_restore() : 0;
@@ -175,7 +176,7 @@ static int platform_pre_restore(int platform_mode)
  *	regardless of the result of platform_pre_restore().
  */
 
-static void platform_restore_cleanup(int platform_mode)
+void platform_restore_cleanup(int platform_mode)
 {
 	if (platform_mode && hibernation_ops)
 		hibernation_ops->restore_cleanup();
@@ -186,7 +187,7 @@ static void platform_restore_cleanup(int platform_mode)
  *	devices.
  */
 
-static void platform_recover(int platform_mode)
+void platform_recover(int platform_mode)
 {
 	if (platform_mode && hibernation_ops && hibernation_ops->recover)
 		hibernation_ops->recover();
@@ -509,6 +510,9 @@ int hibernate(void)
 {
 	int error;
 
+	if (test_action_state(TOI_REPLACE_SWSUSP))
+		return toi_try_hibernate();
+
 	mutex_lock(&pm_mutex);
 	/* The snapshot device should not be opened while we're running */
 	if (!atomic_add_unless(&snapshot_device_available, -1, 0)) {
@@ -586,10 +590,19 @@ int hibernate(void)
  *
  */
 
-static int software_resume(void)
+int software_resume(void)
 {
 	int error;
 	unsigned int flags;
+	resume_attempted = 1;
+
+	/*
+	 * We can't know (until an image header - if any - is loaded), whether
+	 * we did override swsusp. We therefore ensure that both are tried.
+	 */
+	if (test_action_state(TOI_REPLACE_SWSUSP))
+		printk(KERN_INFO "Replacing swsusp.\n");
+		toi_try_resume();
 
 	/*
 	 * name_to_dev_t() below takes a sysfs buffer mutex when sysfs
@@ -893,6 +906,7 @@ static int __init resume_offset_setup(char *str)
 static int __init noresume_setup(char *str)
 {
 	noresume = 1;
+	set_toi_state(TOI_NORESUME_SPECIFIED);
 	return 1;
 }
 

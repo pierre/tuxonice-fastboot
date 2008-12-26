@@ -23,6 +23,7 @@
 #include <linux/pm.h>
 #include <linux/resume-trace.h>
 #include <linux/rwsem.h>
+#include <linux/suspend.h>
 
 #include "../base.h"
 #include "power.h"

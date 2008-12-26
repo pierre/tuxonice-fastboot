@@ -152,3 +152,7 @@ void thaw_processes(void)
 	printk("done.\n");
 }
 
+void thaw_kernel_threads(void)
+{
+	thaw_tasks(true);
+}

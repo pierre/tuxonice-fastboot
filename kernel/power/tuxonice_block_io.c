@@ -1,0 +1,1168 @@
+/*
+ * kernel/power/tuxonice_block_io.c
+ *
+ * Copyright (C) 2004-2008 Nigel Cunningham (nigel at tuxonice net)
+ *
+ * Distributed under GPLv2.
+ *
+ * This file contains block io functions for TuxOnIce. These are
+ * used by the swapwriter and it is planned that they will also
+ * be used by the NFSwriter.
+ *
+ */
+
+#include <linux/blkdev.h>
+#include <linux/syscalls.h>
+#include <linux/suspend.h>
+
+#include "tuxonice.h"
+#include "tuxonice_sysfs.h"
+#include "tuxonice_modules.h"
+#include "tuxonice_prepare_image.h"
+#include "tuxonice_block_io.h"
+#include "tuxonice_ui.h"
+#include "tuxonice_alloc.h"
+#include "tuxonice_io.h"
+
+#define TARGET_OUTSTANDING_IO 16384
+
+/* #define MEASURE_MUTEX_CONTENTION */
+#ifndef MEASURE_MUTEX_CONTENTION
+#define my_mutex_lock(index, the_lock) mutex_lock(the_lock)
+#define my_mutex_unlock(index, the_lock) mutex_unlock(the_lock)
+#else
+unsigned long mutex_times[2][2][NR_CPUS];
+#define my_mutex_lock(index, the_lock) do { \
+	int have_mutex; \
+	have_mutex = mutex_trylock(the_lock); \
+	if (!have_mutex) { \
+		mutex_lock(the_lock); \
+		mutex_times[index][0][smp_processor_id()]++; \
+	} else { \
+		mutex_times[index][1][smp_processor_id()]++; \
+	}
+
+#define my_mutex_unlock(index, the_lock) \
+	mutex_unlock(the_lock); \
+} while (0)
+#endif
+
+static int target_outstanding_io = 1024;
+static int max_outstanding_writes, max_outstanding_reads;
+
+static struct page *bio_queue_head, *bio_queue_tail;
+static atomic_t toi_bio_queue_size;
+static DEFINE_SPINLOCK(bio_queue_lock);
+
+static int free_mem_throttle;
+static int more_readahead = 1;
+static struct page *readahead_list_head, *readahead_list_tail;
+
+static struct page *waiting_on;
+
+static atomic_t toi_io_in_progress;
+static DECLARE_WAIT_QUEUE_HEAD(num_in_progress_wait);
+
+static int extra_page_forward;
+
+static int current_stream;
+/* 0 = Header, 1 = Pageset1, 2 = Pageset2, 3 = End of PS1 */
+struct hibernate_extent_iterate_saved_state toi_writer_posn_save[4];
+
+/* Pointer to current entry being loaded/saved. */
+struct toi_extent_iterate_state toi_writer_posn;
+
+/* Not static, so that the allocators can setup and complete
+ * writing the header */
+char *toi_writer_buffer;
+int toi_writer_buffer_posn;
+
+static struct toi_bdev_info *toi_devinfo;
+
+DEFINE_MUTEX(toi_bio_mutex);
+
+static struct task_struct *toi_queue_flusher;
+static int toi_bio_queue_flush_pages(int dedicated_thread);
+
+#define TOTAL_OUTSTANDING_IO (atomic_read(&toi_io_in_progress) + \
+	       atomic_read(&toi_bio_queue_size))
+
+/**
+ * set_throttle: Set the point where we pause to avoid oom.
+ *
+ * Initially, this value is zero, but when we first fail to allocate memory,
+ * we set it (plus a buffer) and thereafter throttle i/o once that limit is
+ * reached.
+ */
+
+static void set_throttle(void)
+{
+	int new_throttle = nr_unallocated_buffer_pages() + 256;
+
+	if (new_throttle > free_mem_throttle)
+		free_mem_throttle = new_throttle;
+}
+
+#define NUM_REASONS 10
+static atomic_t reasons[NUM_REASONS];
+static char *reason_name[NUM_REASONS] = {
+	"readahead not ready",
+	"bio allocation",
+	"io_struct allocation",
+	"submit buffer",
+	"synchronous I/O",
+	"bio mutex when reading",
+	"bio mutex when writing",
+	"toi_bio_get_new_page",
+	"memory low",
+	"readahead buffer allocation"
+};
+
+/**
+ * do_bio_wait: Wait for some TuxOnIce i/o to complete.
+ *
+ * Submit any I/O that's batched up (if we're not already doing
+ * that, schedule and clean up whatever we can.
+ */
+static void do_bio_wait(int reason)
+{
+	struct page *was_waiting_on = waiting_on;
+
+	/* On SMP, waiting_on can be reset, so we make a copy */
+	if (was_waiting_on) {
+		if (PageLocked(was_waiting_on)) {
+			wait_on_page_bit(was_waiting_on, PG_locked);
+			atomic_inc(&reasons[reason]);
+		}
+	} else {
+		atomic_inc(&reasons[reason]);
+
+		wait_event(num_in_progress_wait,
+			!atomic_read(&toi_io_in_progress) ||
+			nr_unallocated_buffer_pages() > free_mem_throttle);
+	}
+}
+
+static void throttle_if_memory_low(void)
+{
+	int free_pages = nr_unallocated_buffer_pages();
+
+	/* Getting low on memory and I/O is in progress? */
+	while (unlikely(free_pages < free_mem_throttle) &&
+			atomic_read(&toi_io_in_progress)) {
+		do_bio_wait(8);
+		free_pages = nr_unallocated_buffer_pages();
+	}
+}
+
+/**
+ * toi_monitor_outstanding_io: Show the user how much I/O we're waiting for.
+ */
+static void toi_monitor_outstanding_io(void)
+{
+	int orig = TOTAL_OUTSTANDING_IO, step = orig / 5;
+
+	while (orig) {
+		int new_min = orig > step ? orig - step : 0,
+		    new_max = orig + step,
+		    mb = MB(orig);
+		if (mb)
+			toi_prepare_status(DONT_CLEAR_BAR,
+				"Waiting on I/O completion (%d MB)", mb);
+		wait_event(num_in_progress_wait,
+			TOTAL_OUTSTANDING_IO <= new_min ||
+			TOTAL_OUTSTANDING_IO >= new_max);
+		orig = TOTAL_OUTSTANDING_IO;
+	}
+}
+
+/**
+ * toi_finish_all_io: Wait for all outstanding i/o to complete.
+ */
+static void toi_finish_all_io(void)
+{
+	toi_bio_queue_flush_pages(0);
+	wait_event(num_in_progress_wait, !TOTAL_OUTSTANDING_IO);
+}
+
+/**
+ * toi_end_bio: bio completion function.
+ *
+ * @bio: bio that has completed.
+ * @err: Error value. Yes, like end_swap_bio_read, we ignore it.
+ *
+ * Function called by block driver from interrupt context when I/O is completed.
+ * Nearly the fs/buffer.c version, but we want to do our cleanup too. We only
+ * free pages if they were buffers used when writing the image.
+ */
+static void toi_end_bio(struct bio *bio, int err)
+{
+	struct page *page = bio->bi_io_vec[0].bv_page;
+
+	BUG_ON(!test_bit(BIO_UPTODATE, &bio->bi_flags));
+
+	unlock_page(page);
+	bio_put(bio);
+
+	if (waiting_on == page)
+		waiting_on = NULL;
+
+	put_page(page);
+
+	if (bio->bi_private)
+		toi__free_page((int) ((unsigned long) bio->bi_private) , page);
+
+	bio_put(bio);
+
+	atomic_dec(&toi_io_in_progress);
+
+	wake_up(&num_in_progress_wait);
+}
+
+/**
+ *	submit - submit BIO request.
+ *	@writing: READ or WRITE.
+ *
+ * 	Based on Patrick's pmdisk code from long ago:
+ *	"Straight from the textbook - allocate and initialize the bio.
+ *	If we're writing, make sure the page is marked as dirty.
+ *	Then submit it and carry on."
+ *
+ *	With a twist, though - we handle block_size != PAGE_SIZE.
+ *	Caller has already checked that our page is not fragmented.
+ */
+static int submit(int writing, struct block_device *dev, sector_t first_block,
+		struct page *page, int free_group)
+{
+	struct bio *bio = NULL;
+	int cur_outstanding_io;
+
+	throttle_if_memory_low();
+
+	while (!bio) {
+		bio = bio_alloc(TOI_ATOMIC_GFP, 1);
+		if (!bio) {
+			set_throttle();
+			do_bio_wait(1);
+		}
+	}
+
+	bio->bi_bdev = dev;
+	bio->bi_sector = first_block;
+	bio->bi_private = (void *) ((unsigned long) free_group);
+	bio->bi_end_io = toi_end_bio;
+
+	if (bio_add_page(bio, page, PAGE_SIZE, 0) < PAGE_SIZE) {
+		printk(KERN_INFO "ERROR: adding page to bio at %lld\n",
+				(unsigned long long) first_block);
+		bio_put(bio);
+		return -EFAULT;
+	}
+
+	bio_get(bio);
+
+	cur_outstanding_io = atomic_add_return(1, &toi_io_in_progress);
+	if (writing) {
+		if (cur_outstanding_io > max_outstanding_writes)
+			max_outstanding_writes = cur_outstanding_io;
+	} else {
+		if (cur_outstanding_io > max_outstanding_reads)
+			max_outstanding_reads = cur_outstanding_io;
+	}
+
+
+	if (unlikely(test_action_state(TOI_TEST_FILTER_SPEED))) {
+		/* Fake having done the hard work */
+		set_bit(BIO_UPTODATE, &bio->bi_flags);
+		toi_end_bio(bio, 0);
+	} else
+		submit_bio(writing | (1 << BIO_RW_SYNC), bio);
+
+	return 0;
+}
+
+/**
+ * toi_do_io: Prepare to do some i/o on a page and submit or batch it.
+ *
+ * @writing: Whether reading or writing.
+ * @bdev: The block device which we're using.
+ * @block0: The first sector we're reading or writing.
+ * @page: The page on which I/O is being done.
+ * @readahead_index: If doing readahead, the index (reset this flag when done).
+ * @syncio: Whether the i/o is being done synchronously.
+ *
+ * Prepare and start a read or write operation.
+ *
+ * Note that we always work with our own page. If writing, we might be given a
+ * compression buffer that will immediately be used to start compressing the
+ * next page. For reading, we do readahead and therefore don't know the final
+ * address where the data needs to go.
+ */
+static int toi_do_io(int writing, struct block_device *bdev, long block0,
+	struct page *page, int is_readahead, int syncio, int free_group)
+{
+	page->private = 0;
+
+	/* Do here so we don't race against toi_bio_get_next_page_read */
+	lock_page(page);
+
+	if (is_readahead) {
+		if (readahead_list_head)
+			readahead_list_tail->private = (unsigned long) page;
+		else
+			readahead_list_head = page;
+
+		readahead_list_tail = page;
+	}
+
+	/* Done before submitting to avoid races. */
+	if (syncio)
+		waiting_on = page;
+
+	/* Submit the page */
+	get_page(page);
+
+	if (submit(writing, bdev, block0, page, free_group))
+		return -EFAULT;
+
+	if (syncio)
+		do_bio_wait(4);
+
+	return 0;
+}
+
+/**
+ * toi_bdev_page_io: Simpler interface to do directly i/o on a single page.
+ *
+ * @writing: Whether reading or writing.
+ * @bdev: Block device on which we're operating.
+ * @pos: Sector at which page to read starts.
+ * @page: Page to be read/written.
+ *
+ * We used to use bread here, but it doesn't correctly handle
+ * blocksize != PAGE_SIZE. Now we create a submit_info to get the data we
+ * want and use our normal routines (synchronously).
+ */
+static int toi_bdev_page_io(int writing, struct block_device *bdev,
+		long pos, struct page *page)
+{
+	return toi_do_io(writing, bdev, pos, page, 0, 1, 0);
+}
+
+/**
+ * toi_bio_memory_needed: Report amount of memory needed for block i/o.
+ *
+ * We want to have at least enough memory so as to have target_outstanding_io
+ * or more transactions on the fly at once. If we can do more, fine.
+ */
+static int toi_bio_memory_needed(void)
+{
+	return target_outstanding_io * (PAGE_SIZE + sizeof(struct request) +
+				sizeof(struct bio));
+}
+
+/*
+ * toi_bio_print_debug_stats
+ *
+ * Description:
+ */
+static int toi_bio_print_debug_stats(char *buffer, int size)
+{
+	int len = scnprintf(buffer, size, "- Max outstanding reads %d. Max "
+			"writes %d.\n", max_outstanding_reads,
+			max_outstanding_writes);
+
+	len += scnprintf(buffer + len, size - len,
+		"  Memory_needed: %d x (%lu + %u + %u) = %d bytes.\n",
+		target_outstanding_io,
+		PAGE_SIZE, (unsigned int) sizeof(struct request),
+		(unsigned int) sizeof(struct bio), toi_bio_memory_needed());
+
+#ifdef MEASURE_MUTEX_CONTENTION
+	{
+	int i;
+
+	len += scnprintf(buffer + len, size - len,
+		"  Mutex contention while reading:\n  Contended      Free\n");
+
+	for_each_online_cpu(i)
+		len += scnprintf(buffer + len, size - len,
+		"  %9lu %9lu\n",
+		mutex_times[0][0][i], mutex_times[0][1][i]);
+
+	len += scnprintf(buffer + len, size - len,
+		"  Mutex contention while writing:\n  Contended      Free\n");
+
+	for_each_online_cpu(i)
+		len += scnprintf(buffer + len, size - len,
+		"  %9lu %9lu\n",
+		mutex_times[1][0][i], mutex_times[1][1][i]);
+
+	}
+#endif
+
+	return len + scnprintf(buffer + len, size - len,
+		"  Free mem throttle point reached %d.\n", free_mem_throttle);
+}
+
+/**
+ * toi_set_devinfo: Set the bdev info used for i/o.
+ *
+ * @info: Pointer to array of struct toi_bdev_info - the list of
+ * bdevs and blocks on them in which the image is stored.
+ *
+ * Set the list of bdevs and blocks in which the image will be stored.
+ * Sort of like putting a tape in the cassette player.
+ */
+static void toi_set_devinfo(struct toi_bdev_info *info)
+{
+	toi_devinfo = info;
+}
+
+/**
+ * dump_block_chains: Print the contents of the bdev info array.
+ */
+static void dump_block_chains(void)
+{
+	int i;
+
+	for (i = 0; i < toi_writer_posn.num_chains; i++) {
+		struct hibernate_extent *this;
+
+		this = (toi_writer_posn.chains + i)->first;
+
+		if (!this)
+			continue;
+
+		printk(KERN_INFO "Chain %d:", i);
+
+		while (this) {
+			printk(" [%lu-%lu]%s", this->start,
+					this->end, this->next ? "," : "");
+			this = this->next;
+		}
+
+		printk("\n");
+	}
+
+	for (i = 0; i < 4; i++)
+		printk(KERN_INFO "Posn %d: Chain %d, extent %d, offset %lu.\n",
+				i, toi_writer_posn_save[i].chain_num,
+				toi_writer_posn_save[i].extent_num,
+				toi_writer_posn_save[i].offset);
+}
+
+/**
+ * go_next_page: Skip blocks to the start of the next page.
+ *
+ * Go forward one page, or two if extra_page_forward is set. It only gets
+ * set at the start of reading the image header, to skip the first page
+ * of the header, which is read without using the extent chains.
+ */
+static int go_next_page(int writing)
+{
+	int i, max = (toi_writer_posn.current_chain == -1) ? 1 :
+	  toi_devinfo[toi_writer_posn.current_chain].blocks_per_page;
+
+	for (i = 0; i < max; i++)
+		toi_extent_state_next(&toi_writer_posn);
+
+	if (toi_extent_state_eof(&toi_writer_posn)) {
+		/* Don't complain if readahead falls off the end */
+		if (writing) {
+			printk(KERN_INFO "Extent state eof. "
+				"Expected compression ratio too optimistic?\n");
+			dump_block_chains();
+		}
+		return -ENODATA;
+	}
+
+	if (extra_page_forward) {
+		extra_page_forward = 0;
+		return go_next_page(writing);
+	}
+
+	return 0;
+}
+
+/**
+ * set_extra_page_forward: Make us skip an extra page on next go_next_page.
+ *
+ * Used in reading header, to jump to 2nd page after getting 1st page
+ * direct from image header.
+ */
+static void set_extra_page_forward(void)
+{
+	extra_page_forward = 1;
+}
+
+/**
+ * toi_bio_rw_page: Do i/o on the next disk page in the image.
+ *
+ * @writing: Whether reading or writing.
+ * @page: Page to do i/o on.
+ * @readahead_index: -1 or the index in the readahead ring.
+ *
+ * Submit a page for reading or writing, possibly readahead.
+ */
+static int toi_bio_rw_page(int writing, struct page *page,
+		int is_readahead, int free_group)
+{
+	struct toi_bdev_info *dev_info;
+	int result;
+
+	if (go_next_page(writing)) {
+		printk(KERN_INFO "Failed to advance a page in the extent "
+				"data.\n");
+		return -ENODATA;
+	}
+
+	if (current_stream == 0 && writing &&
+		toi_writer_posn.current_chain ==
+			toi_writer_posn_save[2].chain_num &&
+		toi_writer_posn.current_offset ==
+			toi_writer_posn_save[2].offset) {
+		dump_block_chains();
+		BUG();
+	}
+
+	dev_info = &toi_devinfo[toi_writer_posn.current_chain];
+
+	result = toi_do_io(writing, dev_info->bdev,
+		toi_writer_posn.current_offset <<
+			dev_info->bmap_shift,
+		page, is_readahead, 0, free_group);
+
+	if (result) {
+		more_readahead = 0;
+		return result;
+	}
+
+	if (!writing) {
+		int compare_to = 0;
+
+		switch (current_stream) {
+		case 0:
+			compare_to = 2;
+			break;
+		case 1:
+			compare_to = 3;
+			break;
+		case 2:
+			compare_to = 1;
+			break;
+		}
+
+		if (toi_writer_posn.current_chain ==
+				toi_writer_posn_save[compare_to].chain_num &&
+		    toi_writer_posn.current_offset ==
+				toi_writer_posn_save[compare_to].offset)
+			more_readahead = 0;
+	}
+	return 0;
+}
+
+/**
+ * toi_rw_init: Prepare to read or write a stream in the image.
+ *
+ * @writing: Whether reading or writing.
+ * @stream number: Section of the image being processed.
+ */
+static int toi_rw_init(int writing, int stream_number)
+{
+	if (stream_number)
+		toi_extent_state_restore(&toi_writer_posn,
+				&toi_writer_posn_save[stream_number]);
+	else
+		toi_extent_state_goto_start(&toi_writer_posn);
+
+	toi_writer_buffer = (char *) toi_get_zeroed_page(11, TOI_ATOMIC_GFP);
+	toi_writer_buffer_posn = writing ? 0 : PAGE_SIZE;
+
+	current_stream = stream_number;
+
+	more_readahead = 1;
+
+	return toi_writer_buffer ? 0 : -ENOMEM;
+}
+
+/**
+ * toi_read_header_init: Prepare to read the image header.
+ *
+ * Reset readahead indices prior to starting to read a section of the image.
+ */
+static void toi_read_header_init(void)
+{
+	toi_writer_buffer = (char *) toi_get_zeroed_page(11, TOI_ATOMIC_GFP);
+	more_readahead = 1;
+}
+
+/*
+ * toi_bio_queue_write
+ */
+static void toi_bio_queue_write(char **full_buffer)
+{
+	struct page *page = virt_to_page(*full_buffer);
+	unsigned long flags;
+
+	page->private = 0;
+
+	spin_lock_irqsave(&bio_queue_lock, flags);
+	if (!bio_queue_head)
+		bio_queue_head = page;
+	else
+		bio_queue_tail->private = (unsigned long) page;
+
+	bio_queue_tail = page;
+	atomic_inc(&toi_bio_queue_size);
+
+	spin_unlock_irqrestore(&bio_queue_lock, flags);
+	wake_up(&toi_io_queue_flusher);
+
+	*full_buffer = NULL;
+}
+
+/**
+ * toi_rw_cleanup: Cleanup after i/o.
+ *
+ * @writing: Whether we were reading or writing.
+ */
+static int toi_rw_cleanup(int writing)
+{
+	int i;
+
+	if (writing) {
+		int result;
+
+		if (toi_writer_buffer_posn)
+			toi_bio_queue_write(&toi_writer_buffer);
+
+		result = toi_bio_queue_flush_pages(0);
+
+		if (result)
+			return result;
+
+		if (current_stream == 2)
+			toi_extent_state_save(&toi_writer_posn,
+					&toi_writer_posn_save[1]);
+		else if (current_stream == 1)
+			toi_extent_state_save(&toi_writer_posn,
+					&toi_writer_posn_save[3]);
+	}
+
+	toi_finish_all_io();
+
+	while (readahead_list_head) {
+		void *next = (void *) readahead_list_head->private;
+		toi__free_page(12, readahead_list_head);
+		readahead_list_head = next;
+	}
+
+	readahead_list_tail = NULL;
+
+	if (!current_stream)
+		return 0;
+
+	for (i = 0; i < NUM_REASONS; i++) {
+		if (!atomic_read(&reasons[i]))
+			continue;
+		printk(KERN_INFO "Waited for i/o due to %s %d times.\n",
+				reason_name[i], atomic_read(&reasons[i]));
+		atomic_set(&reasons[i], 0);
+	}
+
+	current_stream = 0;
+	return 0;
+}
+
+int toi_start_one_readahead(int dedicated_thread)
+{
+	char *buffer = NULL;
+	int oom = 0;
+
+	throttle_if_memory_low();
+
+	while (!buffer) {
+		buffer = (char *) toi_get_zeroed_page(12,
+				TOI_ATOMIC_GFP);
+		if (!buffer) {
+			if (oom && !dedicated_thread)
+				return -EIO;
+
+			oom = 1;
+			set_throttle();
+			do_bio_wait(9);
+		}
+	}
+
+	return toi_bio_rw_page(READ, virt_to_page(buffer), 1, 0);
+}
+
+/*
+ * toi_start_new_readahead
+ *
+ * Start readahead of image pages.
+ *
+ * No mutex needed because this is only ever called by one cpu.
+ */
+static int toi_start_new_readahead(int dedicated_thread)
+{
+	int last_result, num_submitted = 0;
+
+	/* Start a new readahead? */
+	if (!more_readahead)
+		return 0;
+
+	do {
+		int result = toi_start_one_readahead(dedicated_thread);
+
+		if (result == -EIO)
+			return 0;
+		else
+			last_result = result;
+
+		if (last_result == -ENODATA)
+			more_readahead = 0;
+
+		if (!more_readahead && last_result) {
+			/*
+			 * Don't complain about failing to do readahead past
+			 * the end of storage.
+			 */
+			if (last_result != -ENODATA)
+				printk(KERN_INFO
+					"Begin read chunk returned %d.\n",
+					last_result);
+		} else
+			num_submitted++;
+
+	} while (more_readahead &&
+		 (dedicated_thread ||
+		  (num_submitted < target_outstanding_io &&
+		   atomic_read(&toi_io_in_progress) < target_outstanding_io)));
+	return 0;
+}
+
+static void bio_io_flusher(int writing)
+{
+
+	if (writing)
+		toi_bio_queue_flush_pages(1);
+	else
+		toi_start_new_readahead(1);
+}
+
+/**
+ * toi_bio_get_next_page_read: Read a disk page with readahead.
+ *
+ * Read a page from disk, submitting readahead and cleaning up finished i/o
+ * while we wait for the page we're after.
+ */
+static int toi_bio_get_next_page_read(int no_readahead)
+{
+	unsigned long *virt;
+	struct page *next;
+
+	/*
+	 * When reading the second page of the header, we have to
+	 * delay submitting the read until after we've gotten the
+	 * extents out of the first page.
+	 */
+	if (unlikely(no_readahead && toi_start_one_readahead(0))) {
+		printk(KERN_INFO "No readahead and toi_start_one_readahead "
+				"returned non-zero.\n");
+		return -EIO;
+	}
+
+	/*
+	 * On SMP, we may need to wait for the first readahead
+	 * to be submitted.
+	 */
+	if (unlikely(!readahead_list_head)) {
+		BUG_ON(!more_readahead);
+		do {
+			cpu_relax();
+		} while (!readahead_list_head);
+	}
+
+	if (PageLocked(readahead_list_head)) {
+		waiting_on = readahead_list_head;
+		do_bio_wait(0);
+	}
+
+	virt = page_address(readahead_list_head);
+	memcpy(toi_writer_buffer, virt, PAGE_SIZE);
+
+	next = (struct page *) readahead_list_head->private;
+	toi__free_page(12, readahead_list_head);
+	readahead_list_head = next;
+	return 0;
+}
+
+/*
+ * toi_bio_queue_flush_pages
+ */
+
+static int toi_bio_queue_flush_pages(int dedicated_thread)
+{
+	unsigned long flags;
+	int result = 0;
+
+top:
+	spin_lock_irqsave(&bio_queue_lock, flags);
+	while (bio_queue_head) {
+		struct page *page = bio_queue_head;
+		bio_queue_head = (struct page *) page->private;
+		if (bio_queue_tail == page)
+			bio_queue_tail = NULL;
+		atomic_dec(&toi_bio_queue_size);
+		spin_unlock_irqrestore(&bio_queue_lock, flags);
+		result = toi_bio_rw_page(WRITE, page, 0, 11);
+		if (result)
+			return result;
+		spin_lock_irqsave(&bio_queue_lock, flags);
+	}
+	spin_unlock_irqrestore(&bio_queue_lock, flags);
+
+	if (dedicated_thread) {
+		wait_event(toi_io_queue_flusher, bio_queue_head ||
+				toi_bio_queue_flusher_should_finish);
+		if (likely(!toi_bio_queue_flusher_should_finish))
+			goto top;
+		toi_bio_queue_flusher_should_finish = 0;
+	}
+	return 0;
+}
+
+/*
+ * toi_bio_get_new_page
+ */
+static void toi_bio_get_new_page(char **full_buffer)
+{
+	throttle_if_memory_low();
+
+	while (!*full_buffer) {
+		*full_buffer = (char *) toi_get_zeroed_page(11, TOI_ATOMIC_GFP);
+		if (!*full_buffer) {
+			set_throttle();
+			do_bio_wait(7);
+		}
+	}
+}
+
+/*
+ * toi_rw_buffer: Combine smaller buffers into PAGE_SIZE I/O.
+ *
+ * @writing: Bool - whether writing (or reading).
+ * @buffer: The start of the buffer to write or fill.
+ * @buffer_size: The size of the buffer to write or fill.
+ */
+static int toi_rw_buffer(int writing, char *buffer, int buffer_size,
+		int no_readahead)
+{
+	int bytes_left = buffer_size;
+
+	while (bytes_left) {
+		char *source_start = buffer + buffer_size - bytes_left;
+		char *dest_start = toi_writer_buffer + toi_writer_buffer_posn;
+		int capacity = PAGE_SIZE - toi_writer_buffer_posn;
+		char *to = writing ? dest_start : source_start;
+		char *from = writing ? source_start : dest_start;
+
+		if (bytes_left <= capacity) {
+			memcpy(to, from, bytes_left);
+			toi_writer_buffer_posn += bytes_left;
+			return 0;
+		}
+
+		/* Complete this page and start a new one */
+		memcpy(to, from, capacity);
+		bytes_left -= capacity;
+
+		if (!writing) {
+			int result = toi_bio_get_next_page_read(no_readahead);
+			if (result)
+				return result;
+		} else {
+			toi_bio_queue_write(&toi_writer_buffer);
+			toi_bio_get_new_page(&toi_writer_buffer);
+		}
+
+		toi_writer_buffer_posn = 0;
+		toi_cond_pause(0, NULL);
+	}
+
+	return 0;
+}
+
+/**
+ * toi_bio_read_page - read a page of the image.
+ *
+ * @pfn: The pfn where the data belongs.
+ * @buffer_page: The page containing the (possibly compressed) data.
+ * @buf_size: The number of bytes on @buffer_page used.
+ *
+ * Read a (possibly compressed) page from the image, into buffer_page,
+ * returning its pfn and the buffer size.
+ */
+static int toi_bio_read_page(unsigned long *pfn, struct page *buffer_page,
+		unsigned int *buf_size)
+{
+	int result = 0;
+	char *buffer_virt = kmap(buffer_page);
+
+	/* Only call start_new_readahead if we don't have a dedicated thread */
+	if (current == toi_queue_flusher && toi_start_new_readahead(0)) {
+		printk(KERN_INFO "Queue flusher and toi_start_one_readahead "
+				"returned non-zero.\n");
+		return -EIO;
+	}
+
+	my_mutex_lock(0, &toi_bio_mutex);
+
+	if (toi_rw_buffer(READ, (char *) pfn, sizeof(unsigned long), 0) ||
+	    toi_rw_buffer(READ, (char *) buf_size, sizeof(int), 0) ||
+	    toi_rw_buffer(READ, buffer_virt, *buf_size, 0)) {
+		abort_hibernate(TOI_FAILED_IO, "Read of data failed.");
+		result = 1;
+	}
+
+	my_mutex_unlock(0, &toi_bio_mutex);
+	kunmap(buffer_page);
+	return result;
+}
+
+/**
+ * toi_bio_write_page - Write a page of the image.
+ *
+ * @pfn: The pfn where the data belongs.
+ * @buffer_page: The page containing the (possibly compressed) data.
+ * @buf_size: The number of bytes on @buffer_page used.
+ *
+ * Write a (possibly compressed) page to the image from the buffer, together
+ * with it's index and buffer size.
+ */
+static int toi_bio_write_page(unsigned long pfn, struct page *buffer_page,
+		unsigned int buf_size)
+{
+	char *buffer_virt;
+	int result = 0, result2 = 0;
+
+	if (unlikely(test_action_state(TOI_TEST_FILTER_SPEED)))
+		return 0;
+
+	my_mutex_lock(1, &toi_bio_mutex);
+	buffer_virt = kmap(buffer_page);
+
+	if (toi_rw_buffer(WRITE, (char *) &pfn, sizeof(unsigned long), 0) ||
+	    toi_rw_buffer(WRITE, (char *) &buf_size, sizeof(int), 0) ||
+	    toi_rw_buffer(WRITE, buffer_virt, buf_size, 0)) {
+		printk(KERN_INFO "toi_rw_buffer returned non-zero to "
+				"toi_bio_write_page.\n");
+		result = -EIO;
+	}
+
+	kunmap(buffer_page);
+	my_mutex_unlock(1, &toi_bio_mutex);
+
+	if (current == toi_queue_flusher)
+		result2 = toi_bio_queue_flush_pages(0);
+
+	return result ? result : result2;
+}
+
+/**
+ * toi_rw_header_chunk: Read or write a portion of the image header.
+ *
+ * @writing: Whether reading or writing.
+ * @owner: The module for which we're writing. Used for confirming that modules
+ * don't use more header space than they asked for.
+ * @buffer: Address of the data to write.
+ * @buffer_size: Size of the data buffer.
+ * @no_readahead: Don't try to start readhead (when still getting extents)
+ */
+static int _toi_rw_header_chunk(int writing, struct toi_module_ops *owner,
+		char *buffer, int buffer_size, int no_readahead)
+{
+	int result = 0;
+
+	if (owner) {
+		owner->header_used += buffer_size;
+		toi_message(TOI_HEADER, TOI_LOW, 1,
+			"Header: %s : %d bytes (%d/%d).\n",
+			buffer_size, owner->header_used,
+			owner->header_requested);
+		if (owner->header_used > owner->header_requested) {
+			printk(KERN_EMERG "TuxOnIce module %s is using more "
+				"header space (%u) than it requested (%u).\n",
+				owner->name,
+				owner->header_used,
+				owner->header_requested);
+			return buffer_size;
+		}
+	} else
+		toi_message(TOI_HEADER, TOI_LOW, 1,
+			"Header: (No owner): %d bytes.\n", buffer_size);
+
+	if (!writing && !no_readahead)
+		result = toi_start_new_readahead(0);
+
+	if (!result)
+		result = toi_rw_buffer(writing, buffer, buffer_size,
+				no_readahead);
+
+	return result;
+}
+
+static int toi_rw_header_chunk(int writing, struct toi_module_ops *owner,
+		char *buffer, int size)
+{
+	return _toi_rw_header_chunk(writing, owner, buffer, size, 0);
+}
+
+static int toi_rw_header_chunk_noreadahead(int writing,
+		struct toi_module_ops *owner, char *buffer, int size)
+{
+	return _toi_rw_header_chunk(writing, owner, buffer, size, 1);
+}
+
+/**
+ * write_header_chunk_finish: Flush any buffered header data.
+ */
+static int write_header_chunk_finish(void)
+{
+	int result = 0;
+
+	if (toi_writer_buffer_posn)
+		toi_bio_queue_write(&toi_writer_buffer);
+
+	toi_bio_queue_flush_pages(0);
+	toi_finish_all_io();
+
+	return result;
+}
+
+/**
+ * toi_bio_storage_needed: Get the amount of storage needed for my fns.
+ */
+static int toi_bio_storage_needed(void)
+{
+	return 2 * sizeof(int);
+}
+
+/**
+ * toi_bio_save_config_info: Save block i/o config to image header.
+ *
+ * @buf: PAGE_SIZE'd buffer into which data should be saved.
+ */
+static int toi_bio_save_config_info(char *buf)
+{
+	int *ints = (int *) buf;
+	ints[0] = target_outstanding_io;
+	return sizeof(int);
+}
+
+/**
+ * toi_bio_load_config_info: Restore block i/o config.
+ *
+ * @buf: Data to be reloaded.
+ * @size: Size of the buffer saved.
+ */
+static void toi_bio_load_config_info(char *buf, int size)
+{
+	int *ints = (int *) buf;
+	target_outstanding_io  = ints[0];
+}
+
+/**
+ * toi_bio_initialise: Initialise bio code at start of some action.
+ *
+ * @starting_cycle: Whether starting a hibernation cycle, or just reading or
+ * writing a sysfs value.
+ */
+static int toi_bio_initialise(int starting_cycle)
+{
+	if (starting_cycle) {
+		max_outstanding_writes = 0;
+		max_outstanding_reads = 0;
+		toi_queue_flusher = current;
+#ifdef MEASURE_MUTEX_CONTENTION
+		{
+		int i, j, k;
+
+		for (i = 0; i < 2; i++)
+			for (j = 0; j < 2; j++)
+				for_each_online_cpu(k)
+					mutex_times[i][j][k] = 0;
+		}
+#endif
+	}
+
+	return 0;
+}
+
+/**
+ * toi_bio_cleanup: Cleanup after some action.
+ *
+ * @finishing_cycle: Whether completing a cycle.
+ */
+static void toi_bio_cleanup(int finishing_cycle)
+{
+	if (toi_writer_buffer) {
+		toi_free_page(11, (unsigned long) toi_writer_buffer);
+		toi_writer_buffer = NULL;
+	}
+}
+
+struct toi_bio_ops toi_bio_ops = {
+	.bdev_page_io = toi_bdev_page_io,
+	.finish_all_io = toi_finish_all_io,
+	.monitor_outstanding_io	= toi_monitor_outstanding_io,
+	.forward_one_page = go_next_page,
+	.set_extra_page_forward = set_extra_page_forward,
+	.set_devinfo = toi_set_devinfo,
+	.read_page = toi_bio_read_page,
+	.write_page = toi_bio_write_page,
+	.rw_init = toi_rw_init,
+	.rw_cleanup = toi_rw_cleanup,
+	.read_header_init = toi_read_header_init,
+	.rw_header_chunk = toi_rw_header_chunk,
+	.rw_header_chunk_noreadahead = toi_rw_header_chunk_noreadahead,
+	.write_header_chunk_finish = write_header_chunk_finish,
+	.io_flusher = bio_io_flusher,
+};
+
+static struct toi_sysfs_data sysfs_params[] = {
+	SYSFS_INT("target_outstanding_io", SYSFS_RW, &target_outstanding_io,
+			0, TARGET_OUTSTANDING_IO, 0, NULL),
+};
+
+static struct toi_module_ops toi_blockwriter_ops = {
+	.name					= "lowlevel i/o",
+	.type					= MISC_HIDDEN_MODULE,
+	.directory				= "block_io",
+	.module					= THIS_MODULE,
+	.print_debug_info			= toi_bio_print_debug_stats,
+	.memory_needed				= toi_bio_memory_needed,
+	.storage_needed				= toi_bio_storage_needed,
+	.save_config_info			= toi_bio_save_config_info,
+	.load_config_info			= toi_bio_load_config_info,
+	.initialise				= toi_bio_initialise,
+	.cleanup				= toi_bio_cleanup,
+
+	.sysfs_data		= sysfs_params,
+	.num_sysfs_entries	= sizeof(sysfs_params) /
+		sizeof(struct toi_sysfs_data),
+};
+
+/**
+ * toi_block_io_load: Load time routine for block i/o module.
+ *
+ * Register block i/o ops and sysfs entries.
+ */
+static __init int toi_block_io_load(void)
+{
+	return toi_register_module(&toi_blockwriter_ops);
+}
+
+late_initcall(toi_block_io_load);

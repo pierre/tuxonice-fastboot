@@ -1,7 +1,16 @@
+/*
+ * Copyright (C) 2004-2008 Nigel Cunningham (nigel at tuxonice net)
+ */
+
+#ifndef KERNEL_POWER_POWER_H
+#define KERNEL_POWER_POWER_H
+
 #include <linux/suspend.h>
 #include <linux/suspend_ioctls.h>
 #include <linux/utsname.h>
 #include <linux/freezer.h>
+#include "tuxonice.h"
+#include "tuxonice_builtin.h"
 
 struct swsusp_info {
 	struct new_utsname	uts;
@@ -21,18 +30,22 @@ struct swsusp_info {
 extern int arch_hibernation_header_save(void *addr, unsigned int max_size);
 extern int arch_hibernation_header_restore(void *addr);
 
-static inline int init_header_complete(struct swsusp_info *info)
+static inline int init_swsusp_header_complete(struct swsusp_info *info)
 {
 	return arch_hibernation_header_save(info, MAX_ARCH_HEADER_SIZE);
 }
 
-static inline char *check_image_kernel(struct swsusp_info *info)
+static inline char *check_swsusp_image_kernel(struct swsusp_info *info)
 {
 	return arch_hibernation_header_restore(info) ?
 			"architecture specific data" : NULL;
 }
+#else
+extern char *check_swsusp_image_kernel(struct swsusp_info *info);
 #endif /* CONFIG_ARCH_HIBERNATION_HEADER */
+extern int init_swsusp_header(struct swsusp_info *info);
 
+extern char resume_file[256];
 /*
  * Keep some memory free so that I/O operations can succeed without paging
  * [Might this be more than 4 MB?]
@@ -49,6 +62,7 @@ static inline char *check_image_kernel(struct swsusp_info *info)
 extern int hibernation_snapshot(int platform_mode);
 extern int hibernation_restore(int platform_mode);
 extern int hibernation_platform_enter(void);
+extern void platform_recover(int platform_mode);
 #endif
 
 extern int pfn_is_nosave(unsigned long);
@@ -62,6 +76,8 @@ static struct kobj_attribute _name##_attr = {	\
 	.show	= _name##_show,			\
 	.store	= _name##_store,		\
 }
+
+extern struct pbe *restore_pblist;
 
 /* Preferred image size in bytes (default 500 MB) */
 extern unsigned long image_size;
@@ -222,4 +238,33 @@ static inline int suspend_freeze_processes(void)
 static inline void suspend_thaw_processes(void)
 {
 }
+#endif
+
+extern struct page *saveable_page(unsigned long pfn);
+#ifdef CONFIG_HIGHMEM
+extern struct page *saveable_highmem_page(unsigned long pfn);
+#else
+static inline void *saveable_highmem_page(unsigned long pfn) { return NULL; }
+#endif
+
+#define PBES_PER_PAGE (PAGE_SIZE / sizeof(struct pbe))
+extern struct list_head nosave_regions;
+
+/**
+ *	This structure represents a range of page frames the contents of which
+ *	should not be saved during the suspend.
+ */
+
+struct nosave_region {
+	struct list_head list;
+	unsigned long start_pfn;
+	unsigned long end_pfn;
+};
+
+#ifndef PHYS_PFN_OFFSET
+#define PHYS_PFN_OFFSET 0
+#endif
+
+#define ZONE_START(thiszone) ((thiszone)->zone_start_pfn - PHYS_PFN_OFFSET)
+
 #endif

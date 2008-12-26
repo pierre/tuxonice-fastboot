@@ -4233,6 +4233,13 @@ P:	Maciej W. Rozycki
 M:	macro@linux-mips.org
 S:	Maintained
 
+TUXONICE (ENHANCED HIBERNATION)
+P:	Nigel Cunningham
+M:	nigel@tuxonice.net
+L:	suspend2-devel@tuxonice.net
+W:	http://tuxonice.net
+S:	Maintained
+
 U14-34F SCSI DRIVER
 P:	Dario Ballabio
 M:	ballabio_dario@emc.com

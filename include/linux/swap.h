@@ -165,6 +165,7 @@ extern unsigned long totalram_pages;
 extern unsigned long totalreserve_pages;
 extern long nr_swap_pages;
 extern unsigned int nr_free_buffer_pages(void);
+extern unsigned int nr_unallocated_buffer_pages(void);
 extern unsigned int nr_free_pagecache_pages(void);
 
 /* Definition of global_page_state not available yet */
@@ -216,6 +217,8 @@ extern unsigned long try_to_free_mem_cgroup_pages(struct mem_cgroup *mem,
 							gfp_t gfp_mask);
 extern int __isolate_lru_page(struct page *page, int mode, int file);
 extern unsigned long shrink_all_memory(unsigned long nr_pages);
+extern void shrink_one_zone(struct zone *zone, unsigned long desired_size,
+		int ps_wanted);
 extern int vm_swappiness;
 extern int remove_mapping(struct address_space *mapping, struct page *page);
 extern long vm_total_pages;
@@ -416,5 +419,10 @@ static inline swp_entry_t get_swap_page(void)
 #define disable_swap_token() do { } while(0)
 
 #endif /* CONFIG_SWAP */
+
+/* For TuxOnIce - unlink LRU pages while saving separately */
+void unlink_lru_lists(void);
+void relink_lru_lists(void);
+
 #endif /* __KERNEL__*/
 #endif /* _LINUX_SWAP_H */

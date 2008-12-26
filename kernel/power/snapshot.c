@@ -33,6 +33,8 @@
 #include <asm/io.h>
 
 #include "power.h"
+#include "tuxonice_builtin.h"
+#include "tuxonice_pagedir.h"
 
 static int swsusp_page_is_free(struct page *);
 static void swsusp_set_page_forbidden(struct page *);
@@ -44,6 +46,7 @@ static void swsusp_unset_page_forbidden(struct page *);
  * directly to their "original" page frames.
  */
 struct pbe *restore_pblist;
+int resume_attempted;
 
 /* Pointer to an auxiliary buffer (1 page) */
 static void *buffer;
@@ -86,6 +89,9 @@ static void *get_image_page(gfp_t gfp_mask, int safe_needed)
 
 unsigned long get_safe_page(gfp_t gfp_mask)
 {
+	if (toi_running)
+		return toi_get_nonconflicting_page();
+
 	return (unsigned long)get_image_page(gfp_mask, PG_SAFE);
 }
 
@@ -561,18 +567,7 @@ static unsigned long memory_bm_next_pfn(struct memory_bitmap *bm)
 	return bb->start_pfn + bit;
 }
 
-/**
- *	This structure represents a range of page frames the contents of which
- *	should not be saved during the suspend.
- */
-
-struct nosave_region {
-	struct list_head list;
-	unsigned long start_pfn;
-	unsigned long end_pfn;
-};
-
-static LIST_HEAD(nosave_regions);
+LIST_HEAD(nosave_regions);
 
 /**
  *	register_nosave_region - register a range of page frames the contents
@@ -809,7 +804,7 @@ static unsigned int count_free_highmem_pages(void)
  *	and it isn't a part of a free chunk of pages.
  */
 
-static struct page *saveable_highmem_page(unsigned long pfn)
+struct page *saveable_highmem_page(unsigned long pfn)
 {
 	struct page *page;
 
@@ -851,8 +846,6 @@ unsigned int count_highmem_pages(void)
 	}
 	return n;
 }
-#else
-static inline void *saveable_highmem_page(unsigned long pfn) { return NULL; }
 #endif /* CONFIG_HIGHMEM */
 
 /**
@@ -864,7 +857,7 @@ static inline void *saveable_highmem_page(unsigned long pfn) { return NULL; }
  *	a free chunk of pages.
  */
 
-static struct page *saveable_page(unsigned long pfn)
+struct page *saveable_page(unsigned long pfn)
 {
 	struct page *page;
 
@@ -1198,6 +1191,9 @@ asmlinkage int swsusp_save(void)
 {
 	unsigned int nr_pages, nr_highmem;
 
+	if (toi_running)
+		return toi_post_context_save();
+
 	printk(KERN_INFO "PM: Creating hibernation image: \n");
 
 	drain_local_pages(NULL);
@@ -1238,14 +1234,14 @@ asmlinkage int swsusp_save(void)
 }
 
 #ifndef CONFIG_ARCH_HIBERNATION_HEADER
-static int init_header_complete(struct swsusp_info *info)
+int init_swsusp_header_complete(struct swsusp_info *info)
 {
 	memcpy(&info->uts, init_utsname(), sizeof(struct new_utsname));
 	info->version_code = LINUX_VERSION_CODE;
 	return 0;
 }
 
-static char *check_image_kernel(struct swsusp_info *info)
+char *check_swsusp_image_kernel(struct swsusp_info *info)
 {
 	if (info->version_code != LINUX_VERSION_CODE)
 		return "kernel version";
@@ -1266,7 +1262,7 @@ unsigned long snapshot_get_image_size(void)
 	return nr_copy_pages + nr_meta_pages + 1;
 }
 
-static int init_header(struct swsusp_info *info)
+int init_swsusp_header(struct swsusp_info *info)
 {
 	memset(info, 0, sizeof(struct swsusp_info));
 	info->num_physpages = num_physpages;
@@ -1274,7 +1270,7 @@ static int init_header(struct swsusp_info *info)
 	info->pages = snapshot_get_image_size();
 	info->size = info->pages;
 	info->size <<= PAGE_SHIFT;
-	return init_header_complete(info);
+	return init_swsusp_header_complete(info);
 }
 
 /**
@@ -1330,7 +1326,7 @@ int snapshot_read_next(struct snapshot_handle *handle, size_t count)
 	if (!handle->offset) {
 		int error;
 
-		error = init_header((struct swsusp_info *)buffer);
+		error = init_swsusp_header((struct swsusp_info *)buffer);
 		if (error)
 			return error;
 		handle->buffer = buffer;
@@ -1427,7 +1423,7 @@ static int check_header(struct swsusp_info *info)
 {
 	char *reason;
 
-	reason = check_image_kernel(info);
+	reason = check_swsusp_image_kernel(info);
 	if (!reason && info->num_physpages != num_physpages)
 		reason = "memory size";
 	if (reason) {

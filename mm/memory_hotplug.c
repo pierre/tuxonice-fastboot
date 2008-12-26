@@ -11,6 +11,7 @@
 #include <linux/pagemap.h>
 #include <linux/bootmem.h>
 #include <linux/compiler.h>
+#include <linux/dyn_pageflags.h>
 #include <linux/module.h>
 #include <linux/pagevec.h>
 #include <linux/writeback.h>
@@ -213,6 +214,8 @@ static int __meminit __add_zone(struct zone *zone, unsigned long phys_start_pfn)
 	pgdat_resize_unlock(zone->zone_pgdat, &flags);
 	memmap_init_zone(nr_pages, nid, zone_type,
 			 phys_start_pfn, MEMMAP_HOTPLUG);
+
+	dyn_pageflags_hotplug(zone);
 	return 0;
 }
 
