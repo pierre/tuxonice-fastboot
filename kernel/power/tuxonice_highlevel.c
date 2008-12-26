@@ -1263,6 +1263,8 @@ static __exit void core_unload(void)
 	int i,
 	    numfiles = sizeof(sysfs_params) / sizeof(struct toi_sysfs_data);
 
+	toi_alloc_exit();
+	toi_checksum_exit();
 	toi_poweroff_exit();
 	toi_ui_exit();
 	toi_usm_exit();
