@@ -21,6 +21,7 @@ obj-$(CONFIG_TOI_CRYPTO)	+= tuxonice_compress.o
 
 obj-$(CONFIG_TOI_SWAP)		+= tuxonice_block_io.o tuxonice_swap.o
 obj-$(CONFIG_TOI_FILE)		+= tuxonice_block_io.o tuxonice_file.o
+obj-$(CONFIG_TOI_CLUSTER)	+= tuxonice_cluster.o
 
 obj-$(CONFIG_TOI_USERUI)	+= tuxonice_userui.o
 
