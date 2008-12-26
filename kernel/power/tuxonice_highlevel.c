@@ -83,6 +83,7 @@
 #include "tuxonice_ui.h"
 #include "tuxonice_power_off.h"
 #include "tuxonice_storage.h"
+#include "tuxonice_checksum.h"
 #include "tuxonice_builtin.h"
 #include "tuxonice_atomic_copy.h"
 #include "tuxonice_alloc.h"
@@ -412,6 +413,8 @@ static void do_cleanup(int get_debug_info)
 
 	if (get_debug_info)
 		toi_prepare_status(DONT_CLEAR_BAR, "Cleaning up...");
+
+	free_checksum_pages();
 
 	if (get_debug_info)
 		buffer = (char *) toi_get_zeroed_page(20, TOI_ATOMIC_GFP);
@@ -1236,6 +1239,8 @@ static __init int core_load(void)
 	toi_core_fns = &my_fns;
 
 	if (toi_alloc_init())
+		return 1;
+	if (toi_checksum_init())
 		return 1;
 	if (toi_usm_init())
 		return 1;

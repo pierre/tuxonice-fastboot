@@ -12,6 +12,14 @@ tuxonice_core-objs := tuxonice_modules.o tuxonice_sysfs.o tuxonice_highlevel.o \
 
 obj-$(CONFIG_TOI)		+= tuxonice_builtin.o
 
+ifdef CONFIG_PM_DEBUG
+tuxonice_core-objs		+= tuxonice_alloc.o
+endif
+
+ifdef CONFIG_TOI_CHECKSUM
+tuxonice_core-objs		+= tuxonice_checksum.o
+endif
+
 ifdef CONFIG_NET
 tuxonice_core-objs		+= tuxonice_storage.o tuxonice_netlink.o
 endif
@@ -24,6 +32,8 @@ obj-$(CONFIG_TOI_FILE)		+= tuxonice_block_io.o tuxonice_file.o
 obj-$(CONFIG_TOI_CLUSTER)	+= tuxonice_cluster.o
 
 obj-$(CONFIG_TOI_USERUI)	+= tuxonice_userui.o
+
+obj-$(CONFIG_TOI_PAGEFLAGS_TEST)	+= toi_pageflags_test.o
 
 obj-$(CONFIG_PM_SLEEP)		+= process.o console.o
 obj-$(CONFIG_HIBERNATION)	+= swsusp.o disk.o snapshot.o swap.o user.o

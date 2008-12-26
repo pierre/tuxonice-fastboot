@@ -333,6 +333,16 @@
    configure sudo to allow you to invoke your hibernate script as an ordinary
    user.
  
+   - checksum/enabled
+
+   Use cryptoapi hashing routines to verify that Pageset2 pages don't change
+   while we're saving the first part of the image, and to get any pages that
+   do change resaved in the atomic copy. This should normally not be needed,
+   but if you're seeing issues, please enable this. If your issues stop you
+   being able to resume, enable this option, hibernate and cancel the cycle
+   after the atomic copy is done. If the debugging info shows a non-zero
+   number of pages resaved, please report this to Nigel.
+ 
    - compression/algorithm
 
    Set the cryptoapi algorithm used for compressing the image.

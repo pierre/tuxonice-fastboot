@@ -33,6 +33,7 @@
 #include "tuxonice_extent.h"
 #include "tuxonice_sysfs.h"
 #include "tuxonice_builtin.h"
+#include "tuxonice_checksum.h"
 #include "tuxonice_alloc.h"
 char alt_resume_param[256];
 
@@ -43,6 +44,7 @@ static unsigned long pfn, other_pfn;
 static DEFINE_MUTEX(io_mutex);
 static DEFINE_PER_CPU(struct page *, last_sought);
 static DEFINE_PER_CPU(struct page *, last_high_page);
+static DEFINE_PER_CPU(char *, checksum_locn);
 static DEFINE_PER_CPU(struct pbe *, last_low_page);
 static atomic_t io_count;
 atomic_t toi_io_workers;
@@ -399,6 +401,7 @@ static int worker_rw_loop(void *data)
 		 */
 		if (io_write) {
 			struct page *page;
+			char **my_checksum_locn = &__get_cpu_var(checksum_locn);
 
 			pfn = get_next_bit_on(&io_map, pfn);
 
@@ -431,7 +434,15 @@ static int worker_rw_loop(void *data)
 			}
 			page = pfn_to_page(pfn);
 
+			if (io_pageset == 2)
+				*my_checksum_locn =
+					tuxonice_get_next_checksum();
+
 			mutex_unlock(&io_mutex);
+
+			if (io_pageset == 2 &&
+			    tuxonice_calc_checksum(page, *my_checksum_locn))
+					return 1;
 
 			result = first_filter->write_page(write_pfn, page,
 					PAGE_SIZE);
