@@ -126,6 +126,7 @@ void *toi_kzalloc(int fail_num, size_t size, gfp_t flags)
 		alloc_update_stats(fail_num, result);
 	return result;
 }
+EXPORT_SYMBOL_GPL(toi_kzalloc);
 
 unsigned long toi_get_free_pages(int fail_num, gfp_t mask,
 		unsigned int order)
@@ -139,6 +140,7 @@ unsigned long toi_get_free_pages(int fail_num, gfp_t mask,
 		alloc_update_stats(fail_num, (void *) result);
 	return result;
 }
+EXPORT_SYMBOL_GPL(toi_get_free_pages);
 
 struct page *toi_alloc_page(int fail_num, gfp_t mask)
 {
@@ -151,6 +153,7 @@ struct page *toi_alloc_page(int fail_num, gfp_t mask)
 		alloc_update_stats(fail_num, (void *) result);
 	return result;
 }
+EXPORT_SYMBOL_GPL(toi_alloc_page);
 
 unsigned long toi_get_zeroed_page(int fail_num, gfp_t mask)
 {
@@ -163,6 +166,7 @@ unsigned long toi_get_zeroed_page(int fail_num, gfp_t mask)
 		alloc_update_stats(fail_num, (void *) result);
 	return result;
 }
+EXPORT_SYMBOL_GPL(toi_get_zeroed_page);
 
 void toi_kfree(int fail_num, const void *arg)
 {
@@ -171,6 +175,7 @@ void toi_kfree(int fail_num, const void *arg)
 
 	kfree(arg);
 }
+EXPORT_SYMBOL_GPL(toi_kfree);
 
 void toi_free_page(int fail_num, unsigned long virt)
 {
@@ -179,6 +184,7 @@ void toi_free_page(int fail_num, unsigned long virt)
 
 	free_page(virt);
 }
+EXPORT_SYMBOL_GPL(toi_free_page);
 
 void toi__free_page(int fail_num, struct page *page)
 {
@@ -187,6 +193,7 @@ void toi__free_page(int fail_num, struct page *page)
 
 	__free_page(page);
 }
+EXPORT_SYMBOL_GPL(toi__free_page);
 
 void toi_free_pages(int fail_num, struct page *page, int order)
 {
@@ -221,6 +228,7 @@ void toi_alloc_print_debug_stats(void)
 				toi_alloc_desc[i]);
 		}
 }
+EXPORT_SYMBOL_GPL(toi_alloc_print_debug_stats);
 
 static int toi_alloc_initialise(int starting_cycle)
 {
