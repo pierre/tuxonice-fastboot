@@ -38,6 +38,13 @@ config CAN_PM_TRACE
 	def_bool y
 	depends on PM_DEBUG && PM_SLEEP && EXPERIMENTAL
 
+config FS_FREEZER_DEBUG
+	bool "Filesystem freezer debugging"
+	depends on PM_DEBUG
+	default n
+	---help---
+	This option enables debugging of the filesystem freezing code.
+
 config PM_TRACE
 	bool
 	help

@@ -1962,6 +1962,9 @@ void wakeup_kswapd(struct zone *zone, int order)
 	if (!populated_zone(zone))
 		return;
 
+	if (freezer_is_on())
+		return;
+
 	pgdat = zone->zone_pgdat;
 	if (zone_watermark_ok(zone, order, zone->pages_low, 0, 0))
 		return;
