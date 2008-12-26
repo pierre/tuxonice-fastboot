@@ -287,6 +287,14 @@ config CRYPTO_MD5
 	help
 	  MD5 message digest algorithm (RFC1321).
 
+config CRYPTO_LZF
+	tristate "LZF compression algorithm"
+	default y
+	select CRYPTO_ALGAPI
+	help
+	  This is the LZF algorithm. It is especially useful for TuxOnIce,
+	  because it achieves good compression quickly.
+
 config CRYPTO_MICHAEL_MIC
 	tristate "Michael MIC keyed digest algorithm"
 	select CRYPTO_ALGAPI
