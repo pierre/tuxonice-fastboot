@@ -15,7 +15,6 @@
 #include <linux/tty.h>
 #include <linux/crypto.h>
 #include <linux/cpu.h>
-#include <linux/dyn_pageflags.h>
 #include <linux/ctype.h>
 #include "tuxonice_io.h"
 #include "tuxonice.h"
@@ -187,8 +186,8 @@ int toi_wait = CONFIG_TOI_DEFAULT_WAIT;
 
 struct toi_core_fns *toi_core_fns;
 
-DECLARE_DYN_PAGEFLAGS(pageset1_map);
-DECLARE_DYN_PAGEFLAGS(pageset1_copy_map);
+struct memory_bitmap pageset1_map;
+struct memory_bitmap pageset1_copy_map;
 
 unsigned long toi_result;
 struct pagedir pagedir1 = {1};
