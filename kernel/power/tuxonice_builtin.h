@@ -3,7 +3,6 @@
  *
  * This file is released under the GPLv2.
  */
-#include <linux/dyn_pageflags.h>
 #include <asm/setup.h>
 
 extern struct toi_core_fns *toi_core_fns;
@@ -14,9 +13,6 @@ extern int toi_in_hibernate;
 extern __nosavedata struct pbe *restore_highmem_pblist;
 
 int toi_lowlevel_builtin(void);
-
-extern struct dyn_pageflags __nosavedata toi_nosave_origmap;
-extern struct dyn_pageflags __nosavedata toi_nosave_copymap;
 
 #ifdef CONFIG_HIGHMEM
 extern __nosavedata struct zone_data *toi_nosave_zone_list;
