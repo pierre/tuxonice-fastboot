@@ -24,6 +24,7 @@
 #include "tuxonice_extent.h"
 #include "tuxonice_block_io.h"
 #include "tuxonice_alloc.h"
+#include "tuxonice_builtin.h"
 
 static struct toi_module_ops toi_swapops;
 
