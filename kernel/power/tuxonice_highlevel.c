@@ -75,6 +75,7 @@
 #include <linux/writeback.h>
 #include <linux/uaccess.h> /* for get/set_fs & KERNEL_DS on i386 */
 
+#include "tuxonice.h"
 #include "tuxonice_modules.h"
 #include "tuxonice_sysfs.h"
 #include "tuxonice_prepare_image.h"
@@ -277,13 +278,13 @@ static void mark_nosave_pages(void)
  */
 static int allocate_bitmaps(void)
 {
-	if (allocate_dyn_pageflags(&pageset1_map, 0) ||
-	    allocate_dyn_pageflags(&pageset1_copy_map, 0) ||
-	    allocate_dyn_pageflags(&pageset2_map, 0) ||
-	    allocate_dyn_pageflags(&io_map, 0) ||
-	    allocate_dyn_pageflags(&nosave_map, 0) ||
-	    allocate_dyn_pageflags(&free_map, 0) ||
-	    allocate_dyn_pageflags(&page_resave_map, 0))
+	if (memory_bm_create(&pageset1_map, GFP_KERNEL, 0) ||
+	    memory_bm_create(&pageset1_copy_map, GFP_KERNEL, 0) ||
+	    memory_bm_create(&pageset2_map, GFP_KERNEL, 0) ||
+	    memory_bm_create(&io_map, GFP_KERNEL, 0) ||
+	    memory_bm_create(&nosave_map, GFP_KERNEL, 0) ||
+	    memory_bm_create(&free_map, GFP_KERNEL, 0) ||
+	    memory_bm_create(&page_resave_map, GFP_KERNEL, 0))
 		return 1;
 
 	return 0;
@@ -293,17 +294,17 @@ static int allocate_bitmaps(void)
  * free_bitmaps: Free the bitmaps used to record page states.
  *
  * Free the bitmaps allocated above. It is not an error to call
- * free_dyn_pageflags on a bitmap that isn't currentyl allocated.
+ * memory_bm_free on a bitmap that isn't currently allocated.
  */
 static void free_bitmaps(void)
 {
-	free_dyn_pageflags(&pageset1_map);
-	free_dyn_pageflags(&pageset1_copy_map);
-	free_dyn_pageflags(&pageset2_map);
-	free_dyn_pageflags(&io_map);
-	free_dyn_pageflags(&nosave_map);
-	free_dyn_pageflags(&free_map);
-	free_dyn_pageflags(&page_resave_map);
+	memory_bm_free(&pageset1_map, 0);
+	memory_bm_free(&pageset1_copy_map, 0);
+	memory_bm_free(&pageset2_map, 0);
+	memory_bm_free(&io_map, 0);
+	memory_bm_free(&nosave_map, 0);
+	memory_bm_free(&free_map, 0);
+	memory_bm_free(&page_resave_map, 0);
 }
 
 /**
@@ -862,30 +863,24 @@ static int do_load_atomic_copy(void)
  */
 static void prepare_restore_load_alt_image(int prepare)
 {
-	static struct dyn_pageflags pageset1_map_save, pageset1_copy_map_save;
+	static struct memory_bitmap pageset1_map_save, pageset1_copy_map_save;
 
 	if (prepare) {
 		memcpy(&pageset1_map_save, &pageset1_map,
-				sizeof(struct dyn_pageflags));
-		pageset1_map.bitmap = NULL;
-		pageset1_map.sparse = 0;
-		pageset1_map.initialised = 0;
+				sizeof(struct memory_bitmap));
+		memset(&pageset1_map, 0, sizeof(struct memory_bitmap));
 		memcpy(&pageset1_copy_map_save, &pageset1_copy_map,
-			sizeof(struct dyn_pageflags));
-		pageset1_copy_map.bitmap = NULL;
-		pageset1_copy_map.sparse = 0;
-		pageset1_copy_map.initialised = 0;
+				sizeof(struct memory_bitmap));
+		memset(&pageset1_copy_map, 0, sizeof(struct memory_bitmap));
 		set_toi_state(TOI_LOADING_ALT_IMAGE);
 		toi_reset_alt_image_pageset2_pfn();
 	} else {
-		if (pageset1_map.bitmap)
-			free_dyn_pageflags(&pageset1_map);
+		memory_bm_free(&pageset1_map, 0);
 		memcpy(&pageset1_map, &pageset1_map_save,
-			sizeof(struct dyn_pageflags));
-		if (pageset1_copy_map.bitmap)
-			free_dyn_pageflags(&pageset1_copy_map);
+				sizeof(struct memory_bitmap));
+		memory_bm_free(&pageset1_copy_map, 0);
 		memcpy(&pageset1_copy_map, &pageset1_copy_map_save,
-			sizeof(struct dyn_pageflags));
+				sizeof(struct memory_bitmap));
 		clear_toi_state(TOI_NOW_RESUMING);
 		clear_toi_state(TOI_LOADING_ALT_IMAGE);
 	}

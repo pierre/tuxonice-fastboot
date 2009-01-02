@@ -9,8 +9,6 @@
 #include <linux/suspend_ioctls.h>
 #include <linux/utsname.h>
 #include <linux/freezer.h>
-#include "tuxonice.h"
-#include "tuxonice_builtin.h"
 
 struct swsusp_info {
 	struct new_utsname	uts;
@@ -266,5 +264,63 @@ struct nosave_region {
 #endif
 
 #define ZONE_START(thiszone) ((thiszone)->zone_start_pfn - PHYS_PFN_OFFSET)
+
+#define BM_END_OF_MAP	(~0UL)
+
+#define BM_BITS_PER_BLOCK	(PAGE_SIZE << 3)
+
+struct bm_block {
+	struct bm_block *next;		/* next element of the list */
+	unsigned long start_pfn;	/* pfn represented by the first bit */
+	unsigned long end_pfn;	/* pfn represented by the last bit plus 1 */
+	unsigned long *data;	/* bitmap representing pages */
+};
+
+struct zone_bitmap {
+	struct zone_bitmap *next;	/* next element of the list */
+	unsigned long start_pfn;	/* minimal pfn in this zone */
+	unsigned long end_pfn;		/* maximal pfn in this zone plus 1 */
+	struct bm_block *bm_blocks;	/* list of bitmap blocks */
+	struct bm_block *cur_block;	/* recently used bitmap block */
+};
+
+/* strcut bm_position is used for browsing memory bitmaps */
+
+struct bm_position {
+	struct zone_bitmap *zone_bm;
+	struct bm_block *block;
+	int bit;
+};
+
+struct memory_bitmap {
+	struct zone_bitmap *zone_bm_list;	/* list of zone bitmaps */
+	struct linked_page *p_list;	/* list of pages used to store zone
+					 * bitmap objects and bitmap block
+					 * objects
+					 */
+	struct bm_position cur;	/* most recently used bit position */
+};
+
+extern int memory_bm_create(struct memory_bitmap *bm, gfp_t gfp_mask,
+		int safe_needed);
+extern void memory_bm_free(struct memory_bitmap *bm, int clear_nosave_free);
+extern void memory_bm_set_bit(struct memory_bitmap *bm, unsigned long pfn);
+extern void memory_bm_clear_bit(struct memory_bitmap *bm, unsigned long pfn);
+extern int memory_bm_test_bit(struct memory_bitmap *bm, unsigned long pfn);
+extern unsigned long memory_bm_next_pfn(struct memory_bitmap *bm);
+extern void memory_bm_position_reset(struct memory_bitmap *bm);
+extern void memory_bm_clear(struct memory_bitmap *bm);
+extern void memory_bm_copy(struct memory_bitmap *source,
+		struct memory_bitmap *dest);
+extern void memory_bm_dup(struct memory_bitmap *source,
+		struct memory_bitmap *dest);
+
+#ifdef CONFIG_TOI
+struct toi_module_ops;
+extern int memory_bm_read(struct memory_bitmap *bm, int (*rw_chunk)
+	(int rw, struct toi_module_ops *owner, char *buffer, int buffer_size));
+extern int memory_bm_write(struct memory_bitmap *bm, int (*rw_chunk)
+	(int rw, struct toi_module_ops *owner, char *buffer, int buffer_size));
+#endif
 
 #endif
