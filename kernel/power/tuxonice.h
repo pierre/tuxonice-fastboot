@@ -15,7 +15,6 @@
 #include <linux/delay.h>
 #include <linux/bootmem.h>
 #include <linux/suspend.h>
-#include <linux/dyn_pageflags.h>
 #include <linux/fs.h>
 #include <linux/kmod.h>
 #include <asm/setup.h>

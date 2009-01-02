@@ -5,8 +5,7 @@
  *
  * Distributed under GPLv2.
  *
- * These functions encapsulate the manipulation of storage metadata. For
- * pageflags, we use dynamically allocated bitmaps.
+ * These functions encapsulate the manipulation of storage metadata.
  */
 
 #include <linux/suspend.h>
