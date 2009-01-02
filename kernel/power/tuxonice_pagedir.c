@@ -32,10 +32,11 @@
 static int ptoi_pfn;
 static struct pbe *this_low_pbe;
 static struct pbe **last_low_pbe_ptr;
+static struct memory_bitmap dup_map;
 
 void toi_reset_alt_image_pageset2_pfn(void)
 {
-	ptoi_pfn = max_pfn + 1;
+	memory_bm_position_reset(&pageset2_map);
 }
 
 static struct page *first_conflicting_page;
@@ -69,24 +70,18 @@ struct page *___toi_get_nonconflicting_page(int can_be_highmem)
 		flags |= __GFP_HIGHMEM;
 
 
-	if (test_toi_state(TOI_LOADING_ALT_IMAGE) && pageset2_map.bitmap &&
-				(ptoi_pfn < (max_pfn + 2))) {
-		/*
-		 * ptoi_pfn = max_pfn + 1 when yet to find first ps2 pfn that
-		 * can be used.
-		 * 	   = 0..max_pfn when going through list.
-		 * 	   = max_pfn + 2 when gone through whole list.
-		 */
+	if (test_toi_state(TOI_LOADING_ALT_IMAGE) &&
+			pageset2_map.zone_bm_list &&
+			(ptoi_pfn != BM_END_OF_MAP)) {
 		do {
-			ptoi_pfn = get_next_bit_on(&pageset2_map, ptoi_pfn);
-			if (ptoi_pfn <= max_pfn) {
+			ptoi_pfn = memory_bm_next_pfn(&pageset2_map);
+			if (ptoi_pfn != BM_END_OF_MAP) {
 				page = pfn_to_page(ptoi_pfn);
 				if (!PagePageset1(page) &&
 				    (can_be_highmem || !PageHighMem(page)))
 					return page;
-			} else
-				ptoi_pfn++;
-		} while (ptoi_pfn < max_pfn);
+			}
+		} while (ptoi_pfn != BM_END_OF_MAP);
 	}
 
 	do {
@@ -131,6 +126,93 @@ struct pbe *get_next_pbe(struct page **page_ptr, struct pbe *this_pbe,
 	return this_pbe;
 }
 
+static int setup_pbes(int want_highmem, int to_free, int low_pages_wanted,
+		struct pbe *this_pbe, struct page **last_pbe_page,
+		struct page **cur_pbe_page, struct pbe **last_pbe_ptr)
+{
+	unsigned long pfn;
+
+	memory_bm_position_reset(&dup_map);
+
+	BITMAP_FOR_EACH_SET(pageset1_copy_map, pfn) {
+		struct page *page = pfn_to_page(pfn);
+		int is_high = PageHighMem(page);
+
+		if (PagePageset1(page) ||
+		    (want_highmem && !is_high && !low_pages_wanted) ||
+		    (!want_highmem && is_high))
+			continue;
+
+		/* Free the page? */
+		if (to_free && want_highmem == is_high) {
+			ClearPagePageset1Copy(page);
+			toi__free_page(30, page);
+			to_free--;
+			continue;
+		}
+
+		/* Nope. We're going to use this page. Add a pbe. */
+		if (want_highmem) {
+			struct page *orig_page;
+			if (!is_high)
+				low_pages_wanted--;
+			do {
+				unsigned long orig_high_pfn =
+					memory_bm_next_pfn(&dup_map);
+				BUG_ON(orig_high_pfn == BM_END_OF_MAP);
+				orig_page = pfn_to_page(orig_high_pfn);
+			} while (!PageHighMem(orig_page) ||
+					load_direct(orig_page));
+
+			this_pbe->orig_address = orig_page;
+			this_pbe->address = page;
+			this_pbe->next = NULL;
+			if (last_pbe_page != cur_pbe_page) {
+				*last_pbe_ptr =
+					(struct pbe *) cur_pbe_page;
+				if (!last_pbe_page)
+					last_pbe_page = cur_pbe_page;
+			} else
+				*last_pbe_ptr = this_pbe;
+			last_pbe_ptr = &this_pbe->next;
+			if (last_pbe_page != cur_pbe_page) {
+				kunmap(last_pbe_page);
+				last_pbe_page = cur_pbe_page;
+			}
+			this_pbe = get_next_pbe(cur_pbe_page,
+					this_pbe, 1);
+			if (IS_ERR(this_pbe)) {
+				printk(KERN_INFO
+						"(Highmem) This pbe is an error.\n");
+				return -ENOMEM;
+			}
+		} else {
+			struct page *orig_page;
+			do {
+				unsigned long orig_low_pfn =
+					memory_bm_next_pfn(&dup_map);
+				BUG_ON(orig_low_pfn == BM_END_OF_MAP);
+				orig_page = pfn_to_page(orig_low_pfn);
+			} while (PageHighMem(orig_page) ||
+					load_direct(orig_page));
+
+			this_low_pbe->orig_address = page_address(orig_page);
+			this_low_pbe->address = page_address(page);
+			this_low_pbe->next = NULL;
+			*last_low_pbe_ptr = this_low_pbe;
+			last_low_pbe_ptr = &this_low_pbe->next;
+			this_low_pbe = get_next_pbe(cur_pbe_page,
+					this_low_pbe, 0);
+			if (IS_ERR(this_low_pbe)) {
+				printk(KERN_INFO "this_low_pbe is an error.\n");
+				return -ENOMEM;
+			}
+		}
+	}
+
+	return 0;
+}
+
 /* get_pageset1_load_addresses
  *
  * Description: We check here that pagedir & pages it points to won't collide
@@ -142,7 +224,7 @@ struct pbe *get_next_pbe(struct page **page_ptr, struct pbe *this_pbe,
 
 int toi_get_pageset1_load_addresses(void)
 {
-	int pfn, highallocd = 0, lowallocd = 0;
+	int pfn, highallocd = 0, lowallocd = 0, result;
 	int low_needed = pagedir1.size - get_highmem_size(pagedir1);
 	int high_needed = get_highmem_size(pagedir1);
 	int low_pages_for_highmem = 0;
@@ -151,25 +233,37 @@ int toi_get_pageset1_load_addresses(void)
 		    *low_pbe_page;
 	struct pbe **last_high_pbe_ptr = &restore_highmem_pblist,
 		   *this_high_pbe = NULL;
-	int orig_low_pfn = max_pfn + 1, orig_high_pfn = max_pfn + 1;
-	int high_pbes_done = 0, low_pbes_done = 0;
 	int low_direct = 0, high_direct = 0;
 	int high_to_free, low_to_free;
+
+	/*
+	 * We need to duplicate pageset1's map because memory_bm_next_pfn's state
+	 * gets stomped on by the PagePageset1() test in setup_pbes.
+	 */
+	memory_bm_create(&dup_map, GFP_KERNEL, 0);
+	memory_bm_dup(&pageset1_map, &dup_map);
+
+	memory_bm_position_reset(&pageset1_map);
 
 	last_low_pbe_ptr = &restore_pblist;
 
 	/* First, allocate pages for the start of our pbe lists. */
 	if (high_needed) {
 		high_pbe_page = ___toi_get_nonconflicting_page(1);
-		if (!high_pbe_page)
-			return 1;
+		if (!high_pbe_page) {
+			result = -ENOMEM;
+			goto out;
+		}
 		this_high_pbe = (struct pbe *) kmap(high_pbe_page);
 		memset(this_high_pbe, 0, PAGE_SIZE);
 	}
 
 	low_pbe_page = ___toi_get_nonconflicting_page(0);
-	if (!low_pbe_page)
-		return 1;
+	if (!low_pbe_page) {
+		result = -ENOMEM;
+		goto out;
+	}
+
 	this_low_pbe = (struct pbe *) page_address(low_pbe_page);
 
 	/*
@@ -190,7 +284,7 @@ int toi_get_pageset1_load_addresses(void)
 	 * and how many pages we can reload directly to their original
 	 * location.
 	 */
-	BITMAP_FOR_EACH_SET(&pageset1_copy_map, pfn) {
+	BITMAP_FOR_EACH_SET(pageset1_copy_map, pfn) {
 		int is_high;
 		page = pfn_to_page(pfn);
 		is_high = PageHighMem(page);
@@ -231,89 +325,20 @@ int toi_get_pageset1_load_addresses(void)
 	low_to_free = lowallocd - low_needed;
 
 	/*
-	 * Now generate our pbes (which will be used for the atomic restore,
+	 * Now generate our pbes (which will be used for the atomic restore)
 	 * and free unneeded pages.
 	 */
-	BITMAP_FOR_EACH_SET(&pageset1_copy_map, pfn) {
-		int is_high;
-		page = pfn_to_page(pfn);
-		is_high = PageHighMem(page);
+	result = setup_pbes(1, high_to_free, low_pages_for_highmem,
+			this_high_pbe, &last_high_pbe_page,
+			&high_pbe_page, last_high_pbe_ptr);
+	if (result)
+		goto out;
 
-		if (PagePageset1(page))
-			continue;
-
-		/* Free the page? */
-		if ((is_high && high_to_free) ||
-		    (!is_high && low_to_free)) {
-			ClearPagePageset1Copy(page);
-			toi__free_page(30, page);
-			if (is_high)
-				high_to_free--;
-			else
-				low_to_free--;
-			continue;
-		}
-
-		/* Nope. We're going to use this page. Add a pbe. */
-		if (is_high || low_pages_for_highmem) {
-			struct page *orig_page;
-			high_pbes_done++;
-			if (!is_high)
-				low_pages_for_highmem--;
-			do {
-				orig_high_pfn = get_next_bit_on(&pageset1_map,
-						orig_high_pfn);
-				BUG_ON(orig_high_pfn > max_pfn);
-				orig_page = pfn_to_page(orig_high_pfn);
-			} while (!PageHighMem(orig_page) ||
-					load_direct(orig_page));
-
-			this_high_pbe->orig_address = orig_page;
-			this_high_pbe->address = page;
-			this_high_pbe->next = NULL;
-			if (last_high_pbe_page != high_pbe_page) {
-				*last_high_pbe_ptr =
-					(struct pbe *) high_pbe_page;
-				if (!last_high_pbe_page)
-					last_high_pbe_page = high_pbe_page;
-			} else
-				*last_high_pbe_ptr = this_high_pbe;
-			last_high_pbe_ptr = &this_high_pbe->next;
-			if (last_high_pbe_page != high_pbe_page) {
-				kunmap(last_high_pbe_page);
-				last_high_pbe_page = high_pbe_page;
-			}
-			this_high_pbe = get_next_pbe(&high_pbe_page,
-					this_high_pbe, 1);
-			if (IS_ERR(this_high_pbe)) {
-				printk(KERN_INFO
-						"This high pbe is an error.\n");
-				return -ENOMEM;
-			}
-		} else {
-			struct page *orig_page;
-			low_pbes_done++;
-			do {
-				orig_low_pfn = get_next_bit_on(&pageset1_map,
-						orig_low_pfn);
-				BUG_ON(orig_low_pfn > max_pfn);
-				orig_page = pfn_to_page(orig_low_pfn);
-			} while (PageHighMem(orig_page) ||
-					load_direct(orig_page));
-
-			this_low_pbe->orig_address = page_address(orig_page);
-			this_low_pbe->address = page_address(page);
-			this_low_pbe->next = NULL;
-			*last_low_pbe_ptr = this_low_pbe;
-			last_low_pbe_ptr = &this_low_pbe->next;
-			this_low_pbe = get_next_pbe(&low_pbe_page,
-					this_low_pbe, 0);
-			if (IS_ERR(this_low_pbe)) {
-				printk(KERN_INFO "this_low_pbe is an error.\n");
-				return -ENOMEM;
-			}
-		}
-	}
+	result = setup_pbes(0, low_to_free, 0,
+			this_low_pbe, NULL,
+			&low_pbe_page, last_low_pbe_ptr);
+	if (result)
+		goto out;
 
 	if (high_pbe_page)
 		kunmap(high_pbe_page);
@@ -326,7 +351,9 @@ int toi_get_pageset1_load_addresses(void)
 
 	free_conflicting_pages();
 
-	return 0;
+out:
+	memory_bm_free(&dup_map, 0);
+	return result;
 }
 
 int add_boot_kernel_data_pbe(void)

@@ -237,50 +237,14 @@ static void chain_free(struct chain_allocator *ca, int clear_page_nosave)
  *	the represented memory area.
  */
 
-#define BM_END_OF_MAP	(~0UL)
-
-#define BM_BITS_PER_BLOCK	(PAGE_SIZE << 3)
-
-struct bm_block {
-	struct bm_block *next;		/* next element of the list */
-	unsigned long start_pfn;	/* pfn represented by the first bit */
-	unsigned long end_pfn;	/* pfn represented by the last bit plus 1 */
-	unsigned long *data;	/* bitmap representing pages */
-};
-
 static inline unsigned long bm_block_bits(struct bm_block *bb)
 {
 	return bb->end_pfn - bb->start_pfn;
 }
 
-struct zone_bitmap {
-	struct zone_bitmap *next;	/* next element of the list */
-	unsigned long start_pfn;	/* minimal pfn in this zone */
-	unsigned long end_pfn;		/* maximal pfn in this zone plus 1 */
-	struct bm_block *bm_blocks;	/* list of bitmap blocks */
-	struct bm_block *cur_block;	/* recently used bitmap block */
-};
-
-/* strcut bm_position is used for browsing memory bitmaps */
-
-struct bm_position {
-	struct zone_bitmap *zone_bm;
-	struct bm_block *block;
-	int bit;
-};
-
-struct memory_bitmap {
-	struct zone_bitmap *zone_bm_list;	/* list of zone bitmaps */
-	struct linked_page *p_list;	/* list of pages used to store zone
-					 * bitmap objects and bitmap block
-					 * objects
-					 */
-	struct bm_position cur;	/* most recently used bit position */
-};
-
 /* Functions that operate on memory bitmaps */
 
-static void memory_bm_position_reset(struct memory_bitmap *bm)
+void memory_bm_position_reset(struct memory_bitmap *bm)
 {
 	struct zone_bitmap *zone_bm;
 
@@ -290,7 +254,7 @@ static void memory_bm_position_reset(struct memory_bitmap *bm)
 	bm->cur.bit = 0;
 }
 
-static void memory_bm_free(struct memory_bitmap *bm, int clear_nosave_free);
+void memory_bm_free(struct memory_bitmap *bm, int clear_nosave_free);
 
 /**
  *	create_bm_block_list - create a list of block bitmap objects
@@ -340,7 +304,7 @@ create_zone_bm_list(unsigned int nr_zones, struct chain_allocator *ca)
   *	memory_bm_create - allocate memory for a memory bitmap
   */
 
-static int
+int
 memory_bm_create(struct memory_bitmap *bm, gfp_t gfp_mask, int safe_needed)
 {
 	struct chain_allocator ca;
@@ -420,9 +384,12 @@ memory_bm_create(struct memory_bitmap *bm, gfp_t gfp_mask, int safe_needed)
   *	memory_bm_free - free memory occupied by the memory bitmap @bm
   */
 
-static void memory_bm_free(struct memory_bitmap *bm, int clear_nosave_free)
+void memory_bm_free(struct memory_bitmap *bm, int clear_nosave_free)
 {
 	struct zone_bitmap *zone_bm;
+
+	if (!bm->zone_bm_list)
+		return;
 
 	/* Free the list of bit blocks for each zone_bitmap object */
 	zone_bm = bm->zone_bm_list;
@@ -483,7 +450,7 @@ static int memory_bm_find_bit(struct memory_bitmap *bm, unsigned long pfn,
 	return 0;
 }
 
-static void memory_bm_set_bit(struct memory_bitmap *bm, unsigned long pfn)
+void memory_bm_set_bit(struct memory_bitmap *bm, unsigned long pfn)
 {
 	void *addr;
 	unsigned int bit;
@@ -506,7 +473,7 @@ static int mem_bm_set_bit_check(struct memory_bitmap *bm, unsigned long pfn)
 	return error;
 }
 
-static void memory_bm_clear_bit(struct memory_bitmap *bm, unsigned long pfn)
+void memory_bm_clear_bit(struct memory_bitmap *bm, unsigned long pfn)
 {
 	void *addr;
 	unsigned int bit;
@@ -517,7 +484,7 @@ static void memory_bm_clear_bit(struct memory_bitmap *bm, unsigned long pfn)
 	clear_bit(bit, addr);
 }
 
-static int memory_bm_test_bit(struct memory_bitmap *bm, unsigned long pfn)
+int memory_bm_test_bit(struct memory_bitmap *bm, unsigned long pfn)
 {
 	void *addr;
 	unsigned int bit;
@@ -537,7 +504,7 @@ static int memory_bm_test_bit(struct memory_bitmap *bm, unsigned long pfn)
  *	this function.
  */
 
-static unsigned long memory_bm_next_pfn(struct memory_bitmap *bm)
+unsigned long memory_bm_next_pfn(struct memory_bitmap *bm)
 {
 	struct zone_bitmap *zone_bm;
 	struct bm_block *bb;
@@ -569,6 +536,158 @@ static unsigned long memory_bm_next_pfn(struct memory_bitmap *bm)
 	bm->cur.bit = bit + 1;
 	return bb->start_pfn + bit;
 }
+
+void memory_bm_clear(struct memory_bitmap *bm)
+{
+	unsigned long pfn;
+
+	memory_bm_position_reset(bm);
+	pfn = memory_bm_next_pfn(bm);
+	while (pfn != BM_END_OF_MAP) {
+		memory_bm_clear_bit(bm, pfn);
+		pfn = memory_bm_next_pfn(bm);
+	}
+}
+
+void memory_bm_copy(struct memory_bitmap *source, struct memory_bitmap *dest)
+{
+	unsigned long pfn;
+
+	memory_bm_position_reset(source);
+	pfn = memory_bm_next_pfn(source);
+	while (pfn != BM_END_OF_MAP) {
+		memory_bm_set_bit(dest, pfn);
+		pfn = memory_bm_next_pfn(source);
+	}
+}
+
+void memory_bm_dup(struct memory_bitmap *source, struct memory_bitmap *dest)
+{
+	memory_bm_clear(dest);
+	memory_bm_copy(source, dest);
+}
+
+#ifdef CONFIG_TOI
+int memory_bm_write(struct memory_bitmap *bm, int (*rw_chunk)
+	(int rw, struct toi_module_ops *owner, char *buffer, int buffer_size))
+{
+	int result = 0;
+	unsigned int nr;
+	struct zone_bitmap *zone_bm;
+	struct bm_block *bb;
+
+	if (!bm)
+		return result;
+
+	for (zone_bm = bm->zone_bm_list; zone_bm; zone_bm = zone_bm->next)
+		nr++;
+
+	result = (*rw_chunk)(WRITE, NULL, (char *) &nr, sizeof(unsigned int));
+	if (result)
+		return result;
+
+	for (zone_bm = bm->zone_bm_list; zone_bm; zone_bm = zone_bm->next) {
+		result = (*rw_chunk)(WRITE, NULL, (char *) &zone_bm->start_pfn,
+				2 * sizeof(unsigned long));
+		if (result)
+			return result;
+
+		nr = 0;
+		for (bb = zone_bm->bm_blocks; bb; bb = bb->next)
+			nr++;
+
+		result = (*rw_chunk)(WRITE, NULL, (char *) &nr,
+				sizeof(unsigned int));
+
+		if (result)
+			return result;
+
+		for (bb = zone_bm->bm_blocks; bb; bb = bb->next) {
+			result = (*rw_chunk)(WRITE, NULL, (char *) bb->data,
+					PAGE_SIZE);
+			if (result)
+				return result;
+		}
+	}
+
+	return 0;
+}
+
+int memory_bm_read(struct memory_bitmap *bm, int (*rw_chunk)
+	(int rw, struct toi_module_ops *owner, char *buffer, int buffer_size))
+{
+	int result = 0;
+	unsigned int nr;
+	struct zone_bitmap *zone_bm;
+	struct bm_block *bb;
+	struct chain_allocator ca;
+
+	if (!bm)
+		return result;
+
+	chain_init(&ca, GFP_KERNEL, 0);
+
+	result = (*rw_chunk)(READ, NULL, (char *) &nr, sizeof(unsigned int));
+	if (result)
+		return result;
+
+	zone_bm = create_zone_bm_list(nr, &ca);
+	bm->zone_bm_list = zone_bm;
+	if (!zone_bm) {
+		chain_free(&ca, PG_UNSAFE_CLEAR);
+		return -ENOMEM;
+	}
+
+	for (zone_bm = bm->zone_bm_list; zone_bm; zone_bm = zone_bm->next) {
+		unsigned long pfn;
+
+		result = (*rw_chunk)(READ, NULL, (char *) &zone_bm->start_pfn,
+				2 * sizeof(unsigned long));
+		if (result)
+			return result;
+
+		result = (*rw_chunk)(READ, NULL, (char *) &nr,
+				sizeof(unsigned int));
+
+		if (result)
+			return result;
+
+		bb = create_bm_block_list(nr, &ca);
+		zone_bm->bm_blocks = bb;
+		zone_bm->cur_block = bb;
+		if (!bb)
+			goto Free;
+
+		pfn = zone_bm->start_pfn;
+
+		for (bb = zone_bm->bm_blocks; bb; bb = bb->next) {
+			bb->data = get_image_page(GFP_KERNEL, 0);
+			if (!bb->data)
+				goto Free;
+
+			bb->start_pfn = pfn;
+			if (pfn + BM_BITS_PER_BLOCK > zone_bm->end_pfn)
+				bb->end_pfn = zone_bm->end_pfn;
+			else
+				bb->end_pfn = bb->start_pfn + BM_BITS_PER_BLOCK;
+			pfn = bb->end_pfn;
+			result = (*rw_chunk)(READ, NULL, (char *) bb->data,
+					PAGE_SIZE);
+			if (result)
+				return result;
+		}
+	}
+	bm->p_list = ca.chain;
+	memory_bm_position_reset(bm);
+
+	return 0;
+
+Free:
+	bm->p_list = ca.chain;
+	memory_bm_free(bm, PG_UNSAFE_CLEAR);
+	return -ENOMEM;
+}
+#endif
 
 LIST_HEAD(nosave_regions);
 EXPORT_SYMBOL_GPL(nosave_regions);
