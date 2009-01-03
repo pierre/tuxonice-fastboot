@@ -424,13 +424,6 @@ menuconfig TOI_CORE
 		  always says no pages were resaved, you may be able to safely disable this
 		  option.
 
-	config	TOI_PAGEFLAGS_TEST
-		tristate "Test pageflags"
-		default N
-		depends on TOI_CORE
-		help
-		  Test pageflags.
-
 config TOI
 	bool
 	depends on TOI_CORE!=n
