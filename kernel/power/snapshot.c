@@ -253,6 +253,7 @@ void memory_bm_position_reset(struct memory_bitmap *bm)
 	bm->cur.block = zone_bm->bm_blocks;
 	bm->cur.bit = 0;
 }
+EXPORT_SYMBOL_GPL(memory_bm_position_reset);
 
 void memory_bm_free(struct memory_bitmap *bm, int clear_nosave_free);
 
@@ -379,6 +380,7 @@ memory_bm_create(struct memory_bitmap *bm, gfp_t gfp_mask, int safe_needed)
 	memory_bm_free(bm, PG_UNSAFE_CLEAR);
 	return -ENOMEM;
 }
+EXPORT_SYMBOL_GPL(memory_bm_create);
 
 /**
   *	memory_bm_free - free memory occupied by the memory bitmap @bm
@@ -407,6 +409,7 @@ void memory_bm_free(struct memory_bitmap *bm, int clear_nosave_free)
 	free_list_of_pages(bm->p_list, clear_nosave_free);
 	bm->zone_bm_list = NULL;
 }
+EXPORT_SYMBOL_GPL(memory_bm_free);
 
 /**
  *	memory_bm_find_bit - find the bit in the bitmap @bm that corresponds
@@ -460,6 +463,7 @@ void memory_bm_set_bit(struct memory_bitmap *bm, unsigned long pfn)
 	BUG_ON(error);
 	set_bit(bit, addr);
 }
+EXPORT_SYMBOL_GPL(memory_bm_set_bit);
 
 static int mem_bm_set_bit_check(struct memory_bitmap *bm, unsigned long pfn)
 {
@@ -483,6 +487,7 @@ void memory_bm_clear_bit(struct memory_bitmap *bm, unsigned long pfn)
 	BUG_ON(error);
 	clear_bit(bit, addr);
 }
+EXPORT_SYMBOL_GPL(memory_bm_clear_bit);
 
 int memory_bm_test_bit(struct memory_bitmap *bm, unsigned long pfn)
 {
@@ -494,6 +499,7 @@ int memory_bm_test_bit(struct memory_bitmap *bm, unsigned long pfn)
 	BUG_ON(error);
 	return test_bit(bit, addr);
 }
+EXPORT_SYMBOL_GPL(memory_bm_test_bit);
 
 /**
  *	memory_bm_next_pfn - find the pfn that corresponds to the next set bit
@@ -536,6 +542,7 @@ unsigned long memory_bm_next_pfn(struct memory_bitmap *bm)
 	bm->cur.bit = bit + 1;
 	return bb->start_pfn + bit;
 }
+EXPORT_SYMBOL_GPL(memory_bm_next_pfn);
 
 void memory_bm_clear(struct memory_bitmap *bm)
 {
@@ -548,6 +555,7 @@ void memory_bm_clear(struct memory_bitmap *bm)
 		pfn = memory_bm_next_pfn(bm);
 	}
 }
+EXPORT_SYMBOL_GPL(memory_bm_clear);
 
 void memory_bm_copy(struct memory_bitmap *source, struct memory_bitmap *dest)
 {
@@ -560,12 +568,14 @@ void memory_bm_copy(struct memory_bitmap *source, struct memory_bitmap *dest)
 		pfn = memory_bm_next_pfn(source);
 	}
 }
+EXPORT_SYMBOL_GPL(memory_bm_copy);
 
 void memory_bm_dup(struct memory_bitmap *source, struct memory_bitmap *dest)
 {
 	memory_bm_clear(dest);
 	memory_bm_copy(source, dest);
 }
+EXPORT_SYMBOL_GPL(memory_bm_dup);
 
 #ifdef CONFIG_TOI
 int memory_bm_write(struct memory_bitmap *bm, int (*rw_chunk)
@@ -612,6 +622,7 @@ int memory_bm_write(struct memory_bitmap *bm, int (*rw_chunk)
 
 	return 0;
 }
+EXPORT_SYMBOL_GPL(memory_bm_write);
 
 int memory_bm_read(struct memory_bitmap *bm, int (*rw_chunk)
 	(int rw, struct toi_module_ops *owner, char *buffer, int buffer_size))
@@ -687,6 +698,7 @@ Free:
 	memory_bm_free(bm, PG_UNSAFE_CLEAR);
 	return -ENOMEM;
 }
+EXPORT_SYMBOL_GPL(memory_bm_read);
 #endif
 
 LIST_HEAD(nosave_regions);
