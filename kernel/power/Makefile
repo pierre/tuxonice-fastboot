@@ -32,8 +32,6 @@ obj-$(CONFIG_TOI_FILE)		+= tuxonice_block_io.o tuxonice_file.o
 
 obj-$(CONFIG_TOI_USERUI)	+= tuxonice_userui.o
 
-obj-$(CONFIG_TOI_PAGEFLAGS_TEST)	+= toi_pageflags_test.o
-
 obj-$(CONFIG_PM_SLEEP)		+= process.o console.o
 obj-$(CONFIG_HIBERNATION)	+= swsusp.o disk.o snapshot.o swap.o user.o
 

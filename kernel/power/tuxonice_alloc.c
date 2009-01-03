@@ -11,7 +11,9 @@
 #include <linux/module.h>
 #include <linux/slab.h>
 #include "tuxonice_modules.h"
+#include "tuxonice_alloc.h"
 #include "tuxonice_sysfs.h"
+#include "tuxonice.h"
 
 #define TOI_ALLOC_PATHS 39
 
