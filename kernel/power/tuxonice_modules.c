@@ -17,7 +17,7 @@ LIST_HEAD(toiAllocators);
 LIST_HEAD(toi_modules);
 
 struct toi_module_ops *toiActiveAllocator;
-int toi_num_filters;
+static int toi_num_filters;
 int toiNumAllocators, toi_num_modules;
 
 /*

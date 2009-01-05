@@ -380,7 +380,7 @@ static int worker_rw_loop(void *data)
 	mutex_lock(&io_mutex);
 
 	do {
-		int buf_size;
+		unsigned int buf_size;
 
 		/*
 		 * What page to use? If reading, don't know yet which page's
@@ -448,7 +448,7 @@ static int worker_rw_loop(void *data)
 			if (buf_size != PAGE_SIZE) {
 				abort_hibernate(TOI_FAILED_IO,
 					"I/O pipeline returned %d bytes instead"
-					" of %d.\n", buf_size, PAGE_SIZE);
+					" of %ud.\n", buf_size, PAGE_SIZE);
 				mutex_lock(&io_mutex);
 				break;
 			}
@@ -554,7 +554,7 @@ static int worker_rw_loop(void *data)
 	return 0;
 }
 
-int start_other_threads(void)
+static int start_other_threads(void)
 {
 	int cpu, num_started = 0;
 	struct task_struct *p;
@@ -1087,7 +1087,7 @@ static char *sanity_check(struct toi_header *sh)
 		}
 	}
 
-	return 0;
+	return NULL;
 }
 
 /* __read_pageset1
