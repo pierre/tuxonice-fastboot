@@ -59,7 +59,6 @@
 #include <linux/pid_namespace.h>
 #include <linux/device.h>
 #include <linux/kthread.h>
-#include <linux/dyn_pageflags.h>
 #include <linux/sched.h>
 #include <linux/signal.h>
 #include <linux/idr.h>
@@ -611,7 +610,6 @@ asmlinkage void __init start_kernel(void)
 	softirq_init();
 	timekeeping_init();
 	time_init();
-	dyn_pageflags_init();
 	sched_clock_init();
 	profile_init();
 	if (!irqs_disabled())
@@ -655,7 +653,6 @@ asmlinkage void __init start_kernel(void)
 	enable_debug_pagealloc();
 	cpu_hotplug_init();
 	kmem_cache_init();
-	dyn_pageflags_use_kzalloc();
 	debug_objects_mem_init();
 	idr_init_cache();
 	setup_per_cpu_pageset();
