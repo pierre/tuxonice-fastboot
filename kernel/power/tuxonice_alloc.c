@@ -17,7 +17,7 @@
 
 #define TOI_ALLOC_PATHS 39
 
-DEFINE_MUTEX(toi_alloc_mutex);
+static DEFINE_MUTEX(toi_alloc_mutex);
 
 static struct toi_module_ops toi_alloc_ops;
 
@@ -26,8 +26,8 @@ static atomic_t toi_alloc_count[TOI_ALLOC_PATHS],
 		toi_free_count[TOI_ALLOC_PATHS],
 		toi_test_count[TOI_ALLOC_PATHS],
 		toi_fail_count[TOI_ALLOC_PATHS];
-int toi_cur_allocd[TOI_ALLOC_PATHS], toi_max_allocd[TOI_ALLOC_PATHS];
-int cur_allocd, max_allocd;
+static int toi_cur_allocd[TOI_ALLOC_PATHS], toi_max_allocd[TOI_ALLOC_PATHS];
+static int cur_allocd, max_allocd;
 
 static char *toi_alloc_desc[TOI_ALLOC_PATHS] = {
 	"", /* 0 */
@@ -149,7 +149,7 @@ struct page *toi_alloc_page(int fail_num, gfp_t mask)
 	struct page *result;
 
 	if (toi_alloc_ops.enabled)
-		MIGHT_FAIL(fail_num, 0);
+		MIGHT_FAIL(fail_num, NULL);
 	result = alloc_page(mask);
 	if (toi_alloc_ops.enabled)
 		alloc_update_stats(fail_num, (void *) result);
