@@ -993,8 +993,8 @@ static void _toi_try_resume(void)
 	 */
 	clear_toi_state(TOI_BOOT_TIME);
 
-out:
 	toi_finish_anything(SYSFS_RESUMING);
+out:
 	lockdep_on();
 }
 
