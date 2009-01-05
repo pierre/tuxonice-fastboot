@@ -17,8 +17,8 @@ void toi_check_resleep(void);
 
 extern int platform_begin(int platform_mode);
 extern int platform_pre_snapshot(int platform_mode);
-extern int platform_leave(int platform_mode);
-extern int platform_end(int platform_mode);
-extern int platform_finish(int platform_mode);
+extern void platform_leave(int platform_mode);
+extern void platform_end(int platform_mode);
+extern void platform_finish(int platform_mode);
 extern int platform_pre_restore(int platform_mode);
-extern int platform_restore_cleanup(int platform_mode);
+extern void platform_restore_cleanup(int platform_mode);
