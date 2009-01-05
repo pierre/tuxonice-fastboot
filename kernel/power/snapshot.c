@@ -622,7 +622,7 @@ int memory_bm_read(struct memory_bitmap *bm, int (*rw_chunk)
 	if (!bm)
 		return result;
 
-	chain_init(&ca, GFP_KERNEL, 0);
+	chain_init(&ca, GFP_ATOMIC, 0);
 
 	result = (*rw_chunk)(READ, NULL, (char *) &nr, sizeof(unsigned int));
 	if (result)
@@ -631,7 +631,7 @@ int memory_bm_read(struct memory_bitmap *bm, int (*rw_chunk)
 	zone_bm = create_zone_bm_list(nr, &ca);
 	bm->zone_bm_list = zone_bm;
 	if (!zone_bm) {
-		chain_free(&ca, PG_UNSAFE_CLEAR);
+		chain_free(&ca, PG_ANY);
 		return -ENOMEM;
 	}
 
@@ -658,7 +658,7 @@ int memory_bm_read(struct memory_bitmap *bm, int (*rw_chunk)
 		pfn = zone_bm->start_pfn;
 
 		for (bb = zone_bm->bm_blocks; bb; bb = bb->next) {
-			bb->data = get_image_page(GFP_KERNEL, 0);
+			bb->data = get_image_page(GFP_ATOMIC, 0);
 			if (!bb->data)
 				goto Free;
 
@@ -681,7 +681,7 @@ int memory_bm_read(struct memory_bitmap *bm, int (*rw_chunk)
 
 Free:
 	bm->p_list = ca.chain;
-	memory_bm_free(bm, PG_UNSAFE_CLEAR);
+	memory_bm_free(bm, PG_ANY);
 	return -ENOMEM;
 }
 #endif
