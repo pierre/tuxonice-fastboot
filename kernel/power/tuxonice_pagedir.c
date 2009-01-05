@@ -45,7 +45,7 @@ static struct page *first_conflicting_page;
  * free_conflicting_pages
  */
 
-void free_conflicting_pages(void)
+static void free_conflicting_pages(void)
 {
 	while (first_conflicting_page) {
 		struct page *next =
@@ -65,7 +65,7 @@ void free_conflicting_pages(void)
 struct page *___toi_get_nonconflicting_page(int can_be_highmem)
 {
 	struct page *page;
-	int flags = TOI_ATOMIC_GFP;
+	gfp_t flags = TOI_ATOMIC_GFP;
 	if (can_be_highmem)
 		flags |= __GFP_HIGHMEM;
 
@@ -89,7 +89,7 @@ struct page *___toi_get_nonconflicting_page(int can_be_highmem)
 		if (!page) {
 			printk(KERN_INFO "Failed to get nonconflicting "
 					"page.\n");
-			return 0;
+			return NULL;
 		}
 		if (PagePageset1(page)) {
 			struct page **next = (struct page **) kmap(page);
@@ -108,7 +108,7 @@ unsigned long __toi_get_nonconflicting_page(void)
 	return page ? (unsigned long) page_address(page) : 0;
 }
 
-struct pbe *get_next_pbe(struct page **page_ptr, struct pbe *this_pbe,
+static struct pbe *get_next_pbe(struct page **page_ptr, struct pbe *this_pbe,
 		int highmem)
 {
 	if (((((unsigned long) this_pbe) & (PAGE_SIZE - 1))
@@ -228,7 +228,7 @@ int toi_get_pageset1_load_addresses(void)
 	int low_needed = pagedir1.size - get_highmem_size(pagedir1);
 	int high_needed = get_highmem_size(pagedir1);
 	int low_pages_for_highmem = 0;
-	unsigned long flags = GFP_ATOMIC | __GFP_NOWARN | __GFP_HIGHMEM;
+	gfp_t flags = GFP_ATOMIC | __GFP_NOWARN | __GFP_HIGHMEM;
 	struct page *page, *high_pbe_page = NULL, *last_high_pbe_page = NULL,
 		    *low_pbe_page;
 	struct pbe **last_high_pbe_ptr = &restore_highmem_pblist,
