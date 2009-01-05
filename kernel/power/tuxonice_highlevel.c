@@ -104,7 +104,6 @@ char *tuxonice_signature = "\xed\xc3\x02\xe9\x98\x56\xe5\x0c";
 EXPORT_SYMBOL_GPL(tuxonice_signature);
 
 int toi_fail_num;
-EXPORT_SYMBOL_GPL(toi_fail_num);
 
 int do_toi_step(int step);
 
