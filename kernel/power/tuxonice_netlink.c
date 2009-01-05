@@ -15,7 +15,7 @@
 #include "tuxonice_modules.h"
 #include "tuxonice_alloc.h"
 
-struct user_helper_data *uhd_list;
+static struct user_helper_data *uhd_list;
 
 /*
  * Refill our pool of SKBs for use in emergencies (eg, when eating memory and
