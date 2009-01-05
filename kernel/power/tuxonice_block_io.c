@@ -79,7 +79,7 @@ int toi_writer_buffer_posn;
 
 static struct toi_bdev_info *toi_devinfo;
 
-DEFINE_MUTEX(toi_bio_mutex);
+static DEFINE_MUTEX(toi_bio_mutex);
 
 static struct task_struct *toi_queue_flusher;
 static int toi_bio_queue_flush_pages(int dedicated_thread);
@@ -675,7 +675,7 @@ static int toi_rw_cleanup(int writing)
 	return 0;
 }
 
-int toi_start_one_readahead(int dedicated_thread)
+static int toi_start_one_readahead(int dedicated_thread)
 {
 	char *buffer = NULL;
 	int oom = 0;
