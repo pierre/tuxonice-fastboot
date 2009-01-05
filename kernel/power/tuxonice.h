@@ -29,7 +29,7 @@ struct toi_boot_kernel_data {
 	int size;
 	unsigned long toi_action;
 	unsigned long toi_debug_state;
-	int toi_default_console_level;
+	u32 toi_default_console_level;
 	int toi_io_time[2][2];
 	char toi_nosave_commandline[COMMAND_LINE_SIZE];
 };
