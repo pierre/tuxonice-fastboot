@@ -98,8 +98,6 @@ static char post_hibernate_command[256];
 
 char *tuxonice_signature = "\xed\xc3\x02\xe9\x98\x56\xe5\x0c";
 
-int toi_fail_num;
-
 int do_toi_step(int step);
 
 unsigned long boot_kernel_data_buffer;
@@ -972,7 +970,7 @@ void __toi_try_resume(void)
  * Wrapper for when __toi_try_resume is called from init/do_mounts.c,
  * rather than from echo > /sys/power/tuxonice/do_resume.
  */
-void _toi_try_resume(void)
+static void _toi_try_resume(void)
 {
 	resume_attempted = 1;
 
@@ -1186,7 +1184,7 @@ static struct toi_sysfs_data sysfs_params[] = {
 #endif
 };
 
-struct toi_core_fns my_fns = {
+static struct toi_core_fns my_fns = {
 	.get_nonconflicting_page = __toi_get_nonconflicting_page,
 	.post_context_save = __toi_post_context_save,
 	.try_hibernate = _toi_try_hibernate,
