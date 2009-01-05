@@ -37,7 +37,7 @@ struct user_helper_data {
 	char *name;
 	struct user_helper_data *next;
 	struct completion wait_for_process;
-	unsigned int interface_version;
+	u32 interface_version;
 	int must_init;
 	int debug;
 };
