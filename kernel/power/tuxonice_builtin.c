@@ -99,7 +99,7 @@ static void copyback_high(void)
 }
 
 #else /* CONFIG_HIGHMEM */
-void copyback_high(void) { }
+static void copyback_high(void) { }
 #endif
 
 char toi_wait_for_keypress_dev_console(int timeout)
