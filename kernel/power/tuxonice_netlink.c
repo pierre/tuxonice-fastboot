@@ -126,17 +126,17 @@ EXPORT_SYMBOL_GPL(toi_send_netlink_message);
 
 static void send_whether_debugging(struct user_helper_data *uhd)
 {
-	static int is_debugging = 1;
+	static u8 is_debugging = 1;
 
 	toi_send_netlink_message(uhd, NETLINK_MSG_IS_DEBUGGING,
-			&is_debugging, sizeof(int));
+			&is_debugging, sizeof(u8));
 }
 
 /*
  * Set the PF_NOFREEZE flag on the given process to ensure it can run whilst we
  * are hibernating.
  */
-static int nl_set_nofreeze(struct user_helper_data *uhd, int pid)
+static int nl_set_nofreeze(struct user_helper_data *uhd, __u32 pid)
 {
 	struct task_struct *t;
 
@@ -165,7 +165,7 @@ static int nl_set_nofreeze(struct user_helper_data *uhd, int pid)
 /*
  * Called when the userspace process has informed us that it's ready to roll.
  */
-static int nl_ready(struct user_helper_data *uhd, int version)
+static int nl_ready(struct user_helper_data *uhd, u32 version)
 {
 	if (version != uhd->interface_version) {
 		printk(KERN_INFO "%s userspace process using invalid interface"
@@ -221,7 +221,7 @@ static int toi_nl_gen_rcv_msg(struct user_helper_data *uhd,
 		return -EBUSY;
 	}
 
-	data = (int *)NLMSG_DATA(nlh);
+	data = NLMSG_DATA(nlh);
 
 	switch (type) {
 	case NETLINK_MSG_NOFREEZE_ME:
@@ -230,11 +230,13 @@ static int toi_nl_gen_rcv_msg(struct user_helper_data *uhd,
 		send_whether_debugging(uhd);
 		return 0;
 	case NETLINK_MSG_READY:
-		if (nlh->nlmsg_len < NLMSG_LENGTH(sizeof(int))) {
+		if (nlh->nlmsg_len != NLMSG_LENGTH(sizeof(u32))) {
 			printk(KERN_INFO "Invalid ready mesage.\n");
+			if (uhd->not_ready)
+				uhd->not_ready();
 			return -EINVAL;
 		}
-		return nl_ready(uhd, *data);
+		return nl_ready(uhd, (u32) *data);
 	case NETLINK_MSG_CLEANUP:
 		toi_netlink_close_complete(uhd);
 		return 0;
