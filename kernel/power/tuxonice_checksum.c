@@ -285,7 +285,6 @@ int tuxonice_calc_checksum(struct page *page, char *checksum_locn)
 void check_checksums(void)
 {
 	int pfn, index = 0, cpu = smp_processor_id();
-	unsigned long next_page, this_checksum = 0;
 	char current_checksum[CHECKSUM_SIZE];
 	struct cpu_context *ctx = &per_cpu(contexts, cpu);
 
@@ -295,6 +294,7 @@ void check_checksums(void)
 	next_page = (unsigned long) page_list;
 
 	toi_num_resaved = 0;
+	this_checksum = 0;
 
 	BITMAP_FOR_EACH_SET(pageset2_map, pfn) {
 		int ret;
