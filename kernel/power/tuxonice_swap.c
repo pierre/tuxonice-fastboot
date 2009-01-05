@@ -68,8 +68,8 @@ static char no_image_signature_contents[sizeof(struct sig_data)];
 static struct toi_bdev_info devinfo[MAX_SWAPFILES];
 
 /* Extent chains for swap & blocks */
-struct hibernate_extent_chain swapextents;
-struct hibernate_extent_chain block_chain[MAX_SWAPFILES];
+static struct hibernate_extent_chain swapextents;
+static struct hibernate_extent_chain block_chain[MAX_SWAPFILES];
 
 static dev_t header_dev_t;
 static struct block_device *header_block_device;
@@ -91,7 +91,7 @@ static unsigned long resume_firstblock;
 static dev_t resume_swap_dev_t;
 static struct block_device *resume_block_device;
 
-struct sysinfo swapinfo;
+static struct sysinfo swapinfo;
 
 /* Block devices open. */
 struct bdev_opened {
@@ -854,7 +854,7 @@ static int toi_swap_read_header_init(void)
 	/* Restore device info */
 	for (i = 0; i < MAX_SWAPFILES; i++) {
 		dev_t thisdevice = devinfo[i].dev_t;
-		struct block_device *result;
+		struct block_device *bdev_result;
 
 		devinfo[i].bdev = NULL;
 
@@ -871,9 +871,9 @@ static int toi_swap_read_header_init(void)
 			continue;
 		}
 
-		result = open_bdev(i, thisdevice, 1);
-		if (IS_ERR(result))
-			return PTR_ERR(result);
+		bdev_result = open_bdev(i, thisdevice, 1);
+		if (IS_ERR(bdev_result))
+			return PTR_ERR(bdev_result);
 		devinfo[i].bdev = bdevs_opened[i]->bdev;
 	}
 
@@ -1148,7 +1148,7 @@ static int toi_swap_parse_sig_location(char *commandline,
 static int header_locations_read_sysfs(const char *page, int count)
 {
 	int i, printedpartitionsmessage = 0, len = 0, haveswap = 0;
-	struct inode *swapf = 0;
+	struct inode *swapf = NULL;
 	int zone;
 	char *path_page = (char *) toi_get_free_page(10, GFP_KERNEL);
 	char *path, *output = (char *) page;
