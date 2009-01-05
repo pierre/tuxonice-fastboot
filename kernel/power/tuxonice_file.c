@@ -56,7 +56,7 @@ static struct toi_module_ops toi_fileops;
 
 /* Details of our target.  */
 
-char toi_file_target[256];
+static char toi_file_target[256];
 static struct inode *target_inode;
 static struct file *target_file;
 static struct block_device *toi_file_target_bdev;
@@ -294,10 +294,10 @@ static void toi_file_cleanup(int finishing_cycle)
 		target_storage_available = 0;
 	}
 
-	if (target_file > 0) {
+	if (target_file && !IS_ERR(target_file))
 		filp_close(target_file, NULL);
-		target_file = NULL;
-	}
+
+	target_file = NULL;
 }
 
 /*
@@ -656,7 +656,7 @@ static int toi_file_signature_op(int op)
 	int result = 0, changed = 0;
 	struct toi_file_header *header;
 
-	if (toi_file_target_bdev <= 0)
+	if (IS_ERR(toi_file_target_bdev))
 		return -1;
 
 	cur = (char *) toi_get_zeroed_page(17, TOI_ATOMIC_GFP);

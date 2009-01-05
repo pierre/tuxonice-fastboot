@@ -42,7 +42,8 @@
 static long num_nosave, header_space_allocated, main_storage_allocated,
 	   storage_available;
 long extra_pd1_pages_allowance = CONFIG_TOI_DEFAULT_EXTRA_PAGES_ALLOWANCE;
-int image_size_limit, no_ps2_needed;
+int image_size_limit;
+static int no_ps2_needed;
 
 struct attention_list {
 	struct task_struct *task;
@@ -268,7 +269,7 @@ void toi_free_extra_pagedir_memory(void)
 static int toi_allocate_extra_pagedir_memory(int extra_pages_needed)
 {
 	int j, order, num_to_alloc = extra_pages_needed - extra_pages_allocated;
-	unsigned long flags = TOI_ATOMIC_GFP;
+	gfp_t flags = TOI_ATOMIC_GFP;
 
 	if (num_to_alloc < 1)
 		return 0;
@@ -461,13 +462,13 @@ static long ram_still_required(void)
 static long any_to_free(int use_image_size_limit)
 {
 	long user_limit = (use_image_size_limit && image_size_limit > 0) ?
-		max_t(long, 0, current_image_size() - (image_size_limit << 8))
-		: 0;
+			max_t(long, 0, current_image_size() -
+					(image_size_limit << 8)) : 0,
+		storage_limit = storage_still_required(),
+		ram_limit = ram_still_required(),
+		first_max = max(user_limit, storage_limit);
 
-	long storage_limit = storage_still_required(),
-	    ram_limit = ram_still_required();
-
-	return max(max(user_limit, storage_limit), ram_limit);
+	return max(first_max, ram_limit);
 }
 
 static int need_pageset2(void)
@@ -646,12 +647,12 @@ static void generate_free_page_map(void)
 		for_each_migratetype_order(order, t) {
 			list_for_each(curr,
 					&zone->free_area[order].free_list[t]) {
-				unsigned long i;
+				unsigned long j;
 
 				pfn = page_to_pfn(list_entry(curr, struct page,
 							lru));
-				for (i = 0; i < (1UL << order); i++)
-					SetPageNosaveFree(pfn_to_page(pfn + i));
+				for (j = 0; j < (1UL << order); j++)
+					SetPageNosaveFree(pfn_to_page(pfn + j));
 			}
 		}
 
