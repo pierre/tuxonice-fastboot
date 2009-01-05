@@ -134,7 +134,7 @@ static int toi_compress_init(int toi_or_resume)
  * toi_compress_rw_init()
  */
 
-int toi_compress_rw_init(int rw, int stream_number)
+static int toi_compress_rw_init(int rw, int stream_number)
 {
 	if (toi_compress_prepare_result) {
 		printk("Failed to initialise compression algorithm.\n");

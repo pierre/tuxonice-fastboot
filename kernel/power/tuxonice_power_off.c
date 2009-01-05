@@ -26,10 +26,10 @@
 unsigned long toi_poweroff_method; /* 0 - Kernel power off */
 EXPORT_SYMBOL_GPL(toi_poweroff_method);
 
-int wake_delay;
+static int wake_delay;
 static char lid_state_file[256], wake_alarm_dir[256];
 static struct file *lid_file, *alarm_file, *epoch_file;
-int post_wake_state = -1;
+static int post_wake_state = -1;
 
 static int did_suspend_to_both;
 
@@ -137,7 +137,7 @@ static void open_file(char *format, char *arg, struct file **var, int mode,
 		if (IS_ERR(*var) || !*var) {
 			printk(KERN_INFO "Failed to open %s file '%s' (%p).\n",
 				desc, buf, *var);
-			*var = 0;
+			*var = NULL;
 		}
 	}
 }

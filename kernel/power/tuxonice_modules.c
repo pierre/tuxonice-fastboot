@@ -19,7 +19,7 @@ LIST_HEAD(toi_modules);
 struct toi_module_ops *toiActiveAllocator;
 EXPORT_SYMBOL_GPL(toiActiveAllocator);
 
-int toi_num_filters;
+static int toi_num_filters;
 int toiNumAllocators, toi_num_modules;
 
 /*
