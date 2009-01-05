@@ -268,7 +268,7 @@ int toi_usm_init(void)
 	usm_helper_data.netlink_id = NETLINK_TOI_USM;
 	usm_helper_data.name = "userspace storage manager";
 	usm_helper_data.rcv_msg = usm_user_rcv_msg;
-	usm_helper_data.interface_version = 1;
+	usm_helper_data.interface_version = 2;
 	usm_helper_data.must_init = 0;
 	init_completion(&usm_helper_data.wait_for_process);
 

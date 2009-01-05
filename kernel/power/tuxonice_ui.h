@@ -32,22 +32,21 @@ enum {
 };
 
 struct userui_msg_params {
-	unsigned long a, b, c, d;
+	u32 a, b, c, d;
 	char text[255];
 };
 
 struct ui_ops {
 	char (*wait_for_key) (int timeout);
-	unsigned long (*update_status) (unsigned long value,
-		unsigned long maximum, const char *fmt, ...);
+	u32 (*update_status) (u32 value, u32 maximum, const char *fmt, ...);
 	void (*prepare_status) (int clearbar, const char *fmt, ...);
 	void (*cond_pause) (int pause, char *message);
 	void (*abort)(int result_code, const char *fmt, ...);
 	void (*prepare)(void);
 	void (*cleanup)(void);
 	void (*post_atomic_restore)(void);
-	void (*message)(unsigned long section, unsigned long level,
-		int normally_logged, const char *fmt, ...);
+	void (*message)(u32 section, u32 level, u32 normally_logged,
+			const char *fmt, ...);
 };
 
 extern struct ui_ops *toi_current_ui;

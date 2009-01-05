@@ -64,7 +64,7 @@ static DECLARE_WAIT_QUEUE_HEAD(userui_wait_for_key);
 static void ui_nl_set_state(int n)
 {
 	/* Only let them change certain settings */
-	static const int toi_action_mask =
+	static const u32 toi_action_mask =
 		(1 << TOI_REBOOT) | (1 << TOI_PAUSE) |
 		(1 << TOI_LOGALL) |
 		(1 << TOI_SINGLESTEP) |
@@ -170,14 +170,11 @@ static int userui_memory_needed(void)
  * maximum and progress granularity) where status needs to be updated.
  * This is to reduce unnecessary calls to update_status.
  */
-static unsigned long userui_update_status(unsigned long value,
-		unsigned long maximum, const char *fmt, ...)
+static u32 userui_update_status(u32 value, u32 maximum, const char *fmt, ...)
 {
-	static int last_step = -1;
+	static u32 last_step = 9999;
 	struct userui_msg_params msg;
-	int bitshift;
-	int this_step;
-	unsigned long next_update;
+	u32 bitshift, this_step, next_update;
 
 	if (ui_helper_data.pid == -1)
 		return 0;
@@ -196,14 +193,14 @@ static unsigned long userui_update_status(unsigned long value,
 	 * of 65536 pixels or more?) */
 	bitshift = fls(maximum) - 16;
 	if (bitshift > 0) {
-		unsigned long temp_maximum = maximum >> bitshift;
-		unsigned long temp_value = value >> bitshift;
-		this_step = (int)
+		u32 temp_maximum = maximum >> bitshift;
+		u32 temp_value = value >> bitshift;
+		this_step = (u32)
 			(temp_value * progress_granularity / temp_maximum);
 		next_update = (((this_step + 1) * temp_maximum /
 					progress_granularity) + 1) << bitshift;
 	} else {
-		this_step = (int) (value * progress_granularity / maximum);
+		this_step = (u32) (value * progress_granularity / maximum);
 		next_update = ((this_step + 1) * maximum /
 				progress_granularity) + 1;
 	}
@@ -245,8 +242,8 @@ static unsigned long userui_update_status(unsigned long value,
  *
  * It may be called from an interrupt context - can't sleep!
  */
-static void userui_message(unsigned long section, unsigned long level,
-		int normally_logged, const char *fmt, ...)
+static void userui_message(u32 section, u32 level, u32 normally_logged,
+		const char *fmt, ...)
 {
 	struct userui_msg_params msg;
 
@@ -630,7 +627,7 @@ static __init int toi_user_ui_init(void)
 	ui_helper_data.netlink_id = NETLINK_TOI_USERUI;
 	ui_helper_data.name = "userspace ui";
 	ui_helper_data.rcv_msg = userui_user_rcv_msg;
-	ui_helper_data.interface_version = 7;
+	ui_helper_data.interface_version = 8;
 	ui_helper_data.must_init = 0;
 	ui_helper_data.not_ready = userui_cleanup_console;
 	init_completion(&ui_helper_data.wait_for_process);
