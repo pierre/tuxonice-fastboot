@@ -25,9 +25,7 @@
 #include <linux/ftrace.h>
 
 #include "power.h"
-
 #include "tuxonice.h"
-#include "tuxonice_power_off.h"
 
 static int noresume = 0;
 char resume_file[256] = CONFIG_PM_STD_PARTITION;
