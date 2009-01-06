@@ -24,7 +24,8 @@
 #include "tuxonice_alloc.h"
 #include "tuxonice_io.h"
 
-#define TARGET_OUTSTANDING_IO 16384
+#define ANY_REASON 0
+#define MEMORY_ONLY 1
 
 /* #define MEASURE_MUTEX_CONTENTION */
 #ifndef MEASURE_MUTEX_CONTENTION
@@ -54,13 +55,13 @@ static struct page *bio_queue_head, *bio_queue_tail;
 static atomic_t toi_bio_queue_size;
 static DEFINE_SPINLOCK(bio_queue_lock);
 
-static int free_mem_throttle;
+static int free_mem_throttle, throughput_throttle;
 static int more_readahead = 1;
 static struct page *readahead_list_head, *readahead_list_tail;
 
 static struct page *waiting_on;
 
-static atomic_t toi_io_in_progress;
+static atomic_t toi_io_in_progress, toi_io_done;
 static DECLARE_WAIT_QUEUE_HEAD(num_in_progress_wait);
 
 static int extra_page_forward;
@@ -88,14 +89,14 @@ static int toi_bio_queue_flush_pages(int dedicated_thread);
 	       atomic_read(&toi_bio_queue_size))
 
 /**
- * set_throttle: Set the point where we pause to avoid oom.
+ * set_free_mem_throttle: Set the point where we pause to avoid oom.
  *
  * Initially, this value is zero, but when we first fail to allocate memory,
  * we set it (plus a buffer) and thereafter throttle i/o once that limit is
  * reached.
  */
 
-static void set_throttle(void)
+static void set_free_mem_throttle(void)
 {
 	int new_throttle = nr_unallocated_buffer_pages() + 256;
 
@@ -103,19 +104,16 @@ static void set_throttle(void)
 		free_mem_throttle = new_throttle;
 }
 
-#define NUM_REASONS 10
+#define NUM_REASONS 7
 static atomic_t reasons[NUM_REASONS];
 static char *reason_name[NUM_REASONS] = {
 	"readahead not ready",
 	"bio allocation",
-	"io_struct allocation",
-	"submit buffer",
 	"synchronous I/O",
-	"bio mutex when reading",
-	"bio mutex when writing",
 	"toi_bio_get_new_page",
 	"memory low",
-	"readahead buffer allocation"
+	"readahead buffer allocation",
+	"throughput_throttle",
 };
 
 /**
@@ -143,15 +141,23 @@ static void do_bio_wait(int reason)
 	}
 }
 
-static void throttle_if_memory_low(void)
+static void throttle_if_needed(int reason)
 {
 	int free_pages = nr_unallocated_buffer_pages();
 
 	/* Getting low on memory and I/O is in progress? */
 	while (unlikely(free_pages < free_mem_throttle) &&
 			atomic_read(&toi_io_in_progress)) {
-		do_bio_wait(8);
+		do_bio_wait(4);
 		free_pages = nr_unallocated_buffer_pages();
+	}
+
+	while (reason == ANY_REASON && throughput_throttle &&
+		TOTAL_OUTSTANDING_IO >= throughput_throttle) {
+		atomic_inc(&reasons[6]);
+		wait_event(num_in_progress_wait,
+			!atomic_read(&toi_io_in_progress) ||
+			TOTAL_OUTSTANDING_IO < throughput_throttle);
 	}
 }
 
@@ -174,6 +180,21 @@ static void toi_monitor_outstanding_io(void)
 			TOTAL_OUTSTANDING_IO >= new_max);
 		orig = TOTAL_OUTSTANDING_IO;
 	}
+}
+
+/**
+ * update_throughput_throttle: Update the raw throughput throttle.
+ *
+ * Called once per second by the core, used to limit the amount of I/O
+ * we submit at once, spreading out our waiting through the whole job
+ * and letting userui get an opportunity to do its work.
+ *
+ * We throttle to 1/10s worth of I/O.
+ */
+static void update_throughput_throttle(int jif_index)
+{
+	int done = atomic_read(&toi_io_done);
+	throughput_throttle = done / jif_index;
 }
 
 /**
@@ -215,6 +236,7 @@ static void toi_end_bio(struct bio *bio, int err)
 	bio_put(bio);
 
 	atomic_dec(&toi_io_in_progress);
+	atomic_inc(&toi_io_done);
 
 	wake_up(&num_in_progress_wait);
 }
@@ -237,12 +259,12 @@ static int submit(int writing, struct block_device *dev, sector_t first_block,
 	struct bio *bio = NULL;
 	int cur_outstanding_io;
 
-	throttle_if_memory_low();
+	throttle_if_needed(MEMORY_ONLY);
 
 	while (!bio) {
 		bio = bio_alloc(TOI_ATOMIC_GFP, 1);
 		if (!bio) {
-			set_throttle();
+			set_free_mem_throttle();
 			do_bio_wait(1);
 		}
 	}
@@ -326,7 +348,7 @@ static int toi_do_io(int writing, struct block_device *bdev, long block0,
 		return -EFAULT;
 
 	if (syncio)
-		do_bio_wait(4);
+		do_bio_wait(2);
 
 	return 0;
 }
@@ -576,6 +598,7 @@ static int toi_rw_init(int writing, int stream_number)
 	else
 		toi_extent_state_goto_start(&toi_writer_posn);
 
+	atomic_set(&toi_io_done, 0);
 	toi_writer_buffer = (char *) toi_get_zeroed_page(11, TOI_ATOMIC_GFP);
 	toi_writer_buffer_posn = writing ? 0 : PAGE_SIZE;
 
@@ -680,7 +703,7 @@ static int toi_start_one_readahead(int dedicated_thread)
 	char *buffer = NULL;
 	int oom = 0;
 
-	throttle_if_memory_low();
+	throttle_if_needed(ANY_REASON);
 
 	while (!buffer) {
 		buffer = (char *) toi_get_zeroed_page(12,
@@ -690,8 +713,8 @@ static int toi_start_one_readahead(int dedicated_thread)
 				return -EIO;
 
 			oom = 1;
-			set_throttle();
-			do_bio_wait(9);
+			set_free_mem_throttle();
+			do_bio_wait(5);
 		}
 	}
 
@@ -839,13 +862,13 @@ top:
  */
 static void toi_bio_get_new_page(char **full_buffer)
 {
-	throttle_if_memory_low();
+	throttle_if_needed(ANY_REASON);
 
 	while (!*full_buffer) {
 		*full_buffer = (char *) toi_get_zeroed_page(11, TOI_ATOMIC_GFP);
 		if (!*full_buffer) {
-			set_throttle();
-			do_bio_wait(7);
+			set_free_mem_throttle();
+			do_bio_wait(3);
 		}
 	}
 }
@@ -1118,6 +1141,7 @@ struct toi_bio_ops toi_bio_ops = {
 	.bdev_page_io = toi_bdev_page_io,
 	.finish_all_io = toi_finish_all_io,
 	.monitor_outstanding_io	= toi_monitor_outstanding_io,
+	.update_throughput_throttle = update_throughput_throttle,
 	.forward_one_page = go_next_page,
 	.set_extra_page_forward = set_extra_page_forward,
 	.set_devinfo = toi_set_devinfo,
@@ -1134,7 +1158,7 @@ struct toi_bio_ops toi_bio_ops = {
 
 static struct toi_sysfs_data sysfs_params[] = {
 	SYSFS_INT("target_outstanding_io", SYSFS_RW, &target_outstanding_io,
-			0, TARGET_OUTSTANDING_IO, 0, NULL),
+			0, 16384, 0, NULL),
 };
 
 static struct toi_module_ops toi_blockwriter_ops = {
