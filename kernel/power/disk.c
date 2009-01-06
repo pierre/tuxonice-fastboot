@@ -22,7 +22,6 @@
 #include <linux/console.h>
 #include <linux/cpu.h>
 #include <linux/freezer.h>
-#include <linux/ftrace.h>
 
 #include "power.h"
 #include "tuxonice.h"
@@ -267,7 +266,7 @@ static int create_image(int platform_mode)
 
 int hibernation_snapshot(int platform_mode)
 {
-	int error, ftrace_save;
+	int error;
 
 	/* Free memory before shutting down devices. */
 	error = swsusp_shrink_memory();
@@ -279,7 +278,6 @@ int hibernation_snapshot(int platform_mode)
 		goto Close;
 
 	suspend_console();
-	ftrace_save = __ftrace_enabled_save();
 	error = device_suspend(PMSG_FREEZE);
 	if (error)
 		goto Recover_platform;
@@ -309,7 +307,6 @@ int hibernation_snapshot(int platform_mode)
  Resume_devices:
 	device_resume(in_suspend ?
 		(error ? PMSG_RECOVER : PMSG_THAW) : PMSG_RESTORE);
-	__ftrace_enabled_restore(ftrace_save);
 	resume_console();
  Close:
 	platform_end(platform_mode);
@@ -380,11 +377,10 @@ static int resume_target_kernel(void)
 
 int hibernation_restore(int platform_mode)
 {
-	int error, ftrace_save;
+	int error;
 
 	pm_prepare_console();
 	suspend_console();
-	ftrace_save = __ftrace_enabled_save();
 	error = device_suspend(PMSG_QUIESCE);
 	if (error)
 		goto Finish;
@@ -399,7 +395,6 @@ int hibernation_restore(int platform_mode)
 	platform_restore_cleanup(platform_mode);
 	device_resume(PMSG_RECOVER);
  Finish:
-	__ftrace_enabled_restore(ftrace_save);
 	resume_console();
 	pm_restore_console();
 	return error;
@@ -413,7 +408,7 @@ EXPORT_SYMBOL_GPL(hibernation_platform_enter);
 
 int hibernation_platform_enter(void)
 {
-	int error, ftrace_save;
+	int error;
 
 	if (!hibernation_ops)
 		return -ENOSYS;
@@ -428,7 +423,6 @@ int hibernation_platform_enter(void)
 		goto Close;
 
 	suspend_console();
-	ftrace_save = __ftrace_enabled_save();
 	error = device_suspend(PMSG_HIBERNATE);
 	if (error) {
 		if (hibernation_ops->recover)
@@ -463,7 +457,6 @@ int hibernation_platform_enter(void)
 	hibernation_ops->finish();
  Resume_devices:
 	device_resume(PMSG_RESTORE);
-	__ftrace_enabled_restore(ftrace_save);
 	resume_console();
  Close:
 	hibernation_ops->end();
