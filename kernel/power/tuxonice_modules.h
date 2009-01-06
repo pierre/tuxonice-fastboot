@@ -126,6 +126,9 @@ struct toi_module_ops {
 	/* Attempt to parse an image location */
 	int (*parse_sig_location) (char *buffer, int only_writer, int quiet);
 
+	/* Throttle I/O according to throughput */
+	void (*update_throughput_throttle) (int jif_index);
+
 	/* Monitor outstanding I/O */
 	void (*monitor_outstanding_io) (void);
 
