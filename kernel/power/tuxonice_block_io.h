@@ -30,6 +30,7 @@ struct toi_bio_ops {
 	void (*check_io_stats) (void);
 	void (*reset_io_stats) (void);
 	void (*monitor_outstanding_io) (void);
+	void (*update_throughput_throttle) (int jif_index);
 	void (*finish_all_io) (void);
 	int (*forward_one_page) (int writing);
 	void (*set_extra_page_forward) (void);

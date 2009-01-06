@@ -53,6 +53,9 @@ EXPORT_SYMBOL_GPL(toi_io_queue_flusher);
 int toi_bio_queue_flusher_should_finish;
 EXPORT_SYMBOL_GPL(toi_bio_queue_flusher_should_finish);
 
+/* Indicates that this thread should be used for checking throughput */
+#define MONITOR ((void *) 1)
+
 /* toi_attempt_to_parse_resume_device
  *
  * Can we hibernate, using the current resume= parameter?
@@ -379,7 +382,7 @@ static struct page *copy_page_from_orig_page(struct page *orig_page)
  */
 static int worker_rw_loop(void *data)
 {
-	unsigned long orig_pfn, write_pfn;
+	unsigned long orig_pfn, write_pfn, next_jiffies = jiffies + HZ / 10, jif_index = 1;
 	int result, my_io_index = 0, temp, last_worker, i_finished_first = 0;
 	struct toi_module_ops *first_filter = toi_get_next_filter(NULL);
 	struct page *buffer = toi_alloc_page(28, TOI_ATOMIC_GFP);
@@ -389,6 +392,13 @@ static int worker_rw_loop(void *data)
 
 	do {
 		unsigned int buf_size;
+
+		if (data && jiffies > next_jiffies) {
+			next_jiffies += HZ / 10;
+			if (toiActiveAllocator->update_throughput_throttle)
+				toiActiveAllocator->update_throughput_throttle(jif_index);
+			jif_index++;
+		}
 
 		/*
 		 * What page to use? If reading, don't know yet which page's
@@ -571,7 +581,8 @@ static int start_other_threads(void)
 		if (cpu == smp_processor_id())
 			continue;
 
-		p = kthread_create(worker_rw_loop, NULL, "ks2io/%d", cpu);
+		p = kthread_create(worker_rw_loop, num_started ? NULL : MONITOR,
+				"ks2io/%d", cpu);
 		if (IS_ERR(p)) {
 			printk("ks2io for %i failed\n", cpu);
 			continue;
@@ -648,7 +659,7 @@ static int do_rw_loop(int write, int finish_at, struct memory_bitmap *pageflags,
 
 	if (!num_other_threads || !toiActiveAllocator->io_flusher ||
 		test_action_state(TOI_NO_FLUSHER_THREAD))
-		worker_rw_loop(NULL);
+		worker_rw_loop(num_other_threads ? NULL : MONITOR);
 	else
 		toiActiveAllocator->io_flusher(write);
 
