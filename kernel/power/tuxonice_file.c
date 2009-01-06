@@ -1099,6 +1099,7 @@ static __init int toi_file_load(void)
 	toi_fileops.rw_header_chunk_noreadahead =
 		toi_bio_ops.rw_header_chunk_noreadahead;
 	toi_fileops.io_flusher = toi_bio_ops.io_flusher;
+	toi_fileops.update_throughput_throttle = toi_bio_ops.update_throughput_throttle;
 	toi_fileops.monitor_outstanding_io = toi_bio_ops.monitor_outstanding_io;
 	toi_fileops.finish_all_io = toi_bio_ops.finish_all_io;
 
