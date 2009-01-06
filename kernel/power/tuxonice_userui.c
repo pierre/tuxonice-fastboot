@@ -175,7 +175,8 @@ static u32 userui_update_status(u32 value, u32 maximum, const char *fmt, ...)
 {
 	static u32 last_step = 9999;
 	struct userui_msg_params msg;
-	u32 bitshift, this_step, next_update;
+	u32 this_step, next_update;
+	int bitshift;
 
 	if (ui_helper_data.pid == -1)
 		return 0;
