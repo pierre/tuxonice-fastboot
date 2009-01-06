@@ -347,8 +347,8 @@ static int proc_pid_wchan(struct task_struct *task, char *buffer)
 static int proc_pid_schedstat(struct task_struct *task, char *buffer)
 {
 	return sprintf(buffer, "%llu %llu %lu\n",
-			task->sched_info.cpu_time,
-			task->sched_info.run_delay,
+			(unsigned long long)task->se.sum_exec_runtime,
+			(unsigned long long)task->sched_info.run_delay,
 			task->sched_info.pcount);
 }
 #endif
@@ -1406,6 +1406,7 @@ static struct inode *proc_pid_make_inode(struct super_block * sb, struct task_st
 {
 	struct inode * inode;
 	struct proc_inode *ei;
+	const struct cred *cred;
 
 	/* We need a new inode */
 
@@ -1425,11 +1426,12 @@ static struct inode *proc_pid_make_inode(struct super_block * sb, struct task_st
 	if (!ei->pid)
 		goto out_unlock;
 
-	inode->i_uid = 0;
-	inode->i_gid = 0;
 	if (task_dumpable(task)) {
-		inode->i_uid = task->euid;
-		inode->i_gid = task->egid;
+		rcu_read_lock();
+		cred = __task_cred(task);
+		inode->i_uid = cred->euid;
+		inode->i_gid = cred->egid;
+		rcu_read_unlock();
 	}
 	security_task_to_inode(task, inode);
 
@@ -1445,6 +1447,8 @@ static int pid_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat
 {
 	struct inode *inode = dentry->d_inode;
 	struct task_struct *task;
+	const struct cred *cred;
+
 	generic_fillattr(inode, stat);
 
 	rcu_read_lock();
@@ -1454,8 +1458,9 @@ static int pid_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat
 	if (task) {
 		if ((inode->i_mode == (S_IFDIR|S_IRUGO|S_IXUGO)) ||
 		    task_dumpable(task)) {
-			stat->uid = task->euid;
-			stat->gid = task->egid;
+			cred = __task_cred(task);
+			stat->uid = cred->euid;
+			stat->gid = cred->egid;
 		}
 	}
 	rcu_read_unlock();
@@ -1483,11 +1488,16 @@ static int pid_revalidate(struct dentry *dentry, struct nameidata *nd)
 {
 	struct inode *inode = dentry->d_inode;
 	struct task_struct *task = get_proc_task(inode);
+	const struct cred *cred;
+
 	if (task) {
 		if ((inode->i_mode == (S_IFDIR|S_IRUGO|S_IXUGO)) ||
 		    task_dumpable(task)) {
-			inode->i_uid = task->euid;
-			inode->i_gid = task->egid;
+			rcu_read_lock();
+			cred = __task_cred(task);
+			inode->i_uid = cred->euid;
+			inode->i_gid = cred->egid;
+			rcu_read_unlock();
 		} else {
 			inode->i_uid = 0;
 			inode->i_gid = 0;
@@ -1649,6 +1659,7 @@ static int tid_fd_revalidate(struct dentry *dentry, struct nameidata *nd)
 	struct task_struct *task = get_proc_task(inode);
 	int fd = proc_fd(inode);
 	struct files_struct *files;
+	const struct cred *cred;
 
 	if (task) {
 		files = get_files_struct(task);
@@ -1658,8 +1669,11 @@ static int tid_fd_revalidate(struct dentry *dentry, struct nameidata *nd)
 				rcu_read_unlock();
 				put_files_struct(files);
 				if (task_dumpable(task)) {
-					inode->i_uid = task->euid;
-					inode->i_gid = task->egid;
+					rcu_read_lock();
+					cred = __task_cred(task);
+					inode->i_uid = cred->euid;
+					inode->i_gid = cred->egid;
+					rcu_read_unlock();
 				} else {
 					inode->i_uid = 0;
 					inode->i_gid = 0;
@@ -2333,8 +2347,6 @@ static struct dentry *proc_base_instantiate(struct inode *dir,
 	if (!ei->pid)
 		goto out_iput;
 
-	inode->i_uid = 0;
-	inode->i_gid = 0;
 	inode->i_mode = p->mode;
 	if (S_ISDIR(inode->i_mode))
 		inode->i_nlink = 2;
