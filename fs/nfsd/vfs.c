@@ -671,6 +671,7 @@ __be32
 nfsd_open(struct svc_rqst *rqstp, struct svc_fh *fhp, int type,
 			int access, struct file **filp)
 {
+	const struct cred *cred = current_cred();
 	struct dentry	*dentry;
 	struct inode	*inode;
 	int		flags = O_RDONLY|O_LARGEFILE;
@@ -725,7 +726,7 @@ nfsd_open(struct svc_rqst *rqstp, struct svc_fh *fhp, int type,
 		DQUOT_INIT(inode);
 	}
 	*filp = dentry_open(dget(dentry), mntget(fhp->fh_export->ex_path.mnt),
-				flags);
+			    flags, cred);
 	if (IS_ERR(*filp))
 		host_err = PTR_ERR(*filp);
 out_nfserr:
@@ -743,45 +744,16 @@ nfsd_close(struct file *filp)
 	fput(filp);
 }
 
-/*
- * Sync a file
- * As this calls fsync (not fdatasync) there is no need for a write_inode
- * after it.
- */
-static inline int nfsd_dosync(struct file *filp, struct dentry *dp,
-			      const struct file_operations *fop)
-{
-	struct inode *inode = dp->d_inode;
-	int (*fsync) (struct file *, struct dentry *, int);
-	int err;
-
-	err = filemap_fdatawrite(inode->i_mapping);
-	if (err == 0 && fop && (fsync = fop->fsync))
-		err = fsync(filp, dp, 0);
-	if (err == 0)
-		err = filemap_fdatawait(inode->i_mapping);
-
-	return err;
-}
-	
-
 static int
 nfsd_sync(struct file *filp)
 {
-        int err;
-	struct inode *inode = filp->f_path.dentry->d_inode;
-	dprintk("nfsd: sync file %s\n", filp->f_path.dentry->d_name.name);
-	mutex_lock(&inode->i_mutex);
-	err=nfsd_dosync(filp, filp->f_path.dentry, filp->f_op);
-	mutex_unlock(&inode->i_mutex);
-
-	return err;
+	return vfs_fsync(filp, filp->f_path.dentry, 0);
 }
 
 int
-nfsd_sync_dir(struct dentry *dp)
+nfsd_sync_dir(struct dentry *dentry)
 {
-	return nfsd_dosync(NULL, dp, dp->d_inode->i_fop);
+	return vfs_fsync(NULL, dentry, 0);
 }
 
 /*
@@ -1169,7 +1141,7 @@ nfsd_create_setattr(struct svc_rqst *rqstp, struct svc_fh *resfhp,
 	 * send along the gid on create when it tries to implement
 	 * setgid directories via NFS:
 	 */
-	if (current->fsuid != 0)
+	if (current_fsuid() != 0)
 		iap->ia_valid &= ~(ATTR_UID|ATTR_GID);
 	if (iap->ia_valid)
 		return nfsd_setattr(rqstp, resfhp, iap, 0, (time_t)0);
@@ -1210,7 +1182,7 @@ nfsd_create(struct svc_rqst *rqstp, struct svc_fh *fhp,
 	dirp = dentry->d_inode;
 
 	err = nfserr_notdir;
-	if(!dirp->i_op || !dirp->i_op->lookup)
+	if (!dirp->i_op->lookup)
 		goto out;
 	/*
 	 * Check whether the response file handle has been verified yet.
@@ -1346,7 +1318,7 @@ nfsd_create_v3(struct svc_rqst *rqstp, struct svc_fh *fhp,
 	/* Get all the sanity checks out of the way before
 	 * we lock the parent. */
 	err = nfserr_notdir;
-	if(!dirp->i_op || !dirp->i_op->lookup)
+	if (!dirp->i_op->lookup)
 		goto out;
 	fh_lock_nested(fhp, I_MUTEX_PARENT);
 
@@ -1481,7 +1453,7 @@ nfsd_readlink(struct svc_rqst *rqstp, struct svc_fh *fhp, char *buf, int *lenp)
 	inode = dentry->d_inode;
 
 	err = nfserr_inval;
-	if (!inode->i_op || !inode->i_op->readlink)
+	if (!inode->i_op->readlink)
 		goto out;
 
 	touch_atime(fhp->fh_export->ex_path.mnt, dentry);
@@ -2001,7 +1973,7 @@ nfsd_permission(struct svc_rqst *rqstp, struct svc_export *exp,
 		IS_APPEND(inode)?	" append" : "",
 		__mnt_is_readonly(exp->ex_path.mnt)?	" ro" : "");
 	dprintk("      owner %d/%d user %d/%d\n",
-		inode->i_uid, inode->i_gid, current->fsuid, current->fsgid);
+		inode->i_uid, inode->i_gid, current_fsuid(), current_fsgid());
 #endif
 
 	/* Normally we reject any write/sattr etc access on a read-only file
@@ -2044,7 +2016,7 @@ nfsd_permission(struct svc_rqst *rqstp, struct svc_export *exp,
 	 * with NFSv3.
 	 */
 	if ((acc & NFSD_MAY_OWNER_OVERRIDE) &&
-	    inode->i_uid == current->fsuid)
+	    inode->i_uid == current_fsuid())
 		return 0;
 
 	/* This assumes  NFSD_MAY_{READ,WRITE,EXEC} == MAY_{READ,WRITE,EXEC} */
@@ -2161,7 +2133,7 @@ nfsd_set_posix_acl(struct svc_fh *fhp, int type, struct posix_acl *acl)
 	size_t size;
 	int error;
 
-	if (!IS_POSIXACL(inode) || !inode->i_op ||
+	if (!IS_POSIXACL(inode) ||
 	    !inode->i_op->setxattr || !inode->i_op->removexattr)
 		return -EOPNOTSUPP;
 	switch(type) {
