@@ -168,8 +168,9 @@ static int nl_ready(struct user_helper_data *uhd, u32 version)
 {
 	if (version != uhd->interface_version) {
 		printk(KERN_INFO "%s userspace process using invalid interface"
-				" version. Trying to continue without it.\n",
-				uhd->name);
+				" version (%d - kernel wants %d). Trying to "
+				"continue without it.\n",
+				uhd->name, version, uhd->interface_version);
 		if (uhd->not_ready)
 			uhd->not_ready();
 		return -EINVAL;
