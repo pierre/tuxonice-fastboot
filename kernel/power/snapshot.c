@@ -582,7 +582,7 @@ int memory_bm_write(struct memory_bitmap *bm, int (*rw_chunk)
 	(int rw, struct toi_module_ops *owner, char *buffer, int buffer_size))
 {
 	int result = 0;
-	unsigned int nr;
+	unsigned int nr = 0;
 	struct zone_bitmap *zone_bm;
 	struct bm_block *bb;
 
