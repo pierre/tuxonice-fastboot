@@ -346,7 +346,6 @@ out_notify:
 
 	return ret;
 }
-EXPORT_SYMBOL_GPL(disable_nonboot_cpus);
 
 int __cpuinit cpu_up(unsigned int cpu)
 {
@@ -412,6 +411,7 @@ int disable_nonboot_cpus(void)
 	cpu_maps_update_done();
 	return error;
 }
+EXPORT_SYMBOL_GPL(disable_nonboot_cpus);
 
 void __ref enable_nonboot_cpus(void)
 {
