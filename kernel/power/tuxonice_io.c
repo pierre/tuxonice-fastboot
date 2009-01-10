@@ -412,7 +412,7 @@ static int worker_rw_loop(void *data)
 			pfn = memory_bm_next_pfn(&io_map);
 
 			/* Another thread could have beaten us to it. */
-			if (pfn == max_pfn + 1) {
+			if (pfn == BM_END_OF_MAP) {
 				if (atomic_read(&io_count)) {
 					printk("Ran out of pfns but io_count "
 						"is still %d.\n",
@@ -636,7 +636,7 @@ static int do_rw_loop(int write, int finish_at, struct memory_bitmap *pageflags,
 
 	pfn = memory_bm_next_pfn(pageflags);
 
-	while (pfn < max_pfn + 1 && index < finish_at) {
+	while (pfn != BM_END_OF_MAP && index < finish_at) {
 		memory_bm_set_bit(&io_map, pfn);
 		pfn = memory_bm_next_pfn(pageflags);
 		index++;
@@ -646,7 +646,7 @@ static int do_rw_loop(int write, int finish_at, struct memory_bitmap *pageflags,
 
 	atomic_set(&io_count, finish_at);
 
-	pfn = max_pfn + 1;
+	pfn = BM_END_OF_MAP;
 	other_pfn = pfn;
 
 	memory_bm_position_reset(&pageset1_map);
