@@ -683,6 +683,7 @@ static int do_rw_loop(int write, int finish_at, struct memory_bitmap *pageflags,
 	if (io_write && test_result_state(TOI_ABORTED))
 		io_result = 1;
 	else { /* All I/O done? */
+		memory_bm_position_reset(&io_map);
 		if  (memory_bm_next_pfn(&io_map) != BM_END_OF_MAP) {
 			printk(KERN_INFO "Finished I/O loop but still work to "
 					"do?\nFinish at = %d. io_count = %d.\n",
