@@ -7,8 +7,8 @@ obj-y				:= main.o
 
 tuxonice_core-objs := tuxonice_modules.o tuxonice_sysfs.o tuxonice_highlevel.o \
 		tuxonice_io.o tuxonice_pagedir.o tuxonice_prepare_image.o \
-		tuxonice_extent.o tuxonice_pageflags.o tuxonice_ui.o \
-		tuxonice_power_off.o tuxonice_atomic_copy.o
+		tuxonice_extent.o tuxonice_ui.o tuxonice_power_off.o \
+		tuxonice_atomic_copy.o
 
 obj-$(CONFIG_TOI)		+= tuxonice_builtin.o
 

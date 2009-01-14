@@ -238,11 +238,14 @@ static inline void suspend_thaw_processes(void)
 }
 #endif
 
-extern struct page *saveable_page(unsigned long pfn);
+extern struct page *saveable_page(struct zone *zone, unsigned long pfn);
 #ifdef CONFIG_HIGHMEM
-extern struct page *saveable_highmem_page(unsigned long pfn);
+extern struct page *saveable_highmem_page(struct zone *z, unsigned long pfn);
 #else
-static inline void *saveable_highmem_page(unsigned long pfn) { return NULL; }
+static inline void *saveable_highmem_page(struct zone *z, unsigned long p)
+{
+	return NULL;
+}
 #endif
 
 #define PBES_PER_PAGE (PAGE_SIZE / sizeof(struct pbe))
@@ -270,30 +273,21 @@ struct nosave_region {
 #define BM_BITS_PER_BLOCK	(PAGE_SIZE << 3)
 
 struct bm_block {
-	struct bm_block *next;		/* next element of the list */
+	struct list_head hook;		/* hook into a list of bitmap blocks */
 	unsigned long start_pfn;	/* pfn represented by the first bit */
 	unsigned long end_pfn;	/* pfn represented by the last bit plus 1 */
 	unsigned long *data;	/* bitmap representing pages */
 };
 
-struct zone_bitmap {
-	struct zone_bitmap *next;	/* next element of the list */
-	unsigned long start_pfn;	/* minimal pfn in this zone */
-	unsigned long end_pfn;		/* maximal pfn in this zone plus 1 */
-	struct bm_block *bm_blocks;	/* list of bitmap blocks */
-	struct bm_block *cur_block;	/* recently used bitmap block */
-};
-
-/* strcut bm_position is used for browsing memory bitmaps */
+/* struct bm_position is used for browsing memory bitmaps */
 
 struct bm_position {
-	struct zone_bitmap *zone_bm;
 	struct bm_block *block;
 	int bit;
 };
 
 struct memory_bitmap {
-	struct zone_bitmap *zone_bm_list;	/* list of zone bitmaps */
+	struct list_head blocks;	/* list of bitmap blocks */
 	struct linked_page *p_list;	/* list of pages used to store zone
 					 * bitmap objects and bitmap block
 					 * objects
