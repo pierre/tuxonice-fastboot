@@ -126,15 +126,17 @@ static struct pbe *get_next_pbe(struct page **page_ptr, struct pbe *this_pbe,
 	return this_pbe;
 }
 
-/* get_pageset1_load_addresses
+/**
+ * get_pageset1_load_addresses
  *
- * Description: We check here that pagedir & pages it points to won't collide
- * 		with pages where we're going to restore from the loaded pages
- * 		later.
- * Returns:	Zero on success, one if couldn't find enough pages (shouldn't
- * 		happen).
- */
-
+ * We check here that pagedir & pages it points to won't collide
+ * with pages where we're going to restore from the loaded pages
+ * later.
+ *
+ * Returns:
+ *	Zero on success, one if couldn't find enough pages (shouldn't
+ *	happen).
+ **/
 int toi_get_pageset1_load_addresses(void)
 {
 	int pfn, highallocd = 0, lowallocd = 0;
