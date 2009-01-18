@@ -1286,17 +1286,21 @@ static int __read_pageset1(void)
 	    memory_bm_create(&io_map, GFP_KERNEL, 0))
 		goto out_thaw;
 
-	/* See toi_rw_header_chunk in tuxonice_block_io.c */
+	/*
+	 * See _toi_rw_header_chunk in tuxonice_block_io.c:
+	 * Initialize pageset1_map by reading the map from the image.
+	 */
 	if (memory_bm_read(&pageset1_map, toiActiveAllocator->rw_header_chunk))
 		goto out_thaw;
 
-	/* See toi_rw_cleanup in tuxonice_block_io.c:
+	/*
+	 * See toi_rw_cleanup in tuxonice_block_io.c:
 	 * Clean up after reading the header.
 	 */
 	result = toiActiveAllocator->read_header_cleanup();
 	if (result) {
-		printk("TuxOnIce: Failed to cleanup after reading the image "
-				"header.\n");
+		printk(KERN_ERR "TuxOnIce: Failed to cleanup after reading the "
+				"image header.\n");
 		goto out_thaw;
 	}
 
@@ -1304,7 +1308,7 @@ static int __read_pageset1(void)
 
 	/*
 	 * Get the addresses of pages into which we will load the kernel to
-	 * be copied back
+	 * be copied back and check if they conflict with the ones we are using.
 	 */
 	if (toi_get_pageset1_load_addresses()) {
 		printk(KERN_INFO "TuxOnIce: Failed to get load addresses for "
@@ -1315,6 +1319,7 @@ static int __read_pageset1(void)
 	/* Read the original kernel back */
 	toi_cond_pause(1, "About to read pageset 1.");
 
+	/* Given the pagemap, read back the data from disk */
 	if (read_pageset(&pagedir1, 0)) {
 		toi_prepare_status(DONT_CLEAR_BAR, "Failed to read pageset 1.");
 		result = -EIO;
@@ -1353,7 +1358,7 @@ out_remove_image:
 }
 
 /**
- * read_pageset1 = highlevel function to read the saved pages
+ * read_pageset1 - highlevel function to read the saved pages
  *
  * Attempt to read the header and pageset1 of a hibernate image.
  * Handle the outcome, complaining where appropriate.

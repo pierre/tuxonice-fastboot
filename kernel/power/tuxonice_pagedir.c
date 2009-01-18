@@ -127,7 +127,7 @@ static struct pbe *get_next_pbe(struct page **page_ptr, struct pbe *this_pbe,
 }
 
 /**
- * get_pageset1_load_addresses
+ * get_pageset1_load_addresses - generate pbes for conflicting pages
  *
  * We check here that pagedir & pages it points to won't collide
  * with pages where we're going to restore from the loaded pages
