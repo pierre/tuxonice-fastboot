@@ -94,13 +94,12 @@ static int toi_bio_queue_flush_pages(int dedicated_thread);
 	       atomic_read(&toi_bio_queue_size))
 
 /**
- * set_free_mem_throttle: Set the point where we pause to avoid oom.
+ * set_free_mem_throttle - set the point where we pause to avoid oom.
  *
  * Initially, this value is zero, but when we first fail to allocate memory,
  * we set it (plus a buffer) and thereafter throttle i/o once that limit is
  * reached.
- */
-
+ **/
 static void set_free_mem_throttle(void)
 {
 	int new_throttle = nr_unallocated_buffer_pages() + 256;
@@ -122,11 +121,11 @@ static char *reason_name[NUM_REASONS] = {
 };
 
 /**
- * do_bio_wait: Wait for some TuxOnIce i/o to complete.
+ * do_bio_wait - wait for some TuxOnIce I/O to complete
  *
  * Submit any I/O that's batched up (if we're not already doing
  * that, schedule and clean up whatever we can.
- */
+ **/
 static void do_bio_wait(int reason)
 {
 	struct page *was_waiting_on = waiting_on;
@@ -781,11 +780,11 @@ static void bio_io_flusher(int writing)
 }
 
 /**
- * toi_bio_get_next_page_read: Read a disk page with readahead.
+ * toi_bio_get_next_page_read - read a disk page with readahead
  *
  * Read a page from disk, submitting readahead and cleaning up finished i/o
  * while we wait for the page we're after.
- */
+ **/
 static int toi_bio_get_next_page_read(int no_readahead)
 {
 	unsigned long *virt;
@@ -878,13 +877,13 @@ static void toi_bio_get_new_page(char **full_buffer)
 	}
 }
 
-/*
- * toi_rw_buffer: Combine smaller buffers into PAGE_SIZE I/O.
- *
- * @writing: Bool - whether writing (or reading).
- * @buffer: The start of the buffer to write or fill.
- * @buffer_size: The size of the buffer to write or fill.
- */
+/**
+ * toi_rw_buffer - combine smaller buffers into PAGE_SIZE I/O
+ * @writing:		Bool - whether writing (or reading).
+ * @buffer:		The start of the buffer to write or fill.
+ * @buffer_size:	The size of the buffer to write or fill.
+ * @no_readahead:	Don't try to start readhead (when still getting extents).
+ **/
 static int toi_rw_buffer(int writing, char *buffer, int buffer_size,
 		int no_readahead)
 {
@@ -908,6 +907,10 @@ static int toi_rw_buffer(int writing, char *buffer, int buffer_size,
 		bytes_left -= capacity;
 
 		if (!writing) {
+			/*
+			 * Perform actual I/O:
+			 * read readahead_list_head into toi_writer_buffer
+			 */
 			int result = toi_bio_get_next_page_read(no_readahead);
 			if (result)
 				return result;
@@ -924,15 +927,14 @@ static int toi_rw_buffer(int writing, char *buffer, int buffer_size,
 }
 
 /**
- * toi_bio_read_page - read a page of the image.
- *
- * @pfn: The pfn where the data belongs.
- * @buffer_page: The page containing the (possibly compressed) data.
- * @buf_size: The number of bytes on @buffer_page used.
+ * toi_bio_read_page - read a page of the image
+ * @pfn:		The pfn where the data belongs.
+ * @buffer_page:	The page containing the (possibly compressed) data.
+ * @buf_size:		The number of bytes on @buffer_page used (PAGE_SIZE).
  *
  * Read a (possibly compressed) page from the image, into buffer_page,
  * returning its pfn and the buffer size.
- */
+ **/
 static int toi_bio_read_page(unsigned long *pfn, struct page *buffer_page,
 		unsigned int *buf_size)
 {
@@ -948,6 +950,11 @@ static int toi_bio_read_page(unsigned long *pfn, struct page *buffer_page,
 
 	my_mutex_lock(0, &toi_bio_mutex);
 
+	/*
+	 * Structure in the image:
+	 *	[destination pfn|page size|page data]
+	 * buf_size is PAGE_SIZE
+	 */
 	if (toi_rw_buffer(READ, (char *) pfn, sizeof(unsigned long), 0) ||
 	    toi_rw_buffer(READ, (char *) buf_size, sizeof(int), 0) ||
 	    toi_rw_buffer(READ, buffer_virt, *buf_size, 0)) {
@@ -961,15 +968,14 @@ static int toi_bio_read_page(unsigned long *pfn, struct page *buffer_page,
 }
 
 /**
- * toi_bio_write_page - Write a page of the image.
- *
- * @pfn: The pfn where the data belongs.
- * @buffer_page: The page containing the (possibly compressed) data.
- * @buf_size: The number of bytes on @buffer_page used.
+ * toi_bio_write_page - write a page of the image
+ * @pfn:		The pfn where the data belongs.
+ * @buffer_page:	The page containing the (possibly compressed) data.
+ * @buf_size:	The number of bytes on @buffer_page used.
  *
  * Write a (possibly compressed) page to the image from the buffer, together
  * with it's index and buffer size.
- */
+ **/
 static int toi_bio_write_page(unsigned long pfn, struct page *buffer_page,
 		unsigned int buf_size)
 {
@@ -982,6 +988,11 @@ static int toi_bio_write_page(unsigned long pfn, struct page *buffer_page,
 	my_mutex_lock(1, &toi_bio_mutex);
 	buffer_virt = kmap(buffer_page);
 
+	/*
+	 * Structure in the image:
+	 *	[destination pfn|page size|page data]
+	 * buf_size is PAGE_SIZE
+	 */
 	if (toi_rw_buffer(WRITE, (char *) &pfn, sizeof(unsigned long), 0) ||
 	    toi_rw_buffer(WRITE, (char *) &buf_size, sizeof(int), 0) ||
 	    toi_rw_buffer(WRITE, buffer_virt, buf_size, 0)) {
@@ -1000,15 +1011,17 @@ static int toi_bio_write_page(unsigned long pfn, struct page *buffer_page,
 }
 
 /**
- * toi_rw_header_chunk: Read or write a portion of the image header.
+ * _toi_rw_header_chunk - read or write a portion of the image header
+ * @writing:		Whether reading or writing.
+ * @owner:		The module for which we're writing.
+ *			Used for confirming that modules
+ *			don't use more header space than they asked for.
+ * @buffer:		Address of the data to write.
+ * @buffer_size:	Size of the data buffer.
+ * @no_readahead:	Don't try to start readhead (when still getting extents).
  *
- * @writing: Whether reading or writing.
- * @owner: The module for which we're writing. Used for confirming that modules
- * don't use more header space than they asked for.
- * @buffer: Address of the data to write.
- * @buffer_size: Size of the data buffer.
- * @no_readahead: Don't try to start readhead (when still getting extents)
- */
+ * Perform PAGE_SIZE I/O. Start readahead if needed.
+ **/
 static int _toi_rw_header_chunk(int writing, struct toi_module_ops *owner,
 		char *buffer, int buffer_size, int no_readahead)
 {
@@ -1055,8 +1068,8 @@ static int toi_rw_header_chunk_noreadahead(int writing,
 }
 
 /**
- * write_header_chunk_finish: Flush any buffered header data.
- */
+ * write_header_chunk_finish - flush any buffered header data
+ **/
 static int write_header_chunk_finish(void)
 {
 	int result = 0;
@@ -1071,18 +1084,17 @@ static int write_header_chunk_finish(void)
 }
 
 /**
- * toi_bio_storage_needed: Get the amount of storage needed for my fns.
- */
+ * toi_bio_storage_needed - get the amount of storage needed for my fns
+ **/
 static int toi_bio_storage_needed(void)
 {
 	return 2 * sizeof(int);
 }
 
 /**
- * toi_bio_save_config_info: Save block i/o config to image header.
- *
- * @buf: PAGE_SIZE'd buffer into which data should be saved.
- */
+ * toi_bio_save_config_info - save block I/O config to image header
+ * @buf:	PAGE_SIZE'd buffer into which data should be saved.
+ **/
 static int toi_bio_save_config_info(char *buf)
 {
 	int *ints = (int *) buf;
@@ -1091,11 +1103,10 @@ static int toi_bio_save_config_info(char *buf)
 }
 
 /**
- * toi_bio_load_config_info: Restore block i/o config.
- *
- * @buf: Data to be reloaded.
- * @size: Size of the buffer saved.
- */
+ * toi_bio_load_config_info - restore block I/O config
+ * @buf:	Data to be reloaded.
+ * @size:	Size of the buffer saved.
+ **/
 static void toi_bio_load_config_info(char *buf, int size)
 {
 	int *ints = (int *) buf;
@@ -1103,11 +1114,10 @@ static void toi_bio_load_config_info(char *buf, int size)
 }
 
 /**
- * toi_bio_initialise: Initialise bio code at start of some action.
- *
- * @starting_cycle: Whether starting a hibernation cycle, or just reading or
- * writing a sysfs value.
- */
+ * toi_bio_initialise - initialise bio code at start of some action
+ * @starting_cycle:	Whether starting a hibernation cycle, or just reading or
+ *			writing a sysfs value.
+ **/
 static int toi_bio_initialise(int starting_cycle)
 {
 	if (starting_cycle) {
@@ -1130,10 +1140,9 @@ static int toi_bio_initialise(int starting_cycle)
 }
 
 /**
- * toi_bio_cleanup: Cleanup after some action.
- *
- * @finishing_cycle: Whether completing a cycle.
- */
+ * toi_bio_cleanup - cleanup after some action
+ * @finishing_cycle:	Whether completing a cycle.
+ **/
 static void toi_bio_cleanup(int finishing_cycle)
 {
 	if (toi_writer_buffer) {
@@ -1186,10 +1195,10 @@ static struct toi_module_ops toi_blockwriter_ops = {
 };
 
 /**
- * toi_block_io_load: Load time routine for block i/o module.
+ * toi_block_io_load - load time routine for block I/O module
  *
  * Register block i/o ops and sysfs entries.
- */
+ **/
 static __init int toi_block_io_load(void)
 {
 	return toi_register_module(&toi_blockwriter_ops);

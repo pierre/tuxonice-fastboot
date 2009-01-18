@@ -458,7 +458,7 @@ static int worker_rw_loop(void *data)
 
 			result = first_filter->write_page(write_pfn, page,
 					PAGE_SIZE);
-		} else {
+		} else { /* Reading */
 			my_io_index = io_finish_at -
 				atomic_sub_return(1, &io_count);
 			mutex_unlock(&io_mutex);
@@ -476,6 +476,9 @@ static int worker_rw_loop(void *data)
 					schedule();
 			}
 
+			/* See toi_bio_read_page in tuxonice_block_io.c:
+			 * read the next page in the image.
+			 */
 			result = first_filter->read_page(&write_pfn, buffer,
 					&buf_size);
 			if (buf_size != PAGE_SIZE) {
@@ -780,7 +783,7 @@ int write_pageset(struct pagedir *pagedir)
  *				only part of it.
  *
  * Returns:
- * Zero on success or -1 on failure.
+ *	Zero on success or -1 on failure.
  **/
 static int read_pageset(struct pagedir *pagedir, int overwrittenpagesonly)
 {
@@ -1283,10 +1286,13 @@ static int __read_pageset1(void)
 	    memory_bm_create(&io_map, GFP_KERNEL, 0))
 		goto out_thaw;
 
+	/* See toi_rw_header_chunk in tuxonice_block_io.c */
 	if (memory_bm_read(&pageset1_map, toiActiveAllocator->rw_header_chunk))
 		goto out_thaw;
 
-	/* Clean up after reading the header */
+	/* See toi_rw_cleanup in tuxonice_block_io.c:
+	 * Clean up after reading the header.
+	 */
 	result = toiActiveAllocator->read_header_cleanup();
 	if (result) {
 		printk("TuxOnIce: Failed to cleanup after reading the image "
