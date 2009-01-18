@@ -100,12 +100,42 @@ enum {
 	UNMARK_RESUME_ATTEMPTED,
 };
 
+/**
+ * set_devinfo - populate device information
+ * @bdev:		Block device on which the file is.
+ * @target_blkbits:	Number of bits in the page block size of the target
+ *			file inode.
+ *
+ * Populate the devinfo structure about the target device.
+ *
+ * Background: a sector represents a fixed amount of data (generally 512 bytes).
+ * The hard drive sector size and the filesystem block size may be different.
+ * If fs_blksize mesures the filesystem block size and hd_blksize the hard drive
+ * sector size:
+ *
+ * sector << (fs_blksize - hd_blksize) converts hd sector into fs block
+ * fs_block >> (fs_blksize - hd_blksize) converts fs block into hd sector number
+ *
+ * Here target_blkbits == fs_blksize and hd_blksize == 9, hence:
+ *
+ *	(fs_blksize - hd_blksize) == devinfo.bmap_shift
+ *
+ * The memory page size is defined by PAGE_SHIFT. devinfo.blocks_per_page is the
+ * number of filesystem blocks per memory page.
+ *
+ * Note that blocks are stored after >>. They are used after being <<.
+ * We always only use PAGE_SIZE aligned blocks.
+ *
+ * Side effects:
+ *	devinfo.bdev, devinfo.bmap_shift and devinfo.blocks_per_page are set.
+ */
 static void set_devinfo(struct block_device *bdev, int target_blkbits)
 {
 	devinfo.bdev = bdev;
 	if (!target_blkbits) {
 		devinfo.bmap_shift = devinfo.blocks_per_page = 0;
 	} else {
+		/* We are assuming a hard disk with 512 (2^9) bytes/sector */
 		devinfo.bmap_shift = target_blkbits - 9;
 		devinfo.blocks_per_page = (1 << (PAGE_SHIFT - target_blkbits));
 	}
@@ -185,6 +215,14 @@ static int size_ignoring_ignored_pages(void)
 	return mappable;
 }
 
+/**
+ * __populate_block_list - add an extent to the chain
+ * @min:	Start of the extent (first physical block = sector)
+ * @max:	End of the extent (last physical block = sector)
+ *
+ * If TOI_TEST_BIO is set, print a debug message, outputting the min and max
+ * fs block numbers.
+ **/
 static int __populate_block_list(int min, int max)
 {
 	if (test_action_state(TOI_TEST_BIO))
@@ -300,14 +338,13 @@ static void toi_file_cleanup(int finishing_cycle)
 	target_file = NULL;
 }
 
-/*
+/**
  * reopen_resume_devt - reset the devinfo struct
  *
- * Description:
- *    Having opened resume= once, we remember the major and
- *    minor nodes and use them to reopen the bdev for checking
- *    whether an image exists (possibly when starting a resume).
- */
+ * Having opened resume= once, we remember the major and
+ * minor nodes and use them to reopen the bdev for checking
+ * whether an image exists (possibly when starting a resume).
+ **/
 static void reopen_resume_devt(void)
 {
 	toi_file_target_bdev = toi_open_by_devnum(resume_file_dev_t,
@@ -411,6 +448,14 @@ static void toi_file_noresume_reset(void)
 	toi_bio_ops.rw_cleanup(READ);
 }
 
+/**
+ * parse_signature - check if the file is suitable for resuming
+ * @header:	Signature of the file
+ *
+ * Given a file header, check the content of the file. Return true if it
+ * contains a valid hibernate image.
+ * TOI_RESUMED_BEFORE is set accordingly.
+ **/
 static int parse_signature(struct toi_file_header *header)
 {
 	int have_image = !memcmp(HaveImage, header->sig, sizeof(HaveImage) - 1);
@@ -430,12 +475,15 @@ static int parse_signature(struct toi_file_header *header)
 	else
 		clear_toi_state(TOI_RESUMED_BEFORE);
 
-	target_header_start = header->first_header_block;
+	target_header_start = header->first_header_block; /* sector on the disk */
 	return 1;
 }
 
-/* prepare_signature */
-
+/**
+ * prepare_signature - populate the signature structure
+ * @current_header:	Signature structure to populate
+ * @first_header_block:	Sector with the header containing the extents
+ **/
 static int prepare_signature(struct toi_file_header *current_header,
 		unsigned long first_header_block)
 {
@@ -458,6 +506,9 @@ static int toi_file_storage_allocated(void)
 		return (int) raw_to_real(main_pages_requested);
 }
 
+/**
+ * toi_file_release_storage - deallocate the block chain
+ **/
 static int toi_file_release_storage(void)
 {
 	if (test_action_state(TOI_KEEP_IMAGE) &&
@@ -516,6 +567,9 @@ static int toi_file_allocate_storage(int main_space_requested)
 	return result;
 }
 
+/**
+ * toi_file_write_header_init - save the header on the image
+ **/
 static int toi_file_write_header_init(void)
 {
 	int result;
@@ -545,6 +599,7 @@ static int toi_file_write_header_init(void)
 	if (result)
 		return result;
 
+	/* Flush the chain */
 	toi_serialise_extent_chain(&toi_fileops, &block_chain);
 
 	return 0;
@@ -591,10 +646,10 @@ out:
 
 /* HEADER READING */
 
-/*
- * read_header_init()
+/**
+ * toi_file_read_header_init - check content of signature
  *
- * Description:
+ * Entry point of the resume path.
  * 1. Attempt to read the device specified with resume=.
  * 2. Check the contents of the header for our signature.
  * 3. Warn, ignore, reset and/or continue as appropriate.
@@ -603,19 +658,24 @@ out:
  *    the rest of the header & image.
  *
  * Returns:
- * May not return if user choose to reboot at a warning.
- * -EINVAL if cannot resume at this time. Booting should continue
- * normally.
- */
-
+ *	May not return if user choose to reboot at a warning.
+ *	-EINVAL if cannot resume at this time. Booting should continue
+ *	normally.
+ **/
 static int toi_file_read_header_init(void)
 {
 	int result;
 	struct block_device *tmp;
 
+	/* Allocate toi_writer_buffer */
 	toi_bio_ops.read_header_init();
 
-	/* Read toi_file configuration */
+	/*
+	 * Read toi_file configuration (header containing metadata).
+	 * target_header_start is the first sector of the header. It has been set
+	 * when checking if the file was suitable for resuming, see
+	 * do_toi_step(STEP_RESUME_CAN_RESUME).
+	 */
 	result = toi_bio_ops.bdev_page_io(READ, toi_file_target_bdev,
 			target_header_start,
 			virt_to_page((unsigned long) toi_writer_buffer));
@@ -627,13 +687,16 @@ static int toi_file_read_header_init(void)
 		return result;
 	}
 
+	/* toi_writer_posn_save[0] contains the header */
 	memcpy(&toi_writer_posn_save, toi_writer_buffer,
 	       sizeof(toi_writer_posn_save));
 
+	/* Save the position in the buffer */
 	toi_writer_buffer_posn = sizeof(toi_writer_posn_save);
 
 	tmp = devinfo.bdev;
 
+	/* See tuxonice_block_io.h */
 	memcpy(&devinfo,
 	       toi_writer_buffer + toi_writer_buffer_posn,
 	       sizeof(devinfo));
@@ -641,9 +704,14 @@ static int toi_file_read_header_init(void)
 	devinfo.bdev = tmp;
 	toi_writer_buffer_posn += sizeof(devinfo);
 
+	/* Reinitialize the extent pointer */
 	toi_extent_state_goto_start(&toi_writer_posn);
+	/* Jump to the next page */
 	toi_bio_ops.set_extra_page_forward();
 
+	/* Bring back the chain from disk: this will read
+	 * all extents.
+	 */
 	return toi_load_extent_chain(&block_chain);
 }
 
@@ -657,12 +725,11 @@ static int toi_file_read_header_cleanup(void)
  * toi_file_signature_op - perform an operation on the file signature
  * @op:	operation to perform
  *
- * Description:
- *    op is either GET_IMAGE_EXISTS, INVALIDATE, MARK_RESUME_ATTEMPTED or
- *    UNMARK_RESUME_ATTEMPTED.
- *    If the signature is changed, an I/O operation is performed.
- *    The signature exists iff toi_file_signature_op(GET_IMAGE_EXISTS)>-1.
- */
+ * op is either GET_IMAGE_EXISTS, INVALIDATE, MARK_RESUME_ATTEMPTED or
+ * UNMARK_RESUME_ATTEMPTED.
+ * If the signature is changed, an I/O operation is performed.
+ * The signature exists iff toi_file_signature_op(GET_IMAGE_EXISTS)>-1.
+ **/
 static int toi_file_signature_op(int op)
 {
 	char *cur;
@@ -728,9 +795,11 @@ out:
 	return result;
 }
 
-/*
+/**
  * toi_file_print_debug_stats - print debug info
- */
+ * @buffer:	Buffer to data to populate
+ * @size:	Size of the buffer
+ **/
 static int toi_file_print_debug_stats(char *buffer, int size)
 {
 	int len = 0;
@@ -750,8 +819,8 @@ static int toi_file_print_debug_stats(char *buffer, int size)
 	return len;
 }
 
-/*
- * Storage needed
+/**
+ * toi_file_storage_needed - storage needed
  *
  * Returns amount of space in the image header required
  * for the toi_file's data.
@@ -759,7 +828,7 @@ static int toi_file_print_debug_stats(char *buffer, int size)
  * We ensure the space is allocated, but actually save the
  * data from write_header_init and therefore don't also define a
  * save_config_info routine.
- */
+ **/
 static int toi_file_storage_needed(void)
 {
 	return sig_size + strlen(toi_file_target) + 1 +
@@ -769,38 +838,53 @@ static int toi_file_storage_needed(void)
 		(2 * sizeof(unsigned long) * block_chain.num_extents);
 }
 
-/*
+/**
  * toi_file_remove_image - invalidate the image
- */
+ **/
 static int toi_file_remove_image(void)
 {
 	toi_file_release_storage();
 	return toi_file_signature_op(INVALIDATE);
 }
 
-/*
+/**
  * toi_file_image_exists - test if an image exists
- */
-static int toi_file_image_exists(int quiet)
+ *
+ * Repopulate toi_file_target_bdev if needed.
+ **/
+static int toi_file_image_exists()
 {
 	if (!toi_file_target_bdev)
 		reopen_resume_devt();
 	return toi_file_signature_op(GET_IMAGE_EXISTS);
 }
 
-/*
- * toi_file_mark_resume_attempted - mark resume attempted
+/**
+ * toi_file_mark_resume_attempted - mark resume attempted if so
  * @mark:	attempted flag
  *
- * Descrption:
- *    Record that we tried to resume from this image.
- */
+ * Record that we tried to resume from this image. Resuming
+ * multiple times from the same image may be dangerous
+ * (possible filesystem corruption).
+ **/
 static int toi_file_mark_resume_attempted(int mark)
 {
 	return toi_file_signature_op(mark ? MARK_RESUME_ATTEMPTED :
 		UNMARK_RESUME_ATTEMPTED);
 }
 
+/**
+ * toi_file_set_resume_param - validate the specified resume file
+ *
+ * Given a target filename, populate the resume parameter. This is
+ * meant to be used by the user to populate the kernel command line.
+ * By setting /sys/power/tuxonice/file/target, the valid resume
+ * parameter to use is set and accessible through
+ * /sys/power/tuxonice/resume.
+ *
+ * If the file could be located, we check if it contains a valid
+ * signature.
+ **/
 static void toi_file_set_resume_param(void)
 {
 	char *buffer = (char *) toi_get_zeroed_page(18, TOI_ATOMIC_GFP);
@@ -826,6 +910,7 @@ static void toi_file_set_resume_param(void)
 				"/dev/%s", buffer2);
 
 		if (sector)
+			/* The offset is: sector << (inode->i_blkbits - 9) */
 			offset += snprintf(buffer + offset, PAGE_SIZE - offset,
 				":0x%lx", sector << devinfo.bmap_shift);
 	} else
@@ -840,16 +925,16 @@ static void toi_file_set_resume_param(void)
 	toi_attempt_to_parse_resume_device(1);
 }
 
-/*
- * __test_toi_file_target - is the file target ready for hibernating?
+/**
+ * __test_toi_file_target - is the file target valid for hibernating?
  * @target:		target file
- * @resume_param: 	whether resume= has been specified
+ * @resume_param:	whether resume= has been specified
  * @quiet:		quiet flag
  *
- * Description:
- * 	Test wheter the file target can be used for hibernating: valid target
- * 	and signature.
- */
+ * Test whether the file target can be used for hibernating: valid target
+ * and signature.
+ * The resume parameter is set if needed.
+ **/
 static int __test_toi_file_target(char *target, int resume_param, int quiet)
 {
 	toi_file_get_target_info(target, 0, resume_param);
@@ -890,12 +975,11 @@ static int __test_toi_file_target(char *target, int resume_param, int quiet)
 	return 1;
 }
 
-/*
+/**
  * test_toi_file_target - sysfs callback for /sys/power/tuxonince/file/target
  *
- * Description:
- * 	Test wheter the target file is valid for hibernating.
- */
+ * Test wheter the target file is valid for hibernating.
+ **/
 static void test_toi_file_target(void)
 {
 	setting_toi_file_target = 1;
@@ -907,24 +991,28 @@ static void test_toi_file_target(void)
 	setting_toi_file_target = 0;
 }
 
-/*
- * Parse Image Location
+/**
+ * toi_file_parse_sig_location - parse image Location
+ * @commandline:	the resume parameter
+ * @only_writer:	??
+ * @quiet:		quiet flag
  *
  * Attempt to parse a resume= parameter.
  * File Allocator accepts:
- * resume=file:DEVNAME[:FIRSTBLOCK]
+ *	resume=file:DEVNAME[:FIRSTBLOCK]
  *
  * Where:
- * DEVNAME is convertable to a dev_t by name_to_dev_t
- * FIRSTBLOCK is the location of the first block in the file.
- * BLOCKSIZE is the logical blocksize >= SECTOR_SIZE & <= PAGE_SIZE,
- * mod SECTOR_SIZE == 0 of the device.
+ *	DEVNAME is convertable to a dev_t by name_to_dev_t
+ *	FIRSTBLOCK is the location of the first block in the file.
+ *	BLOCKSIZE is the logical blocksize >= SECTOR_SIZE & 
+ *					<= PAGE_SIZE,
+ *	mod SECTOR_SIZE == 0 of the device.
+ *
  * Data is validated by attempting to read a header from the
  * location given. Failure will result in toi_file refusing to
  * save an image, and a reboot with correct parameters will be
  * necessary.
- */
-
+ **/
 static int toi_file_parse_sig_location(char *commandline,
 		int only_writer, int quiet)
 {
@@ -1027,27 +1115,34 @@ out:
 	return result;
 }
 
-/* toi_file_save_config_info
+/**
+ * toi_file_save_config_info - populate toi_file_target
+ * @buffer:	Pointer to a buffer of size PAGE_SIZE.
  *
- * Description:	Save the target's name, not for resume time, but for
- * 		all_settings.
- * Arguments:	Buffer:		Pointer to a buffer of size PAGE_SIZE.
- * Returns:	Number of bytes used for saving our data.
- */
-
+ * Save the target's name, not for resume time, but for
+ * all_settings.
+ * Returns:
+ *	Number of bytes used for saving our data.
+ **/
 static int toi_file_save_config_info(char *buffer)
 {
 	strcpy(buffer, toi_file_target);
 	return strlen(toi_file_target) + 1;
 }
 
-/* toi_file_load_config_info - Reload target's name
+/**
+ * toi_file_load_config_info - reload target's name
  * @buffer:	pointer to the start of the data
  * @size:	number of bytes that were saved
- */
+ *
+ * toi_file_target is set to buffer.
+ **/
 static void toi_file_load_config_info(char *buffer, int size)
 {
-	strcpy(toi_file_target, buffer);
+	if (size != 0)
+		strlcpy(toi_file_target, buffer, size);
+	else
+		strcpy(toi_file_target, buffer);
 }
 
 static int toi_file_initialise(int starting_cycle)
@@ -1066,7 +1161,7 @@ static int toi_file_initialise(int starting_cycle)
 	if (*toi_file_target)
 		toi_file_get_target_info(toi_file_target, starting_cycle, 0);
 
-	if (starting_cycle && (toi_file_image_exists(1) == -1)) {
+	if (starting_cycle && (toi_file_image_exists() == -1)) {
 		printk("%s is does not have a valid signature for "
 				"hibernating.\n", toi_file_target);
 		return 1;
