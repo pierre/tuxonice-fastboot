@@ -58,10 +58,11 @@ EXPORT_SYMBOL_GPL(toi_bio_queue_flusher_should_finish);
 /* Indicates that this thread should be used for checking throughput */
 #define MONITOR ((void *) 1)
 
-/* toi_attempt_to_parse_resume_device
+/**
+ * toi_attempt_to_parse_resume_device - determine if we can hibernate
  *
  * Can we hibernate, using the current resume= parameter?
- */
+ **/
 int toi_attempt_to_parse_resume_device(int quiet)
 {
 	struct list_head *Allocator;
@@ -180,13 +181,13 @@ void attempt_to_parse_alt_resume_param(void)
 	alt_resume_param[0] = '\0';
 }
 
-/* noresume_reset_modules
+/**
+ * noresume_reset_modules - reset data structures in case of non resuming
  *
- * Description:	When we read the start of an image, modules (and especially the
- * 		active allocator) might need to reset data structures if we
- * 		decide to remove the image rather than resuming from it.
- */
-
+ * When we read the start of an image, modules (and especially the
+ * active allocator) might need to reset data structures if we
+ * decide to remove the image rather than resuming from it.
+ **/
 static void noresume_reset_modules(void)
 {
 	struct toi_module_ops *this_filter;
@@ -199,12 +200,10 @@ static void noresume_reset_modules(void)
 		toiActiveAllocator->noresume_reset();
 }
 
-/* fill_toi_header()
- *
- * Description:	Fill the hibernate header structure.
- * Arguments:	struct toi_header: Header data structure to be filled.
- */
-
+/**
+ * fill_toi_header - fill the hibernate header structure
+ * @struct toi_header: Header data structure to be filled.
+ **/
 static int fill_toi_header(struct toi_header *sh)
 {
 	int i, error;
@@ -226,12 +225,14 @@ static int fill_toi_header(struct toi_header *sh)
 	return 0;
 }
 
-/*
- * rw_init_modules
+/**
+ * rw_init_modules - initialize modules
+ * @rw:		Whether we are reading of writing an image.
+ * @which:	Section of the image being processed.
  *
  * Iterate over modules, preparing the ones that will be used to read or write
  * data.
- */
+ **/
 static int rw_init_modules(int rw, int which)
 {
 	struct toi_module_ops *this_module;
@@ -241,7 +242,7 @@ static int rw_init_modules(int rw, int which)
 			continue;
 		if (this_module->rw_init && this_module->rw_init(rw, which)) {
 			abort_hibernate(TOI_FAILED_MODULE_INIT,
-				"Failed to initialise the %s filter.",
+				"Failed to initialize the %s filter.",
 				this_module->name);
 			return 1;
 		}
@@ -271,12 +272,13 @@ static int rw_init_modules(int rw, int which)
 	return 0;
 }
 
-/*
- * rw_cleanup_modules
+/**
+ * rw_cleanup_modules - cleanup modules
+ * @rw:	Whether we are reading of writing an image.
  *
  * Cleanup components after reading or writing a set of pages.
  * Only the allocator may fail.
- */
+ **/
 static int rw_cleanup_modules(int rw)
 {
 	struct toi_module_ops *this_module;
@@ -377,11 +379,13 @@ static struct page *copy_page_from_orig_page(struct page *orig_page)
 	return NULL;
 }
 
-/*
- * do_rw_loop
+/**
+ * worker_rw_loop - main loop to read/write pages
  *
- * The main I/O loop for reading or writing pages.
- */
+ * The main I/O loop for reading or writing pages. The io_map bitmap is used to
+ * track the pages to read/write.
+ * If we are reading, the pages are loaded to their final (mapped) pfn.
+ **/
 static int worker_rw_loop(void *data)
 {
 	unsigned long orig_pfn, write_pfn, next_jiffies = jiffies + HZ / 10, jif_index = 1;
@@ -607,11 +611,11 @@ static int start_other_threads(void)
 	return num_started;
 }
 
-/*
- * do_rw_loop
+/**
+ * do_rw_loop - main highlevel function for reading or writing pages
  *
- * The main I/O loop for reading or writing pages.
- */
+ * Create the io_map bitmap and call worker_rw_loop to perform I/O operations.
+ **/
 static int do_rw_loop(int write, int finish_at, struct memory_bitmap *pageflags,
 		int base, int barmax, int pageset)
 {
@@ -706,13 +710,13 @@ static int do_rw_loop(int write, int finish_at, struct memory_bitmap *pageflags,
 	return io_result;
 }
 
-/* write_pageset()
+/**
+ * write_pageset - write a pageset to disk.
+ * @pagedir:	Which pagedir to write.
  *
- * Description:	Write a pageset to disk.
- * Arguments:	pagedir:	Which pagedir to write..
- * Returns:	Zero on success or -1 on failure.
- */
-
+ * Returns:
+ *	Zero on success or -1 on failure.
+ **/
 int write_pageset(struct pagedir *pagedir)
 {
 	int finish_at, base = 0, start_time, end_time;
@@ -769,15 +773,15 @@ int write_pageset(struct pagedir *pagedir)
 	return error;
 }
 
-/* read_pageset()
+/**
+ * read_pageset - highlevel function to read a pageset from disk
+ * @pagedir:			pageset to read
+ * @overwrittenpagesonly:	Whether to read the whole pageset or
+ *				only part of it.
  *
- * Description:	Read a pageset from disk.
- * Arguments:	whichtowrite:	Controls what debugging output is printed.
- * 		overwrittenpagesonly: Whether to read the whole pageset or
- * 		only part.
- * Returns:	Zero on success or -1 on failure.
- */
-
+ * Returns:
+ * Zero on success or -1 on failure.
+ **/
 static int read_pageset(struct pagedir *pagedir, int overwrittenpagesonly)
 {
 	int result = 0, base = 0, start_time, end_time;
@@ -825,11 +829,13 @@ static int read_pageset(struct pagedir *pagedir, int overwrittenpagesonly)
 	return result;
 }
 
-/* write_module_configs()
+/**
+ * write_module_configs - store the modules configuration
  *
- * Description:	Store the configuration for each module in the image header.
- * Returns:	Int: Zero on success, Error value otherwise.
- */
+ * The configuration for each module is stored in the image header.
+ * Returns: Int
+ *	Zero on success, Error value otherwise.
+ **/
 static int write_module_configs(void)
 {
 	struct toi_module_ops *this_module;
@@ -890,13 +896,15 @@ static int write_module_configs(void)
 	return 0;
 }
 
-/* read_one_module_config()
+/**
+ * read_one_module_config - read and configure one module
  *
- * Description: Read the configuration for one module, and configure the module
- * 		to match if it is loaded.
- * Returns:	Int. Zero on success or an error code.
- */
-
+ * Read the configuration for one module, and configure the module
+ * to match if it is loaded.
+ *
+ * Returns: Int
+ *	Zero on success, Error value otherwise.
+ **/
 static int read_one_module_config(struct toi_module_header *header)
 {
 	struct toi_module_ops *this_module;
@@ -972,12 +980,12 @@ out:
 	return 0;
 }
 
-/* read_module_configs()
+/**
+ * read_module_configs - reload module configurations from the image header.
  *
- * Description:	Reload module configurations from the image header.
- * Returns:	Int. Zero on success, error value otherwise.
- */
-
+ * Returns: Int
+ *	Zero on success or an error code.
+ **/
 static int read_module_configs(void)
 {
 	int result = 0;
@@ -1021,12 +1029,12 @@ static int read_module_configs(void)
 	return 0;
 }
 
-/* write_image_header()
+/**
+ * write_image_header - write the image header after write the image proper
  *
- * Description:	Write the image header after write the image proper.
- * Returns:	Int. Zero on success or -1 on failure.
- */
-
+ * Returns: Int
+ *	Zero on success, error value otherwise.
+ **/
 int write_image_header(void)
 {
 	int ret;
@@ -1091,15 +1099,15 @@ write_image_header_abort_no_cleanup:
 	return -1;
 }
 
-/* sanity_check()
+/**
+ * sanity_check - check the header
+ * @sh:	the header which was saved at hibernate time.
  *
- * Description:	Perform a few checks, seeking to ensure that the kernel being
- * 		booted matches the one hibernated. They need to match so we can
- * 		be _sure_ things will work. It is not absolutely impossible for
- * 		resuming from a different kernel to work, just not assured.
- * Arguments:	Struct toi_header. The header which was saved at hibernate
- * 		time.
- */
+ * Perform a few checks, seeking to ensure that the kernel being
+ * booted matches the one hibernated. They need to match so we can
+ * be _sure_ things will work. It is not absolutely impossible for
+ * resuming from a different kernel to work, just not assured.
+ **/
 static char *sanity_check(struct toi_header *sh)
 {
 	char *reason = check_swsusp_image_kernel((struct swsusp_info *) sh);
@@ -1121,12 +1129,13 @@ static char *sanity_check(struct toi_header *sh)
 	return NULL;
 }
 
-/* __read_pageset1
+/**
+ * __read_pageset1 - test for the existence of an image and attempt to load it
  *
- * Description:	Test for the existence of an image and attempt to load it.
- * Returns:	Int. Zero if image found and pageset1 successfully loaded.
- * 		Error if no image found or loaded.
- */
+ * Returns:	Int
+ *	Zero if image found and pageset1 successfully loaded.
+ *	Error if no image found or loaded.
+ **/
 static int __read_pageset1(void)
 {
 	int i, result = 0;
@@ -1337,12 +1346,12 @@ out_remove_image:
 	goto out;
 }
 
-/* read_pageset1()
+/**
+ * read_pageset1 = highlevel function to read the saved pages
  *
- * Description:	Attempt to read the header and pageset1 of a hibernate image.
- * 		Handle the outcome, complaining where appropriate.
- */
-
+ * Attempt to read the header and pageset1 of a hibernate image.
+ * Handle the outcome, complaining where appropriate.
+ **/
 int read_pageset1(void)
 {
 	int error;
@@ -1357,9 +1366,9 @@ int read_pageset1(void)
 	return error;
 }
 
-/*
- * get_have_image_data()
- */
+/**
+ * get_have_image_data - check the image header
+ **/
 static char *get_have_image_data(void)
 {
 	char *output_buffer = (char *) toi_get_zeroed_page(26, TOI_ATOMIC_GFP);
@@ -1399,16 +1408,19 @@ out:
 	return output_buffer;
 }
 
-/* read_pageset2()
+/**
+ * read_pageset2 - read second part of the image
+ * @overwrittenpagesonly:	Read only pages which would have been
+ *				verwritten by pageset1?
  *
- * Description:	Read in part or all of pageset2 of an image, depending upon
- * 		whether we are hibernating and have only overwritten a portion
- * 		with pageset1 pages, or are resuming and need to read them
- * 		all.
- * Arguments:	Int. Boolean. Read only pages which would have been
- * 		overwritten by pageset1?
- * Returns:	Int. Zero if no error, otherwise the error value.
- */
+ * Read in part or all of pageset2 of an image, depending upon
+ * whether we are hibernating and have only overwritten a portion
+ * with pageset1 pages, or are resuming and need to read them
+ * all.
+ *
+ * Returns: Int
+ *	Zero if no error, otherwise the error value.
+ **/
 int read_pageset2(int overwrittenpagesonly)
 {
 	int result = 0;
@@ -1423,13 +1435,15 @@ int read_pageset2(int overwrittenpagesonly)
 	return result;
 }
 
-/* image_exists_read
+/**
+ * image_exists_read - has an image been found?
+ * @page:	Output buffer
  *
- * Return 0 or 1, depending on whether an image is found.
+ * Store 0 or 1 in page, depending on whether an image is found.
  * Incoming buffer is PAGE_SIZE and result is guaranteed
  * to be far less than that, so we don't worry about
  * overflow.
- */
+ **/
 int image_exists_read(const char *page, int count)
 {
 	int len = 0;
@@ -1456,10 +1470,9 @@ int image_exists_read(const char *page, int count)
 	return len;
 }
 
-/* image_exists_write
- *
- * Invalidate an image if one exists.
- */
+/**
+ * image_exists_write - invalidate an image if one exists
+ **/
 int image_exists_write(const char *buffer, int count)
 {
 	if (toi_activate_storage(0))
