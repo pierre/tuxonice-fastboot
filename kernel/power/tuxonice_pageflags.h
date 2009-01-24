@@ -36,17 +36,17 @@ extern struct memory_bitmap free_map;
 #define SetPageWasRW(page) (memory_bm_set_bit(&pageset2_map, page_to_pfn(page)))
 #define ClearPageWasRW(page) (memory_bm_clear_bit(&pageset2_map, page_to_pfn(page)))
 
-#define PageResave(page) ((page_resave_map.p_list) ? \
+#define PageResave(page) (page_resave_map.p_list ? \
 	memory_bm_test_bit(&page_resave_map, page_to_pfn(page)) : 0)
 #define SetPageResave(page) (memory_bm_set_bit(&page_resave_map, page_to_pfn(page)))
 #define ClearPageResave(page) (memory_bm_clear_bit(&page_resave_map, page_to_pfn(page)))
 
-#define PageNosave(page) ((nosave_map.p_list) ? \
+#define PageNosave(page) (nosave_map.p_list ? \
 		memory_bm_test_bit(&nosave_map, page_to_pfn(page)) : 0)
 #define SetPageNosave(page) (memory_bm_set_bit(&nosave_map, page_to_pfn(page)))
 #define ClearPageNosave(page) (memory_bm_clear_bit(&nosave_map, page_to_pfn(page)))
 
-#define PageNosaveFree(page) ((free_map.p_list) ? \
+#define PageNosaveFree(page) (free_map.p_list ? \
 		memory_bm_test_bit(&free_map, page_to_pfn(page)) : 0)
 #define SetPageNosaveFree(page) (memory_bm_set_bit(&free_map, page_to_pfn(page)))
 #define ClearPageNosaveFree(page) (memory_bm_clear_bit(&free_map, page_to_pfn(page)))
