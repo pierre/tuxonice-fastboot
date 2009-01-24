@@ -238,11 +238,11 @@ static inline void suspend_thaw_processes(void)
 }
 #endif
 
-extern struct page *saveable_page(struct zone *zone, unsigned long pfn);
+extern struct page *saveable_page(struct zone *z, unsigned long p);
 #ifdef CONFIG_HIGHMEM
-extern struct page *saveable_highmem_page(struct zone *z, unsigned long pfn);
+extern struct page *saveable_highmem_page(struct zone *z, unsigned long p);
 #else
-static inline void *saveable_highmem_page(struct zone *z, unsigned long p)
+static inline struct page *saveable_highmem_page(struct zone *z, unsigned long p)
 {
 	return NULL;
 }
@@ -292,7 +292,10 @@ struct memory_bitmap {
 					 * bitmap objects and bitmap block
 					 * objects
 					 */
-	struct bm_position cur;	/* most recently used bit position */
+	struct bm_position cur;		/* most recently used bit position */
+	struct bm_position iter;	/* most recently used bit position
+					 * when iterating over a bitmap.
+					 */
 };
 
 extern int memory_bm_create(struct memory_bitmap *bm, gfp_t gfp_mask,

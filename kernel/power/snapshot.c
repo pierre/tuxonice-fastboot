@@ -240,6 +240,9 @@ void memory_bm_position_reset(struct memory_bitmap *bm)
 {
 	bm->cur.block = list_entry(bm->blocks.next, struct bm_block, hook);
 	bm->cur.bit = 0;
+
+	bm->iter.block = list_entry(bm->blocks.next, struct bm_block, hook);
+	bm->iter.bit = 0;
 }
 
 void memory_bm_free(struct memory_bitmap *bm, int clear_nosave_free);
@@ -413,10 +416,13 @@ memory_bm_create(struct memory_bitmap *bm, gfp_t gfp_mask, int safe_needed)
 /**
   *	memory_bm_free - free memory occupied by the memory bitmap @bm
   */
-
 void memory_bm_free(struct memory_bitmap *bm, int clear_nosave_free)
 {
 	struct bm_block *bb;
+
+	/* Unused so far? */
+	if (!bm->blocks.next)
+		return;
 
 	list_for_each_entry(bb, &bm->blocks, hook)
 		if (bb->data)
@@ -531,23 +537,23 @@ unsigned long memory_bm_next_pfn(struct memory_bitmap *bm)
 	struct bm_block *bb;
 	int bit;
 
-	bb = bm->cur.block;
+	bb = bm->iter.block;
 	do {
-		bit = bm->cur.bit;
+		bit = bm->iter.bit;
 		bit = find_next_bit(bb->data, bm_block_bits(bb), bit);
 		if (bit < bm_block_bits(bb))
 			goto Return_pfn;
 
 		bb = list_entry(bb->hook.next, struct bm_block, hook);
-		bm->cur.block = bb;
-		bm->cur.bit = 0;
+		bm->iter.block = bb;
+		bm->iter.bit = 0;
 	} while (&bb->hook != &bm->blocks);
 
 	memory_bm_position_reset(bm);
 	return BM_END_OF_MAP;
 
  Return_pfn:
-	bm->cur.bit = bit + 1;
+	bm->iter.bit = bit + 1;
 	return bb->start_pfn + bit;
 }
 
@@ -618,8 +624,7 @@ int memory_bm_write(struct memory_bitmap *bm, int (*rw_chunk)
 		if (result)
 			return result;
 
-		result = (*rw_chunk)(WRITE, NULL, (char *) bb->data,
-				PAGE_SIZE);
+		result = (*rw_chunk)(WRITE, NULL, (char *) bb->data, PAGE_SIZE);
 		if (result)
 			return result;
 	}
@@ -631,86 +636,62 @@ int memory_bm_read(struct memory_bitmap *bm, int (*rw_chunk)
 	(int rw, struct toi_module_ops *owner, char *buffer, int buffer_size))
 {
 	int result = 0;
-	unsigned int nr = 0, nr_expected;
+	unsigned int nr, i;
 	struct bm_block *bb;
 
-	result = memory_bm_create(bm, GFP_KERNEL, PG_ANY);
+	if (!bm)
+		return result;
+
+	result = memory_bm_create(bm, GFP_KERNEL, 0);
 
 	if (result)
 		return result;
 
-	result = (*rw_chunk)(READ, NULL, (char *) &nr_expected,
-			sizeof(unsigned int));
+	result = (*rw_chunk)(READ, NULL, (char *) &nr, sizeof(unsigned int));
 	if (result)
-		return result;
+		goto Free;
 
-	list_for_each_entry(bb, &bm->blocks, hook) {
+	for (i = 0; i < nr; i++) {
 		unsigned long pfn;
 
 		result = (*rw_chunk)(READ, NULL, (char *) &pfn,
 				sizeof(unsigned long));
 		if (result)
-			return result;
+			goto Free;
 
-		if (pfn != bb->start_pfn) {
-			printk(KERN_ERR "TuxOnIce: Memory map has changed "
-					"(Start pfn %lx != %lx. "
-					"Unable to resume.\n",
-					pfn, bb->start_pfn);
-			return -EINVAL;
+		list_for_each_entry(bb, &bm->blocks, hook)
+			if (bb->start_pfn == pfn)
+				break;
+
+		if (&bb->hook == &bm->blocks) {
+			printk("TuxOnIce: Failed to load memory bitmap.\n");
+			result = -EINVAL;
+			goto Free;
 		}
 
 		result = (*rw_chunk)(READ, NULL, (char *) &pfn,
 				sizeof(unsigned long));
-
 		if (result)
-			return result;
+			goto Free;
 
 		if (pfn != bb->end_pfn) {
-			printk(KERN_ERR "TuxOnIce: Memory map has changed "
-					"(End pfn %lx != %lx. "
-					"Unable to resume.\n",
-					pfn, bb->end_pfn);
-			return -EINVAL;
+			printk("TuxOnIce: Failed to load memory bitmap. "
+				"End PFN doesn't match what was saved.\n");
+			result = -EINVAL;
+			goto Free;
 		}
 
 		result = (*rw_chunk)(READ, NULL, (char *) bb->data, PAGE_SIZE);
 
 		if (result)
-			return result;
-
-		nr++;
-
-		if (nr > nr_expected) {
-			printk("TuxOnIce: Too many memory map blocks.\n");
-			return -EINVAL;
-		}
+			goto Free;
 	}
-
-	memory_bm_position_reset(bm);
 
 	return 0;
-}
 
-int toi_pageflags_space_needed(void)
-{
-	int total = 0, error;
-	struct mem_extent *ext;
-	struct list_head mem_extents;
-
-	total = sizeof(unsigned int);
-
-	error = create_mem_extents(&mem_extents, GFP_KERNEL);
-	if (error)
-		return error;
-
-	list_for_each_entry(ext, &mem_extents, hook) {
-		total += 2 * sizeof(unsigned long) + sizeof(unsigned int)
-			+ PAGE_SIZE;
-	}
-
-	free_mem_extents(&mem_extents);
-	return total;
+Free:
+	memory_bm_free(bm, PG_ANY);
+	return result;
 }
 #endif
 

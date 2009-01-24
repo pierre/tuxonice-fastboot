@@ -7,8 +7,8 @@ obj-y				:= main.o
 
 tuxonice_core-objs := tuxonice_modules.o tuxonice_sysfs.o tuxonice_highlevel.o \
 		tuxonice_io.o tuxonice_pagedir.o tuxonice_prepare_image.o \
-		tuxonice_extent.o tuxonice_ui.o tuxonice_power_off.o \
-		tuxonice_atomic_copy.o
+		tuxonice_extent.o tuxonice_pageflags.o tuxonice_ui.o \
+		tuxonice_power_off.o tuxonice_atomic_copy.o
 
 obj-$(CONFIG_TOI)		+= tuxonice_builtin.o
 
@@ -24,7 +24,8 @@ obj-$(CONFIG_TOI_FILE)		+= tuxonice_block_io.o tuxonice_file.o
 
 obj-$(CONFIG_TOI_USERUI)	+= tuxonice_userui.o
 
-obj-$(CONFIG_PM_SLEEP)		+= process.o console.o
+obj-$(CONFIG_PM_SLEEP)		+= console.o
+obj-$(CONFIG_FREEZER)		+= process.o
 obj-$(CONFIG_HIBERNATION)	+= swsusp.o disk.o snapshot.o swap.o user.o
 
 obj-$(CONFIG_MAGIC_SYSRQ)	+= poweroff.o
