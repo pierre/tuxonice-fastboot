@@ -29,18 +29,12 @@ struct memory_bitmap free_map;
 int toi_pageflags_space_needed(void)
 {
 	int total = 0;
-	struct zone_bitmap *zone_bm;
 	struct bm_block *bb;
 
 	total = sizeof(unsigned int);
 
-	for (zone_bm = pageset1_map.zone_bm_list; zone_bm;
-			zone_bm = zone_bm->next) {
-		total += 2 * sizeof(unsigned long) + sizeof(unsigned int);
-
-		for (bb = zone_bm->bm_blocks; bb; bb = bb->next)
-			total += PAGE_SIZE;
-	}
+	list_for_each_entry(bb, &pageset1_map.blocks, hook)
+		total += 2 * sizeof(unsigned long) + PAGE_SIZE;
 
 	return total;
 }
