@@ -511,6 +511,13 @@ config BLK_DEV_PIIX
 	  This allows the kernel to change PIO, DMA and UDMA speeds and to
 	  configure the chip to optimum performance.
 
+config BLK_DEV_IT8172
+	tristate "IT8172 IDE support"
+	select BLK_DEV_IDEDMA_PCI
+	help
+	  This driver adds support for the IDE controller on the
+	  IT8172 System Controller.
+
 config BLK_DEV_IT8213
 	tristate "IT8213 IDE support"
 	select BLK_DEV_IDEDMA_PCI
@@ -693,11 +700,6 @@ config BLK_DEV_IDE_AU1XXX_MDMA2_DBDMA
        bool "MDMA2+DbDMA IDE for AMD Alchemy Au1200"
        depends on SOC_AU1200 && BLK_DEV_IDE_AU1XXX
 endchoice
-
-config BLK_DEV_IDE_AU1XXX_SEQTS_PER_RQ
-       int "Maximum transfer size (KB) per request (up to 128)"
-       default "128"
-       depends on BLK_DEV_IDE_AU1XXX
 
 config BLK_DEV_IDE_TX4938
 	tristate "TX4938 internal IDE support"
