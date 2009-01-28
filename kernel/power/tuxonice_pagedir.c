@@ -71,7 +71,7 @@ struct page *___toi_get_nonconflicting_page(int can_be_highmem)
 
 
 	if (test_toi_state(TOI_LOADING_ALT_IMAGE) &&
-			pageset2_map.zone_bm_list &&
+			pageset2_map.p_list &&
 			(ptoi_pfn != BM_END_OF_MAP)) {
 		do {
 			ptoi_pfn = memory_bm_next_pfn(&pageset2_map);
