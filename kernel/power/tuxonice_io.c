@@ -374,7 +374,7 @@ static struct page *copy_page_from_orig_page(struct page *orig_page)
  */
 static int worker_rw_loop(void *data)
 {
-	unsigned long orig_pfn, write_pfn, next_jiffies = jiffies + HZ / 10, jif_index = 1;
+	unsigned long orig_pfn, write_pfn, next_jiffies = jiffies + HZ / 2, jif_index = 1;
 	int result, my_io_index = 0, temp, last_worker, i_finished_first = 0;
 	struct toi_module_ops *first_filter = toi_get_next_filter(NULL);
 	struct page *buffer = toi_alloc_page(28, TOI_ATOMIC_GFP);
@@ -386,7 +386,7 @@ static int worker_rw_loop(void *data)
 		unsigned int buf_size;
 
 		if (data && jiffies > next_jiffies) {
-			next_jiffies += HZ / 10;
+			next_jiffies += HZ / 2;
 			if (toiActiveAllocator->update_throughput_throttle)
 				toiActiveAllocator->update_throughput_throttle(jif_index);
 			jif_index++;
