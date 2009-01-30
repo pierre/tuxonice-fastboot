@@ -9,22 +9,9 @@
  * store our image metadata.
  */
 
-#include <linux/kernel.h>
-#include <linux/mm.h>
-#include <linux/module.h>
-#include <linux/bitops.h>
 #include <linux/list.h>
-#include <linux/suspend.h>
 #include "tuxonice_pageflags.h"
-#include "tuxonice_modules.h"
-#include "tuxonice_pagedir.h"
-#include "tuxonice.h"
-
-struct memory_bitmap pageset2_map;
-struct memory_bitmap page_resave_map;
-struct memory_bitmap io_map;
-struct memory_bitmap nosave_map;
-struct memory_bitmap free_map;
+#include "power.h"
 
 int toi_pageflags_space_needed(void)
 {
