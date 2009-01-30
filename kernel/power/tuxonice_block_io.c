@@ -190,16 +190,20 @@ static void toi_monitor_outstanding_io(void)
 /**
  * update_throughput_throttle: Update the raw throughput throttle.
  *
- * Called once per second by the core, used to limit the amount of I/O
+ * Called twice per second by the core, used to limit the amount of I/O
  * we submit at once, spreading out our waiting through the whole job
  * and letting userui get an opportunity to do its work.
+ *
+ * We don't start limiting I/O until 1/2s has gone so that we get a
+ * decent sample for our initial limit, and keep updating it because
+ * throughput may vary (on rotating media, eg) with our block number.
  *
  * We throttle to 1/10s worth of I/O.
  */
 static void update_throughput_throttle(int jif_index)
 {
 	int done = atomic_read(&toi_io_done);
-	throughput_throttle = done / jif_index;
+	throughput_throttle = done / jif_index / 5;
 }
 
 /**

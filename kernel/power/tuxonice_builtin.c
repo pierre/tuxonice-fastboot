@@ -192,12 +192,6 @@ EXPORT_SYMBOL_GPL(toi_wait);
 struct toi_core_fns *toi_core_fns;
 EXPORT_SYMBOL_GPL(toi_core_fns);
 
-struct memory_bitmap pageset1_map;
-EXPORT_SYMBOL_GPL(pageset1_map);
-
-struct memory_bitmap pageset1_copy_map;
-EXPORT_SYMBOL_GPL(pageset1_copy_map);
-
 unsigned long toi_result;
 EXPORT_SYMBOL_GPL(toi_result);
 
