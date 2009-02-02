@@ -58,6 +58,7 @@ static DEFINE_SPINLOCK(bio_queue_lock);
 static int free_mem_throttle, throughput_throttle;
 static int more_readahead = 1;
 static struct page *readahead_list_head, *readahead_list_tail;
+static DECLARE_WAIT_QUEUE_HEAD(readahead_list_wait);
 
 static struct page *waiting_on;
 
@@ -318,6 +319,7 @@ static int toi_do_io(int writing, struct block_device *bdev, long block0,
 			readahead_list_head = page;
 
 		readahead_list_tail = page;
+		wake_up(&readahead_list_wait);
 	}
 
 	/* Done before submitting to avoid races. */
@@ -782,13 +784,16 @@ static int toi_bio_get_next_page_read(int no_readahead)
 
 	/*
 	 * On SMP, we may need to wait for the first readahead
-	 * to be submitted.
+	 * to be submitted or submit a new batch if we're the thread
+	 * submitting I/O and everyone else already used the I/O
+	 * we'd submitted before taking toi_bio_mutex (resume time only).
 	 */
 	if (unlikely(!readahead_list_head)) {
 		BUG_ON(!more_readahead);
-		do {
-			cpu_relax();
-		} while (!readahead_list_head);
+		if (current == toi_queue_flusher)
+			toi_start_new_readahead(0);
+		else
+			wait_event(readahead_list_wait, readahead_list_head);
 	}
 
 	if (PageLocked(readahead_list_head)) {
