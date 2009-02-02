@@ -572,9 +572,9 @@ static int start_other_threads(void)
 			continue;
 
 		p = kthread_create(worker_rw_loop, num_started ? NULL : MONITOR,
-				"ks2io/%d", cpu);
+				"ktoi_io/%d", cpu);
 		if (IS_ERR(p)) {
-			printk("ks2io for %i failed\n", cpu);
+			printk("ktoi_io for %i failed\n", cpu);
 			continue;
 		}
 		kthread_bind(p, cpu);
