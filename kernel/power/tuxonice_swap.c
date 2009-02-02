@@ -1016,7 +1016,7 @@ static int toi_swap_image_exists(int quiet)
 		return 1;
 	}
 
-	BUG();
+	printk("Unrecognised parse_signature result (%d).\n", signature_found);
 	return 0;
 }
 
