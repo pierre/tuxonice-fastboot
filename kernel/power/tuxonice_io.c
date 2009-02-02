@@ -389,6 +389,8 @@ static int worker_rw_loop(void *data)
 	struct toi_module_ops *first_filter = toi_get_next_filter(NULL);
 	struct page *buffer = toi_alloc_page(28, TOI_ATOMIC_GFP);
 
+	current->flags |= PF_NOFREEZE;
+
 	atomic_inc(&toi_io_workers);
 	mutex_lock(&io_mutex);
 
@@ -1121,6 +1123,20 @@ static char *sanity_check(struct toi_header *sh)
 	return NULL;
 }
 
+static DECLARE_WAIT_QUEUE_HEAD(freeze_wait);
+
+#define FREEZE_IN_PROGRESS ~0
+
+static int freeze_result;
+
+static void do_freeze(struct work_struct *dummy)
+{
+	freeze_result = freeze_processes();
+	wake_up(&freeze_wait);
+}
+
+static DECLARE_WORK(freeze_work, do_freeze);
+
 /* __read_pageset1
  *
  * Description:	Test for the existence of an image and attempt to load it.
@@ -1257,12 +1273,11 @@ static int __read_pageset1(void)
 	if (usermodehelper_disable())
 		goto out_enable_nonboot_cpus;
 
-	toi_prepare_status(DONT_CLEAR_BAR,	"Freeze processes.");
+	current->flags |= PF_NOFREEZE;
+	freeze_result = FREEZE_IN_PROGRESS;
 
-	if (freeze_processes()) {
-		printk("Some processes failed to stop.\n");
-		goto out_thaw;
-	}
+	schedule_work_on(first_cpu(cpu_online_map), &freeze_work);
+
 	toi_cond_pause(1, "About to read original pageset1 locations.");
 
 	/*
@@ -1314,11 +1329,14 @@ static int __read_pageset1(void)
 	    toiActiveAllocator->mark_resume_attempted)
 		toiActiveAllocator->mark_resume_attempted(1);
 
+	wait_event(freeze_wait, freeze_result != FREEZE_IN_PROGRESS);
 out:
+	current->flags &= ~PF_NOFREEZE;
 	toi_free_page(25, (unsigned long) header_buffer);
 	return result;
 
 out_thaw:
+	wait_event(freeze_wait, freeze_result != FREEZE_IN_PROGRESS);
 	thaw_processes();
 	usermodehelper_enable();
 out_enable_nonboot_cpus:
