@@ -142,9 +142,10 @@ static void do_bio_wait(int reason)
 	}
 }
 
-static void throttle_if_needed(int reason)
+static int throttle_if_needed(int reason)
 {
-	int free_pages = nr_unallocated_buffer_pages();
+	int free_pages = nr_unallocated_buffer_pages(),
+	    flushed_queue = 0;
 
 	/* Getting low on memory and I/O is in progress? */
 	while (unlikely(free_pages < free_mem_throttle) &&
@@ -155,11 +156,19 @@ static void throttle_if_needed(int reason)
 
 	while (reason == ANY_REASON && throughput_throttle &&
 		TOTAL_OUTSTANDING_IO >= throughput_throttle) {
+		if (!flushed_queue) {
+			int result = toi_bio_queue_flush_pages(0);
+			if (result)
+				return result;
+			flushed_queue = 1;
+		}
 		atomic_inc(&reasons[6]);
 		wait_event(num_in_progress_wait,
 			!atomic_read(&toi_io_in_progress) ||
 			TOTAL_OUTSTANDING_IO < throughput_throttle);
 	}
+
+	return 0;
 }
 
 /**
@@ -241,9 +250,11 @@ static int submit(int writing, struct block_device *dev, sector_t first_block,
 		struct page *page, int free_group)
 {
 	struct bio *bio = NULL;
-	int cur_outstanding_io;
+	int cur_outstanding_io, result;
 
-	throttle_if_needed(MEMORY_ONLY);
+	result = throttle_if_needed(MEMORY_ONLY);
+	if (result)
+		return result;
 
 	while (!bio) {
 		bio = bio_alloc(TOI_ATOMIC_GFP, 1);
@@ -540,10 +551,8 @@ static int toi_bio_rw_page(int writing, struct page *page,
 			dev_info->bmap_shift,
 		page, is_readahead, 0, free_group);
 
-	if (result) {
-		more_readahead = 0;
+	if (result) 
 		return result;
-	}
 
 	if (!writing) {
 		int compare_to = 0;
@@ -563,8 +572,9 @@ static int toi_bio_rw_page(int writing, struct page *page,
 		if (toi_writer_posn.current_chain ==
 				toi_writer_posn_save[compare_to].chain_num &&
 		    toi_writer_posn.current_offset ==
-				toi_writer_posn_save[compare_to].offset)
+				toi_writer_posn_save[compare_to].offset) {
 			more_readahead = 0;
+		}
 	}
 	return 0;
 }
@@ -642,7 +652,7 @@ static int toi_rw_cleanup(int writing)
 	if (writing) {
 		int result;
 
-		if (toi_writer_buffer_posn)
+		if (toi_writer_buffer_posn && !test_result_state(TOI_ABORTED))
 			toi_bio_queue_write(&toi_writer_buffer);
 
 		result = toi_bio_queue_flush_pages(0);
@@ -686,9 +696,11 @@ static int toi_rw_cleanup(int writing)
 static int toi_start_one_readahead(int dedicated_thread)
 {
 	char *buffer = NULL;
-	int oom = 0;
+	int oom = 0, result;
 
-	throttle_if_needed(ANY_REASON);
+	result = throttle_if_needed(ANY_REASON);
+	if (result)
+		return result;
 
 	while (!buffer) {
 		buffer = (char *) toi_get_zeroed_page(12,
@@ -814,7 +826,7 @@ static int toi_bio_get_next_page_read(int no_readahead)
  * toi_bio_queue_flush_pages
  */
 
-static int toi_bio_queue_flush_pages(int dedicated_thread)
+int toi_bio_queue_flush_pages(int dedicated_thread)
 {
 	unsigned long flags;
 	int result = 0;
@@ -848,9 +860,11 @@ top:
 /*
  * toi_bio_get_new_page
  */
-static void toi_bio_get_new_page(char **full_buffer)
+static int toi_bio_get_new_page(char **full_buffer)
 {
-	throttle_if_needed(ANY_REASON);
+	int result = throttle_if_needed(ANY_REASON);
+	if (result)
+		return result;
 
 	while (!*full_buffer) {
 		*full_buffer = (char *) toi_get_zeroed_page(11, TOI_ATOMIC_GFP);
@@ -859,6 +873,8 @@ static void toi_bio_get_new_page(char **full_buffer)
 			do_bio_wait(3);
 		}
 	}
+
+	return 0;
 }
 
 /*
@@ -871,7 +887,7 @@ static void toi_bio_get_new_page(char **full_buffer)
 static int toi_rw_buffer(int writing, char *buffer, int buffer_size,
 		int no_readahead)
 {
-	int bytes_left = buffer_size;
+	int bytes_left = buffer_size, result = 0;
 
 	while (bytes_left) {
 		char *source_start = buffer + buffer_size - bytes_left;
@@ -896,7 +912,9 @@ static int toi_rw_buffer(int writing, char *buffer, int buffer_size,
 				return result;
 		} else {
 			toi_bio_queue_write(&toi_writer_buffer);
-			toi_bio_get_new_page(&toi_writer_buffer);
+			result = toi_bio_get_new_page(&toi_writer_buffer);
+			if (result)
+				return result;
 		}
 
 		toi_writer_buffer_posn = 0;
@@ -922,14 +940,14 @@ static int toi_bio_read_page(unsigned long *pfn, struct page *buffer_page,
 	int result = 0;
 	char *buffer_virt = kmap(buffer_page);
 
+	my_mutex_lock(0, &toi_bio_mutex);
+
 	/* Only call start_new_readahead if we don't have a dedicated thread */
 	if (current == toi_queue_flusher && toi_start_new_readahead(0)) {
 		printk(KERN_INFO "Queue flusher and toi_start_one_readahead "
 				"returned non-zero.\n");
 		return -EIO;
 	}
-
-	my_mutex_lock(0, &toi_bio_mutex);
 
 	if (toi_rw_buffer(READ, (char *) pfn, sizeof(unsigned long), 0) ||
 	    toi_rw_buffer(READ, (char *) buf_size, sizeof(int), 0) ||
@@ -963,6 +981,12 @@ static int toi_bio_write_page(unsigned long pfn, struct page *buffer_page,
 		return 0;
 
 	my_mutex_lock(1, &toi_bio_mutex);
+
+	if (test_result_state(TOI_ABORTED)) {
+		my_mutex_unlock(1, &toi_bio_mutex);
+		return -EIO;
+	}
+
 	buffer_virt = kmap(buffer_page);
 
 	if (toi_rw_buffer(WRITE, (char *) &pfn, sizeof(unsigned long), 0) ||
