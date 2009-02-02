@@ -550,10 +550,10 @@ static void display_failure_reason(int tries_exceeded)
 		printk(KERN_INFO "     Minimum free     : %8d\n", MIN_FREE_RAM);
 		printk(KERN_INFO "   + Reqd. by modules : %8ld\n",
 				toi_memory_for_modules(0));
-		printk(KERN_INFO "   - Currently free   : %8ld\n",
-				real_nr_free_low_pages());
 		printk(KERN_INFO "   + 2 * extra allow  : %8ld\n",
 				2 * extra_pd1_pages_allowance);
+		printk(KERN_INFO "   - Currently free   : %8ld\n",
+				real_nr_free_low_pages());
 		printk(KERN_INFO "                      : ========\n");
 		printk(KERN_INFO "     Still needed     : %8ld\n",
 				ram_required);
