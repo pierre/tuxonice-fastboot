@@ -927,6 +927,7 @@ static void eat_memory(void)
 
 	if (amount_wanted > 0 && !test_result_state(TOI_ABORTED) &&
 			image_size_limit != -1) {
+		long request = amount_wanted;
 
 		toi_prepare_status(CLEAR_BAR,
 				"Seeking to free %ldMB of memory.",
@@ -941,6 +942,9 @@ static void eat_memory(void)
 		toi_recalculate_image_contents(0);
 
 		amount_wanted = amount_needed(1);
+
+		printk("Asked shrink_all_memory for %ld pages, got %ld.\n",
+				request, request - amount_wanted);
 
 		toi_cond_pause(0, NULL);
 
