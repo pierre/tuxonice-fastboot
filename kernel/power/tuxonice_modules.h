@@ -129,9 +129,6 @@ struct toi_module_ops {
 	/* Throttle I/O according to throughput */
 	void (*update_throughput_throttle) (int jif_index);
 
-	/* Monitor outstanding I/O */
-	void (*monitor_outstanding_io) (void);
-
 	/* Flush outstanding I/O */
 	void (*finish_all_io) (void);
 
