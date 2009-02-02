@@ -167,27 +167,6 @@ static void throttle_if_needed(int reason)
 }
 
 /**
- * toi_monitor_outstanding_io: Show the user how much I/O we're waiting for.
- */
-static void toi_monitor_outstanding_io(void)
-{
-	int orig = TOTAL_OUTSTANDING_IO, step = orig / 5;
-
-	while (orig) {
-		int new_min = orig > step ? orig - step : 0,
-		    new_max = orig + step,
-		    mb = MB(orig);
-		if (mb)
-			toi_prepare_status(DONT_CLEAR_BAR,
-				"Waiting on I/O completion (%d MB)", mb);
-		wait_event(num_in_progress_wait,
-			TOTAL_OUTSTANDING_IO <= new_min ||
-			TOTAL_OUTSTANDING_IO >= new_max);
-		orig = TOTAL_OUTSTANDING_IO;
-	}
-}
-
-/**
  * update_throughput_throttle: Update the raw throughput throttle.
  *
  * Called twice per second by the core, used to limit the amount of I/O
@@ -1149,7 +1128,6 @@ static void toi_bio_cleanup(int finishing_cycle)
 struct toi_bio_ops toi_bio_ops = {
 	.bdev_page_io = toi_bdev_page_io,
 	.finish_all_io = toi_finish_all_io,
-	.monitor_outstanding_io	= toi_monitor_outstanding_io,
 	.update_throughput_throttle = update_throughput_throttle,
 	.forward_one_page = go_next_page,
 	.set_extra_page_forward = set_extra_page_forward,
