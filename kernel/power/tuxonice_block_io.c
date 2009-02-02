@@ -1076,7 +1076,6 @@ static int write_header_chunk_finish(void)
 	if (toi_writer_buffer_posn)
 		toi_bio_queue_write(&toi_writer_buffer);
 
-	toi_bio_queue_flush_pages(0);
 	toi_finish_all_io();
 
 	return result;
