@@ -656,7 +656,7 @@ static int toi_file_signature_op(int op)
 	int result = 0, changed = 0;
 	struct toi_file_header *header;
 
-	if (IS_ERR(toi_file_target_bdev))
+	if (!toi_file_target_bdev || IS_ERR(toi_file_target_bdev))
 		return -1;
 
 	cur = (char *) toi_get_zeroed_page(17, TOI_ATOMIC_GFP);
