@@ -15,20 +15,21 @@
 #include "tuxonice_ui.h"
 #include "tuxonice.h"
 
-/* toi_get_extent
+/**
+ * toi_get_extent - return a free extent
  *
- * Returns a free extent. May fail, returning NULL instead.
- */
+ * May fail, returning NULL instead.
+ **/
 static struct hibernate_extent *toi_get_extent(void)
 {
 	return (struct hibernate_extent *) toi_kzalloc(2,
 			sizeof(struct hibernate_extent), TOI_ATOMIC_GFP);
 }
 
-/* toi_put_extent_chain.
- *
- * Frees a whole chain of extents.
- */
+/**
+ * toi_put_extent_chain - free a whole chain of extents
+ * @chain:	Chain to free.
+ **/
 void toi_put_extent_chain(struct hibernate_extent_chain *chain)
 {
 	struct hibernate_extent *this;
@@ -47,11 +48,14 @@ void toi_put_extent_chain(struct hibernate_extent_chain *chain)
 	chain->size = 0;
 }
 
-/*
- * toi_add_to_extent_chain
+/**
+ * toi_add_to_extent_chain - add an extent to an existing chain
+ * @chain:	Chain to which the extend should be added
+ * @start:	Start of the extent (first physical block)
+ * @end:	End of the extent (last physical block)
  *
- * Add an extent to an existing chain.
- */
+ * The chain information is updated if the insertion is successful.
+ **/
 int toi_add_to_extent_chain(struct hibernate_extent_chain *chain,
 		unsigned long start, unsigned long end)
 {
@@ -112,10 +116,11 @@ int toi_add_to_extent_chain(struct hibernate_extent_chain *chain,
 	return 0;
 }
 
-/* toi_serialise_extent_chain
- *
- * Write a chain in the image.
- */
+/**
+ * toi_serialise_extent_chain - write a chain in the image
+ * @owner:	Module writing the chain.
+ * @chain:	Chain to write.
+ **/
 int toi_serialise_extent_chain(struct toi_module_ops *owner,
 		struct hibernate_extent_chain *chain)
 {
@@ -146,19 +151,23 @@ int toi_serialise_extent_chain(struct toi_module_ops *owner,
 	return ret;
 }
 
-/* toi_load_extent_chain
+/**
+ * toi_load_extent_chain - read back a chain saved in the image
+ * @chain:	Chain to load
  *
- * Read back a chain saved in the image.
- */
+ * The linked list of extents is reconstructed from the disk. chain will point
+ * to the first entry.
+ **/
 int toi_load_extent_chain(struct hibernate_extent_chain *chain)
 {
 	struct hibernate_extent *this, *last = NULL;
 	int i, ret;
 
+	/* Get the next page */
 	ret = toiActiveAllocator->rw_header_chunk_noreadahead(READ, NULL,
 			(char *) chain, 2 * sizeof(int));
 	if (ret) {
-		printk("Failed to read size of extent chain.\n");
+		printk("Failed to read the size of extent chain.\n");
 		return 1;
 	}
 
@@ -170,10 +179,11 @@ int toi_load_extent_chain(struct hibernate_extent_chain *chain)
 			return -ENOMEM;
 		}
 		this->next = NULL;
+		/* Get the next page */
 		ret = toiActiveAllocator->rw_header_chunk_noreadahead(READ,
 				NULL, (char *) this, 2 * sizeof(unsigned long));
 		if (ret) {
-			printk(KERN_INFO "Failed to an extent.\n");
+			printk(KERN_INFO "Failed to read an extent.\n");
 			return 1;
 		}
 		if (last)
@@ -185,14 +195,15 @@ int toi_load_extent_chain(struct hibernate_extent_chain *chain)
 	return 0;
 }
 
-/* toi_extent_state_next
+/**
+ * toi_extent_state_next - go to the next extent
  *
  * Given a state, progress to the next valid entry. We may begin in an
  * invalid state, as we do when invoked after extent_state_goto_start below.
  *
  * When using compression and expected_compression > 0, we let the image size
  * be larger than storage, so we can validly run out of data to return.
- */
+ **/
 unsigned long toi_extent_state_next(struct toi_extent_iterate_state *state)
 {
 	if (state->current_chain == state->num_chains)
@@ -230,10 +241,10 @@ unsigned long toi_extent_state_next(struct toi_extent_iterate_state *state)
 	return state->current_offset;
 }
 
-/* toi_extent_state_goto_start
- *
- * Find the first valid value in a group of chains.
- */
+/**
+ * toi_extent_state_goto_start - reinitialize an extent chain iterator
+ * @state:	Iterator to reinitialize
+ **/
 void toi_extent_state_goto_start(struct toi_extent_iterate_state *state)
 {
 	state->current_chain = -1;
@@ -241,12 +252,15 @@ void toi_extent_state_goto_start(struct toi_extent_iterate_state *state)
 	state->current_offset = 0;
 }
 
-/* toi_extent_start_save
+/**
+ * toi_extent_state_save - save state of the iterator
+ * @state:		Current state of the chain
+ * @saved_state:	Iterator to populate
  *
  * Given a state and a struct hibernate_extent_state_store, save the current
  * position in a format that can be used with relocated chains (at
  * resume time).
- */
+ **/
 void toi_extent_state_save(struct toi_extent_iterate_state *state,
 		struct hibernate_extent_iterate_saved_state *saved_state)
 {
@@ -267,10 +281,11 @@ void toi_extent_state_save(struct toi_extent_iterate_state *state,
 	}
 }
 
-/* toi_extent_start_restore
- *
- * Restore the position saved by extent_state_save.
- */
+/**
+ * toi_extent_state_restore - restore the position saved by extent_state_save
+ * @state:		State to populate
+ * @saved_state:	Iterator saved to restore
+ **/
 void toi_extent_state_restore(struct toi_extent_iterate_state *state,
 		struct hibernate_extent_iterate_saved_state *saved_state)
 {
