@@ -32,7 +32,9 @@ long extra_pd1_pages_used;
 static int ftrace_save;
 
 /**
- * free_pbe_list: Free page backup entries used by the atomic copy code.
+ * free_pbe_list - free page backup entries used by the atomic copy code.
+ * @list:	List to free.
+ * @highmem:	If the list is in highmem.
  *
  * Normally, this function isn't used. If, however, we need to abort before
  * doing the atomic copy, we use this to free the pbes previously allocated.
@@ -78,17 +80,16 @@ static void free_pbe_list(struct pbe **list, int highmem)
 }
 
 /**
- * copyback_post: Post atomic-restore actions.
+ * copyback_post - post atomic-restore actions
  *
  * After doing the atomic restore, we have a few more things to do:
- * 1) We want to retain some values across the restore, so we now copy
- * these from the nosave variables to the normal ones.
- * 2) Set the status flags.
- * 3) Resume devices.
- * 4) Tell userui so it can redraw & restore settings.
- * 5) Reread the page cache.
+ *	1) We want to retain some values across the restore, so we now copy
+ *	these from the nosave variables to the normal ones.
+ *	2) Set the status flags.
+ *	3) Resume devices.
+ *	4) Tell userui so it can redraw & restore settings.
+ *	5) Reread the page cache.
  **/
-
 void copyback_post(void)
 {
 	struct toi_boot_kernel_data *bkd =
@@ -125,7 +126,7 @@ void copyback_post(void)
 }
 
 /**
- * toi_copy_pageset1: Do the atomic copy of pageset1.
+ * toi_copy_pageset1 - do the atomic copy of pageset1
  *
  * Make the atomic copy of pageset1. We can't use copy_page (as we once did)
  * because we can't be sure what side effects it has. On my old Duron, with
@@ -137,7 +138,6 @@ void copyback_post(void)
  * post resume (the page containing the preempt count will be copied after
  * its incremented. This is essentially the same problem.
  **/
-
 void toi_copy_pageset1(void)
 {
 	int i;
@@ -190,14 +190,13 @@ void toi_copy_pageset1(void)
 }
 
 /**
- * __toi_post_context_save: Steps after saving the cpu context.
+ * __toi_post_context_save - steps after saving the cpu context
  *
  * Steps taken after saving the CPU state to make the actual
  * atomic copy.
  *
  * Called from swsusp_save in snapshot.c via toi_post_context_save.
  **/
-
 int __toi_post_context_save(void)
 {
 	long old_ps1_size = pagedir1.size;
@@ -227,16 +226,16 @@ int __toi_post_context_save(void)
 }
 
 /**
- * toi_hibernate: High level code for doing the atomic copy.
+ * toi_hibernate - high level code for doing the atomic copy
  *
  * High-level code which prepares to do the atomic copy. Loosely based
  * on the swsusp version, but with the following twists:
- * - We set toi_running so the swsusp code uses our code paths.
- * - We give better feedback regarding what goes wrong if there is a problem.
- * - We use an extra function to call the assembly, just in case this code
- *   is in a module (return address).
+ *	- We set toi_running so the swsusp code uses our code paths.
+ *	- We give better feedback regarding what goes wrong if there is a
+ *	  problem.
+ *	- We use an extra function to call the assembly, just in case this code
+ *	  is in a module (return address).
  **/
-
 int toi_hibernate(void)
 {
 	int error;
@@ -250,14 +249,13 @@ int toi_hibernate(void)
 }
 
 /**
- * toi_atomic_restore: Prepare to do the atomic restore.
+ * toi_atomic_restore - prepare to do the atomic restore
  *
  * Get ready to do the atomic restore. This part gets us into the same
  * state we are in prior to do calling do_toi_lowlevel while
  * hibernating: hot-unplugging secondary cpus and freeze processes,
  * before starting the thread that will do the restore.
  **/
-
 int toi_atomic_restore(void)
 {
 	int error;
@@ -299,6 +297,9 @@ Failed:
 	return 1;
 }
 
+/**
+ * toi_go_atomic - do the actual atomic copy/restore
+ **/
 int toi_go_atomic(pm_message_t state, int suspend_time)
 {
 	toi_prepare_status(DONT_CLEAR_BAR, "Doing atomic copy/restore.");
@@ -364,6 +365,9 @@ int toi_go_atomic(pm_message_t state, int suspend_time)
 	return 0;
 }
 
+/**
+ * toi_end_atomic - post atomic copy/restore routines
+ **/
 void toi_end_atomic(int stage, int suspend_time, int error)
 {
 	switch (stage) {
