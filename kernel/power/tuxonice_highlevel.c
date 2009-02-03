@@ -98,6 +98,7 @@ static int block_dump_save;
 static char pre_hibernate_command[256];
 static char post_hibernate_command[256];
 
+/* Binary signature if an image is present */
 char *tuxonice_signature = "\xed\xc3\x02\xe9\x98\x56\xe5\x0c";
 EXPORT_SYMBOL_GPL(tuxonice_signature);
 
@@ -138,14 +139,14 @@ static char *result_strings[] = {
 };
 
 /**
- * toi_finish_anything - Cleanup after doing anything.
- *
- * @hibernate_or_resume: Whether finishing a cycle or attempt at resuming.
+ * toi_finish_anything - cleanup after doing anything
+ * @hibernate_or_resume:	Whether finishing a cycle or attempt at
+ *				resuming.
  *
  * This is our basic clean-up routine, matching start_anything below. We
  * call cleanup routines, drop module references and restore process fs and
  * cpus allowed masks, together with the global block_dump variable's value.
- */
+ **/
 void toi_finish_anything(int hibernate_or_resume)
 {
 	toi_cleanup_modules(hibernate_or_resume);
@@ -168,14 +169,13 @@ void toi_finish_anything(int hibernate_or_resume)
 }
 
 /**
- * toi_start_anything - Basic initialisation for TuxOnIce.
- *
- * @toi_or_resume: Whether starting a cycle or attempt at resuming.
+ * toi_start_anything - basic initialisation for TuxOnIce
+ * @toi_or_resume:	Whether starting a cycle or attempt at resuming.
  *
  * Our basic initialisation routine. Take references on modules, use the
  * kernel segment, recheck resume= if no active allocator is set, initialise
  * modules, save and reset block_dump and ensure we're running on CPU0.
- */
+ **/
 int toi_start_anything(int hibernate_or_resume)
 {
 	int starting_cycle = (hibernate_or_resume == SYSFS_HIBERNATE);
@@ -207,7 +207,7 @@ int toi_start_anything(int hibernate_or_resume)
 		toi_print_modules();
 
 	if (toi_get_modules()) {
-		printk("TuxOnIce: Get modules failed!\n");
+		printk(KERN_INFO "TuxOnIce: Get modules failed!\n");
 		goto prehibernate_err;
 	}
 
@@ -252,11 +252,11 @@ snapshotdevice_unavailable:
  */
 
 /**
- * mark_nosave_pages - Set up our Nosave bitmap.
+ * mark_nosave_pages - set up our Nosave bitmap
  *
  * Build a bitmap of Nosave pages from the list. The bitmap allows faster
  * use when preparing the image.
- */
+ **/
 static void mark_nosave_pages(void)
 {
 	struct nosave_region *region;
@@ -271,11 +271,11 @@ static void mark_nosave_pages(void)
 }
 
 /**
- * allocate_bitmaps: Allocate bitmaps used to record page states.
+ * allocate_bitmaps - allocate bitmaps used to record page states
  *
  * Allocate the bitmaps we use to record the various TuxOnIce related
  * page states.
- */
+ **/
 static int allocate_bitmaps(void)
 {
 	if (memory_bm_create(&pageset1_map, GFP_KERNEL, 0) ||
@@ -291,11 +291,11 @@ static int allocate_bitmaps(void)
 }
 
 /**
- * free_bitmaps: Free the bitmaps used to record page states.
+ * free_bitmaps - free the bitmaps used to record page states
  *
  * Free the bitmaps allocated above. It is not an error to call
  * memory_bm_free on a bitmap that isn't currently allocated.
- */
+ **/
 static void free_bitmaps(void)
 {
 	memory_bm_free(&pageset1_map, 0);
@@ -308,12 +308,11 @@ static void free_bitmaps(void)
 }
 
 /**
- * io_MB_per_second: Return the number of MB/s read or written.
- *
- * @write: Whether to return the speed at which we wrote.
+ * io_MB_per_second - return the number of MB/s read or written
+ * @write:	Whether to return the speed at which we wrote.
  *
  * Calculate the number of megabytes per second that were read or written.
- */
+ **/
 static int io_MB_per_second(int write)
 {
 	return (toi_bkd.toi_io_time[write][1]) ?
@@ -321,18 +320,17 @@ static int io_MB_per_second(int write)
 		toi_bkd.toi_io_time[write][1] : 0;
 }
 
-/**
- * get_debug_info: Fill a buffer with debugging information.
- *
- * @buffer: The buffer to be filled.
- * @count: The size of the buffer, in bytes.
- *
- * Fill a (usually PAGE_SIZEd) buffer with the debugging info that we will
- * either printk or return via sysfs.
- */
 #define SNPRINTF(a...) 	do { len += scnprintf(((char *) buffer) + len, \
 		count - len - 1, ## a); } while (0)
 
+/**
+ * get_debug_info - fill a buffer with debugging information
+ * @buffer:	The buffer to be filled.
+ * @count:	The size of the buffer, in bytes.
+ *
+ * Fill a (usually PAGE_SIZEd) buffer with the debugging info that we will
+ * either printk or return via sysfs.
+ **/
 static int get_toi_debug_info(const char *buffer, int count)
 {
 	int len = 0, i, first_result = 1;
@@ -395,13 +393,12 @@ static int get_toi_debug_info(const char *buffer, int count)
 }
 
 /**
- * do_cleanup: Cleanup after attempting to hibernate or resume.
- *
- * @get_debug_info: Whether to allocate and return debugging info.
+ * do_cleanup - cleanup after attempting to hibernate or resume
+ * @get_debug_info:	Whether to allocate and return debugging info.
  *
  * Cleanup after attempting to hibernate or resume, possibly getting
  * debugging info as we do so.
- */
+ **/
 static void do_cleanup(int get_debug_info)
 {
 	int i = 0;
@@ -473,7 +470,7 @@ static void do_cleanup(int get_debug_info)
 }
 
 /**
- * check_still_keeping_image: We kept an image; check whether to reuse it.
+ * check_still_keeping_image - we kept an image; check whether to reuse it.
  *
  * We enter this routine when we have kept an image. If the user has said they
  * want to still keep it, all we need to do is powerdown. If powering down
@@ -483,7 +480,7 @@ static void do_cleanup(int get_debug_info)
  *
  * If the user has said they want to remove the previously kept image, we
  * remove it, and return 0. We'll then store a new image.
- */
+ **/
 static int check_still_keeping_image(void)
 {
 	if (test_action_state(TOI_KEEP_IMAGE)) {
@@ -499,11 +496,11 @@ static int check_still_keeping_image(void)
 }
 
 /**
- * toi_init: Prepare to hibernate to disk.
+ * toi_init - prepare to hibernate to disk
  *
  * Initialise variables & data structures, in preparation for
  * hibernating to disk.
- */
+ **/
 static int toi_init(void)
 {
 	int result, i, j;
@@ -558,12 +555,12 @@ static int toi_init(void)
 }
 
 /**
- * can_hibernate: Perform basic 'Can we hibernate?' tests.
+ * can_hibernate - perform basic 'Can we hibernate?' tests
  *
  * Perform basic tests that must pass if we're going to be able to hibernate:
  * Can we get the pm_mutex? Is resume= valid (we need to know where to write
  * the image header).
- */
+ **/
 static int can_hibernate(void)
 {
 	if (!test_toi_state(TOI_CAN_HIBERNATE))
@@ -594,12 +591,12 @@ static int can_hibernate(void)
 }
 
 /**
- * do_post_image_write: Having written an image, figure out what to do next.
+ * do_post_image_write - having written an image, figure out what to do next
  *
  * After writing an image, we might load an alternate image or power down.
  * Powering down might involve hibernating to ram, in which case we also
  * need to handle reloading pageset2.
- */
+ **/
 static int do_post_image_write(void)
 {
 	/* If switching images fails, do normal powerdown */
@@ -615,7 +612,7 @@ static int do_post_image_write(void)
 }
 
 /**
- * __save_image: Do the hard work of saving the image.
+ * __save_image - do the hard work of saving the image
  *
  * High level routine for getting the image saved. The key assumptions made
  * are that processes have been frozen and sufficient memory is available.
@@ -623,7 +620,7 @@ static int do_post_image_write(void)
  * We also exit through here at resume time, coming back from toi_hibernate
  * after the atomic restore. This is the reason for the toi_in_hibernate
  * test.
- */
+ **/
 static int __save_image(void)
 {
 	int temp_result, did_copy = 0;
@@ -725,12 +722,11 @@ abort_reloading_pagedir_two:
 }
 
 /**
- * do_save_image: Save the image and handle the result.
+ * do_save_image - save the image and handle the result
  *
  * Save the prepared image. If we fail or we're in the path returning
  * from the atomic restore, cleanup.
- */
-
+ **/
 static int do_save_image(void)
 {
 	int result = __save_image();
@@ -740,12 +736,11 @@ static int do_save_image(void)
 }
 
 /**
- * do_prepare_image: Try to prepare an image.
+ * do_prepare_image - try to prepare an image
  *
  * Seek to initialise and prepare an image to be saved. On failure,
  * cleanup.
- */
-
+ **/
 static int do_prepare_image(void)
 {
 	if (toi_activate_storage(0))
@@ -772,12 +767,12 @@ cleanup:
 }
 
 /**
- * do_check_can_resume: Find out whether an image has been stored.
+ * do_check_can_resume - find out whether an image has been stored
  *
  * Read whether an image exists. We use the same routine as the
  * image_exists sysfs entry, and just look to see whether the
  * first character in the resulting buffer is a '1'.
- */
+ **/
 int do_check_can_resume(void)
 {
 	char *buf = (char *) toi_get_zeroed_page(21, TOI_ATOMIC_GFP);
@@ -798,7 +793,7 @@ int do_check_can_resume(void)
 EXPORT_SYMBOL_GPL(do_check_can_resume);
 
 /**
- * do_load_atomic_copy: Load the first part of an image, if it exists.
+ * do_load_atomic_copy - load the first part of an image, if it exists
  *
  * Check whether we have an image. If one exists, do sanity checking
  * (possibly invalidating the image or even rebooting if the user
@@ -806,7 +801,7 @@ EXPORT_SYMBOL_GPL(do_check_can_resume);
  * atomic restore.
  *
  * If and only if we have an image loaded and ready to restore, we return 1.
- */
+ **/
 static int do_load_atomic_copy(void)
 {
 	int read_image_result = 0;
@@ -844,6 +839,7 @@ static int do_load_atomic_copy(void)
 		return 1;
 	}
 
+	/* See tuxonice_io.c */
 	read_image_result = read_pageset1(); /* non fatal error ignored */
 
 	if (test_toi_state(TOI_NORESUME_SPECIFIED))
@@ -858,10 +854,10 @@ static int do_load_atomic_copy(void)
 }
 
 /**
- * prepare_restore_load_alt_image: Save & restore alt image variables.
+ * prepare_restore_load_alt_image - save & restore alt image variables
  *
  * Save and restore the pageset1 maps, when loading an alternate image.
- */
+ **/
 static void prepare_restore_load_alt_image(int prepare)
 {
 	static struct memory_bitmap pageset1_map_save, pageset1_copy_map_save;
@@ -888,12 +884,12 @@ static void prepare_restore_load_alt_image(int prepare)
 }
 
 /**
- * do_toi_step: Perform a step in hibernating or resuming.
+ * do_toi_step - perform a step in hibernating or resuming
  *
  * Perform a step in hibernating or resuming an image. This abstraction
  * is in preparation for implementing cluster support, and perhaps replacing
  * uswsusp too (haven't looked whether that's possible yet).
- */
+ **/
 int do_toi_step(int step)
 {
 	switch (step) {
@@ -946,11 +942,11 @@ EXPORT_SYMBOL_GPL(do_toi_step);
 /* -- Functions for kickstarting a hibernate or resume --- */
 
 /**
- * __toi_try_resume: Try to do the steps in resuming.
+ * __toi_try_resume - try to do the steps in resuming
  *
  * Check if we have an image and if so try to resume. Clear the status
  * flags too.
- */
+ **/
 void __toi_try_resume(void)
 {
 	set_toi_state(TOI_TRYING_TO_RESUME);
@@ -972,11 +968,11 @@ void __toi_try_resume(void)
 }
 
 /**
- * _toi_try_resume: Wrapper calling __toi_try_resume from do_mounts.
+ * _toi_try_resume - wrapper calling __toi_try_resume from do_mounts
  *
  * Wrapper for when __toi_try_resume is called from init/do_mounts.c,
  * rather than from echo > /sys/power/tuxonice/do_resume.
- */
+ **/
 static void _toi_try_resume(void)
 {
 	resume_attempted = 1;
@@ -1006,9 +1002,8 @@ out:
 }
 
 /**
- * _toi_try_hibernate: Try to start a hibernation cycle.
- *
- * have_pmsem: Whther the pm_sem is already taken.
+ * _toi_try_hibernate - try to start a hibernation cycle
+ * @have_pmsem:	Whether the pm_sem is already taken.
  *
  * Start a hibernation cycle, coming in from either
  * echo > /sys/power/tuxonice/do_suspend
@@ -1019,7 +1014,7 @@ out:
  *
  * In the later case, we come in without pm_sem taken; in the
  * former, it has been taken.
- */
+ **/
 int _toi_try_hibernate(void)
 {
 	int result = 0, sys_power_disk = 0;
@@ -1199,12 +1194,12 @@ static struct toi_core_fns my_fns = {
 };
 
 /**
- * core_load: Initialisation of TuxOnIce core.
+ * core_load - initialisation of TuxOnIce core
  *
  * Initialise the core, beginning with sysfs. Checksum and so on are part of
  * the core, but have their own initialisation routines because they either
  * aren't compiled in all the time or have their own subdirectories.
- */
+ **/
 static __init int core_load(void)
 {
 	int i,
