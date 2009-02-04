@@ -1315,7 +1315,6 @@ static int __read_pageset1(void)
 	if (read_pageset(&pagedir1, 0)) {
 		toi_prepare_status(DONT_CLEAR_BAR, "Failed to read pageset 1.");
 		result = -EIO;
-		printk(KERN_INFO "TuxOnIce: Failed to get load pageset1.\n");
 		goto out_thaw;
 	}
 
