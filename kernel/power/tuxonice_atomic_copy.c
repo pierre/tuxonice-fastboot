@@ -34,7 +34,7 @@ static int ftrace_save;
 /**
  * free_pbe_list - free page backup entries used by the atomic copy code.
  * @list:	List to free.
- * @highmem:	If the list is in highmem.
+ * @highmem:	Whether the list is in highmem.
  *
  * Normally, this function isn't used. If, however, we need to abort before
  * doing the atomic copy, we use this to free the pbes previously allocated.
@@ -299,6 +299,8 @@ Failed:
 
 /**
  * toi_go_atomic - do the actual atomic copy/restore
+ * @state:		The state to use for device_suspend & power_down calls.
+ * @suspend_time: 	Whether we're suspending or resuming.
  **/
 int toi_go_atomic(pm_message_t state, int suspend_time)
 {
@@ -367,6 +369,9 @@ int toi_go_atomic(pm_message_t state, int suspend_time)
 
 /**
  * toi_end_atomic - post atomic copy/restore routines
+ * @stage:		What step to start at.
+ * @suspend_time:	Whether we're suspending or resuming.
+ * @error:		Whether we're recovering from an error.
  **/
 void toi_end_atomic(int stage, int suspend_time, int error)
 {
