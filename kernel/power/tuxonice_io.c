@@ -415,7 +415,7 @@ static int worker_rw_loop(void *data)
 		if (io_write) {
 			struct page *page;
 
-			pfn = memory_bm_next_pfn(&io_map);
+			pfn = memory_bm_next_pfn(io_map);
 
 			/* Another thread could have beaten us to it. */
 			if (pfn == BM_END_OF_MAP) {
@@ -438,9 +438,9 @@ static int worker_rw_loop(void *data)
 			 * Other_pfn is updated by all threads, so we're not
 			 * writing the same page multiple times.
 			 */
-			memory_bm_clear_bit(&io_map, pfn);
+			memory_bm_clear_bit(io_map, pfn);
 			if (io_pageset == 1) {
-				other_pfn = memory_bm_next_pfn(&pageset1_map);
+				other_pfn = memory_bm_next_pfn(pageset1_map);
 				write_pfn = other_pfn;
 			}
 			page = pfn_to_page(pfn);
@@ -510,13 +510,13 @@ static int worker_rw_loop(void *data)
 				BUG_ON(!copy_page);
 			}
 
-			if (memory_bm_test_bit(&io_map, write_pfn)) {
+			if (memory_bm_test_bit(io_map, write_pfn)) {
 				virt = kmap(copy_page);
 				buffer_virt = kmap(buffer);
 				memcpy(virt, buffer_virt, PAGE_SIZE);
 				kunmap(copy_page);
 				kunmap(buffer);
-				memory_bm_clear_bit(&io_map, write_pfn);
+				memory_bm_clear_bit(io_map, write_pfn);
 			} else {
 				mutex_lock(&io_mutex);
 				atomic_inc(&io_count);
@@ -625,7 +625,7 @@ static int do_rw_loop(int write, int finish_at, struct memory_bitmap *pageflags,
 	}
 
 	/* Ensure all bits clear */
-	memory_bm_clear(&io_map);
+	memory_bm_clear(io_map);
 
 	/* Set the bits for the pages to write */
 	memory_bm_position_reset(pageflags);
@@ -633,7 +633,7 @@ static int do_rw_loop(int write, int finish_at, struct memory_bitmap *pageflags,
 	pfn = memory_bm_next_pfn(pageflags);
 
 	while (pfn != BM_END_OF_MAP && index < finish_at) {
-		memory_bm_set_bit(&io_map, pfn);
+		memory_bm_set_bit(io_map, pfn);
 		pfn = memory_bm_next_pfn(pageflags);
 		index++;
 	}
@@ -645,10 +645,10 @@ static int do_rw_loop(int write, int finish_at, struct memory_bitmap *pageflags,
 	pfn = BM_END_OF_MAP;
 	other_pfn = pfn;
 
-	memory_bm_position_reset(&pageset1_map);
+	memory_bm_position_reset(pageset1_map);
 
 	clear_toi_state(TOI_IO_STOPPED);
-	memory_bm_position_reset(&io_map);
+	memory_bm_position_reset(io_map);
 
 	if (!test_action_state(TOI_NO_MULTITHREADED_IO))
 		num_other_threads = start_other_threads();
@@ -679,8 +679,8 @@ static int do_rw_loop(int write, int finish_at, struct memory_bitmap *pageflags,
 	if (test_result_state(TOI_ABORTED))
 		io_result = 1;
 	else { /* All I/O done? */
-		memory_bm_position_reset(&io_map);
-		if  (memory_bm_next_pfn(&io_map) != BM_END_OF_MAP) {
+		memory_bm_position_reset(io_map);
+		if  (memory_bm_next_pfn(io_map) != BM_END_OF_MAP) {
 			printk(KERN_INFO "Finished I/O loop but still work to "
 					"do?\nFinish at = %d. io_count = %d.\n",
 					finish_at, atomic_read(&io_count));
@@ -718,12 +718,12 @@ int write_pageset(struct pagedir *pagedir)
 		base = pagedir2.size;
 		if (test_action_state(TOI_TEST_FILTER_SPEED) ||
 		    test_action_state(TOI_TEST_BIO))
-			pageflags = &pageset1_map;
+			pageflags = pageset1_map;
 		else
-			pageflags = &pageset1_copy_map;
+			pageflags = pageset1_copy_map;
 	} else {
 		toi_prepare_status(DONT_CLEAR_BAR, "Writing caches...");
-		pageflags = &pageset2_map;
+		pageflags = pageset2_map;
 	}
 
 	start_time = jiffies;
@@ -773,7 +773,7 @@ static int read_pageset(struct pagedir *pagedir, int overwrittenpagesonly)
 	if (pagedir->id == 1) {
 		toi_prepare_status(DONT_CLEAR_BAR,
 				"Reading kernel & process data...");
-		pageflags = &pageset1_map;
+		pageflags = pageset1_map;
 	} else {
 		toi_prepare_status(DONT_CLEAR_BAR, "Reading caches...");
 		if (overwrittenpagesonly)
@@ -781,7 +781,7 @@ static int read_pageset(struct pagedir *pagedir, int overwrittenpagesonly)
 						 pagedir2.size);
 		else
 			base = pagedir1.size;
-		pageflags = &pageset2_map;
+		pageflags = pageset2_map;
 	}
 
 	start_time = jiffies;
@@ -1058,7 +1058,7 @@ int write_image_header(void)
 		goto write_image_header_abort;
 	}
 
-	memory_bm_write(&pageset1_map, toiActiveAllocator->rw_header_chunk);
+	memory_bm_write(pageset1_map, toiActiveAllocator->rw_header_chunk);
 
 	/* Flush data and let allocator cleanup */
 	if (toiActiveAllocator->write_header_cleanup()) {
@@ -1269,19 +1269,10 @@ static int __read_pageset1(void)
 	toi_cond_pause(1, "About to read original pageset1 locations.");
 
 	/*
-	 * Read original pageset1 locations. These are the addresses we can't
-	 * use for the data to be restored.
-	 */
-
-	if (memory_bm_create(&pageset1_copy_map, GFP_KERNEL, 0) ||
-	    memory_bm_create(&io_map, GFP_KERNEL, 0))
-		goto out_thaw;
-
-	/*
 	 * See _toi_rw_header_chunk in tuxonice_block_io.c:
 	 * Initialize pageset1_map by reading the map from the image.
 	 */
-	if (memory_bm_read(&pageset1_map, toiActiveAllocator->rw_header_chunk))
+	if (memory_bm_read(pageset1_map, toiActiveAllocator->rw_header_chunk))
 		goto out_thaw;
 
 	/*
@@ -1339,9 +1330,6 @@ out_enable_nonboot_cpus:
 out_reset_console:
 	toi_cleanup_console();
 out_remove_image:
-	memory_bm_free(&pageset1_map, 0);
-	memory_bm_free(&pageset1_copy_map, 0);
-	memory_bm_free(&io_map, 0);
 	result = -EINVAL;
 	if (!test_action_state(TOI_KEEP_IMAGE))
 		toiActiveAllocator->remove_image();
