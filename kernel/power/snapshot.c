@@ -585,7 +585,7 @@ void memory_bm_dup(struct memory_bitmap *source, struct memory_bitmap *dest)
 
 #ifdef CONFIG_TOI
 #define DEFINE_MEMORY_BITMAP(name) \
-struct memory_bitmap name;
+struct memory_bitmap *name;
 
 DEFINE_MEMORY_BITMAP(pageset1_map);
 DEFINE_MEMORY_BITMAP(pageset1_copy_map);
