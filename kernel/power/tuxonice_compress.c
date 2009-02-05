@@ -136,11 +136,16 @@ static int toi_compress_init(int toi_or_resume)
 static int toi_compress_rw_init(int rw, int stream_number)
 {
 	if (toi_compress_prepare_result) {
-		printk("Failed to initialise compression algorithm.\n");
-		if (rw == READ)
+		printk(KERN_ERR "Failed to initialise compression "
+				"algorithm.\n");
+		if (rw == READ) {
+			printk(KERN_INFO "Unable to read the image.\n");
 			return -ENODEV;
-		else
+		} else {
+			printk(KERN_INFO "Continuing without "
+				"compressing the image.\n");
 			toi_compression_ops.enabled = 0;
+		}
 	}
 
 	return 0;
