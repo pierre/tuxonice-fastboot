@@ -117,7 +117,8 @@ static int toi_compress_init(int toi_or_resume)
 	if (!toi_or_resume)
 		return 0;
 
-	toi_compress_bytes_in = toi_compress_bytes_out = 0;
+	toi_compress_bytes_in = 0;
+	toi_compress_bytes_out = 0;
 
 	next_driver = toi_get_next_filter(&toi_compression_ops);
 
@@ -282,8 +283,8 @@ static int toi_compress_print_debug_stats(char *buffer, int size)
 		len = scnprintf(buffer, size, "- Compressor is not set.\n");
 
 	if (pages_in)
-		len += scnprintf(buffer+len, size - len,
-		  "  Compressed %lu bytes into %lu (%ld percent compression).\n",
+		len += scnprintf(buffer+len, size - len, "  Compressed "
+			"%lu bytes into %lu (%ld percent compression).\n",
 		  toi_compress_bytes_in,
 		  toi_compress_bytes_out,
 		  (pages_in - pages_out) * 100 / pages_in);
