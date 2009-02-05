@@ -20,7 +20,7 @@ int toi_pageflags_space_needed(void)
 
 	total = sizeof(unsigned int);
 
-	list_for_each_entry(bb, &pageset1_map.blocks, hook)
+	list_for_each_entry(bb, &pageset1_map->blocks, hook)
 		total += 2 * sizeof(unsigned long) + PAGE_SIZE;
 
 	return total;
