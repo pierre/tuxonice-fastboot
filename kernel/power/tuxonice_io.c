@@ -668,7 +668,7 @@ static int do_rw_loop(int write, int finish_at, struct memory_bitmap *pageflags,
 				MB(io_base + io_finish_at), MB(io_barmax));
 	}
 
-	if (io_write && test_result_state(TOI_ABORTED))
+	if (test_result_state(TOI_ABORTED))
 		io_result = 1;
 	else { /* All I/O done? */
 		memory_bm_position_reset(&io_map);
