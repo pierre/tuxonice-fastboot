@@ -154,8 +154,8 @@ int toi_get_pageset1_load_addresses(void)
 	int high_to_free, low_to_free, result = 0;
 
 	/*
-	 * We need to duplicate pageset1's map because memory_bm_next_pfn's state
-	 * gets stomped on by the PagePageset1() test in setup_pbes.
+	 * We need to duplicate pageset1's map because memory_bm_next_pfn's
+	 * state gets stomped on by the PagePageset1() test in setup_pbes.
 	 */
 	memory_bm_create(&dup_map1, GFP_KERNEL, 0);
 	memory_bm_dup(pageset1_map, &dup_map1);
