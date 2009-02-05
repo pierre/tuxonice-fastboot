@@ -386,7 +386,8 @@ static struct page *copy_page_from_orig_page(struct page *orig_page)
  **/
 static int worker_rw_loop(void *data)
 {
-	unsigned long orig_pfn, write_pfn, next_jiffies = jiffies + HZ / 2, jif_index = 1;
+	unsigned long orig_pfn, write_pfn, next_jiffies = jiffies + HZ / 2,
+		      jif_index = 1;
 	int result, my_io_index = 0, temp, last_worker;
 	struct toi_module_ops *first_filter = toi_get_next_filter(NULL);
 	struct page *buffer = toi_alloc_page(28, TOI_ATOMIC_GFP);
@@ -402,7 +403,8 @@ static int worker_rw_loop(void *data)
 		if (data && jiffies > next_jiffies) {
 			next_jiffies += HZ / 2;
 			if (toiActiveAllocator->update_throughput_throttle)
-				toiActiveAllocator->update_throughput_throttle(jif_index);
+				toiActiveAllocator->update_throughput_throttle(
+						jif_index);
 			jif_index++;
 		}
 
@@ -776,10 +778,10 @@ static int read_pageset(struct pagedir *pagedir, int overwrittenpagesonly)
 		pageflags = pageset1_map;
 	} else {
 		toi_prepare_status(DONT_CLEAR_BAR, "Reading caches...");
-		if (overwrittenpagesonly)
-			barmax = finish_at = min(pagedir1.size,
-						 pagedir2.size);
-		else
+		if (overwrittenpagesonly) {
+			barmax = min(pagedir1.size, pagedir2.size);
+			finish_at = min(pagedir1.size, pagedir2.size);
+		} else
 			base = pagedir1.size;
 		pageflags = pageset2_map;
 	}
@@ -985,7 +987,7 @@ static int read_module_configs(void)
 			(char *) &toi_module_header,
 			sizeof(toi_module_header));
 	if (result) {
-		printk("Failed to read the next module header.\n");
+		printk(KERN_ERR "Failed to read the next module header.\n");
 		return -EINVAL;
 	}
 
@@ -1112,7 +1114,7 @@ static char *sanity_check(struct toi_header *sh)
 
 static DECLARE_WAIT_QUEUE_HEAD(freeze_wait);
 
-#define FREEZE_IN_PROGRESS ~0
+#define FREEZE_IN_PROGRESS (~0)
 
 static int freeze_result;
 
@@ -1239,7 +1241,8 @@ static int __read_pageset1(void)
 	/* Read module configurations */
 	result = read_module_configs();
 	if (result) {
-		pagedir1.size = pagedir2.size = 0;
+		pagedir1.size = 0;
+		pagedir2.size = 0;
 		printk(KERN_INFO "TuxOnIce: Failed to read TuxOnIce module "
 				"configurations.\n");
 		clear_action_state(TOI_KEEP_IMAGE);

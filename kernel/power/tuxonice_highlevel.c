@@ -445,7 +445,8 @@ static void do_cleanup(int get_debug_info)
 
 	toi_free_extra_pagedir_memory();
 
-	pagedir1.size = pagedir2.size = 0;
+	pagedir1.size = 0;
+	pagedir2.size = 0;
 	set_highmem_size(pagedir1, 0);
 	set_highmem_size(pagedir2, 0);
 
