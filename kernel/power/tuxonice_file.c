@@ -736,7 +736,7 @@ static int toi_file_signature_op(int op)
 	int result = 0, changed = 0;
 	struct toi_file_header *header;
 
-	if (IS_ERR(toi_file_target_bdev))
+	if (!toi_file_target_bdev || IS_ERR(toi_file_target_bdev))
 		return -1;
 
 	cur = (char *) toi_get_zeroed_page(17, TOI_ATOMIC_GFP);
@@ -849,10 +849,11 @@ static int toi_file_remove_image(void)
 
 /**
  * toi_file_image_exists - test if an image exists
+ * @quiet:	Ignored.
  *
  * Repopulate toi_file_target_bdev if needed.
  **/
-static int toi_file_image_exists()
+static int toi_file_image_exists(int quiet)
 {
 	if (!toi_file_target_bdev)
 		reopen_resume_devt();
@@ -1222,7 +1223,6 @@ static __init int toi_file_load(void)
 		toi_bio_ops.rw_header_chunk_noreadahead;
 	toi_fileops.io_flusher = toi_bio_ops.io_flusher;
 	toi_fileops.update_throughput_throttle = toi_bio_ops.update_throughput_throttle;
-	toi_fileops.monitor_outstanding_io = toi_bio_ops.monitor_outstanding_io;
 	toi_fileops.finish_all_io = toi_bio_ops.finish_all_io;
 
 	return toi_register_module(&toi_fileops);

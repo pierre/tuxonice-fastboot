@@ -38,7 +38,7 @@ char alt_resume_param[256];
 
 /* Variables shared between threads and updated under the mutex */
 static int io_write, io_finish_at, io_base, io_barmax, io_pageset, io_result;
-static int io_index, io_nextupdate, io_pc, io_pc_step, first_to_finish;
+static int io_index, io_nextupdate, io_pc, io_pc_step;
 static unsigned long pfn, other_pfn;
 static DEFINE_MUTEX(io_mutex);
 static DEFINE_PER_CPU(struct page *, last_sought);
@@ -388,10 +388,12 @@ static struct page *copy_page_from_orig_page(struct page *orig_page)
  **/
 static int worker_rw_loop(void *data)
 {
-	unsigned long orig_pfn, write_pfn, next_jiffies = jiffies + HZ / 10, jif_index = 1;
-	int result, my_io_index = 0, temp, last_worker, i_finished_first = 0;
+	unsigned long orig_pfn, write_pfn, next_jiffies = jiffies + HZ / 2, jif_index = 1;
+	int result, my_io_index = 0, temp, last_worker;
 	struct toi_module_ops *first_filter = toi_get_next_filter(NULL);
 	struct page *buffer = toi_alloc_page(28, TOI_ATOMIC_GFP);
+
+	current->flags |= PF_NOFREEZE;
 
 	atomic_inc(&toi_io_workers);
 	mutex_lock(&io_mutex);
@@ -400,7 +402,7 @@ static int worker_rw_loop(void *data)
 		unsigned int buf_size;
 
 		if (data && jiffies > next_jiffies) {
-			next_jiffies += HZ / 10;
+			next_jiffies += HZ / 2;
 			if (toiActiveAllocator->update_throughput_throttle)
 				toiActiveAllocator->update_throughput_throttle(jif_index);
 			jif_index++;
@@ -565,24 +567,12 @@ static int worker_rw_loop(void *data)
 		!(io_write && test_result_state(TOI_ABORTED)));
 
 	last_worker = atomic_dec_and_test(&toi_io_workers);
-	if (!first_to_finish) {
-		first_to_finish = 1;
-		i_finished_first = 1;
-	}
 	mutex_unlock(&io_mutex);
 
 	if (last_worker) {
 		toi_bio_queue_flusher_should_finish = 1;
 		wake_up(&toi_io_queue_flusher);
 		toiActiveAllocator->finish_all_io();
-	} else {
-		/* Yes, there's still I/O above, but it's the last
-		 * pages being submitted, so switch to displaying
-		 * how much I/O we're waiting on.
-		 */
-		if (i_finished_first &&
-		    toiActiveAllocator->monitor_outstanding_io)
-			toiActiveAllocator->monitor_outstanding_io();
 	}
 
 	toi__free_page(28, buffer);
@@ -600,9 +590,9 @@ static int start_other_threads(void)
 			continue;
 
 		p = kthread_create(worker_rw_loop, num_started ? NULL : MONITOR,
-				"ks2io/%d", cpu);
+				"ktoi_io/%d", cpu);
 		if (IS_ERR(p)) {
-			printk("ks2io for %i failed\n", cpu);
+			printk("ktoi_io for %i failed\n", cpu);
 			continue;
 		}
 		kthread_bind(p, cpu);
@@ -638,7 +628,6 @@ static int do_rw_loop(int write, int finish_at, struct memory_bitmap *pageflags,
 	io_result = 0;
 	io_nextupdate = base + 1;
 	toi_bio_queue_flusher_should_finish = 0;
-	first_to_finish = 0;
 
 	for_each_online_cpu(cpu) {
 		per_cpu(last_sought, cpu) = NULL;
@@ -1132,6 +1121,20 @@ static char *sanity_check(struct toi_header *sh)
 	return NULL;
 }
 
+static DECLARE_WAIT_QUEUE_HEAD(freeze_wait);
+
+#define FREEZE_IN_PROGRESS ~0
+
+static int freeze_result;
+
+static void do_freeze(struct work_struct *dummy)
+{
+	freeze_result = freeze_processes();
+	wake_up(&freeze_wait);
+}
+
+static DECLARE_WORK(freeze_work, do_freeze);
+
 /**
  * __read_pageset1 - test for the existence of an image and attempt to load it
  *
@@ -1269,12 +1272,11 @@ static int __read_pageset1(void)
 	if (usermodehelper_disable())
 		goto out_enable_nonboot_cpus;
 
-	toi_prepare_status(DONT_CLEAR_BAR,	"Freeze processes.");
+	current->flags |= PF_NOFREEZE;
+	freeze_result = FREEZE_IN_PROGRESS;
 
-	if (freeze_processes()) {
-		printk("Some processes failed to stop.\n");
-		goto out_thaw;
-	}
+	schedule_work_on(first_cpu(cpu_online_map), &freeze_work);
+
 	toi_cond_pause(1, "About to read original pageset1 locations.");
 
 	/*
@@ -1334,11 +1336,14 @@ static int __read_pageset1(void)
 	    toiActiveAllocator->mark_resume_attempted)
 		toiActiveAllocator->mark_resume_attempted(1);
 
+	wait_event(freeze_wait, freeze_result != FREEZE_IN_PROGRESS);
 out:
+	current->flags &= ~PF_NOFREEZE;
 	toi_free_page(25, (unsigned long) header_buffer);
 	return result;
 
 out_thaw:
+	wait_event(freeze_wait, freeze_result != FREEZE_IN_PROGRESS);
 	thaw_processes();
 	usermodehelper_enable();
 out_enable_nonboot_cpus:

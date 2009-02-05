@@ -279,14 +279,6 @@ struct bm_block {
 	unsigned long *data;	/* bitmap representing pages */
 };
 
-struct zone_bitmap {
-	struct zone_bitmap *next;	/* next element of the list */
-	unsigned long start_pfn;	/* minimal pfn in this zone */
-	unsigned long end_pfn;		/* maximal pfn in this zone plus 1 */
-	struct bm_block *bm_blocks;	/* list of bitmap blocks */
-	struct bm_block *cur_block;	/* recently used bitmap block */
-};
-
 /* struct bm_position is used for browsing memory bitmaps */
 
 struct bm_position {

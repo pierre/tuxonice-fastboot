@@ -13,11 +13,17 @@
 
 #if defined(CONFIG_PM_SLEEP) && defined(CONFIG_VT) && defined(CONFIG_VT_CONSOLE)
 extern void pm_set_vt_switch(int);
+extern int pm_get_vt_switch(void);
 extern int pm_prepare_console(void);
 extern void pm_restore_console(void);
 #else
 static inline void pm_set_vt_switch(int do_switch)
 {
+}
+
+static inline int pm_get_vt_switch(void)
+{
+	return 0;
 }
 
 static inline int pm_prepare_console(void)
@@ -237,6 +243,7 @@ extern int hibernate_nvs_alloc(void);
 extern void hibernate_nvs_free(void);
 extern void hibernate_nvs_save(void);
 extern void hibernate_nvs_restore(void);
+extern bool system_entering_hibernation(void);
 #else /* CONFIG_HIBERNATION */
 static inline int swsusp_page_is_forbidden(struct page *p) { return 0; }
 static inline void swsusp_set_page_free(struct page *p) {}
@@ -252,6 +259,7 @@ static inline int hibernate_nvs_alloc(void) { return 0; }
 static inline void hibernate_nvs_free(void) {}
 static inline void hibernate_nvs_save(void) {}
 static inline void hibernate_nvs_restore(void) {}
+static inline bool system_entering_hibernation(void) { return false; }
 #endif /* CONFIG_HIBERNATION */
 
 #ifdef CONFIG_PM_SLEEP

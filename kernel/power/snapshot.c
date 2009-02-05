@@ -601,6 +601,20 @@ void memory_bm_dup(struct memory_bitmap *source, struct memory_bitmap *dest)
 EXPORT_SYMBOL_GPL(memory_bm_dup);
 
 #ifdef CONFIG_TOI
+#define DEFINE_MEMORY_BITMAP(name) \
+struct memory_bitmap name = { \
+	LIST_HEAD_INIT(name.blocks) \
+}; \
+EXPORT_SYMBOL_GPL(name)
+
+DEFINE_MEMORY_BITMAP(pageset1_map);
+DEFINE_MEMORY_BITMAP(pageset1_copy_map);
+DEFINE_MEMORY_BITMAP(pageset2_map);
+DEFINE_MEMORY_BITMAP(page_resave_map);
+DEFINE_MEMORY_BITMAP(io_map);
+DEFINE_MEMORY_BITMAP(nosave_map);
+DEFINE_MEMORY_BITMAP(free_map);
+
 int memory_bm_write(struct memory_bitmap *bm, int (*rw_chunk)
 	(int rw, struct toi_module_ops *owner, char *buffer, int buffer_size))
 {

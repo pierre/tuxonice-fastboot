@@ -473,9 +473,9 @@ static int userui_user_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 				sizeof(toi_poweroff_method));
 		return 0;
 	case USERUI_MSG_SET_POWERDOWN_METHOD:
-		if (nlh->nlmsg_len < NLMSG_LENGTH(sizeof(int)))
+		if (nlh->nlmsg_len != NLMSG_LENGTH(sizeof(char)))
 			return -EINVAL;
-		toi_poweroff_method = (*data);
+		toi_poweroff_method = (unsigned long)(*data);
 		return 0;
 	case USERUI_MSG_GET_LOGLEVEL:
 		toi_send_netlink_message(&ui_helper_data,

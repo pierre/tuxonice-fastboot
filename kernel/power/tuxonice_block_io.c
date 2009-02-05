@@ -58,6 +58,7 @@ static DEFINE_SPINLOCK(bio_queue_lock);
 static int free_mem_throttle, throughput_throttle;
 static int more_readahead = 1;
 static struct page *readahead_list_head, *readahead_list_tail;
+static DECLARE_WAIT_QUEUE_HEAD(readahead_list_wait);
 
 static struct page *waiting_on;
 
@@ -122,9 +123,14 @@ static char *reason_name[NUM_REASONS] = {
 
 /**
  * do_bio_wait - wait for some TuxOnIce I/O to complete
+ * @reason: The array index of the reason we're waiting.
  *
- * Submit any I/O that's batched up (if we're not already doing
- * that, schedule and clean up whatever we can.
+ * Wait for a particular page of I/O if we're after a particular page.
+ * If we're not after a particular page, wait instead for all in flight
+ * I/O to be completed or for us to have enough free memory to be able
+ * to submit more I/O.
+ *
+ * If we wait, we also update our statistics regarding why we waited.
  **/
 static void do_bio_wait(int reason)
 {
@@ -145,9 +151,18 @@ static void do_bio_wait(int reason)
 	}
 }
 
-static void throttle_if_needed(int reason)
+/**
+ * throttle_if_needed - wait for I/O completion if throttle points are reached
+ * @reason: The reason we're checking whether to throttle.
+ *
+ * Check whether we need to wait for some I/O to complete. We always check
+ * whether we have enough memory available, but may also (depending upon 
+ * @reason) check if the throughput throttle limit has been reached.
+ **/
+static int throttle_if_needed(int reason)
 {
-	int free_pages = nr_unallocated_buffer_pages();
+	int free_pages = nr_unallocated_buffer_pages(),
+	    flushed_queue = 0;
 
 	/* Getting low on memory and I/O is in progress? */
 	while (unlikely(free_pages < free_mem_throttle) &&
@@ -158,52 +173,46 @@ static void throttle_if_needed(int reason)
 
 	while (reason == ANY_REASON && throughput_throttle &&
 		TOTAL_OUTSTANDING_IO >= throughput_throttle) {
+		if (!flushed_queue) {
+			int result = toi_bio_queue_flush_pages(0);
+			if (result)
+				return result;
+			flushed_queue = 1;
+		}
 		atomic_inc(&reasons[6]);
 		wait_event(num_in_progress_wait,
 			!atomic_read(&toi_io_in_progress) ||
 			TOTAL_OUTSTANDING_IO < throughput_throttle);
 	}
+
+	return 0;
 }
 
 /**
- * toi_monitor_outstanding_io: Show the user how much I/O we're waiting for.
- */
-static void toi_monitor_outstanding_io(void)
-{
-	int orig = TOTAL_OUTSTANDING_IO, step = orig / 5;
-
-	while (orig) {
-		int new_min = orig > step ? orig - step : 0,
-		    new_max = orig + step,
-		    mb = MB(orig);
-		if (mb)
-			toi_prepare_status(DONT_CLEAR_BAR,
-				"Waiting on I/O completion (%d MB)", mb);
-		wait_event(num_in_progress_wait,
-			TOTAL_OUTSTANDING_IO <= new_min ||
-			TOTAL_OUTSTANDING_IO >= new_max);
-		orig = TOTAL_OUTSTANDING_IO;
-	}
-}
-
-/**
- * update_throughput_throttle: Update the raw throughput throttle.
+ * update_throughput_throttle - update the raw throughput throttle
+ * @jif_index: The number of times this function has been called.
  *
- * Called once per second by the core, used to limit the amount of I/O
- * we submit at once, spreading out our waiting through the whole job
- * and letting userui get an opportunity to do its work.
+ * This function is called twice per second by the core, and used to limit the
+ * amount of I/O we submit at once, spreading out our waiting through the
+ * whole job and letting userui get an opportunity to do its work.
+ *
+ * We don't start limiting I/O until 1/2s has gone so that we get a
+ * decent sample for our initial limit, and keep updating it because
+ * throughput may vary (on rotating media, eg) with our block number.
  *
  * We throttle to 1/10s worth of I/O.
- */
+ **/
 static void update_throughput_throttle(int jif_index)
 {
 	int done = atomic_read(&toi_io_done);
-	throughput_throttle = done / jif_index;
+	throughput_throttle = done / jif_index / 5;
 }
 
 /**
- * toi_finish_all_io: Wait for all outstanding i/o to complete.
- */
+ * toi_finish_all_io - wait for all outstanding i/o to complete
+ *
+ * Flush any queued but unsubmitted I/O and wait for it all to complete.
+ **/
 static void toi_finish_all_io(void)
 {
 	toi_bio_queue_flush_pages(0);
@@ -211,15 +220,17 @@ static void toi_finish_all_io(void)
 }
 
 /**
- * toi_end_bio: bio completion function.
- *
+ * toi_end_bio - bio completion function.
  * @bio: bio that has completed.
  * @err: Error value. Yes, like end_swap_bio_read, we ignore it.
  *
- * Function called by block driver from interrupt context when I/O is completed.
- * Nearly the fs/buffer.c version, but we want to do our cleanup too. We only
- * free pages if they were buffers used when writing the image.
- */
+ * Function called by the block driver from interrupt context when I/O is
+ * completed. If we were writing the page, we want to free it and will have
+ * set bio->bi_private to the parameter we should use in telling the page
+ * allocation accounting code what the page was allocated for. If we're
+ * reading the page, it will be in the singly linked list made from
+ * page->private pointers.
+ **/
 static void toi_end_bio(struct bio *bio, int err)
 {
 	struct page *page = bio->bi_io_vec[0].bv_page;
@@ -246,24 +257,31 @@ static void toi_end_bio(struct bio *bio, int err)
 }
 
 /**
- *	submit - submit BIO request.
- *	@writing: READ or WRITE.
+ * submit - submit BIO request
+ * @writing: READ or WRITE.
+ * @dev: The block device we're using.
+ * @first_block: The first sector we're using.
+ * @page: The page being used for I/O.
+ * @free_group: If writing, the group that was used in allocating the page
+ * 	and which will be used in freeing the page from the completion
+ * 	routine.
  *
- * 	Based on Patrick's pmdisk code from long ago:
- *	"Straight from the textbook - allocate and initialize the bio.
- *	If we're writing, make sure the page is marked as dirty.
- *	Then submit it and carry on."
+ * Based on Patrick Mochell's pmdisk code from long ago: "Straight from the
+ * textbook - allocate and initialize the bio. If we're writing, make sure
+ * the page is marked as dirty. Then submit it and carry on."
  *
- *	With a twist, though - we handle block_size != PAGE_SIZE.
- *	Caller has already checked that our page is not fragmented.
- */
+ * If we're just testing the speed of our own code, we fake having done all
+ * the hard work and all toi_end_bio immediately.
+ **/
 static int submit(int writing, struct block_device *dev, sector_t first_block,
 		struct page *page, int free_group)
 {
 	struct bio *bio = NULL;
-	int cur_outstanding_io;
+	int cur_outstanding_io, result;
 
-	throttle_if_needed(MEMORY_ONLY);
+	result = throttle_if_needed(MEMORY_ONLY);
+	if (result)
+		return result;
 
 	while (!bio) {
 		bio = bio_alloc(TOI_ATOMIC_GFP, 1);
@@ -323,7 +341,7 @@ static int submit(int writing, struct block_device *dev, sector_t first_block,
  * compression buffer that will immediately be used to start compressing the
  * next page. For reading, we do readahead and therefore don't know the final
  * address where the data needs to go.
- */
+ **/
 static int toi_do_io(int writing, struct block_device *bdev, long block0,
 	struct page *page, int is_readahead, int syncio, int free_group)
 {
@@ -339,6 +357,7 @@ static int toi_do_io(int writing, struct block_device *bdev, long block0,
 			readahead_list_head = page;
 
 		readahead_list_tail = page;
+		wake_up(&readahead_list_wait);
 	}
 
 	/* Done before submitting to avoid races. */
@@ -358,17 +377,15 @@ static int toi_do_io(int writing, struct block_device *bdev, long block0,
 }
 
 /**
- * toi_bdev_page_io: Simpler interface to do directly i/o on a single page.
- *
+ * toi_bdev_page_io - simpler interface to do directly i/o on a single page
  * @writing: Whether reading or writing.
  * @bdev: Block device on which we're operating.
- * @pos: Sector at which page to read starts.
+ * @pos: Sector at which page to read or write starts.
  * @page: Page to be read/written.
  *
- * We used to use bread here, but it doesn't correctly handle
- * blocksize != PAGE_SIZE. Now we create a submit_info to get the data we
- * want and use our normal routines (synchronously).
- */
+ * A simple interface to submit a page of I/O and wait for its completion.
+ * The caller must free the page used.
+ **/
 static int toi_bdev_page_io(int writing, struct block_device *bdev,
 		long pos, struct page *page)
 {
@@ -376,22 +393,25 @@ static int toi_bdev_page_io(int writing, struct block_device *bdev,
 }
 
 /**
- * toi_bio_memory_needed: Report amount of memory needed for block i/o.
+ * toi_bio_memory_needed - report the amount of memory needed for block i/o
  *
  * We want to have at least enough memory so as to have target_outstanding_io
  * or more transactions on the fly at once. If we can do more, fine.
- */
+ **/
 static int toi_bio_memory_needed(void)
 {
 	return target_outstanding_io * (PAGE_SIZE + sizeof(struct request) +
 				sizeof(struct bio));
 }
 
-/*
- * toi_bio_print_debug_stats
+/**
+ * toi_bio_print_debug_stats - put out debugging info in the buffer provided
+ * @buffer: A buffer of size @size into which text should be placed.
+ * @size: The size of @buffer.
  *
- * Description:
- */
+ * Fill a buffer with debugging info. This is used for both our debug_info sysfs
+ * entry and for recording the same info in dmesg.
+ **/
 static int toi_bio_print_debug_stats(char *buffer, int size)
 {
 	int len = scnprintf(buffer, size, "- Max outstanding reads %d. Max "
@@ -432,22 +452,22 @@ static int toi_bio_print_debug_stats(char *buffer, int size)
 }
 
 /**
- * toi_set_devinfo: Set the bdev info used for i/o.
- *
- * @info: Pointer to array of struct toi_bdev_info - the list of
+ * toi_set_devinfo - set the bdev info used for i/o
+ * @info: Pointer to an array of struct toi_bdev_info - the list of
  * bdevs and blocks on them in which the image is stored.
  *
  * Set the list of bdevs and blocks in which the image will be stored.
- * Sort of like putting a tape in the cassette player.
- */
+ * Think of them (all together) as one long tape on which the data will be
+ * stored.
+ **/
 static void toi_set_devinfo(struct toi_bdev_info *info)
 {
 	toi_devinfo = info;
 }
 
 /**
- * dump_block_chains: Print the contents of the bdev info array.
- */
+ * dump_block_chains - print the contents of the bdev info array.
+ **/
 static void dump_block_chains(void)
 {
 	int i;
@@ -479,12 +499,13 @@ static void dump_block_chains(void)
 }
 
 /**
- * go_next_page: Skip blocks to the start of the next page.
+ * go_next_page - skip blocks to the start of the next page
+ * @writing: Whether we're reading or writing the image.
  *
  * Go forward one page, or two if extra_page_forward is set. It only gets
  * set at the start of reading the image header, to skip the first page
  * of the header, which is read without using the extent chains.
- */
+ **/
 static int go_next_page(int writing)
 {
 	int i, max = (toi_writer_posn.current_chain == -1) ? 1 :
@@ -512,25 +533,27 @@ static int go_next_page(int writing)
 }
 
 /**
- * set_extra_page_forward: Make us skip an extra page on next go_next_page.
+ * set_extra_page_forward - make us skip an extra page on next go_next_page
  *
  * Used in reading header, to jump to 2nd page after getting 1st page
  * direct from image header.
- */
+ **/
 static void set_extra_page_forward(void)
 {
 	extra_page_forward = 1;
 }
 
 /**
- * toi_bio_rw_page: Do i/o on the next disk page in the image.
- *
+ * toi_bio_rw_page - do i/o on the next disk page in the image
  * @writing: Whether reading or writing.
  * @page: Page to do i/o on.
- * @readahead_index: -1 or the index in the readahead ring.
+ * @is_readahead: Whether we're doing readahead
+ * @free_group: The group used in allocating the page
  *
  * Submit a page for reading or writing, possibly readahead.
- */
+ * Pass the group used in allocating the page as well, as it should
+ * be freed on completion of the bio if we're writing the page.
+ **/
 static int toi_bio_rw_page(int writing, struct page *page,
 		int is_readahead, int free_group)
 {
@@ -559,10 +582,8 @@ static int toi_bio_rw_page(int writing, struct page *page,
 			dev_info->bmap_shift,
 		page, is_readahead, 0, free_group);
 
-	if (result) {
-		more_readahead = 0;
+	if (result) 
 		return result;
-	}
 
 	if (!writing) {
 		int compare_to = 0;
@@ -582,18 +603,20 @@ static int toi_bio_rw_page(int writing, struct page *page,
 		if (toi_writer_posn.current_chain ==
 				toi_writer_posn_save[compare_to].chain_num &&
 		    toi_writer_posn.current_offset ==
-				toi_writer_posn_save[compare_to].offset)
+				toi_writer_posn_save[compare_to].offset) {
 			more_readahead = 0;
+		}
 	}
 	return 0;
 }
 
 /**
- * toi_rw_init: Prepare to read or write a stream in the image.
- *
+ * toi_rw_init - prepare to read or write a stream in the image
  * @writing: Whether reading or writing.
  * @stream number: Section of the image being processed.
- */
+ *
+ * Prepare to read or write a section ('stream') in the image.
+ **/
 static int toi_rw_init(int writing, int stream_number)
 {
 	if (stream_number)
@@ -614,19 +637,25 @@ static int toi_rw_init(int writing, int stream_number)
 }
 
 /**
- * toi_read_header_init: Prepare to read the image header.
+ * toi_read_header_init - prepare to read the image header
  *
  * Reset readahead indices prior to starting to read a section of the image.
- */
+ **/
 static void toi_read_header_init(void)
 {
 	toi_writer_buffer = (char *) toi_get_zeroed_page(11, TOI_ATOMIC_GFP);
 	more_readahead = 1;
 }
 
-/*
- * toi_bio_queue_write
- */
+/**
+ * toi_bio_queue_write - queue a page for writing
+ * @full_buffer: Pointer to a page to be queued
+ *
+ * Add a page to the queue to be submitted. If we're the queue flusher,
+ * we'll do this once we've dropped toi_bio_mutex, so other threads can
+ * continue to submit I/O while we're on the slow path doing the actual
+ * submission.
+ **/
 static void toi_bio_queue_write(char **full_buffer)
 {
 	struct page *page = virt_to_page(*full_buffer);
@@ -650,10 +679,12 @@ static void toi_bio_queue_write(char **full_buffer)
 }
 
 /**
- * toi_rw_cleanup: Cleanup after i/o.
- *
+ * toi_rw_cleanup - Cleanup after i/o.
  * @writing: Whether we were reading or writing.
- */
+ *
+ * Flush all I/O and clean everything up after reading or writing a
+ * section of the image.
+ **/
 static int toi_rw_cleanup(int writing)
 {
 	int i;
@@ -661,7 +692,7 @@ static int toi_rw_cleanup(int writing)
 	if (writing) {
 		int result;
 
-		if (toi_writer_buffer_posn)
+		if (toi_writer_buffer_posn && !test_result_state(TOI_ABORTED))
 			toi_bio_queue_write(&toi_writer_buffer);
 
 		result = toi_bio_queue_flush_pages(0);
@@ -702,12 +733,22 @@ static int toi_rw_cleanup(int writing)
 	return 0;
 }
 
+/**
+ * toi_start_one_readahead - start one page of readahead
+ * @dedicated_thread: Is this a thread dedicated to doing readahead?
+ *
+ * Start one new page of readahead. If this is being called by a thread
+ * whose only just is to submit readahead, don't quit because we failed
+ * to allocate a page.
+ **/
 static int toi_start_one_readahead(int dedicated_thread)
 {
 	char *buffer = NULL;
-	int oom = 0;
+	int oom = 0, result;
 
-	throttle_if_needed(ANY_REASON);
+	result = throttle_if_needed(ANY_REASON);
+	if (result)
+		return result;
 
 	while (!buffer) {
 		buffer = (char *) toi_get_zeroed_page(12,
@@ -725,13 +766,23 @@ static int toi_start_one_readahead(int dedicated_thread)
 	return toi_bio_rw_page(READ, virt_to_page(buffer), 1, 0);
 }
 
-/*
- * toi_start_new_readahead
+/**
+ * toi_start_new_readahead - start new readahead
+ * @dedicated_thread: Are we dedicated to this task?
  *
  * Start readahead of image pages.
  *
- * No mutex needed because this is only ever called by one cpu.
- */
+ * We can be called as a thread dedicated to this task (may be helpful on
+ * systems with lots of CPUs), in which case we don't exit until there's no
+ * more readahead.
+ *
+ * If this is not called by a dedicated thread, we top up our queue until
+ * there's no more readahead to submit, we've submitted the number given
+ * in target_outstanding_io or the number in progress exceeds the target
+ * outstanding I/O value.
+ *
+ * No mutex needed because this is only ever called by the first cpu.
+ **/
 static int toi_start_new_readahead(int dedicated_thread)
 {
 	int last_result, num_submitted = 0;
@@ -770,6 +821,10 @@ static int toi_start_new_readahead(int dedicated_thread)
 	return 0;
 }
 
+/**
+ * bio_io_flusher - start the dedicated I/O flushing routine
+ * @writing: Whether we're writing the image.
+ **/
 static void bio_io_flusher(int writing)
 {
 
@@ -780,7 +835,8 @@ static void bio_io_flusher(int writing)
 }
 
 /**
- * toi_bio_get_next_page_read - read a disk page with readahead
+ * toi_bio_get_next_page_read - read a disk page, perhaps with readahead
+ * @no_readahead: Whether we can use readahead
  *
  * Read a page from disk, submitting readahead and cleaning up finished i/o
  * while we wait for the page we're after.
@@ -803,13 +859,16 @@ static int toi_bio_get_next_page_read(int no_readahead)
 
 	/*
 	 * On SMP, we may need to wait for the first readahead
-	 * to be submitted.
+	 * to be submitted or submit a new batch if we're the thread
+	 * submitting I/O and everyone else already used the I/O
+	 * we'd submitted before taking toi_bio_mutex (resume time only).
 	 */
 	if (unlikely(!readahead_list_head)) {
 		BUG_ON(!more_readahead);
-		do {
-			cpu_relax();
-		} while (!readahead_list_head);
+		if (current == toi_queue_flusher)
+			toi_start_new_readahead(0);
+		else
+			wait_event(readahead_list_wait, readahead_list_head);
 	}
 
 	if (PageLocked(readahead_list_head)) {
@@ -826,11 +885,17 @@ static int toi_bio_get_next_page_read(int no_readahead)
 	return 0;
 }
 
-/*
- * toi_bio_queue_flush_pages
- */
+/**
+ * toi_bio_queue_flush_pages - flush the queue of pages queued for writing
+ * @dedicated_thread: Whether we're a dedicated thread
+ *
+ * Flush the queue of pages ready to be written to disk.
+ *
+ * If we're a dedicated thread, stay in here until told to leave,
+ * sleeping in wait_event.
+ **/
 
-static int toi_bio_queue_flush_pages(int dedicated_thread)
+int toi_bio_queue_flush_pages(int dedicated_thread)
 {
 	unsigned long flags;
 	int result = 0;
@@ -861,12 +926,15 @@ top:
 	return 0;
 }
 
-/*
- * toi_bio_get_new_page
- */
-static void toi_bio_get_new_page(char **full_buffer)
+/**
+ * toi_bio_get_new_page - get a new page for I/O
+ * @full_buffer: Pointer to a page to allocate.
+ **/
+static int toi_bio_get_new_page(char **full_buffer)
 {
-	throttle_if_needed(ANY_REASON);
+	int result = throttle_if_needed(ANY_REASON);
+	if (result)
+		return result;
 
 	while (!*full_buffer) {
 		*full_buffer = (char *) toi_get_zeroed_page(11, TOI_ATOMIC_GFP);
@@ -875,6 +943,8 @@ static void toi_bio_get_new_page(char **full_buffer)
 			do_bio_wait(3);
 		}
 	}
+
+	return 0;
 }
 
 /**
@@ -887,7 +957,7 @@ static void toi_bio_get_new_page(char **full_buffer)
 static int toi_rw_buffer(int writing, char *buffer, int buffer_size,
 		int no_readahead)
 {
-	int bytes_left = buffer_size;
+	int bytes_left = buffer_size, result = 0;
 
 	while (bytes_left) {
 		char *source_start = buffer + buffer_size - bytes_left;
@@ -916,7 +986,9 @@ static int toi_rw_buffer(int writing, char *buffer, int buffer_size,
 				return result;
 		} else {
 			toi_bio_queue_write(&toi_writer_buffer);
-			toi_bio_get_new_page(&toi_writer_buffer);
+			result = toi_bio_get_new_page(&toi_writer_buffer);
+			if (result)
+				return result;
 		}
 
 		toi_writer_buffer_posn = 0;
@@ -941,14 +1013,14 @@ static int toi_bio_read_page(unsigned long *pfn, struct page *buffer_page,
 	int result = 0;
 	char *buffer_virt = kmap(buffer_page);
 
+	my_mutex_lock(0, &toi_bio_mutex);
+
 	/* Only call start_new_readahead if we don't have a dedicated thread */
 	if (current == toi_queue_flusher && toi_start_new_readahead(0)) {
 		printk(KERN_INFO "Queue flusher and toi_start_one_readahead "
 				"returned non-zero.\n");
 		return -EIO;
 	}
-
-	my_mutex_lock(0, &toi_bio_mutex);
 
 	/*
 	 * Structure in the image:
@@ -986,6 +1058,12 @@ static int toi_bio_write_page(unsigned long pfn, struct page *buffer_page,
 		return 0;
 
 	my_mutex_lock(1, &toi_bio_mutex);
+
+	if (test_result_state(TOI_ABORTED)) {
+		my_mutex_unlock(1, &toi_bio_mutex);
+		return -EIO;
+	}
+
 	buffer_virt = kmap(buffer_page);
 
 	/*
@@ -1077,7 +1155,6 @@ static int write_header_chunk_finish(void)
 	if (toi_writer_buffer_posn)
 		toi_bio_queue_write(&toi_writer_buffer);
 
-	toi_bio_queue_flush_pages(0);
 	toi_finish_all_io();
 
 	return result;
@@ -1154,7 +1231,6 @@ static void toi_bio_cleanup(int finishing_cycle)
 struct toi_bio_ops toi_bio_ops = {
 	.bdev_page_io = toi_bdev_page_io,
 	.finish_all_io = toi_finish_all_io,
-	.monitor_outstanding_io	= toi_monitor_outstanding_io,
 	.update_throughput_throttle = update_throughput_throttle,
 	.forward_one_page = go_next_page,
 	.set_extra_page_forward = set_extra_page_forward,
