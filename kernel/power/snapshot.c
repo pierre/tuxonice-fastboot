@@ -598,7 +598,7 @@ EXPORT_SYMBOL_GPL(memory_bm_dup);
 
 #ifdef CONFIG_TOI
 #define DEFINE_MEMORY_BITMAP(name) \
-struct memory_bitmap name; \
+struct memory_bitmap *name; \
 EXPORT_SYMBOL_GPL(name)
 
 DEFINE_MEMORY_BITMAP(pageset1_map);
