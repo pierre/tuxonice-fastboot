@@ -420,10 +420,6 @@ void memory_bm_free(struct memory_bitmap *bm, int clear_nosave_free)
 {
 	struct bm_block *bb;
 
-	/* Unused so far? */
-	if (!bm->blocks.next)
-		return;
-
 	list_for_each_entry(bb, &bm->blocks, hook)
 		if (bb->data)
 			free_image_page(bb->data, clear_nosave_free);
@@ -589,9 +585,7 @@ void memory_bm_dup(struct memory_bitmap *source, struct memory_bitmap *dest)
 
 #ifdef CONFIG_TOI
 #define DEFINE_MEMORY_BITMAP(name) \
-struct memory_bitmap name = { \
-	LIST_HEAD_INIT(name.blocks) \
-}
+struct memory_bitmap name;
 
 DEFINE_MEMORY_BITMAP(pageset1_map);
 DEFINE_MEMORY_BITMAP(pageset1_copy_map);

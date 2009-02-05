@@ -267,6 +267,26 @@ static void mark_nosave_pages(void)
 	}
 }
 
+static int alloc_a_bitmap(struct memory_bitmap **bm)
+{
+	int result = 0;
+
+	*bm = kzalloc(sizeof(struct memory_bitmap), GFP_KERNEL);
+	if (!*bm) {
+		printk(KERN_ERR "Failed to kzalloc memory for a bitmap.\n");
+		return -ENOMEM;
+	}
+
+	result = memory_bm_create(*bm, GFP_KERNEL, 0);
+
+	if (result) {
+		printk(KERN_ERR "Failed to create a bitmap.\n");
+		kfree(*bm);
+	}
+
+	return result;
+}
+
 /**
  * allocate_bitmaps - allocate bitmaps used to record page states
  *
@@ -275,16 +295,26 @@ static void mark_nosave_pages(void)
  **/
 static int allocate_bitmaps(void)
 {
-	if (memory_bm_create(&pageset1_map, GFP_KERNEL, 0) ||
-	    memory_bm_create(&pageset1_copy_map, GFP_KERNEL, 0) ||
-	    memory_bm_create(&pageset2_map, GFP_KERNEL, 0) ||
-	    memory_bm_create(&io_map, GFP_KERNEL, 0) ||
-	    memory_bm_create(&nosave_map, GFP_KERNEL, 0) ||
-	    memory_bm_create(&free_map, GFP_KERNEL, 0) ||
-	    memory_bm_create(&page_resave_map, GFP_KERNEL, 0))
+	if (alloc_a_bitmap(&pageset1_map) ||
+	    alloc_a_bitmap(&pageset1_copy_map) ||
+	    alloc_a_bitmap(&pageset2_map) ||
+	    alloc_a_bitmap(&io_map) ||
+	    alloc_a_bitmap(&nosave_map) ||
+	    alloc_a_bitmap(&free_map) ||
+	    alloc_a_bitmap(&page_resave_map))
 		return 1;
 
 	return 0;
+}
+
+static void free_a_bitmap(struct memory_bitmap **bm)
+{
+	if (!*bm)
+		return;
+
+	memory_bm_free(*bm, 0);
+	kfree(*bm);
+	*bm = NULL;
 }
 
 /**
@@ -295,13 +325,13 @@ static int allocate_bitmaps(void)
  **/
 static void free_bitmaps(void)
 {
-	memory_bm_free(&pageset1_map, 0);
-	memory_bm_free(&pageset1_copy_map, 0);
-	memory_bm_free(&pageset2_map, 0);
-	memory_bm_free(&io_map, 0);
-	memory_bm_free(&nosave_map, 0);
-	memory_bm_free(&free_map, 0);
-	memory_bm_free(&page_resave_map, 0);
+	free_a_bitmap(&pageset1_map);
+	free_a_bitmap(&pageset1_copy_map);
+	free_a_bitmap(&pageset2_map);
+	free_a_bitmap(&io_map);
+	free_a_bitmap(&nosave_map);
+	free_a_bitmap(&free_map);
+	free_a_bitmap(&page_resave_map);
 }
 
 /**
@@ -833,7 +863,9 @@ static int do_load_atomic_copy(void)
 		return 1;
 	}
 
-	/* See tuxonice_io.c */
+	if (allocate_bitmaps())
+		return 1;
+
 	read_image_result = read_pageset1(); /* non fatal error ignored */
 
 	if (test_toi_state(TOI_NORESUME_SPECIFIED))
@@ -854,24 +886,20 @@ static int do_load_atomic_copy(void)
  **/
 static void prepare_restore_load_alt_image(int prepare)
 {
-	static struct memory_bitmap pageset1_map_save, pageset1_copy_map_save;
+	static struct memory_bitmap *pageset1_map_save, *pageset1_copy_map_save;
 
 	if (prepare) {
-		memcpy(&pageset1_map_save, &pageset1_map,
-				sizeof(struct memory_bitmap));
-		memset(&pageset1_map, 0, sizeof(struct memory_bitmap));
-		memcpy(&pageset1_copy_map_save, &pageset1_copy_map,
-				sizeof(struct memory_bitmap));
-		memset(&pageset1_copy_map, 0, sizeof(struct memory_bitmap));
+		pageset1_map_save = pageset1_map;
+		pageset1_map = NULL;
+		pageset1_copy_map_save = pageset1_copy_map;
+		pageset1_copy_map = NULL;
 		set_toi_state(TOI_LOADING_ALT_IMAGE);
 		toi_reset_alt_image_pageset2_pfn();
 	} else {
-		memory_bm_free(&pageset1_map, 0);
-		memcpy(&pageset1_map, &pageset1_map_save,
-				sizeof(struct memory_bitmap));
-		memory_bm_free(&pageset1_copy_map, 0);
-		memcpy(&pageset1_copy_map, &pageset1_copy_map_save,
-				sizeof(struct memory_bitmap));
+		memory_bm_free(pageset1_map, 0);
+		pageset1_map = pageset1_map_save;
+		memory_bm_free(pageset1_copy_map, 0);
+		pageset1_copy_map = pageset1_copy_map_save;
 		clear_toi_state(TOI_NOW_RESUMING);
 		clear_toi_state(TOI_LOADING_ALT_IMAGE);
 	}
