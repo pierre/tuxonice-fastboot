@@ -36,7 +36,7 @@ static struct memory_bitmap dup_map1, dup_map2;
 
 void toi_reset_alt_image_pageset2_pfn(void)
 {
-	memory_bm_position_reset(&pageset2_map);
+	memory_bm_position_reset(pageset2_map);
 }
 
 static struct page *first_conflicting_page;
@@ -71,10 +71,10 @@ struct page *___toi_get_nonconflicting_page(int can_be_highmem)
 
 
 	if (test_toi_state(TOI_LOADING_ALT_IMAGE) &&
-			pageset2_map.p_list &&
+			pageset2_map &&
 			(ptoi_pfn != BM_END_OF_MAP)) {
 		do {
-			ptoi_pfn = memory_bm_next_pfn(&pageset2_map);
+			ptoi_pfn = memory_bm_next_pfn(pageset2_map);
 			if (ptoi_pfn != BM_END_OF_MAP) {
 				page = pfn_to_page(ptoi_pfn);
 				if (!PagePageset1(page) &&
@@ -158,12 +158,12 @@ int toi_get_pageset1_load_addresses(void)
 	 * gets stomped on by the PagePageset1() test in setup_pbes.
 	 */
 	memory_bm_create(&dup_map1, GFP_KERNEL, 0);
-	memory_bm_dup(&pageset1_map, &dup_map1);
+	memory_bm_dup(pageset1_map, &dup_map1);
 
 	memory_bm_create(&dup_map2, GFP_KERNEL, 0);
-	memory_bm_dup(&pageset1_map, &dup_map2);
+	memory_bm_dup(pageset1_map, &dup_map2);
 
-	memory_bm_position_reset(&pageset1_map);
+	memory_bm_position_reset(pageset1_map);
 	memory_bm_position_reset(&dup_map1);
 	memory_bm_position_reset(&dup_map2);
 
