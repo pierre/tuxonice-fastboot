@@ -133,7 +133,8 @@ static void set_devinfo(struct block_device *bdev, int target_blkbits)
 {
 	devinfo.bdev = bdev;
 	if (!target_blkbits) {
-		devinfo.bmap_shift = devinfo.blocks_per_page = 0;
+		devinfo.bmap_shift = 0;
+		devinfo.blocks_per_page = 0;
 	} else {
 		/* We are assuming a hard disk with 512 (2^9) bytes/sector */
 		devinfo.bmap_shift = target_blkbits - 9;
@@ -765,7 +766,8 @@ static int toi_file_signature_op(int op)
 				sizeof(tuxonice_signature));
 		header->resumed_before = 0;
 		header->have_image = 0;
-		result = changed = 1;
+		result = 1;
+		changed = 1;
 		break;
 	case MARK_RESUME_ATTEMPTED:
 		if (result == 1) {
@@ -1033,7 +1035,8 @@ static int toi_file_parse_sig_location(char *commandline,
 	if (toi_file_target_bdev)
 		return 0;
 
-	devstart = thischar = commandline;
+	devstart = commandline;
+	thischar = commandline;
 	while ((*thischar != ':') && (*thischar != '@') &&
 		((thischar - commandline) < 250) && (*thischar))
 		thischar++;
@@ -1221,7 +1224,8 @@ static __init int toi_file_load(void)
 	toi_fileops.rw_header_chunk_noreadahead =
 		toi_bio_ops.rw_header_chunk_noreadahead;
 	toi_fileops.io_flusher = toi_bio_ops.io_flusher;
-	toi_fileops.update_throughput_throttle = toi_bio_ops.update_throughput_throttle;
+	toi_fileops.update_throughput_throttle =
+		toi_bio_ops.update_throughput_throttle;
 	toi_fileops.finish_all_io = toi_bio_ops.finish_all_io;
 
 	return toi_register_module(&toi_fileops);

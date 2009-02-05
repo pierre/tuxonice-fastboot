@@ -673,7 +673,8 @@ int memory_bm_read(struct memory_bitmap *bm, int (*rw_chunk)
 				break;
 
 		if (&bb->hook == &bm->blocks) {
-			printk("TuxOnIce: Failed to load memory bitmap.\n");
+			printk(KERN_ERR
+				"TuxOnIce: Failed to load memory bitmap.\n");
 			result = -EINVAL;
 			goto Free;
 		}
@@ -684,7 +685,8 @@ int memory_bm_read(struct memory_bitmap *bm, int (*rw_chunk)
 			goto Free;
 
 		if (pfn != bb->end_pfn) {
-			printk("TuxOnIce: Failed to load memory bitmap. "
+			printk(KERN_ERR
+				"TuxOnIce: Failed to load memory bitmap. "
 				"End PFN doesn't match what was saved.\n");
 			result = -EINVAL;
 			goto Free;
