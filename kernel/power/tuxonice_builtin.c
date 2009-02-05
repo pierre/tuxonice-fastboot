@@ -261,8 +261,10 @@ int toi_lowlevel_builtin(void)
 }
 EXPORT_SYMBOL_GPL(toi_lowlevel_builtin);
 
-unsigned long toi_compress_bytes_in, toi_compress_bytes_out;
+unsigned long toi_compress_bytes_in;
 EXPORT_SYMBOL_GPL(toi_compress_bytes_in);
+
+unsigned long toi_compress_bytes_out;
 EXPORT_SYMBOL_GPL(toi_compress_bytes_out);
 
 unsigned long toi_state = ((1 << TOI_BOOT_TIME) |
@@ -277,7 +279,7 @@ EXPORT_SYMBOL_GPL(nr_hibernates);
 int toi_running;
 EXPORT_SYMBOL_GPL(toi_running);
 
-int toi_in_hibernate __nosavedata;
+__nosavedata int toi_in_hibernate;
 EXPORT_SYMBOL_GPL(toi_in_hibernate);
 
 __nosavedata struct pbe *restore_highmem_pblist;

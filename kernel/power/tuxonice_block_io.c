@@ -582,7 +582,7 @@ static int toi_bio_rw_page(int writing, struct page *page,
 			dev_info->bmap_shift,
 		page, is_readahead, 0, free_group);
 
-	if (result) 
+	if (result)
 		return result;
 
 	if (!writing) {

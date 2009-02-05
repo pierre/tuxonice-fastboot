@@ -385,9 +385,8 @@ void toi_end_atomic(int stage, int suspend_time, int error)
 	case ATOMIC_STEP_PLATFORM_FINISH:
 		platform_finish(1);
 	case ATOMIC_STEP_DEVICE_RESUME:
-		if (suspend_time && (error & 2)) {
+		if (suspend_time && (error & 2))
 			platform_recover(1);
-		}
 		device_resume(suspend_time ?
 			((error & 1) ? PMSG_RECOVER : PMSG_THAW) :
 			PMSG_RESTORE);
