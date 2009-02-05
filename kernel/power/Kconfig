@@ -185,13 +185,13 @@ menuconfig TOI_CORE
 	default y
 	---help---
 	  TuxOnIce is the 'new and improved' suspend support.
-	  
+
 	  See the TuxOnIce home page (tuxonice.net)
 	  for FAQs, HOWTOs and other documentation.
 
 	comment "Image Storage (you need at least one allocator)"
 		depends on TOI_CORE
-	
+
 	config TOI_FILE
 		bool "File Allocator"
 		depends on TOI_CORE
@@ -300,7 +300,7 @@ menuconfig TOI_CORE
 		  When booting, TuxOnIce can check for an image and start to resume prior
 		  to any initrd/ramfs running (via a late initcall).
 
-		  If you don't have an initrd/ramfs, this is what you want to happen - 
+		  If you don't have an initrd/ramfs, this is what you want to happen -
 		  otherwise you won't be able to safely resume. You should set this option
 		  to 'No'.
 

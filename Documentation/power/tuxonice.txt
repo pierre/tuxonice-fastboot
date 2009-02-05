@@ -43,7 +43,7 @@
 2. Why would you want it?
 
    Why wouldn't you want it?
-   
+
    Being able to save the state of your system and quickly restore it improves
    your productivity - you get a useful system in far less time than through
    the normal boot process. You also get to be completely 'green', using zero
@@ -51,13 +51,13 @@
    minimal power to some devices, so they can initiate a power on, but that
    will be the same amount of power as would be used if you told the computer
    to shutdown.
-   
+
 3. What do you need to use it?
 
    a. Kernel Support.
 
    i) The TuxOnIce patch.
-   
+
    TuxOnIce is part of the Linux Kernel. This version is not part of Linus's
    2.6 tree at the moment, so you will need to download the kernel source and
    apply the latest patch. Having done that, enable the appropriate options in
@@ -100,7 +100,7 @@
    add the amount of memory you have. This swapspace can be arranged in any way
    you'd like. It can be in one partition or file, or spread over a number. The
    only requirement is that they be active when you start a hibernation cycle.
-   
+
    There is one exception to this requirement. TuxOnIce has the ability to turn
    on one swap file or partition at the start of hibernating and turn it back off
    at the end. If you want to ensure you have enough memory to store a image
@@ -142,13 +142,13 @@
    ---EXAMPLE-ONLY-DON'T-COPY-AND-PASTE---
    # cat /sys/power/tuxonice/resume
    file:/dev/hda2:0x1e001
-   
+
    In this example, we would edit the append= line of our lilo.conf|menu.lst
    so that it included:
 
    resume=file:/dev/hda2:0x1e001
    ---EXAMPLE-ONLY-DON'T-COPY-AND-PASTE---
- 
+
    For those who are thinking 'Could I make the file sparse?', the answer is
    'No!'. At the moment, there is no way for TuxOnIce to fill in the holes in
    a sparse file while hibernating. In the longer term (post merge!), I'd like
@@ -157,13 +157,13 @@
    priority.
 
    c. Bootloader configuration.
-   
-   Using TuxOnIce also requires that you add an extra parameter to 
+
+   Using TuxOnIce also requires that you add an extra parameter to
    your lilo.conf or equivalent. Here's an example for a swap partition:
 
    append="resume=swap:/dev/hda1"
 
-   This would tell TuxOnIce that /dev/hda1 is a swap partition you 
+   This would tell TuxOnIce that /dev/hda1 is a swap partition you
    have. TuxOnIce will use the swap signature of this partition as a
    pointer to your data when you hibernate. This means that (in this example)
    /dev/hda1 doesn't need to be _the_ swap partition where all of your data
@@ -172,7 +172,7 @@
 
    You don't need to have a swap partition for this purpose. TuxOnIce
    can also use a swap file, but usage is a little more complex. Having made
-   your swap file, turn it on and do 
+   your swap file, turn it on and do
 
    cat /sys/power/tuxonice/swap/headerlocations
 
@@ -214,8 +214,8 @@
    - Switching to a text console and back if X doesn't like the video card
      status on resume.
    - Un/reloading drivers that don't play well with hibernation.
-  
-   Note that you might not be able to unload some drivers if there are 
+
+   Note that you might not be able to unload some drivers if there are
    processes using them. You might have to kill off processes that hold
    devices open. Hint: if your X server accesses an USB mouse, doing a
    'chvt' to a text console releases the device and you can unload the
@@ -304,7 +304,7 @@
    You can change the settings for powering down while the image is being
    written by pressing 'R' to toggle rebooting and 'O' to toggle between
    suspending to ram and powering down completely).
-   
+
    If you run into problems with resuming, adding the "noresume" option to
    the kernel command line will let you skip the resume step and recover your
    system. This option shouldn't normally be needed, because TuxOnIce modifies
@@ -356,7 +356,7 @@
    ratio is achieved in the logs after hibernating.
 
    - debug_info:
-  
+
    This file returns information about your configuration that may be helpful
    in diagnosing problems with hibernating.
 
@@ -459,7 +459,7 @@
       you want to protect your machine with the bios password, this is probably
       not the right choice. Mode 4 may be necessary on some machines where ACPI
       wake up methods need to be run to properly reinitialise hardware after a
-      hibernation cycle.  
+      hibernation cycle.
    0: Switch the machine completely off. The only possible wakeup is the power
       button. For the bios, resume is then the same as a cold boot, in
       particular you would  have to provide your bios boot password if your
@@ -493,7 +493,7 @@
    TuxOnIce will attempt to swapon/swapoff automatically. Thus, if
    I normally use /dev/hda1 for swap, and want to use /dev/hda2 for specifically
    for my hibernation image, I would
-  
+
    echo /dev/hda2 > /sys/power/tuxonice/swap/swapfile
 
    /dev/hda2 would then be automatically swapon'd and swapoff'd. Note that the
@@ -554,7 +554,7 @@ away
    on its ability to save the image are not met).
 
    - version:
-  
+
    The version of TuxOnIce you have compiled into the currently running kernel.
 
 7. How do you get support?
