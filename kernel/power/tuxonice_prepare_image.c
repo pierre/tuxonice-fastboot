@@ -609,7 +609,7 @@ static void display_stats(int always, int sub_extra_pd1_allow)
 		any_to_free(1),
 		MIN_FREE_RAM, toi_memory_for_modules(0),
 		extra_pd1_pages_allowance, ((long) image_size_limit) << 8,
-		
+
 		need_pageset2() ? "yes" : "no");
 
 	if (always)

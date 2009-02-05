@@ -251,7 +251,8 @@ int toi_lowlevel_builtin(void)
 	return error;
 }
 
-unsigned long toi_compress_bytes_in, toi_compress_bytes_out;
+unsigned long toi_compress_bytes_in;
+unsigned long toi_compress_bytes_out;
 
 unsigned long toi_state = ((1 << TOI_BOOT_TIME) |
 		(1 << TOI_IGNORE_LOGLEVEL) |
@@ -261,7 +262,7 @@ unsigned long toi_state = ((1 << TOI_BOOT_TIME) |
 unsigned int nr_hibernates;
 
 int toi_running;
-int toi_in_hibernate __nosavedata;
+__nosavedata int toi_in_hibernate;
 
 __nosavedata struct pbe *restore_highmem_pblist;
 
