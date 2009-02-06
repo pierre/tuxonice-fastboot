@@ -1275,7 +1275,7 @@ static __init int core_load(void)
 #ifdef MODULE
 /**
  * core_unload: Prepare to unload the core code.
- */
+ **/
 static __exit void core_unload(void)
 {
 	int i,
