@@ -71,9 +71,4 @@ extern struct memory_bitmap *free_map;
 extern void save_pageflags(struct memory_bitmap *pagemap);
 extern int load_pageflags(struct memory_bitmap *pagemap);
 extern int toi_pageflags_space_needed(void);
-
-#define BITMAP_FOR_EACH_SET(map, pfn) \
-	memory_bm_position_reset(map); \
-	for (pfn = memory_bm_next_pfn(map); pfn != BM_END_OF_MAP; \
-		pfn = memory_bm_next_pfn(map))
 #endif
