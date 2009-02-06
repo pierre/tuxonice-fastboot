@@ -205,7 +205,9 @@ int toi_get_pageset1_load_addresses(void)
 	 * and how many pages we can reload directly to their original
 	 * location.
 	 */
-	BITMAP_FOR_EACH_SET(pageset1_copy_map, pfn) {
+	memory_bm_position_reset(pageset1_copy_map);
+	for (pfn = memory_bm_next_pfn(pageset1_copy_map); pfn != BM_END_OF_MAP;
+			pfn = memory_bm_next_pfn(pageset1_copy_map)) {
 		int is_high;
 		page = pfn_to_page(pfn);
 		is_high = PageHighMem(page);
@@ -249,7 +251,9 @@ int toi_get_pageset1_load_addresses(void)
 	 * Now generate our pbes (which will be used for the atomic restore),
 	 * and free unneeded pages.
 	 */
-	BITMAP_FOR_EACH_SET(pageset1_copy_map, pfn) {
+	memory_bm_position_reset(pageset1_copy_map);
+	for (pfn = memory_bm_next_pfn(pageset1_copy_map); pfn != BM_END_OF_MAP;
+			pfn = memory_bm_next_pfn(pageset1_copy_map)) {
 		int is_high;
 		page = pfn_to_page(pfn);
 		is_high = PageHighMem(page);
