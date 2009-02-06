@@ -87,6 +87,7 @@ EXPORT_SYMBOL_GPL(toi_writer_buffer_posn);
 static struct toi_bdev_info *toi_devinfo;
 
 static DEFINE_MUTEX(toi_bio_mutex);
+static DEFINE_MUTEX(toi_bio_readahead_mutex);
 
 static struct task_struct *toi_queue_flusher;
 static int toi_bio_queue_flush_pages(int dedicated_thread);
@@ -750,6 +751,8 @@ static int toi_start_one_readahead(int dedicated_thread)
 	if (result)
 		return result;
 
+	mutex_lock(&toi_bio_readahead_mutex);
+
 	while (!buffer) {
 		buffer = (char *) toi_get_zeroed_page(12,
 				TOI_ATOMIC_GFP);
@@ -763,7 +766,9 @@ static int toi_start_one_readahead(int dedicated_thread)
 		}
 	}
 
-	return toi_bio_rw_page(READ, virt_to_page(buffer), 1, 0);
+	result = toi_bio_rw_page(READ, virt_to_page(buffer), 1, 0);
+	mutex_unlock(&toi_bio_readahead_mutex);
+	return result;
 }
 
 /**
@@ -818,6 +823,7 @@ static int toi_start_new_readahead(int dedicated_thread)
 		 (dedicated_thread ||
 		  (num_submitted < target_outstanding_io &&
 		   atomic_read(&toi_io_in_progress) < target_outstanding_io)));
+
 	return 0;
 }
 
@@ -857,18 +863,9 @@ static int toi_bio_get_next_page_read(int no_readahead)
 		return -EIO;
 	}
 
-	/*
-	 * On SMP, we may need to wait for the first readahead
-	 * to be submitted or submit a new batch if we're the thread
-	 * submitting I/O and everyone else already used the I/O
-	 * we'd submitted before taking toi_bio_mutex (resume time only).
-	 */
 	if (unlikely(!readahead_list_head)) {
 		BUG_ON(!more_readahead);
-		if (current == toi_queue_flusher)
-			toi_start_new_readahead(0);
-		else
-			wait_event(readahead_list_wait, readahead_list_head);
+		toi_start_one_readahead(0);
 	}
 
 	if (PageLocked(readahead_list_head)) {
@@ -1013,14 +1010,18 @@ static int toi_bio_read_page(unsigned long *pfn, struct page *buffer_page,
 	int result = 0;
 	char *buffer_virt = kmap(buffer_page);
 
-	my_mutex_lock(0, &toi_bio_mutex);
-
-	/* Only call start_new_readahead if we don't have a dedicated thread */
+	/*
+	 * Only call start_new_readahead if we don't have a dedicated thread
+	 * and we're the queue flusher.
+	 */
 	if (current == toi_queue_flusher && toi_start_new_readahead(0)) {
 		printk(KERN_INFO "Queue flusher and toi_start_one_readahead "
 				"returned non-zero.\n");
-		return -EIO;
+		result = -EIO;
+		goto out;
 	}
+
+	my_mutex_lock(0, &toi_bio_mutex);
 
 	/*
 	 * Structure in the image:
@@ -1035,6 +1036,7 @@ static int toi_bio_read_page(unsigned long *pfn, struct page *buffer_page,
 	}
 
 	my_mutex_unlock(0, &toi_bio_mutex);
+out:
 	kunmap(buffer_page);
 	return result;
 }
