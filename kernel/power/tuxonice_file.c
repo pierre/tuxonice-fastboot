@@ -476,7 +476,7 @@ static int parse_signature(struct toi_file_header *header)
 	else
 		clear_toi_state(TOI_RESUMED_BEFORE);
 
-	target_header_start = header->first_header_block; /* sector on the disk */
+	target_header_start = header->first_header_block;
 	return 1;
 }
 
@@ -673,8 +673,8 @@ static int toi_file_read_header_init(void)
 
 	/*
 	 * Read toi_file configuration (header containing metadata).
-	 * target_header_start is the first sector of the header. It has been set
-	 * when checking if the file was suitable for resuming, see
+	 * target_header_start is the first sector of the header. It has been
+	 * set when checking if the file was suitable for resuming, see
 	 * do_toi_step(STEP_RESUME_CAN_RESUME).
 	 */
 	result = toi_bio_ops.bdev_page_io(READ, toi_file_target_bdev,
@@ -972,7 +972,7 @@ static int __test_toi_file_target(char *target, int resume_param, int quiet)
 	else
 		if (!resume_param)
 			printk(KERN_INFO "TuxOnIce: FileAllocator: Sorry. "
-					 "Target is not set for hibernating.\n");
+					"Target is not set for hibernating.\n");
 
 	return 1;
 }
@@ -1006,7 +1006,7 @@ static void test_toi_file_target(void)
  * Where:
  *	DEVNAME is convertable to a dev_t by name_to_dev_t
  *	FIRSTBLOCK is the location of the first block in the file.
- *	BLOCKSIZE is the logical blocksize >= SECTOR_SIZE & 
+ *	BLOCKSIZE is the logical blocksize >= SECTOR_SIZE &
  *					<= PAGE_SIZE,
  *	mod SECTOR_SIZE == 0 of the device.
  *
