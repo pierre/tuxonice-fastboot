@@ -123,7 +123,7 @@ static char *reason_name[NUM_REASONS] = {
 
 /**
  * do_bio_wait - wait for some TuxOnIce I/O to complete
- * @reason: The array index of the reason we're waiting.
+ * @reason:	The array index of the reason we're waiting.
  *
  * Wait for a particular page of I/O if we're after a particular page.
  * If we're not after a particular page, wait instead for all in flight
@@ -258,20 +258,32 @@ static void toi_end_bio(struct bio *bio, int err)
 
 /**
  * submit - submit BIO request
- * @writing: READ or WRITE.
- * @dev: The block device we're using.
- * @first_block: The first sector we're using.
- * @page: The page being used for I/O.
- * @free_group: If writing, the group that was used in allocating the page
- * 	and which will be used in freeing the page from the completion
- * 	routine.
+ * @writing:		READ or WRITE.
+ * @dev:		The block device we're using.
+ * @first_block:	The first sector we're using.
+ * @page:		The page being used for I/O.
+ * @free_group:		If writing, the group that was used in
+ *			allocating the page and which will be used
+ *			in freeing the page from the completion
+ *			routine.
  *
- * Based on Patrick Mochell's pmdisk code from long ago: "Straight from the
- * textbook - allocate and initialize the bio. If we're writing, make sure
- * the page is marked as dirty. Then submit it and carry on."
+ * Based on Patrick Mochel's pmdisk code from long ago:
+ *	http://lkml.org/lkml/2004/7/17/80
+ *	"Straight from the textbook - allocate and initialize the bio.
+ *	If we're writing, make sure the page is marked as dirty.
+ *	Then submit it and carry on."
  *
  * If we're just testing the speed of our own code, we fake having done all
  * the hard work and all toi_end_bio immediately.
+ *
+ * first_block is computed via:
+ *
+ *	toi_writer_posn.current_offset << dev_info->bmap_shift
+ *
+ * Typically dev_info->bmap_shift is 3, so first_block is:
+ *
+ *	toi_writer_posn.current_offset * 8
+ *
  **/
 static int submit(int writing, struct block_device *dev, sector_t first_block,
 		struct page *page, int free_group)
@@ -326,14 +338,14 @@ static int submit(int writing, struct block_device *dev, sector_t first_block,
 }
 
 /**
- * toi_do_io: Prepare to do some i/o on a page and submit or batch it.
- *
- * @writing: Whether reading or writing.
- * @bdev: The block device which we're using.
- * @block0: The first sector we're reading or writing.
- * @page: The page on which I/O is being done.
- * @readahead_index: If doing readahead, the index (reset this flag when done).
- * @syncio: Whether the i/o is being done synchronously.
+ * toi_do_io - prepare to do some i/o on a page and submit or batch it
+ * @writing:		Whether reading or writing.
+ * @bdev:		The block device which we're using.
+ * @block0:		The first sector we're reading or writing.
+ * @page:		The page on which I/O is being done.
+ * @readahead_index:	If doing readahead, the index (reset this flag when
+ *			done).
+ * @syncio:		Whether the i/o is being done synchronously.
  *
  * Prepare and start a read or write operation.
  *
@@ -378,10 +390,10 @@ static int toi_do_io(int writing, struct block_device *bdev, long block0,
 
 /**
  * toi_bdev_page_io - simpler interface to do directly i/o on a single page
- * @writing: Whether reading or writing.
- * @bdev: Block device on which we're operating.
- * @pos: Sector at which page to read or write starts.
- * @page: Page to be read/written.
+ * @writing:	Whether reading or writing.
+ * @bdev:	Block device on which we're operating.
+ * @pos:	Sector at which page to read or write starts.
+ * @page:	Page to be read/written.
  *
  * A simple interface to submit a page of I/O and wait for its completion.
  * The caller must free the page used.
@@ -406,8 +418,8 @@ static int toi_bio_memory_needed(void)
 
 /**
  * toi_bio_print_debug_stats - put out debugging info in the buffer provided
- * @buffer: A buffer of size @size into which text should be placed.
- * @size: The size of @buffer.
+ * @buffer:	A buffer of size @size into which text should be placed.
+ * @size:	The size of @buffer.
  *
  * Fill a buffer with debugging info. This is used for both our debug_info sysfs
  * entry and for recording the same info in dmesg.
@@ -453,8 +465,8 @@ static int toi_bio_print_debug_stats(char *buffer, int size)
 
 /**
  * toi_set_devinfo - set the bdev info used for i/o
- * @info: Pointer to an array of struct toi_bdev_info - the list of
- * bdevs and blocks on them in which the image is stored.
+ * @info:	Pointer to an array of struct toi_bdev_info - the list of
+ *		bdevs and blocks on them in which the image is stored.
  *
  * Set the list of bdevs and blocks in which the image will be stored.
  * Think of them (all together) as one long tape on which the data will be
@@ -500,7 +512,7 @@ static void dump_block_chains(void)
 
 /**
  * go_next_page - skip blocks to the start of the next page
- * @writing: Whether we're reading or writing the image.
+ * @writing:	Whether we're reading or writing the image.
  *
  * Go forward one page, or two if extra_page_forward is set. It only gets
  * set at the start of reading the image header, to skip the first page
@@ -545,10 +557,10 @@ static void set_extra_page_forward(void)
 
 /**
  * toi_bio_rw_page - do i/o on the next disk page in the image
- * @writing: Whether reading or writing.
- * @page: Page to do i/o on.
- * @is_readahead: Whether we're doing readahead
- * @free_group: The group used in allocating the page
+ * @writing:		Whether reading or writing.
+ * @page:		Page to do i/o on.
+ * @is_readahead:	Whether we're doing readahead
+ * @free_group:		The group used in allocating the page
  *
  * Submit a page for reading or writing, possibly readahead.
  * Pass the group used in allocating the page as well, as it should
@@ -578,9 +590,9 @@ static int toi_bio_rw_page(int writing, struct page *page,
 	dev_info = &toi_devinfo[toi_writer_posn.current_chain];
 
 	result = toi_do_io(writing, dev_info->bdev,
-		toi_writer_posn.current_offset <<
-			dev_info->bmap_shift,
-		page, is_readahead, 0, free_group);
+			   toi_writer_posn.current_offset <<
+			   dev_info->bmap_shift,
+			   page, is_readahead, 0, free_group);
 
 	if (result) 
 		return result;
@@ -649,7 +661,7 @@ static void toi_read_header_init(void)
 
 /**
  * toi_bio_queue_write - queue a page for writing
- * @full_buffer: Pointer to a page to be queued
+ * @full_buffer:	Pointer to a page to be queued.
  *
  * Add a page to the queue to be submitted. If we're the queue flusher,
  * we'll do this once we've dropped toi_bio_mutex, so other threads can
@@ -1043,7 +1055,7 @@ static int toi_bio_read_page(unsigned long *pfn, struct page *buffer_page,
  * toi_bio_write_page - write a page of the image
  * @pfn:		The pfn where the data belongs.
  * @buffer_page:	The page containing the (possibly compressed) data.
- * @buf_size:	The number of bytes on @buffer_page used.
+ * @buf_size:		The number of bytes on @buffer_page used.
  *
  * Write a (possibly compressed) page to the image from the buffer, together
  * with it's index and buffer size.

@@ -183,6 +183,15 @@ static int toi_file_storage_available(void)
 	return raw_to_real(result);
 }
 
+/**
+ * has_contiguous_blocks - check if a page is represented by contiguous sectors
+ * @page_num:	page number in the file
+ *
+ * A page (in the context of filesystems) is a logical unit of multiple blocks.
+ * A block (or sector) is the smallest unit of data that can be transfered to disk.
+ * For most filesystems, these are the same, but for xfs, they can have independant
+ * values.
+ **/
 static int has_contiguous_blocks(int page_num)
 {
 	int j;
@@ -251,6 +260,11 @@ static int apply_header_reservation(void)
 	return 0;
 }
 
+/**
+ * populate_block_list - create the lost of extents
+ *
+ * Iterate through the blocks in the file to create the chain of extents.
+ **/
 static int populate_block_list(void)
 {
 	int i, extent_min = -1, extent_max = -1, got_header = 0, result = 0;
@@ -265,18 +279,29 @@ static int populate_block_list(void)
 				devinfo.blocks_per_page - 1) : 0;
 	}
 
+	/*
+	 * Iterate through the file in chunks of PAGE_SIZE.
+	 * We ensure that each chunk has contiguous blocks. If not,
+	 * the page is discarded.
+	 * Hence we only use contiguous PAGE_SIZE aligned sectors, like
+	 * the swap code does.
+	 */
 	for (i = 0; i < (target_inode->i_size >> PAGE_SHIFT); i++) {
 		sector_t new_sector;
 
+		/* Check if page i has contiguous blocks */
 		if (!has_contiguous_blocks(i))
 			continue;
 
 		new_sector = bmap(target_inode,
-		(i * devinfo.blocks_per_page));
+				  (i * devinfo.blocks_per_page));
 
 		/*
 		 * Ignore the first block in the file.
 		 * It gets the header.
+		 *
+		 * Note: bmap_shift gives the size of a sector on disk,
+		 * generally 3 (1 << 3 = 512 bytes/sector).
 		 */
 		if (new_sector == target_firstblock >> devinfo.bmap_shift) {
 			got_header = 1;
