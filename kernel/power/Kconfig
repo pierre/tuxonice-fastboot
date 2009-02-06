@@ -327,7 +327,7 @@ menuconfig TOI_CORE
 		---help---
 		  The default interface on which to communicate with other nodes in
 		  the cluster.
-		  
+
 		  If no value is set here, cluster support will be disabled by default.
 
 	config TOI_DEFAULT_CLUSTER_KEY
