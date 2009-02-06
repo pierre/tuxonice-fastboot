@@ -296,7 +296,9 @@ void check_checksums(void)
 	toi_num_resaved = 0;
 	this_checksum = 0;
 
-	BITMAP_FOR_EACH_SET(pageset2_map, pfn) {
+	memory_bm_position_reset(pageset2_map);
+	for (pfn = memory_bm_next_pfn(pageset2_map); pfn != BM_END_OF_MAP;
+			pfn = memory_bm_next_pfn(pageset2_map)) {
 		int ret;
 		char *pa;
 		struct page *page = pfn_to_page(pfn);
