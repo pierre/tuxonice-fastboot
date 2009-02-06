@@ -996,7 +996,8 @@ static int read_module_configs(void)
 				sizeof(toi_module_header));
 
 		if (result) {
-			printk("Failed to read the next module header.\n");
+			printk(KERN_ERR "Failed to read the next module "
+					"header.\n");
 			return -EINVAL;
 		}
 	}
