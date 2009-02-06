@@ -113,17 +113,18 @@ static int build_attention_list(void)
 static void pageset2_full(void)
 {
 	struct zone *zone;
+	struct page *page;
 	unsigned long flags;
 	int i;
 
 	for_each_zone(zone) {
 		spin_lock_irqsave(&zone->lru_lock, flags);
 		for_each_lru(i) {
-			if (zone_page_state(zone, NR_LRU_BASE + i)) {
-				struct page *page;
-				list_for_each_entry(page, &zone->lru[i].list, lru)
-					SetPagePageset2(page);
-			}
+			if (!zone_page_state(zone, NR_LRU_BASE + i))
+				continue;
+
+			list_for_each_entry(page, &zone->lru[i].list, lru)
+				SetPagePageset2(page);
 		}
 		spin_unlock_irqrestore(&zone->lru_lock, flags);
 	}
@@ -782,7 +783,10 @@ void toi_recalculate_image_contents(int atomic_copy)
 	memory_bm_clear(pageset1_map);
 	if (!atomic_copy) {
 		unsigned long pfn;
-		BITMAP_FOR_EACH_SET(pageset2_map, pfn)
+		memory_bm_position_reset(pageset2_map);
+		for (pfn = memory_bm_next_pfn(pageset2_map);
+				pfn != BM_END_OF_MAP;
+				pfn = memory_bm_next_pfn(pageset2_map))
 			ClearPagePageset1Copy(pfn_to_page(pfn));
 		/* Need to call this before getting pageset1_size! */
 		toi_mark_pages_for_pageset2();
