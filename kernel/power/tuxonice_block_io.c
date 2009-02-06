@@ -157,7 +157,7 @@ static void do_bio_wait(int reason)
  * @reason: The reason we're checking whether to throttle.
  *
  * Check whether we need to wait for some I/O to complete. We always check
- * whether we have enough memory available, but may also (depending upon 
+ * whether we have enough memory available, but may also (depending upon
  * @reason) check if the throughput throttle limit has been reached.
  **/
 static int throttle_if_needed(int reason)
@@ -949,7 +949,7 @@ static int toi_bio_get_new_page(char **full_buffer)
  * @writing:		Bool - whether writing (or reading).
  * @buffer:		The start of the buffer to write or fill.
  * @buffer_size:	The size of the buffer to write or fill.
- * @no_readahead:	Don't try to start readhead (when still getting extents).
+ * @no_readahead:	Don't try to start readhead (when getting extents).
  **/
 static int toi_rw_buffer(int writing, char *buffer, int buffer_size,
 		int no_readahead)
@@ -1098,7 +1098,7 @@ static int toi_bio_write_page(unsigned long pfn, struct page *buffer_page,
  *			don't use more header space than they asked for.
  * @buffer:		Address of the data to write.
  * @buffer_size:	Size of the data buffer.
- * @no_readahead:	Don't try to start readhead (when still getting extents).
+ * @no_readahead:	Don't try to start readhead (when getting extents).
  *
  * Perform PAGE_SIZE I/O. Start readahead if needed.
  **/
