@@ -103,7 +103,7 @@
     Second, we have constraints on the amount of storage available. In these
     calculations, we may also consider any compression that will be done. The
     cryptoapi module allows the user to configure an expected compression ratio.
- 
+
     Third, the user can specify an arbitrary limit on the image size, in
     megabytes. This limit is treated as a soft limit, so that we don't fail the
     attempt to suspend if we cannot meet this constraint.
@@ -116,7 +116,7 @@
     seek to free the amount of memory that we calculate is needed and try again.
     We allow up to four iterations of this loop before aborting the cycle. If we
     do fail, it should only be because of a bug in TuxOnIce's calculations.
- 
+
     These steps are merged together in the prepare_image function, found in
     prepare_image.c. The functions are merged because of the cyclical nature
     of the problem of calculating how much memory and storage is needed. Since
