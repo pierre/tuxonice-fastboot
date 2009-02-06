@@ -556,11 +556,11 @@ static void set_extra_page_forward(void)
 }
 
 /**
- * toi_bio_rw_page - do i/o on the next disk page in the image
+ * toi_bio_rw_page - do I/O on the next disk page in the image
  * @writing:		Whether reading or writing.
- * @page:		Page to do i/o on.
- * @is_readahead:	Whether we're doing readahead
- * @free_group:		The group used in allocating the page
+ * @page:		Page to do I/O on.
+ * @is_readahead:	Whether we're doing readahead.
+ * @free_group:		The group used in allocating the page.
  *
  * Submit a page for reading or writing, possibly readahead.
  * Pass the group used in allocating the page as well, as it should
@@ -572,6 +572,14 @@ static int toi_bio_rw_page(int writing, struct page *page,
 	struct toi_bdev_info *dev_info;
 	int result;
 
+	/*
+	 * Update the extent state toi_writer_posn by incrementing its
+	 * current_offset or making it point to the next extent.
+	 * Note: current_offset is the sector on which the data starts >>
+	 * bmap_shift for the current chain. The ">> bmap_shift for the current
+	 * chain" makes consecutive values refer to consecutive pages (chunks of
+	 * PAGE_SIZE bytes in the file).
+	 */
 	if (go_next_page(writing)) {
 		printk(KERN_INFO "Failed to advance a page in the extent "
 				"data.\n");
@@ -594,7 +602,7 @@ static int toi_bio_rw_page(int writing, struct page *page,
 			   dev_info->bmap_shift,
 			   page, is_readahead, 0, free_group);
 
-	if (result) 
+	if (result)
 		return result;
 
 	if (!writing) {
@@ -691,8 +699,8 @@ static void toi_bio_queue_write(char **full_buffer)
 }
 
 /**
- * toi_rw_cleanup - Cleanup after i/o.
- * @writing: Whether we were reading or writing.
+ * toi_rw_cleanup - cleanup after I/O
+ * @writing:	Whether we were reading or writing.
  *
  * Flush all I/O and clean everything up after reading or writing a
  * section of the image.
@@ -848,9 +856,9 @@ static void bio_io_flusher(int writing)
 
 /**
  * toi_bio_get_next_page_read - read a disk page, perhaps with readahead
- * @no_readahead: Whether we can use readahead
+ * @no_readahead:	Whether we can use readahead.
  *
- * Read a page from disk, submitting readahead and cleaning up finished i/o
+ * Read a page from disk, submitting readahead and cleaning up finished I/O
  * while we wait for the page we're after.
  **/
 static int toi_bio_get_next_page_read(int no_readahead)
@@ -865,7 +873,7 @@ static int toi_bio_get_next_page_read(int no_readahead)
 	 */
 	if (unlikely(no_readahead && toi_start_one_readahead(0))) {
 		printk(KERN_INFO "No readahead and toi_start_one_readahead "
-				"returned non-zero.\n");
+				 "returned non-zero.\n");
 		return -EIO;
 	}
 
@@ -906,7 +914,6 @@ static int toi_bio_get_next_page_read(int no_readahead)
  * If we're a dedicated thread, stay in here until told to leave,
  * sleeping in wait_event.
  **/
-
 int toi_bio_queue_flush_pages(int dedicated_thread)
 {
 	unsigned long flags;
