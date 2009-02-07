@@ -262,7 +262,7 @@ static int apply_header_reservation(void)
 }
 
 /**
- * populate_block_list - create the lost of extents
+ * populate_block_list - create the list of extents
  *
  * Iterate through the blocks in the file to create the chain of extents.
  **/
@@ -876,11 +876,10 @@ static int toi_file_remove_image(void)
 
 /**
  * toi_file_image_exists - test if an image exists
- * @quiet:	Ignored.
  *
  * Repopulate toi_file_target_bdev if needed.
  **/
-static int toi_file_image_exists(int quiet)
+static int toi_file_image_exists(void)
 {
 	if (!toi_file_target_bdev)
 		reopen_resume_devt();

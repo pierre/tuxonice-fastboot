@@ -76,8 +76,10 @@ EXPORT_SYMBOL_GPL(toi_writer_posn_save);
 struct toi_extent_iterate_state toi_writer_posn;
 EXPORT_SYMBOL_GPL(toi_writer_posn);
 
-/* Not static, so that the allocators can setup and complete
- * writing the header */
+/*
+ * Not static, so that the allocators can setup and complete
+ * writing the header
+ */
 char *toi_writer_buffer;
 EXPORT_SYMBOL_GPL(toi_writer_buffer);
 
@@ -96,10 +98,10 @@ static int toi_bio_queue_flush_pages(int dedicated_thread);
 	       atomic_read(&toi_bio_queue_size))
 
 /**
- * set_free_mem_throttle - set the point where we pause to avoid oom.
+ * set_free_mem_throttle - set the point where we pause to avoid oom
  *
  * Initially, this value is zero, but when we first fail to allocate memory,
- * we set it (plus a buffer) and thereafter throttle i/o once that limit is
+ * we set it (plus a buffer) and thereafter throttle I/O once that limit is
  * reached.
  **/
 static void set_free_mem_throttle(void)
@@ -123,7 +125,7 @@ static char *reason_name[NUM_REASONS] = {
 };
 
 /**
- * do_bio_wait - wait for some TuxOnIce I/O to complete
+ * bio_wait_for_completion - wait for some TuxOnIce I/O to complete
  * @reason:	The array index of the reason we're waiting.
  *
  * Wait for a particular page of I/O if we're after a particular page.
@@ -133,7 +135,7 @@ static char *reason_name[NUM_REASONS] = {
  *
  * If we wait, we also update our statistics regarding why we waited.
  **/
-static void do_bio_wait(int reason)
+static void bio_wait_for_completion(int reason)
 {
 	struct page *was_waiting_on = waiting_on;
 
@@ -154,7 +156,7 @@ static void do_bio_wait(int reason)
 
 /**
  * throttle_if_needed - wait for I/O completion if throttle points are reached
- * @reason: The reason we're checking whether to throttle.
+ * @reason:	the reason we're checking whether to throttle.
  *
  * Check whether we need to wait for some I/O to complete. We always check
  * whether we have enough memory available, but may also (depending upon
@@ -168,7 +170,7 @@ static int throttle_if_needed(int reason)
 	/* Getting low on memory and I/O is in progress? */
 	while (unlikely(free_pages < free_mem_throttle) &&
 			atomic_read(&toi_io_in_progress)) {
-		do_bio_wait(4);
+		bio_wait_for_completion(4);
 		free_pages = nr_unallocated_buffer_pages();
 	}
 
@@ -210,11 +212,11 @@ static void update_throughput_throttle(int jif_index)
 }
 
 /**
- * toi_finish_all_io - wait for all outstanding i/o to complete
+ * bio_finish_all - wait for all outstanding i/o to complete
  *
  * Flush any queued but unsubmitted I/O and wait for it all to complete.
  **/
-static void toi_finish_all_io(void)
+static void bio_finish_all(void)
 {
 	toi_bio_queue_flush_pages(0);
 	wait_event(num_in_progress_wait, !TOTAL_OUTSTANDING_IO);
@@ -258,7 +260,7 @@ static void toi_end_bio(struct bio *bio, int err)
 }
 
 /**
- * submit - submit BIO request
+ * bio_submit - bio_submit BIO request
  * @writing:		READ or WRITE.
  * @dev:		The block device we're using.
  * @first_block:	The first sector we're using.
@@ -286,7 +288,7 @@ static void toi_end_bio(struct bio *bio, int err)
  *	toi_writer_posn.current_offset * 8
  *
  **/
-static int submit(int writing, struct block_device *dev, sector_t first_block,
+static int bio_submit(int writing, struct block_device *dev, sector_t first_block,
 		struct page *page, int free_group)
 {
 	struct bio *bio = NULL;
@@ -300,7 +302,7 @@ static int submit(int writing, struct block_device *dev, sector_t first_block,
 		bio = bio_alloc(TOI_ATOMIC_GFP, 1);
 		if (!bio) {
 			set_free_mem_throttle();
-			do_bio_wait(1);
+			bio_wait_for_completion(1);
 		}
 	}
 
@@ -339,7 +341,7 @@ static int submit(int writing, struct block_device *dev, sector_t first_block,
 }
 
 /**
- * toi_do_io - prepare to do some i/o on a page and submit or batch it
+ * toi_do_io - prepare to do some I/O on a page and bio_submit or batch it
  * @writing:		Whether reading or writing.
  * @bdev:		The block device which we're using.
  * @block0:		The first sector we're reading or writing.
@@ -379,12 +381,11 @@ static int toi_do_io(int writing, struct block_device *bdev, long block0,
 
 	/* Submit the page */
 	get_page(page);
-
-	if (submit(writing, bdev, block0, page, free_group))
+	if (bio_submit(writing, bdev, block0, page, free_group))
 		return -EFAULT;
 
 	if (syncio)
-		do_bio_wait(2);
+		bio_wait_for_completion(2);
 
 	return 0;
 }
@@ -729,7 +730,7 @@ static int toi_rw_cleanup(int writing)
 					&toi_writer_posn_save[3]);
 	}
 
-	toi_finish_all_io();
+	bio_finish_all();
 
 	while (readahead_list_head) {
 		void *next = (void *) readahead_list_head->private;
@@ -782,7 +783,7 @@ static int toi_start_one_readahead(int dedicated_thread)
 
 			oom = 1;
 			set_free_mem_throttle();
-			do_bio_wait(5);
+			bio_wait_for_completion(5);
 		}
 	}
 
@@ -810,7 +811,7 @@ static int toi_start_one_readahead(int dedicated_thread)
  **/
 static int toi_start_new_readahead(int dedicated_thread)
 {
-	int last_result, num_submitted = 0;
+	int last_result, num_bio_submitted = 0;
 
 	/* Start a new readahead? */
 	if (!more_readahead)
@@ -837,11 +838,11 @@ static int toi_start_new_readahead(int dedicated_thread)
 					"Begin read chunk returned %d.\n",
 					last_result);
 		} else
-			num_submitted++;
+			num_bio_submitted++;
 
 	} while (more_readahead &&
 		 (dedicated_thread ||
-		  (num_submitted < target_outstanding_io &&
+		  (num_bio_submitted < target_outstanding_io &&
 		   atomic_read(&toi_io_in_progress) < target_outstanding_io)));
 
 	return 0;
@@ -890,7 +891,7 @@ static int toi_bio_get_next_page_read(int no_readahead)
 
 	if (PageLocked(readahead_list_head)) {
 		waiting_on = readahead_list_head;
-		do_bio_wait(0);
+		bio_wait_for_completion(0);
 	}
 
 	virt = page_address(readahead_list_head);
@@ -956,7 +957,7 @@ static int toi_bio_get_new_page(char **full_buffer)
 		*full_buffer = (char *) toi_get_zeroed_page(11, TOI_ATOMIC_GFP);
 		if (!*full_buffer) {
 			set_free_mem_throttle();
-			do_bio_wait(3);
+			bio_wait_for_completion(3);
 		}
 	}
 
@@ -1176,7 +1177,7 @@ static int write_header_chunk_finish(void)
 	if (toi_writer_buffer_posn)
 		toi_bio_queue_write(&toi_writer_buffer);
 
-	toi_finish_all_io();
+	bio_finish_all();
 
 	return result;
 }
@@ -1251,7 +1252,7 @@ static void toi_bio_cleanup(int finishing_cycle)
 
 struct toi_bio_ops toi_bio_ops = {
 	.bdev_page_io = toi_bdev_page_io,
-	.finish_all_io = toi_finish_all_io,
+	.finish_all_io = bio_finish_all,
 	.update_throughput_throttle = update_throughput_throttle,
 	.forward_one_page = go_next_page,
 	.set_extra_page_forward = set_extra_page_forward,

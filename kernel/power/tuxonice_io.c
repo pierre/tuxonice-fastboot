@@ -468,7 +468,7 @@ static int worker_rw_loop(void *data)
 			mutex_unlock(&io_mutex);
 
 			/*
-			 * Are we aborting? If so, don't submit any more I/O as
+			 * Are we aborting? If so, don't bio_submit any more I/O as
 			 * resetting the resume_attempted flag (from ui.c) will
 			 * clear the bdev flags, making this thread oops.
 			 */
@@ -480,11 +480,12 @@ static int worker_rw_loop(void *data)
 					schedule();
 			}
 
-			/* See toi_bio_read_page in tuxonice_block_io.c:
+			/*
+			 * See toi_bio_read_page in tuxonice_block_io.c:
 			 * read the next page in the image.
 			 */
 			result = first_filter->read_page(&write_pfn, buffer,
-					&buf_size);
+							 &buf_size);
 			if (buf_size != PAGE_SIZE) {
 				abort_hibernate(TOI_FAILED_IO,
 					"I/O pipeline returned %d bytes instead"
@@ -1292,7 +1293,7 @@ static int __read_pageset1(void)
 
 	/*
 	 * See toi_rw_cleanup in tuxonice_block_io.c:
-	 * Clean up after reading the header.
+	 * clean up after reading the header (finish all I/O).
 	 */
 	result = toiActiveAllocator->read_header_cleanup();
 	if (result) {
