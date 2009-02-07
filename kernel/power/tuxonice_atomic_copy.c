@@ -143,11 +143,11 @@ void toi_copy_pageset1(void)
 	int i;
 	unsigned long source_index, dest_index;
 
-	memory_bm_position_reset(&pageset1_map);
-	memory_bm_position_reset(&pageset1_copy_map);
+	memory_bm_position_reset(pageset1_map);
+	memory_bm_position_reset(pageset1_copy_map);
 
-	source_index = memory_bm_next_pfn(&pageset1_map);
-	dest_index = memory_bm_next_pfn(&pageset1_copy_map);
+	source_index = memory_bm_next_pfn(pageset1_map);
+	dest_index = memory_bm_next_pfn(pageset1_copy_map);
 
 	for (i = 0; i < pagedir1.size; i++) {
 		unsigned long *origvirt, *copyvirt;
@@ -184,8 +184,8 @@ void toi_copy_pageset1(void)
 		if (PageHighMem(copypage))
 			kunmap_atomic(copyvirt, KM_USER1);
 
-		source_index = memory_bm_next_pfn(&pageset1_map);
-		dest_index = memory_bm_next_pfn(&pageset1_copy_map);
+		source_index = memory_bm_next_pfn(pageset1_map);
+		dest_index = memory_bm_next_pfn(pageset1_copy_map);
 	}
 }
 
@@ -390,9 +390,8 @@ void toi_end_atomic(int stage, int suspend_time, int error)
 	case ATOMIC_STEP_PLATFORM_FINISH:
 		platform_finish(1);
 	case ATOMIC_STEP_DEVICE_RESUME:
-		if (suspend_time && (error & 2)) {
+		if (suspend_time && (error & 2))
 			platform_recover(1);
-		}
 		device_resume(suspend_time ?
 			((error & 1) ? PMSG_RECOVER : PMSG_THAW) :
 			PMSG_RESTORE);

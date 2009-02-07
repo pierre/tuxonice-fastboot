@@ -425,10 +425,6 @@ void memory_bm_free(struct memory_bitmap *bm, int clear_nosave_free)
 {
 	struct bm_block *bb;
 
-	/* Unused so far? */
-	if (!bm->blocks.next)
-		return;
-
 	list_for_each_entry(bb, &bm->blocks, hook)
 		if (bb->data)
 			free_image_page(bb->data, clear_nosave_free);
@@ -602,9 +598,7 @@ EXPORT_SYMBOL_GPL(memory_bm_dup);
 
 #ifdef CONFIG_TOI
 #define DEFINE_MEMORY_BITMAP(name) \
-struct memory_bitmap name = { \
-	LIST_HEAD_INIT(name.blocks) \
-}; \
+struct memory_bitmap *name; \
 EXPORT_SYMBOL_GPL(name)
 
 DEFINE_MEMORY_BITMAP(pageset1_map);
@@ -679,7 +673,8 @@ int memory_bm_read(struct memory_bitmap *bm, int (*rw_chunk)
 				break;
 
 		if (&bb->hook == &bm->blocks) {
-			printk("TuxOnIce: Failed to load memory bitmap.\n");
+			printk(KERN_ERR
+				"TuxOnIce: Failed to load memory bitmap.\n");
 			result = -EINVAL;
 			goto Free;
 		}
@@ -690,7 +685,8 @@ int memory_bm_read(struct memory_bitmap *bm, int (*rw_chunk)
 			goto Free;
 
 		if (pfn != bb->end_pfn) {
-			printk("TuxOnIce: Failed to load memory bitmap. "
+			printk(KERN_ERR
+				"TuxOnIce: Failed to load memory bitmap. "
 				"End PFN doesn't match what was saved.\n");
 			result = -EINVAL;
 			goto Free;

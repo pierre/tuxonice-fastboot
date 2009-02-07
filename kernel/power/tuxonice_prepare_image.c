@@ -114,17 +114,18 @@ static int build_attention_list(void)
 static void pageset2_full(void)
 {
 	struct zone *zone;
+	struct page *page;
 	unsigned long flags;
 	int i;
 
 	for_each_zone(zone) {
 		spin_lock_irqsave(&zone->lru_lock, flags);
 		for_each_lru(i) {
-			if (zone_page_state(zone, NR_LRU_BASE + i)) {
-				struct page *page;
-				list_for_each_entry(page, &zone->lru[i].list, lru)
-					SetPagePageset2(page);
-			}
+			if (!zone_page_state(zone, NR_LRU_BASE + i))
+				continue;
+
+			list_for_each_entry(page, &zone->lru[i].list, lru)
+				SetPagePageset2(page);
 		}
 		spin_unlock_irqrestore(&zone->lru_lock, flags);
 	}
@@ -188,7 +189,7 @@ static void toi_mark_pages_for_pageset2(void)
 	struct task_struct *p;
 	struct attention_list *this = attention_list;
 
-	memory_bm_clear(&pageset2_map);
+	memory_bm_clear(pageset2_map);
 
 	if (test_action_state(TOI_NO_PAGESET2) || no_ps2_needed)
 		return;
@@ -611,7 +612,7 @@ static void display_stats(int always, int sub_extra_pd1_allow)
 		any_to_free(1),
 		MIN_FREE_RAM, toi_memory_for_modules(0),
 		extra_pd1_pages_allowance, ((long) image_size_limit) << 8,
-		
+
 		need_pageset2() ? "yes" : "no");
 
 	if (always)
@@ -708,7 +709,7 @@ static void flag_image_pages(int atomic_copy)
 
 	num_nosave = 0;
 
-	memory_bm_clear(&pageset1_map);
+	memory_bm_clear(pageset1_map);
 
 	generate_free_page_map();
 
@@ -781,10 +782,13 @@ static void flag_image_pages(int atomic_copy)
 
 void toi_recalculate_image_contents(int atomic_copy)
 {
-	memory_bm_clear(&pageset1_map);
+	memory_bm_clear(pageset1_map);
 	if (!atomic_copy) {
 		unsigned long pfn;
-		BITMAP_FOR_EACH_SET(pageset2_map, pfn)
+		memory_bm_position_reset(pageset2_map);
+		for (pfn = memory_bm_next_pfn(pageset2_map);
+				pfn != BM_END_OF_MAP;
+				pfn = memory_bm_next_pfn(pageset2_map))
 			ClearPagePageset1Copy(pfn_to_page(pfn));
 		/* Need to call this before getting pageset1_size! */
 		toi_mark_pages_for_pageset2();

@@ -242,7 +242,8 @@ extern struct page *saveable_page(struct zone *z, unsigned long p);
 #ifdef CONFIG_HIGHMEM
 extern struct page *saveable_highmem_page(struct zone *z, unsigned long p);
 #else
-static inline struct page *saveable_highmem_page(struct zone *z, unsigned long p)
+static
+inline struct page *saveable_highmem_page(struct zone *z, unsigned long p)
 {
 	return NULL;
 }

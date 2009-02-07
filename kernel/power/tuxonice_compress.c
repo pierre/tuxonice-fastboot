@@ -118,7 +118,8 @@ static int toi_compress_init(int toi_or_resume)
 	if (!toi_or_resume)
 		return 0;
 
-	toi_compress_bytes_in = toi_compress_bytes_out = 0;
+	toi_compress_bytes_in = 0;
+	toi_compress_bytes_out = 0;
 
 	next_driver = toi_get_next_filter(&toi_compression_ops);
 
@@ -137,11 +138,16 @@ static int toi_compress_init(int toi_or_resume)
 static int toi_compress_rw_init(int rw, int stream_number)
 {
 	if (toi_compress_prepare_result) {
-		printk("Failed to initialise compression algorithm.\n");
-		if (rw == READ)
+		printk(KERN_ERR "Failed to initialise compression "
+				"algorithm.\n");
+		if (rw == READ) {
+			printk(KERN_INFO "Unable to read the image.\n");
 			return -ENODEV;
-		else
+		} else {
+			printk(KERN_INFO "Continuing without "
+				"compressing the image.\n");
 			toi_compression_ops.enabled = 0;
+		}
 	}
 
 	return 0;
@@ -278,8 +284,8 @@ static int toi_compress_print_debug_stats(char *buffer, int size)
 		len = scnprintf(buffer, size, "- Compressor is not set.\n");
 
 	if (pages_in)
-		len += scnprintf(buffer+len, size - len,
-		  "  Compressed %lu bytes into %lu (%ld percent compression).\n",
+		len += scnprintf(buffer+len, size - len, "  Compressed "
+			"%lu bytes into %lu (%ld percent compression).\n",
 		  toi_compress_bytes_in,
 		  toi_compress_bytes_out,
 		  (pages_in - pages_out) * 100 / pages_in);

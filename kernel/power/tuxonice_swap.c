@@ -141,7 +141,8 @@ static void close_bdevs(void)
 	for (i = 0; i < MAX_SWAPFILES + 2; i++)
 		close_bdev(i);
 
-	resume_block_device = header_block_device = NULL;
+	resume_block_device = NULL;
+	header_block_device = NULL;
 }
 
 /**
@@ -524,7 +525,8 @@ static int get_main_pool_phys_params(void)
 					extent_min, extent_max))
 			return -ENOMEM;
 
-		extent_min = extent_max = new_sector;
+		extent_min = new_sector;
+		extent_max = new_sector;
 		last_chain = swapfilenum;
 	}
 
@@ -1098,7 +1100,8 @@ static int toi_swap_parse_sig_location(char *commandline,
 	} else
 		commandline += 5;
 
-	devstart = thischar = commandline;
+	devstart = commandline;
+	thischar = commandline;
 	while ((*thischar != ':') && (*thischar != '@') &&
 		((thischar - commandline) < 250) && (*thischar))
 		thischar++;
@@ -1256,7 +1259,8 @@ static __init int toi_swap_load(void)
 	toi_swapops.rw_header_chunk_noreadahead =
 		toi_bio_ops.rw_header_chunk_noreadahead;
 	toi_swapops.io_flusher = toi_bio_ops.io_flusher;
-	toi_swapops.update_throughput_throttle = toi_bio_ops.update_throughput_throttle;
+	toi_swapops.update_throughput_throttle =
+		toi_bio_ops.update_throughput_throttle;
 	toi_swapops.finish_all_io = toi_bio_ops.finish_all_io;
 
 	return toi_register_module(&toi_swapops);
