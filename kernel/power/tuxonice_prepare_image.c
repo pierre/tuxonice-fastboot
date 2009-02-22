@@ -675,17 +675,15 @@ static void generate_free_page_map(void)
  * Description:	Return the number of pages that are free, beginning with and
  * 		including this one.
  */
-static int size_of_free_region(struct page *page)
+static int size_of_free_region(struct zone *zone, unsigned long start_pfn)
 {
-	struct zone *zone = page_zone(page);
-	unsigned long this_pfn = page_to_pfn(page),
-		      orig_pfn = this_pfn,
+	unsigned long this_pfn = start_pfn,
 		      end_pfn = ZONE_START(zone) + zone->spanned_pages - 1;
 
 	while (this_pfn <= end_pfn && PageNosaveFree(pfn_to_page(this_pfn)))
 		this_pfn++;
 
-	return this_pfn - orig_pfn;
+	return this_pfn - start_pfn;
 }
 
 /* flag_image_pages
@@ -731,9 +729,7 @@ static void flag_image_pages(int atomic_copy)
 			if (!pfn_valid(pfn))
 				continue;
 
-			page = pfn_to_page(pfn);
-
-			chunk_size = size_of_free_region(page);
+			chunk_size = size_of_free_region(zone, pfn);
 			if (chunk_size) {
 				num_free += chunk_size;
 				loop += chunk_size - 1;
