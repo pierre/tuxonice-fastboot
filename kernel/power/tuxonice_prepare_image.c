@@ -735,12 +735,19 @@ static void flag_image_pages(int atomic_copy)
 				continue;
 			}
 
+			page = pfn_to_page(pfn);
+
+			if (PageNosave(page)) {
+				num_nosave++;
+				continue;
+			}
+
 			if (highmem)
 				page = saveable_highmem_page(zone, pfn);
 			else
 				page = saveable_page(zone, pfn);
 
-			if (!page || PageNosave(page)) {
+			if (!page) {
 				num_nosave++;
 				continue;
 			}
