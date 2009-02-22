@@ -742,10 +742,8 @@ static void flag_image_pages(int atomic_copy)
 				continue;
 			}
 
-			if (highmem)
-				page = saveable_highmem_page(zone, pfn);
-			else
-				page = saveable_page(zone, pfn);
+			page = highmem ? saveable_highmem_page(zone, pfn) :
+				saveable_page(zone, pfn);
 
 			if (!page) {
 				num_nosave++;
