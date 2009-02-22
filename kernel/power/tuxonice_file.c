@@ -488,7 +488,7 @@ static int parse_signature(struct toi_file_header *header)
 static int prepare_signature(struct toi_file_header *current_header,
 		unsigned long first_header_block)
 {
-	strncpy(current_header->sig, tuxonice_signature,
+	memcpy(current_header->sig, tuxonice_signature,
 			sizeof(tuxonice_signature));
 	current_header->resumed_before = 0;
 	current_header->first_header_block = first_header_block;
