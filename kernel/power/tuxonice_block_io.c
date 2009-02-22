@@ -766,8 +766,10 @@ static int toi_start_one_readahead(int dedicated_thread)
 		buffer = (char *) toi_get_zeroed_page(12,
 				TOI_ATOMIC_GFP);
 		if (!buffer) {
-			if (oom && !dedicated_thread)
-				return -EIO;
+			if (oom && !dedicated_thread) {
+				mutex_unlock(&toi_bio_readahead_mutex);
+				return -ENOMEM;
+			}
 
 			oom = 1;
 			set_free_mem_throttle();
