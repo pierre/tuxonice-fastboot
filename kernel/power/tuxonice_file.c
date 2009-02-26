@@ -77,6 +77,9 @@ struct toi_file_header {
 	int resumed_before;
 	unsigned long first_header_block;
 	int have_image;
+	int devinfo_sz;
+	int num_nodes;
+	int num_zones;
 };
 
 /* Header Page Information */
@@ -493,6 +496,9 @@ static int prepare_signature(struct toi_file_header *current_header,
 	current_header->resumed_before = 0;
 	current_header->first_header_block = first_header_block;
 	current_header->have_image = 1;
+	current_header->devinfo_sz = sizeof(devinfo);
+	current_header->num_nodes = MAX_NUMNODES;
+	current_header->num_zones = MAX_NR_ZONES;
 	return 0;
 }
 
