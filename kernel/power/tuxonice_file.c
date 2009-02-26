@@ -77,10 +77,24 @@ struct toi_file_header {
 	int resumed_before;
 	unsigned long first_header_block;
 	int have_image;
+	char hw_uuid[16];
 };
 
 /* Header Page Information */
 static int header_pages_reserved;
+
+/*
+ * The hw uuid helps probing the hardware to check if it has changed.
+ * Most changes can be handled via hotplug on resume. But if the disk is
+ * placed in another machine, it is a whole new world - don't try to
+ * resume in that case. A full boot is wiser.
+ */
+
+/* Hardware uuid detected on the machine */
+extern char const *hw_uuid_detected;
+
+/* Hardware uuid found in the image */
+static char const *hw_uuid_found;
 
 /* Main Storage Pages */
 static int main_pages_allocated, main_pages_requested;
@@ -465,6 +479,8 @@ static int parse_signature(struct toi_file_header *header)
 	int binary_sig = !memcmp(tuxonice_signature, header->sig,
 			sizeof(tuxonice_signature));
 
+	hw_uuid_found = header->hw_uuid;
+
 	if (no_image_header || (binary_sig && !header->have_image))
 		return 0;
 
@@ -493,6 +509,7 @@ static int prepare_signature(struct toi_file_header *current_header,
 	current_header->resumed_before = 0;
 	current_header->first_header_block = first_header_block;
 	current_header->have_image = 1;
+	strncpy(current_header->hw_uuid, hw_uuid_detected, 16);
 	return 0;
 }
 
@@ -730,6 +747,9 @@ static int toi_file_read_header_cleanup(void)
  * UNMARK_RESUME_ATTEMPTED.
  * If the signature is changed, an I/O operation is performed.
  * The signature exists iff toi_file_signature_op(GET_IMAGE_EXISTS)>-1.
+ *
+ * When op is GET_IMAGE_EXISTS, returns 0 if there is a mismatch in the
+ * hardware uuid.
  **/
 static int toi_file_signature_op(int op)
 {
@@ -779,6 +799,19 @@ static int toi_file_signature_op(int op)
 		if (result == 1) {
 			header->resumed_before = 0;
 			changed = 1;
+		}
+		break;
+	case GET_IMAGE_EXISTS:
+		/* Check hardware uuid */
+		if (result == 1) {
+			if (strncmp(hw_uuid_found, hw_uuid_detected, 16)) {
+				printk(KERN_NOTICE "TuxOnIce: hw uuid mismatch, "
+						   "full boot needed.\n");
+				toi_file_signature_op(INVALIDATE);
+				result = 0;
+			} else
+				printk(KERN_INFO "TuxOnIce: hw uuid match, "
+						 "continue resuming.\n");
 		}
 		break;
 	}

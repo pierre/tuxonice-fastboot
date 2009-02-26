@@ -17,6 +17,8 @@
 #include <linux/crypto.h>
 #include <linux/cpu.h>
 #include <linux/ctype.h>
+#include <linux/dmi.h>
+
 #include "tuxonice_io.h"
 #include "tuxonice.h"
 #include "tuxonice_extent.h"
@@ -223,6 +225,46 @@ static int ignore_late_initcall = 1;
 static int ignore_late_initcall;
 #endif
 
+/**
+ * toi_try_resume -- resume path entry point
+ *
+ * All core devices should be up and running by now.
+ * Before trying to resume, we need to check if the hardware has
+ * fundamentally changed (and would require a full boot).
+ *
+ * How can the hardware change?
+ * The use cases are:
+ *  o Memory: Linux, as well as TuxOnIce, support memory hotplugging.
+ *  o PCI devices (Wifi cards, docking stations, ...). Most should be
+ *    hotpluggables.
+ *  o USB devices: hotpluggable.
+ *  o SATA devices (cdroms, ...): XXX
+ *  o Hard Drive put in another board (common for laptops).
+ *
+ * All of the hotpluggable devices can be handled by post resume hooks:
+ * we can force reprobing for complicated ones (Docking Stations,
+ * Memory, ...) when resuming.
+ * The difficult use case is when a disk is put in another board. In
+ * that case, it's a whole new world. A full boot is needed.
+ * We could use for_each_pci_dev() and hash the system (hash /sys
+ * basically) but this would be too complicated and dangerous.
+ *
+ * To detect such a scenario, we use the dmi product uuid. The value
+ * when hibernating is written to the hibernated image.
+ *
+ * See Section 3.3.2 of the DMI spec for DMI_PRODUCT_UUID:
+ *  http://www.dmtf.org/standards/published_documents/DSP0134_2.6.0.pdf
+ *
+ * Corner cases TODO:
+ *  o If the value is FFh, the DMI has not been set and can be
+ *    rewritten. What to do? Use vendor?
+ *  o If the value is 00h, the DMI has not been set. What to do? Use
+ *    vendor?
+ *
+ * Side Effects:
+ *    hw_uuid_detected is set.
+ **/
+char const *hw_uuid_detected;
 void toi_try_resume(void)
 {
 	/* Don't let it wrap around eventually */
@@ -234,8 +276,10 @@ void toi_try_resume(void)
 		return;
 	}
 
-	if (toi_core_fns)
+	if (toi_core_fns) {
+		hw_uuid_detected = dmi_get_system_info(DMI_PRODUCT_UUID);
 		toi_core_fns->try_resume();
+	}
 	else
 		printk(KERN_INFO "TuxOnIce core not loaded yet.\n");
 }

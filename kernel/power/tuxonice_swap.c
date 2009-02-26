@@ -35,6 +35,7 @@ struct sig_data {
 	unsigned long sector;
 	int resume_attempted;
 	int orig_sig_type;
+	char hw_uuid[16];
 };
 
 union diskpage {
@@ -81,6 +82,19 @@ static int toi_swapon_status;
 
 /* Header Page Information */
 static long header_pages_reserved;
+
+/*
+ * The hw uuid helps probing the hardware to check if it has changed.
+ * Most changes can be handled via hotplug on resume. But if the disk is
+ * placed in another machine, it is a whole new world - don't try to
+ * resume in that case. A full boot is wiser.
+ */
+
+/* Hardware uuid detected on the machine */
+extern char const *hw_uuid_detected;
+
+/* Hardware uuid found in the image */
+static char const *hw_uuid_found;
 
 /* Swap Pages */
 static long swap_pages_allocated;
@@ -341,6 +355,8 @@ static int parse_signature(void)
 	sig = (struct sig_data *) current_signature_page;
 	swap_header = swap_header_page.pointer->swh.magic.magic;
 
+	hw_uuid_found = swap_header_page.pointer->sig_data.hw_uuid;
+
 	for (type = 0; type < 5; type++)
 		if (!memcmp(sigs[type], swap_header, strlen(sigs[type])))
 			return type;
@@ -410,6 +426,8 @@ static int write_modified_signature(int modification)
 		swap_header_page.pointer->sig_data.resume_attempted = 0;
 		swap_header_page.pointer->sig_data.orig_sig_type =
 			parse_signature();
+		strncpy(swap_header_page.pointer->sig_data.hw_uuid,
+		        hw_uuid_detected, 16);
 
 		memcpy(swap_header_page.pointer->swh.magic.magic,
 				tuxonice_signature, sizeof(tuxonice_signature));
@@ -968,6 +986,7 @@ static int toi_swap_storage_needed(void)
  * Image_exists
  *
  * Returns -1 if don't know, otherwise 0 (no) or 1 (yes).
+ * Returns 0 if there is a mismatch in the hardware uuid.
  */
 static int toi_swap_image_exists(int quiet)
 {
@@ -1015,7 +1034,17 @@ static int toi_swap_image_exists(int quiet)
 		if (!quiet)
 			printk(KERN_INFO "TuxOnIce: Detected TuxOnIce binary "
 				"signature.\n");
-		return 1;
+
+		if (strncmp(hw_uuid_found, hw_uuid_detected, 16)) {
+			printk(KERN_NOTICE "TuxOnIce: hw uuid mismatch, "
+					   "full boot needed.\n");
+			write_modified_signature(NO_IMAGE_SIGNATURE);
+			return 0;
+		} else {
+			printk(KERN_INFO "TuxOnIce: hw uuid match, "
+					 "continue resuming.\n");
+			return 1;
+		}
 	}
 
 	printk("Unrecognised parse_signature result (%d).\n", signature_found);
