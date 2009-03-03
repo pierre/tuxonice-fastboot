@@ -330,7 +330,8 @@ static int submit(int writing, struct block_device *dev, sector_t first_block,
 		set_bit(BIO_UPTODATE, &bio->bi_flags);
 		toi_end_bio(bio, 0);
 	} else
-		submit_bio(writing | (1 << BIO_RW_SYNC), bio);
+		submit_bio(writing | (1 << BIO_RW_SYNCIO) |
+				(1 << BIO_RW_UNPLUG), bio);
 
 	return 0;
 }
