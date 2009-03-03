@@ -24,6 +24,7 @@ obj-$(CONFIG_TOI_FILE)		+= tuxonice_block_io.o tuxonice_file.o
 
 obj-$(CONFIG_TOI_USERUI)	+= tuxonice_userui.o
 
+obj-$(CONFIG_PM)		+= main.o
 obj-$(CONFIG_PM_SLEEP)		+= console.o
 obj-$(CONFIG_FREEZER)		+= process.o
 obj-$(CONFIG_HIBERNATION)	+= swsusp.o disk.o snapshot.o swap.o user.o
