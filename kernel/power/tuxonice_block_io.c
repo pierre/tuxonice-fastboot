@@ -24,8 +24,8 @@
 #include "tuxonice_alloc.h"
 #include "tuxonice_io.h"
 
-#define ANY_REASON 0
 #define MEMORY_ONLY 1
+#define THROTTLE_WAIT 2
 
 /* #define MEASURE_MUTEX_CONTENTION */
 #ifndef MEASURE_MUTEX_CONTENTION
@@ -154,13 +154,13 @@ static void do_bio_wait(int reason)
 
 /**
  * throttle_if_needed - wait for I/O completion if throttle points are reached
- * @reason: The reason we're checking whether to throttle.
+ * @flags: What to check and how to act.
  *
  * Check whether we need to wait for some I/O to complete. We always check
  * whether we have enough memory available, but may also (depending upon
  * @reason) check if the throughput throttle limit has been reached.
  **/
-static int throttle_if_needed(int reason)
+static int throttle_if_needed(int flags)
 {
 	int free_pages = nr_unallocated_buffer_pages(),
 	    flushed_queue = 0;
@@ -168,11 +168,13 @@ static int throttle_if_needed(int reason)
 	/* Getting low on memory and I/O is in progress? */
 	while (unlikely(free_pages < free_mem_throttle) &&
 			atomic_read(&toi_io_in_progress)) {
+		if (!(flags & THROTTLE_WAIT))
+			return -ENOMEM;
 		do_bio_wait(4);
 		free_pages = nr_unallocated_buffer_pages();
 	}
 
-	while (reason == ANY_REASON && throughput_throttle &&
+	while (!(flags & MEMORY_ONLY) && throughput_throttle &&
 		TOTAL_OUTSTANDING_IO >= throughput_throttle) {
 		if (!flushed_queue) {
 			int result = toi_bio_queue_flush_pages(0);
@@ -280,9 +282,16 @@ static int submit(int writing, struct block_device *dev, sector_t first_block,
 	struct bio *bio = NULL;
 	int cur_outstanding_io, result;
 
-	result = throttle_if_needed(MEMORY_ONLY);
-	if (result)
-		return result;
+	/*
+	 * Shouldn't throttle if reading - can deadlock in the single
+	 * threaded case as pages are only freed when we use the
+	 * readahead.
+	 */
+	if (writing) {
+		result = throttle_if_needed(MEMORY_ONLY | THROTTLE_WAIT);
+		if (result)
+			return result;
+	}
 
 	while (!bio) {
 		bio = bio_alloc(TOI_ATOMIC_GFP, 1);
@@ -321,7 +330,8 @@ static int submit(int writing, struct block_device *dev, sector_t first_block,
 		set_bit(BIO_UPTODATE, &bio->bi_flags);
 		toi_end_bio(bio, 0);
 	} else
-		submit_bio(writing | (1 << BIO_RW_SYNC), bio);
+		submit_bio(writing | (1 << BIO_RW_SYNCIO) |
+				(1 << BIO_RW_UNPLUG), bio);
 
 	return 0;
 }
@@ -747,7 +757,7 @@ static int toi_start_one_readahead(int dedicated_thread)
 	char *buffer = NULL;
 	int oom = 0, result;
 
-	result = throttle_if_needed(ANY_REASON);
+	result = throttle_if_needed(dedicated_thread ? THROTTLE_WAIT : 0);
 	if (result)
 		return result;
 
@@ -757,8 +767,10 @@ static int toi_start_one_readahead(int dedicated_thread)
 		buffer = (char *) toi_get_zeroed_page(12,
 				TOI_ATOMIC_GFP);
 		if (!buffer) {
-			if (oom && !dedicated_thread)
-				return -EIO;
+			if (oom && !dedicated_thread) {
+				mutex_unlock(&toi_bio_readahead_mutex);
+				return -ENOMEM;
+			}
 
 			oom = 1;
 			set_free_mem_throttle();
@@ -797,17 +809,14 @@ static int toi_start_new_readahead(int dedicated_thread)
 		return 0;
 
 	do {
-		int result = toi_start_one_readahead(dedicated_thread);
+		last_result = toi_start_one_readahead(dedicated_thread);
 
-		if (result == -EIO)
-			return 0;
-		else
-			last_result = result;
+		if (last_result) {
+			if (last_result == -ENOMEM || last_result == -EIO)
+				return 0;
 
-		if (last_result == -ENODATA)
 			more_readahead = 0;
 
-		if (!more_readahead && last_result) {
 			/*
 			 * Don't complain about failing to do readahead past
 			 * the end of storage.
@@ -819,12 +828,12 @@ static int toi_start_new_readahead(int dedicated_thread)
 		} else
 			num_submitted++;
 
-	} while (more_readahead &&
+	} while (more_readahead && !last_result &&
 		 (dedicated_thread ||
 		  (num_submitted < target_outstanding_io &&
 		   atomic_read(&toi_io_in_progress) < target_outstanding_io)));
 
-	return 0;
+	return last_result;
 }
 
 /**
@@ -865,7 +874,11 @@ static int toi_bio_get_next_page_read(int no_readahead)
 
 	if (unlikely(!readahead_list_head)) {
 		BUG_ON(!more_readahead);
-		toi_start_one_readahead(0);
+		if (unlikely(toi_start_one_readahead(0))) {
+			printk(KERN_INFO "No readahead and "
+			 "toi_start_one_readahead returned non-zero.\n");
+			return -EIO;
+		}
 	}
 
 	if (PageLocked(readahead_list_head)) {
@@ -929,7 +942,7 @@ top:
  **/
 static int toi_bio_get_new_page(char **full_buffer)
 {
-	int result = throttle_if_needed(ANY_REASON);
+	int result = throttle_if_needed(THROTTLE_WAIT);
 	if (result)
 		return result;
 
@@ -1014,11 +1027,14 @@ static int toi_bio_read_page(unsigned long *pfn, struct page *buffer_page,
 	 * Only call start_new_readahead if we don't have a dedicated thread
 	 * and we're the queue flusher.
 	 */
-	if (current == toi_queue_flusher && toi_start_new_readahead(0)) {
-		printk(KERN_INFO "Queue flusher and toi_start_one_readahead "
-				"returned non-zero.\n");
-		result = -EIO;
-		goto out;
+	if (current == toi_queue_flusher) {
+		int result2 = toi_start_new_readahead(0);
+		if (result2) {
+			printk(KERN_INFO "Queue flusher and "
+			 "toi_start_one_readahead returned non-zero.\n");
+			result = -EIO;
+			goto out;
+		}
 	}
 
 	my_mutex_lock(0, &toi_bio_mutex);

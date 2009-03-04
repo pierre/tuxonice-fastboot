@@ -265,7 +265,7 @@ int toi_atomic_restore(void)
 	toi_prepare_status(DONT_CLEAR_BAR,	"Atomic restore.");
 
 	memcpy(&toi_bkd.toi_nosave_commandline, saved_command_line,
-		COMMAND_LINE_SIZE);
+		strlen(saved_command_line));
 
 	if (add_boot_kernel_data_pbe())
 		goto Failed;
