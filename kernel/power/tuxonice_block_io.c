@@ -330,7 +330,8 @@ static int submit(int writing, struct block_device *dev, sector_t first_block,
 		set_bit(BIO_UPTODATE, &bio->bi_flags);
 		toi_end_bio(bio, 0);
 	} else
-		submit_bio(writing | (1 << BIO_RW_SYNC), bio);
+		submit_bio(writing | (1 << BIO_RW_SYNCIO) |
+				(1 << BIO_RW_UNPLUG), bio);
 
 	return 0;
 }
@@ -766,8 +767,10 @@ static int toi_start_one_readahead(int dedicated_thread)
 		buffer = (char *) toi_get_zeroed_page(12,
 				TOI_ATOMIC_GFP);
 		if (!buffer) {
-			if (oom && !dedicated_thread)
-				return -EIO;
+			if (oom && !dedicated_thread) {
+				mutex_unlock(&toi_bio_readahead_mutex);
+				return -ENOMEM;
+			}
 
 			oom = 1;
 			set_free_mem_throttle();
@@ -806,17 +809,14 @@ static int toi_start_new_readahead(int dedicated_thread)
 		return 0;
 
 	do {
-		int result = toi_start_one_readahead(dedicated_thread);
+		last_result = toi_start_one_readahead(dedicated_thread);
 
-		if (result == -ENOMEM || result == -EIO)
-			return 0;
-		else
-			last_result = result;
+		if (last_result) {
+			if (last_result == -ENOMEM || last_result == -EIO)
+				return 0;
 
-		if (last_result == -ENODATA)
 			more_readahead = 0;
 
-		if (!more_readahead && last_result) {
 			/*
 			 * Don't complain about failing to do readahead past
 			 * the end of storage.
@@ -828,12 +828,12 @@ static int toi_start_new_readahead(int dedicated_thread)
 		} else
 			num_submitted++;
 
-	} while (more_readahead &&
+	} while (more_readahead && !last_result &&
 		 (dedicated_thread ||
 		  (num_submitted < target_outstanding_io &&
 		   atomic_read(&toi_io_in_progress) < target_outstanding_io)));
 
-	return 0;
+	return last_result;
 }
 
 /**
