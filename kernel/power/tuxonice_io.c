@@ -670,7 +670,7 @@ static int do_rw_loop(int write, int finish_at, struct memory_bitmap *pageflags,
 			schedule();
 	}
 
-	if (!io_result) {
+	if (!io_result && !test_result_state(TOI_ABORTED)) {
 		unsigned long next;
 
 		printk("done.\n");
