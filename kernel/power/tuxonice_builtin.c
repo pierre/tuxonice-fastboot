@@ -265,6 +265,7 @@ static int ignore_late_initcall;
  *    hw_uuid_detected is set.
  **/
 char const *hw_uuid_detected;
+EXPORT_SYMBOL_GPL(hw_uuid_detected);
 void toi_try_resume(void)
 {
 	/* Don't let it wrap around eventually */
