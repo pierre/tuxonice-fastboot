@@ -115,6 +115,7 @@ static char *result_strings[] = {
 	"Unable to free enough memory to hibernate",
 	"Unable to obtain the Power Management Semaphore",
 	"A device suspend/resume returned an error",
+	"A system device suspend/resume returned an error",
 	"The extra pages allowance is too small",
 	"We were unable to successfully prepare an image",
 	"TuxOnIce module initialisation failed",
