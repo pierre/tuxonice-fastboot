@@ -14,7 +14,6 @@
 #include <linux/cpu.h>
 #include <linux/freezer.h>
 #include <linux/console.h>
-#include <linux/ftrace.h>
 #include "tuxonice.h"
 #include "tuxonice_storage.h"
 #include "tuxonice_power_off.h"
@@ -28,7 +27,6 @@
 #include "tuxonice_alloc.h"
 
 long extra_pd1_pages_used;
-static int ftrace_save;
 
 /**
  * free_pbe_list - free page backup entries used by the atomic copy code.
@@ -308,7 +306,6 @@ int toi_go_atomic(pm_message_t state, int suspend_time)
 	}
 
 	suspend_console();
-	ftrace_save = __ftrace_enabled_save();
 
 	if (device_suspend(state)) {
 		set_abort_result(TOI_DEVICE_REFUSED);
@@ -399,7 +396,6 @@ void toi_end_atomic(int stage, int suspend_time, int error)
 			((error & 1) ? PMSG_RECOVER : PMSG_THAW) :
 			PMSG_RESTORE);
 	case ATOMIC_STEP_RESUME_CONSOLE:
-		__ftrace_enabled_restore(ftrace_save);
 		resume_console();
 	case ATOMIC_STEP_PLATFORM_END:
 		platform_end(1);
