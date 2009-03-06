@@ -364,6 +364,12 @@ int toi_go_atomic(pm_message_t state, int suspend_time)
 		return 1;
 	}
 
+	if (sysdev_suspend(state)) {
+		set_abort_result(TOI_SYSDEV_REFUSED);
+		toi_end_atomic(ATOMIC_STEP_POWER_UP, suspend_time, 0);
+		return 1;
+	}
+
 	return 0;
 }
 
@@ -379,6 +385,8 @@ void toi_end_atomic(int stage, int suspend_time, int error)
 	case ATOMIC_ALL_STEPS:
 		if (!suspend_time)
 			platform_leave(1);
+		sysdev_resume();
+	case ATOMIC_STEP_POWER_UP:
 		device_power_up(suspend_time ?
 			(error ? PMSG_RECOVER : PMSG_THAW) : PMSG_RESTORE);
 	case ATOMIC_STEP_IRQS:
