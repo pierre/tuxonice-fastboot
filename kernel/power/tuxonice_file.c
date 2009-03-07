@@ -380,6 +380,7 @@ static void toi_file_get_target_info(char *target, int get_size,
 		}
 
 		target_file = NULL;
+		wait_for_device_probe();
 		resume_file_dev_t = name_to_dev_t(target);
 		if (!resume_file_dev_t) {
 			struct kstat stat;
