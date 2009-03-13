@@ -37,7 +37,6 @@ char alt_resume_param[256];
 /* Variables shared between threads and updated under the mutex */
 static int io_write, io_finish_at, io_base, io_barmax, io_pageset, io_result;
 static int io_index, io_nextupdate, io_pc, io_pc_step;
-static unsigned long pfn;
 static DEFINE_MUTEX(io_mutex);
 static DEFINE_PER_CPU(struct page *, last_sought);
 static DEFINE_PER_CPU(struct page *, last_high_page);
@@ -409,10 +408,10 @@ static int worker_rw_loop(void *data)
 		if (io_write) {
 			struct page *page;
 
-			pfn = memory_bm_next_pfn(io_map);
+			data_pfn = memory_bm_next_pfn(io_map);
 
 			/* Another thread could have beaten us to it. */
-			if (pfn == BM_END_OF_MAP) {
+			if (data_pfn == BM_END_OF_MAP) {
 				if (atomic_read(&io_count)) {
 					printk("Ran out of pfns but io_count "
 						"is still %d.\n",
@@ -425,13 +424,12 @@ static int worker_rw_loop(void *data)
 			my_io_index = io_finish_at -
 				atomic_sub_return(1, &io_count);
 
-			data_pfn = pfn;
-			write_pfn = pfn;
-
-			memory_bm_clear_bit(io_map, pfn);
+			memory_bm_clear_bit(io_map, data_pfn);
+			page = pfn_to_page(data_pfn);
 			if (io_pageset == 1)
 				write_pfn = memory_bm_next_pfn(pageset1_map);
-			page = pfn_to_page(pfn);
+			else
+				write_pfn = data_pfn;
 
 			mutex_unlock(&io_mutex);
 
@@ -590,6 +588,7 @@ static int do_rw_loop(int write, int finish_at, struct memory_bitmap *pageflags,
 		int base, int barmax, int pageset)
 {
 	int index = 0, cpu, num_other_threads = 0;
+	unsigned long pfn;
 
 	if (!finish_at)
 		return 0;
@@ -629,8 +628,6 @@ static int do_rw_loop(int write, int finish_at, struct memory_bitmap *pageflags,
 	BUG_ON(index < finish_at);
 
 	atomic_set(&io_count, finish_at);
-
-	pfn = BM_END_OF_MAP;
 
 	memory_bm_position_reset(pageset1_map);
 
