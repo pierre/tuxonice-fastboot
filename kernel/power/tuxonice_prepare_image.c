@@ -38,6 +38,7 @@
 #include "tuxonice_checksum.h"
 #include "tuxonice_sysfs.h"
 #include "tuxonice_alloc.h"
+#include "tuxonice_atomic_copy.h"
 
 static long num_nosave, header_space_allocated, main_storage_allocated,
 	   storage_available;
@@ -367,23 +368,14 @@ static void get_extra_pd1_allowance(void)
 
 	toi_prepare_status(CLEAR_BAR, "Finding allowance for drivers.");
 
-	suspend_console();
-	device_suspend(PMSG_FREEZE);
-	device_pm_lock();
-	local_irq_disable(); /* irqs might have been re-enabled on us */
-	device_power_down(PMSG_FREEZE);
+	if (!toi_go_atomic(PMSG_FREEZE, 1)) {
+		final = real_nr_free_pages(all_zones_mask);
+		toi_end_atomic(ATOMIC_ALL_STEPS, 1, 0);
 
-	final = real_nr_free_pages(all_zones_mask);
-
-	device_power_up(PMSG_THAW);
-	local_irq_enable();
-	device_pm_unlock();
-	device_resume(PMSG_THAW);
-	resume_console();
-
-	extra_pd1_pages_allowance = max(
-		orig_num_free - final + MIN_EXTRA_PAGES_ALLOWANCE,
-		(long) MIN_EXTRA_PAGES_ALLOWANCE);
+		extra_pd1_pages_allowance = max(
+			orig_num_free - final + MIN_EXTRA_PAGES_ALLOWANCE,
+			(long) MIN_EXTRA_PAGES_ALLOWANCE);
+	}
 }
 
 /*
