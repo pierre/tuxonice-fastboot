@@ -938,7 +938,11 @@ static void eat_memory(void)
 
 		thaw_kernel_threads();
 
-		shrink_all_memory(amount_wanted);
+		/*
+		 * Ask for too many because shrink_all_memory doesn't
+		 * currently return enough most of the time.
+		 */
+		shrink_all_memory(amount_wanted + 50);
 
 		did_eat_memory = 1;
 
