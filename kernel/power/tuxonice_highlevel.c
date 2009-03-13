@@ -748,6 +748,19 @@ abort_reloading_pagedir_two:
 	return 1;
 }
 
+static void map_ps2_pages(int enable)
+{
+	unsigned long pfn = 0;
+
+	pfn = memory_bm_next_pfn(pageset2_map);
+
+	while (pfn != BM_END_OF_MAP) {
+		struct page *page = pfn_to_page(pfn);
+		kernel_map_pages(page, 1, enable);
+		pfn = memory_bm_next_pfn(pageset2_map);
+	}
+}
+
 /**
  * do_save_image - save the image and handle the result
  *
@@ -756,7 +769,11 @@ abort_reloading_pagedir_two:
  **/
 static int do_save_image(void)
 {
-	int result = __save_image();
+	int result;
+	map_ps2_pages(0);
+	result = __save_image();
+	map_ps2_pages(1);
+
 	if (!toi_in_hibernate || result)
 		do_cleanup(1);
 	return result;
