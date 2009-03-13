@@ -634,7 +634,6 @@ static int do_post_image_write(void)
 
 	barrier();
 	mb();
-	do_cleanup(1);
 	return 0;
 }
 
@@ -773,9 +772,6 @@ static int do_save_image(void)
 	map_ps2_pages(0);
 	result = __save_image();
 	map_ps2_pages(1);
-
-	if (!toi_in_hibernate || result)
-		do_cleanup(1);
 	return result;
 }
 
@@ -799,14 +795,12 @@ static int do_prepare_image(void)
 	if (!can_hibernate() ||
 	    (test_result_state(TOI_KEPT_IMAGE) &&
 	     check_still_keeping_image()))
-		goto cleanup;
+		return 1;
 
 	if (toi_init() && !toi_prepare_image() &&
 			!test_result_state(TOI_ABORTED))
 		return 0;
 
-cleanup:
-	do_cleanup(0);
 	return 1;
 }
 
@@ -1070,13 +1064,9 @@ int _toi_try_hibernate(void)
 
 prepare:
 	result = do_toi_step(STEP_HIBERNATE_PREPARE_IMAGE);
-	if (result)
-		goto out;
 
-	if (test_action_state(TOI_FREEZER_TEST)) {
-		do_cleanup(0);
+	if (result || test_action_state(TOI_FREEZER_TEST))
 		goto out;
-	}
 
 	result = do_toi_step(STEP_HIBERNATE_SAVE_IMAGE);
 
@@ -1100,6 +1090,7 @@ prepare:
 	if (!result && toi_in_hibernate)
 		result = do_toi_step(STEP_HIBERNATE_POWERDOWN);
 out:
+	do_cleanup(1);
 	current->flags &= ~PF_MEMALLOC;
 
 	if (sys_power_disk)
