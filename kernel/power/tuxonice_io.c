@@ -439,12 +439,11 @@ static int worker_rw_loop(void *data)
 			page = pfn_to_page(data_pfn);
 			if (io_pageset == 1)
 				write_pfn = memory_bm_next_pfn(pageset1_map);
-			else
+			else {
 				write_pfn = data_pfn;
-
-			if (io_pageset == 2)
 				*my_checksum_locn =
 					tuxonice_get_next_checksum();
+			}
 
 			mutex_unlock(&io_mutex);
 
