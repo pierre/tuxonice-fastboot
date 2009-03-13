@@ -38,7 +38,7 @@ char alt_resume_param[256];
 /* Variables shared between threads and updated under the mutex */
 static int io_write, io_finish_at, io_base, io_barmax, io_pageset, io_result;
 static int io_index, io_nextupdate, io_pc, io_pc_step;
-static unsigned long pfn, other_pfn;
+static unsigned long pfn;
 static DEFINE_MUTEX(io_mutex);
 static DEFINE_PER_CPU(struct page *, last_sought);
 static DEFINE_PER_CPU(struct page *, last_high_page);
@@ -431,15 +431,9 @@ static int worker_rw_loop(void *data)
 			orig_pfn = pfn;
 			write_pfn = pfn;
 
-			/*
-			 * Other_pfn is updated by all threads, so we're not
-			 * writing the same page multiple times.
-			 */
 			memory_bm_clear_bit(io_map, pfn);
-			if (io_pageset == 1) {
-				other_pfn = memory_bm_next_pfn(pageset1_map);
-				write_pfn = other_pfn;
-			}
+			if (io_pageset == 1)
+				write_pfn = memory_bm_next_pfn(pageset1_map);
 			page = pfn_to_page(pfn);
 
 			if (io_pageset == 2)
@@ -648,7 +642,6 @@ static int do_rw_loop(int write, int finish_at, struct memory_bitmap *pageflags,
 	atomic_set(&io_count, finish_at);
 
 	pfn = BM_END_OF_MAP;
-	other_pfn = pfn;
 
 	memory_bm_position_reset(pageset1_map);
 
