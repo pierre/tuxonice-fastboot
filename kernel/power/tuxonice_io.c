@@ -386,7 +386,7 @@ static struct page *copy_page_from_orig_page(struct page *orig_page)
  **/
 static int worker_rw_loop(void *data)
 {
-	unsigned long orig_pfn, write_pfn, next_jiffies = jiffies + HZ / 2,
+	unsigned long data_pfn, write_pfn, next_jiffies = jiffies + HZ / 2,
 		      jif_index = 1;
 	int result, my_io_index = 0, temp, last_worker;
 	struct toi_module_ops *first_filter = toi_get_next_filter(NULL);
@@ -433,7 +433,7 @@ static int worker_rw_loop(void *data)
 			my_io_index = io_finish_at -
 				atomic_sub_return(1, &io_count);
 
-			orig_pfn = pfn;
+			data_pfn = pfn;
 			write_pfn = pfn;
 
 			memory_bm_clear_bit(io_map, pfn);
