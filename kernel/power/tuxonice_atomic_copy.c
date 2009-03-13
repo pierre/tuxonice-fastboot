@@ -212,6 +212,11 @@ int __toi_post_context_save(void)
 			"extra_pages_allowance is currently only %lu.\n",
 			pagedir1.size - old_ps1_size,
 			extra_pd1_pages_allowance);
+
+		/*
+		 * Highlevel code will see this, clear the state and
+		 * retry if we haven't already done so twice.
+		 */
 		set_abort_result(TOI_EXTRA_PAGES_ALLOW_TOO_SMALL);
 		return 1;
 	}
