@@ -1041,7 +1041,7 @@ out:
  **/
 int _toi_try_hibernate(void)
 {
-	int result = 0, sys_power_disk = 0;
+	int result = 0, sys_power_disk = 0, retries = 0;
 
 	if (!mutex_is_locked(&tuxonice_in_use)) {
 		/* Came in via /sys/power/disk */
@@ -1057,6 +1057,7 @@ int _toi_try_hibernate(void)
 		goto out;
 	}
 
+prepare:
 	result = do_toi_step(STEP_HIBERNATE_PREPARE_IMAGE);
 	if (result)
 		goto out;
@@ -1067,6 +1068,22 @@ int _toi_try_hibernate(void)
 	}
 
 	result = do_toi_step(STEP_HIBERNATE_SAVE_IMAGE);
+
+	if (test_result_state(TOI_EXTRA_PAGES_ALLOW_TOO_SMALL)) {
+		if (retries < 2) {
+			do_cleanup(0);
+			retries++;
+			toi_result = 0;
+			extra_pd1_pages_allowance = extra_pd1_pages_used + 500;
+			printk(KERN_INFO "Automatically adjusting the extra"
+				" pages allowance to %ld and restarting.\n",
+				extra_pd1_pages_allowance);
+			goto prepare;
+		}
+
+		printk(KERN_INFO "Adjusted extra pages allowance twice and "
+			"still couldn't hibernate successfully. Giving up.");
+	}
 
 	/* This code runs at resume time too! */
 	if (!result && toi_in_hibernate)
