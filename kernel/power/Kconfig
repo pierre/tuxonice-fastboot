@@ -258,7 +258,7 @@ menuconfig TOI_CORE
 
 	config TOI_USERUI_DEFAULT_PATH
 		string "Default userui program location"
-		default "/usr/local/sbin/tuxonice_fbsplash"
+		default "/usr/local/sbin/tuxoniceui_fbsplash"
 		depends on TOI_USERUI
 		---help---
 		  This entry allows you to specify a default path to the userui binary.
