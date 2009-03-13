@@ -671,7 +671,7 @@ static int __save_image(void)
 
 	toi_deactivate_storage(1);
 
-	toi_prepare_status(DONT_CLEAR_BAR, "Doing atomic copy.");
+	toi_prepare_status(DONT_CLEAR_BAR, "Doing atomic copy/restore.");
 
 	toi_in_hibernate = 1;
 
