@@ -400,6 +400,7 @@ static int worker_rw_loop(void *data)
 
 	do {
 		unsigned int buf_size;
+		int was_present = 1;
 
 		if (data && jiffies > next_jiffies) {
 			next_jiffies += HZ / 2;
@@ -437,6 +438,11 @@ static int worker_rw_loop(void *data)
 
 			memory_bm_clear_bit(io_map, data_pfn);
 			page = pfn_to_page(data_pfn);
+
+			was_present = kernel_page_present(page);
+			if (!was_present)
+				kernel_map_pages(page, 1, 1);
+
 			if (io_pageset == 1)
 				write_pfn = memory_bm_next_pfn(pageset1_map);
 			else {
@@ -453,6 +459,9 @@ static int worker_rw_loop(void *data)
 
 			result = first_filter->write_page(write_pfn, page,
 					PAGE_SIZE);
+
+			if (!was_present)
+				kernel_map_pages(page, 1, 0);
 		} else { /* Reading */
 			my_io_index = io_finish_at -
 				atomic_sub_return(1, &io_count);
@@ -517,7 +526,12 @@ static int worker_rw_loop(void *data)
 			if (memory_bm_test_bit(io_map, write_pfn)) {
 				virt = kmap(copy_page);
 				buffer_virt = kmap(buffer);
+				was_present = kernel_page_present(copy_page);
+				if (!was_present)
+					kernel_map_pages(copy_page, 1, 1);
 				memcpy(virt, buffer_virt, PAGE_SIZE);
+				if (!was_present)
+					kernel_map_pages(copy_page, 1, 0);
 				kunmap(copy_page);
 				kunmap(buffer);
 				memory_bm_clear_bit(io_map, write_pfn);

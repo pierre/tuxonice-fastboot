@@ -151,7 +151,7 @@ void toi_copy_pageset1(void)
 		unsigned long *origvirt, *copyvirt;
 		struct page *origpage, *copypage;
 		int loop = (PAGE_SIZE / sizeof(unsigned long)) - 1,
-		    was_present;
+		    was_present1, was_present2;
 
 		origpage = pfn_to_page(source_index);
 		copypage = pfn_to_page(dest_index);
@@ -164,17 +164,24 @@ void toi_copy_pageset1(void)
 			kmap_atomic(copypage, KM_USER1) :
 			page_address(copypage);
 
-		was_present = kernel_page_present(origpage);
-		if (!was_present)
+		was_present1 = kernel_page_present(origpage);
+		if (!was_present1)
 			kernel_map_pages(origpage, 1, 1);
+
+		was_present2 = kernel_page_present(copypage);
+		if (!was_present2)
+			kernel_map_pages(copypage, 1, 1);
 
 		while (loop >= 0) {
 			*(copyvirt + loop) = *(origvirt + loop);
 			loop--;
 		}
 
-		if (!was_present)
+		if (!was_present1)
 			kernel_map_pages(origpage, 1, 0);
+
+		if (!was_present2)
+			kernel_map_pages(copypage, 1, 0);
 
 		if (PageHighMem(origpage))
 			kunmap_atomic(origvirt, KM_USER0);
