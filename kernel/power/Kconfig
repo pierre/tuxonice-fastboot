@@ -390,13 +390,13 @@ menuconfig TOI_CORE
 
 	config  TOI_DEFAULT_EXTRA_PAGES_ALLOWANCE
 		int "Default extra pages allowance"
-		default "500"
+		default "2000"
 		range 500 32768
 		depends on TOI_CORE
 		help
 		  This value controls the default for the allowance TuxOnIce makes for
 		  drivers to allocate extra memory during the atomic copy. The default
-		  value of 500 will be okay if you're not using DRI. If you are using
+		  value of 2000 will be okay in most cases. If you are using
 		  DRI, the easiest way to find what value to use is to try to hibernate
 		  and look at how many pages were actually needed in the sysfs entry
 		  /sys/power/tuxonice/debug_info (first number on the last line), adding
