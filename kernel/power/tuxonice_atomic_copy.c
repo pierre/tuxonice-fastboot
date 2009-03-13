@@ -280,6 +280,8 @@ int toi_atomic_restore(void)
 	if (add_boot_kernel_data_pbe())
 		goto Failed;
 
+	toi_prepare_status(DONT_CLEAR_BAR, "Doing atomic copy/restore.");
+
 	if (toi_go_atomic(PMSG_QUIESCE, 0))
 		goto Failed;
 
@@ -314,8 +316,6 @@ Failed:
  **/
 int toi_go_atomic(pm_message_t state, int suspend_time)
 {
-	toi_prepare_status(DONT_CLEAR_BAR, "Doing atomic copy/restore.");
-
 	if (suspend_time && platform_begin(1)) {
 		set_abort_result(TOI_PLATFORM_PREP_FAILED);
 		toi_end_atomic(ATOMIC_STEP_PLATFORM_END, suspend_time, 0);
