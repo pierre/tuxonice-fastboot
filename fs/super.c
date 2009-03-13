@@ -373,8 +373,10 @@ retry:
 				continue;
 			if (!grab_super(old))
 				goto retry;
-			if (s)
+			if (s) {
+				up_write(&s->s_umount);
 				destroy_super(s);
+			}
 			return old;
 		}
 	}
@@ -389,6 +391,7 @@ retry:
 	err = set(s, data);
 	if (err) {
 		spin_unlock(&sb_lock);
+		up_write(&s->s_umount);
 		destroy_super(s);
 		return ERR_PTR(err);
 	}
