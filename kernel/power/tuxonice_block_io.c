@@ -157,8 +157,7 @@ static void do_bio_wait(int reason)
  **/
 static int throttle_if_needed(int flags)
 {
-	int free_pages = nr_unallocated_buffer_pages(),
-	    flushed_queue = 0;
+	int free_pages = nr_unallocated_buffer_pages();
 
 	/* Getting low on memory and I/O is in progress? */
 	while (unlikely(free_pages < free_mem_throttle) &&
@@ -171,12 +170,9 @@ static int throttle_if_needed(int flags)
 
 	while (!(flags & MEMORY_ONLY) && throughput_throttle &&
 		TOTAL_OUTSTANDING_IO >= throughput_throttle) {
-		if (!flushed_queue) {
-			int result = toi_bio_queue_flush_pages(0);
-			if (result)
-				return result;
-			flushed_queue = 1;
-		}
+		int result = toi_bio_queue_flush_pages(0);
+		if (result)
+			return result;
 		atomic_inc(&reasons[6]);
 		wait_event(num_in_progress_wait,
 			!atomic_read(&toi_io_in_progress) ||
@@ -898,12 +894,24 @@ static int toi_bio_get_next_page_read(int no_readahead)
  *
  * If we're a dedicated thread, stay in here until told to leave,
  * sleeping in wait_event.
+ *
+ * The first thread is normally the only one to come in here. Another
+ * thread can enter this routine too, though, via throttle_if_needed.
+ * Since that's the case, we must be careful to only have one thread
+ * doing this work at a time. Otherwise we have a race and could save
+ * pages out of order.
  **/
 
 int toi_bio_queue_flush_pages(int dedicated_thread)
 {
 	unsigned long flags;
 	int result = 0;
+	static int busy = 0;
+
+	if (busy)
+		return 0;
+
+	busy = 1;
 
 top:
 	spin_lock_irqsave(&bio_queue_lock, flags);
@@ -916,7 +924,7 @@ top:
 		spin_unlock_irqrestore(&bio_queue_lock, flags);
 		result = toi_bio_rw_page(WRITE, page, 0, 11);
 		if (result)
-			return result;
+			goto out;
 		spin_lock_irqsave(&bio_queue_lock, flags);
 	}
 	spin_unlock_irqrestore(&bio_queue_lock, flags);
@@ -928,7 +936,10 @@ top:
 			goto top;
 		toi_bio_queue_flusher_should_finish = 0;
 	}
-	return 0;
+
+out:
+	busy = 0;
+	return result;
 }
 
 /**
