@@ -304,20 +304,15 @@ static void toi_swap_noresume_reset(void)
 
 static int get_current_signature(void)
 {
-	int result;
-
-	if (current_signature_page)
-		return 0;
-
-	current_signature_page = (char *) toi_get_zeroed_page(38,
+	if (!current_signature_page) {
+		current_signature_page = (char *) toi_get_zeroed_page(38,
 			TOI_ATOMIC_GFP);
-	if (!current_signature_page)
-		return -ENOMEM;
+		if (!current_signature_page)
+			return -ENOMEM;
+	}
 
-	result = toi_bio_ops.bdev_page_io(READ, resume_block_device,
+	return toi_bio_ops.bdev_page_io(READ, resume_block_device,
 		resume_firstblock, virt_to_page(current_signature_page));
-
-	return result;
 }
 
 static int parse_signature(void)
@@ -330,12 +325,9 @@ static int parse_signature(void)
 		"SWAP-SPACE", "SWAPSPACE2", "S1SUSP", "S2SUSP", "S1SUSPEND"
 	};
 
-	if (!current_signature_page) {
-		int result = get_current_signature();
-
-		if (result)
-			return result;
-	}
+	int result = get_current_signature();
+	if (result)
+		return result;
 
 	swap_header_page = (union p_diskpage) current_signature_page;
 	sig = (struct sig_data *) current_signature_page;
