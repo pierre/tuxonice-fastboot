@@ -183,6 +183,7 @@ int wait_for_device_probe(void)
 	async_synchronize_full();
 	return 0;
 }
+EXPORT_SYMBOL_GPL(wait_for_device_probe);
 
 /**
  * driver_probe_device - attempt to bind device & driver together
