@@ -643,7 +643,6 @@ static int do_post_image_write(void)
 
 	barrier();
 	mb();
-	do_cleanup(1);
 	return 0;
 }
 
@@ -681,7 +680,7 @@ static int __save_image(void)
 
 	toi_deactivate_storage(1);
 
-	toi_prepare_status(DONT_CLEAR_BAR, "Doing atomic copy.");
+	toi_prepare_status(DONT_CLEAR_BAR, "Doing atomic copy/restore.");
 
 	toi_in_hibernate = 1;
 
@@ -757,6 +756,19 @@ abort_reloading_pagedir_two:
 	return 1;
 }
 
+static void map_ps2_pages(int enable)
+{
+	unsigned long pfn = 0;
+
+	pfn = memory_bm_next_pfn(pageset2_map);
+
+	while (pfn != BM_END_OF_MAP) {
+		struct page *page = pfn_to_page(pfn);
+		kernel_map_pages(page, 1, enable);
+		pfn = memory_bm_next_pfn(pageset2_map);
+	}
+}
+
 /**
  * do_save_image - save the image and handle the result
  *
@@ -765,9 +777,10 @@ abort_reloading_pagedir_two:
  **/
 static int do_save_image(void)
 {
-	int result = __save_image();
-	if (!toi_in_hibernate || result)
-		do_cleanup(1);
+	int result;
+	map_ps2_pages(0);
+	result = __save_image();
+	map_ps2_pages(1);
 	return result;
 }
 
@@ -791,14 +804,12 @@ static int do_prepare_image(void)
 	if (!can_hibernate() ||
 	    (test_result_state(TOI_KEPT_IMAGE) &&
 	     check_still_keeping_image()))
-		goto cleanup;
+		return 1;
 
 	if (toi_init() && !toi_prepare_image() &&
 			!test_result_state(TOI_ABORTED))
 		return 0;
 
-cleanup:
-	do_cleanup(0);
 	return 1;
 }
 
@@ -1051,7 +1062,7 @@ out:
  **/
 int _toi_try_hibernate(void)
 {
-	int result = 0, sys_power_disk = 0;
+	int result = 0, sys_power_disk = 0, retries = 0;
 
 	if (!mutex_is_locked(&tuxonice_in_use)) {
 		/* Came in via /sys/power/disk */
@@ -1067,21 +1078,35 @@ int _toi_try_hibernate(void)
 		goto out;
 	}
 
+prepare:
 	result = do_toi_step(STEP_HIBERNATE_PREPARE_IMAGE);
-	if (result)
-		goto out;
 
-	if (test_action_state(TOI_FREEZER_TEST)) {
-		do_cleanup(0);
+	if (result || test_action_state(TOI_FREEZER_TEST))
 		goto out;
-	}
 
 	result = do_toi_step(STEP_HIBERNATE_SAVE_IMAGE);
+
+	if (test_result_state(TOI_EXTRA_PAGES_ALLOW_TOO_SMALL)) {
+		if (retries < 2) {
+			do_cleanup(0);
+			retries++;
+			toi_result = 0;
+			extra_pd1_pages_allowance = extra_pd1_pages_used + 500;
+			printk(KERN_INFO "Automatically adjusting the extra"
+				" pages allowance to %ld and restarting.\n",
+				extra_pd1_pages_allowance);
+			goto prepare;
+		}
+
+		printk(KERN_INFO "Adjusted extra pages allowance twice and "
+			"still couldn't hibernate successfully. Giving up.");
+	}
 
 	/* This code runs at resume time too! */
 	if (!result && toi_in_hibernate)
 		result = do_toi_step(STEP_HIBERNATE_POWERDOWN);
 out:
+	do_cleanup(1);
 	current->flags &= ~PF_MEMALLOC;
 
 	if (sys_power_disk)

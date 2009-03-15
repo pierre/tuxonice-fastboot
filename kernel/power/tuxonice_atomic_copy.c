@@ -151,7 +151,7 @@ void toi_copy_pageset1(void)
 		unsigned long *origvirt, *copyvirt;
 		struct page *origpage, *copypage;
 		int loop = (PAGE_SIZE / sizeof(unsigned long)) - 1,
-		    was_present;
+		    was_present1, was_present2;
 
 		origpage = pfn_to_page(source_index);
 		copypage = pfn_to_page(dest_index);
@@ -164,17 +164,24 @@ void toi_copy_pageset1(void)
 			kmap_atomic(copypage, KM_USER1) :
 			page_address(copypage);
 
-		was_present = kernel_page_present(origpage);
-		if (!was_present)
+		was_present1 = kernel_page_present(origpage);
+		if (!was_present1)
 			kernel_map_pages(origpage, 1, 1);
+
+		was_present2 = kernel_page_present(copypage);
+		if (!was_present2)
+			kernel_map_pages(copypage, 1, 1);
 
 		while (loop >= 0) {
 			*(copyvirt + loop) = *(origvirt + loop);
 			loop--;
 		}
 
-		if (!was_present)
+		if (!was_present1)
 			kernel_map_pages(origpage, 1, 0);
+
+		if (!was_present2)
+			kernel_map_pages(copypage, 1, 0);
 
 		if (PageHighMem(origpage))
 			kunmap_atomic(origvirt, KM_USER0);
@@ -212,6 +219,11 @@ int __toi_post_context_save(void)
 			"extra_pages_allowance is currently only %lu.\n",
 			pagedir1.size - old_ps1_size,
 			extra_pd1_pages_allowance);
+
+		/*
+		 * Highlevel code will see this, clear the state and
+		 * retry if we haven't already done so twice.
+		 */
 		set_abort_result(TOI_EXTRA_PAGES_ALLOW_TOO_SMALL);
 		return 1;
 	}
@@ -268,6 +280,8 @@ int toi_atomic_restore(void)
 	if (add_boot_kernel_data_pbe())
 		goto Failed;
 
+	toi_prepare_status(DONT_CLEAR_BAR, "Doing atomic copy/restore.");
+
 	if (toi_go_atomic(PMSG_QUIESCE, 0))
 		goto Failed;
 
@@ -302,8 +316,6 @@ Failed:
  **/
 int toi_go_atomic(pm_message_t state, int suspend_time)
 {
-	toi_prepare_status(DONT_CLEAR_BAR, "Doing atomic copy/restore.");
-
 	if (suspend_time && platform_begin(1)) {
 		set_abort_result(TOI_PLATFORM_PREP_FAILED);
 		toi_end_atomic(ATOMIC_STEP_PLATFORM_END, suspend_time, 0);

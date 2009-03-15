@@ -39,7 +39,6 @@ char alt_resume_param[256];
 /* Variables shared between threads and updated under the mutex */
 static int io_write, io_finish_at, io_base, io_barmax, io_pageset, io_result;
 static int io_index, io_nextupdate, io_pc, io_pc_step;
-static unsigned long pfn, other_pfn;
 static DEFINE_MUTEX(io_mutex);
 static DEFINE_PER_CPU(struct page *, last_sought);
 static DEFINE_PER_CPU(struct page *, last_high_page);
@@ -388,7 +387,7 @@ static struct page *copy_page_from_orig_page(struct page *orig_page)
  **/
 static int worker_rw_loop(void *data)
 {
-	unsigned long orig_pfn, write_pfn, next_jiffies = jiffies + HZ / 2,
+	unsigned long data_pfn, write_pfn, next_jiffies = jiffies + HZ / 2,
 		      jif_index = 1;
 	int result, my_io_index = 0, temp, last_worker;
 	struct toi_module_ops *first_filter = toi_get_next_filter(NULL);
@@ -401,6 +400,7 @@ static int worker_rw_loop(void *data)
 
 	do {
 		unsigned int buf_size;
+		int was_present = 1;
 
 		if (data && jiffies > next_jiffies) {
 			next_jiffies += HZ / 2;
@@ -420,10 +420,10 @@ static int worker_rw_loop(void *data)
 			struct page *page;
 			char **my_checksum_locn = &__get_cpu_var(checksum_locn);
 
-			pfn = memory_bm_next_pfn(io_map);
+			data_pfn = memory_bm_next_pfn(io_map);
 
 			/* Another thread could have beaten us to it. */
-			if (pfn == BM_END_OF_MAP) {
+			if (data_pfn == BM_END_OF_MAP) {
 				if (atomic_read(&io_count)) {
 					printk("Ran out of pfns but io_count "
 						"is still %d.\n",
@@ -436,23 +436,20 @@ static int worker_rw_loop(void *data)
 			my_io_index = io_finish_at -
 				atomic_sub_return(1, &io_count);
 
-			orig_pfn = pfn;
-			write_pfn = pfn;
+			memory_bm_clear_bit(io_map, data_pfn);
+			page = pfn_to_page(data_pfn);
 
-			/*
-			 * Other_pfn is updated by all threads, so we're not
-			 * writing the same page multiple times.
-			 */
-			memory_bm_clear_bit(io_map, pfn);
-			if (io_pageset == 1) {
-				other_pfn = memory_bm_next_pfn(pageset1_map);
-				write_pfn = other_pfn;
-			}
-			page = pfn_to_page(pfn);
+			was_present = kernel_page_present(page);
+			if (!was_present)
+				kernel_map_pages(page, 1, 1);
 
-			if (io_pageset == 2)
+			if (io_pageset == 1)
+				write_pfn = memory_bm_next_pfn(pageset1_map);
+			else {
+				write_pfn = data_pfn;
 				*my_checksum_locn =
 					tuxonice_get_next_checksum();
+			}
 
 			mutex_unlock(&io_mutex);
 
@@ -462,6 +459,9 @@ static int worker_rw_loop(void *data)
 
 			result = first_filter->write_page(write_pfn, page,
 					PAGE_SIZE);
+
+			if (!was_present)
+				kernel_map_pages(page, 1, 0);
 		} else { /* Reading */
 			my_io_index = io_finish_at -
 				atomic_sub_return(1, &io_count);
@@ -526,7 +526,12 @@ static int worker_rw_loop(void *data)
 			if (memory_bm_test_bit(io_map, write_pfn)) {
 				virt = kmap(copy_page);
 				buffer_virt = kmap(buffer);
+				was_present = kernel_page_present(copy_page);
+				if (!was_present)
+					kernel_map_pages(copy_page, 1, 1);
 				memcpy(virt, buffer_virt, PAGE_SIZE);
+				if (!was_present)
+					kernel_map_pages(copy_page, 1, 0);
 				kunmap(copy_page);
 				kunmap(buffer);
 				memory_bm_clear_bit(io_map, write_pfn);
@@ -615,6 +620,7 @@ static int do_rw_loop(int write, int finish_at, struct memory_bitmap *pageflags,
 		int base, int barmax, int pageset)
 {
 	int index = 0, cpu, num_other_threads = 0;
+	unsigned long pfn;
 
 	if (!finish_at)
 		return 0;
@@ -654,9 +660,6 @@ static int do_rw_loop(int write, int finish_at, struct memory_bitmap *pageflags,
 	BUG_ON(index < finish_at);
 
 	atomic_set(&io_count, finish_at);
-
-	pfn = BM_END_OF_MAP;
-	other_pfn = pfn;
 
 	memory_bm_position_reset(pageset1_map);
 

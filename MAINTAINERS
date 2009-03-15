@@ -1469,8 +1469,6 @@ L:	linux-acpi@vger.kernel.org
 S:	Supported
 
 DOCUMENTATION (/Documentation directory)
-P:	Michael Kerrisk
-M:	mtk.manpages@gmail.com
 P:	Randy Dunlap
 M:	rdunlap@xenotime.net
 L:	linux-doc@vger.kernel.org
@@ -2879,7 +2877,7 @@ P:	Michael Kerrisk
 M:	mtk.manpages@gmail.com
 W:	http://www.kernel.org/doc/man-pages
 L:	linux-man@vger.kernel.org
-S:	Supported
+S:	Maintained
 
 MARVELL LIBERTAS WIRELESS DRIVER
 P:	Dan Williams
@@ -4341,7 +4339,7 @@ S:	Maintained
 TUXONICE (ENHANCED HIBERNATION)
 P:	Nigel Cunningham
 M:	nigel@tuxonice.net
-L:	suspend2-devel@tuxonice.net
+L:	tuxonice-devel@tuxonice.net
 W:	http://tuxonice.net
 S:	Maintained
 
