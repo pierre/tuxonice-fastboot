@@ -18,6 +18,7 @@ struct toi_bdev_info {
 	dev_t dev_t;
 	int bmap_shift;
 	int blocks_per_page;
+	int ignored;
 };
 
 /*
