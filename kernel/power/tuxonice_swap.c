@@ -565,7 +565,7 @@ void si_swapinfo_no_compcache(struct sysinfo *val)
 		struct swap_info_struct *si = get_swap_info_struct(i);
 		if ((si->flags & SWP_USED) &&
 		    (si->flags & SWP_WRITEOK) &&
-		    (!strncmp(si->bdev->bd_disk->disk_name, "ram", 3))) {
+		    (strncmp(si->bdev->bd_disk->disk_name, "ram", 3))) {
 			val->totalswap += si->inuse_pages;
 			val->freeswap += si->pages - si->inuse_pages;
 		}
@@ -677,7 +677,7 @@ static int toi_swap_allocate_storage(int request)
 		devinfo[i].blocks_per_page = 1;
 	}
 
-	for (i = 0; i < pages_to_get; i++) {
+	while (gotten < pages_to_get) {
 		swp_entry_t entry;
 		unsigned long new_value;
 		unsigned swapfilenum;
