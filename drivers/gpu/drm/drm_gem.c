@@ -136,7 +136,7 @@ drm_gem_object_alloc(struct drm_device *dev, size_t size)
 	obj = kcalloc(1, sizeof(*obj), GFP_KERNEL);
 
 	obj->dev = dev;
-	obj->filp = shmem_file_setup("drm mm object", size, VM_NORESERVE);
+	obj->filp = shmem_file_setup("drm mm object", size, VM_NORESERVE | VM_ATOMIC_COPY);
 	if (IS_ERR(obj->filp)) {
 		kfree(obj);
 		return NULL;
