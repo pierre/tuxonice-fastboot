@@ -207,7 +207,7 @@ int toi_register_module(struct toi_module_ops *module)
 	case MISC_HIDDEN_MODULE:
 		break;
 	default:
-		printk("Hmmm. Module '%s' has an invalid type."
+		printk(KERN_ERR "Hmmm. Module '%s' has an invalid type."
 			" It has been ignored.\n", module->name);
 		return -EINVAL;
 	}
@@ -227,8 +227,8 @@ int toi_register_module(struct toi_module_ops *module)
 		struct toi_module_ops *shared =
 			toi_find_module_given_dir(module->shared_directory);
 		if (!shared) {
-			printk("TuxOnIce: Module %s wants to share %s's "
-					"directory but %s isn't loaded.\n",
+			printk(KERN_ERR "TuxOnIce: Module %s wants to share "
+					"%s's directory but %s isn't loaded.\n",
 					module->name, module->shared_directory,
 					module->shared_directory);
 			toi_unregister_module(module);
@@ -288,7 +288,7 @@ void toi_unregister_module(struct toi_module_ops *module)
 	case MISC_HIDDEN_MODULE:
 		break;
 	default:
-		printk("Hmmm. Module '%s' has an invalid type."
+		printk(KERN_ERR "Module '%s' has an invalid type."
 			" It has been ignored.\n", module->name);
 		return;
 	}
@@ -317,7 +317,7 @@ void toi_move_module_tail(struct toi_module_ops *module)
 	case MISC_HIDDEN_MODULE:
 		break;
 	default:
-		printk("Hmmm. Module '%s' has an invalid type."
+		printk(KERN_ERR "Module '%s' has an invalid type."
 			" It has been ignored.\n", module->name);
 		return;
 	}
@@ -409,7 +409,7 @@ void toi_print_modules(void)
 	struct toi_module_ops *this_module;
 	int prev = 0;
 
-	printk("TuxOnIce " TOI_CORE_VERSION ", with support for");
+	printk(KERN_INFO "TuxOnIce " TOI_CORE_VERSION ", with support for");
 
 	list_for_each_entry(this_module, &toi_modules, module_list) {
 		if (this_module->type == MISC_HIDDEN_MODULE)

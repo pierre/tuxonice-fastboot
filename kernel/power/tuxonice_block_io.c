@@ -1137,7 +1137,7 @@ static int _toi_rw_header_chunk(int writing, struct toi_module_ops *owner,
 	if (owner) {
 		owner->header_used += buffer_size;
 		toi_message(TOI_HEADER, TOI_LOW, 1,
-			"Header: %s : %d bytes (%d/%d).\n",
+			"Header: %s : %d bytes (%d/%d).",
 			buffer_size, owner->header_used,
 			owner->header_requested);
 		if (owner->header_used > owner->header_requested) {
