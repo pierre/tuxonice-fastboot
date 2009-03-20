@@ -682,8 +682,8 @@ static int toi_file_read_header_init(void)
 			virt_to_page((unsigned long) toi_writer_buffer));
 
 	if (result) {
-		printk("FileAllocator read header init: Failed to initialise "
-				"reading the first page of data.\n");
+		printk(KERN_ERR "FileAllocator read header init: Failed to "
+				"initialise reading the first page of data.\n");
 		toi_bio_ops.rw_cleanup(READ);
 		return result;
 	}
@@ -899,8 +899,8 @@ static void toi_file_set_resume_param(void)
 			toi_free_page(18, (unsigned long) buffer);
 		if (buffer2)
 			toi_free_page(19, (unsigned long) buffer2);
-		printk("TuxOnIce: Failed to allocate memory while setting "
-				"resume= parameter.\n");
+		printk(KERN_ERR "TuxOnIce: Failed to allocate memory while "
+				"setting resume= parameter.\n");
 		return;
 	}
 
