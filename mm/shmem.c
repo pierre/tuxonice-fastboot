@@ -1538,6 +1538,8 @@ static struct inode *shmem_get_inode(struct super_block *sb, int mode,
 		memset(info, 0, (char *)inode - (char *)info);
 		spin_lock_init(&info->lock);
 		info->flags = flags & VM_NORESERVE;
+		if (flags & VM_ATOMIC_COPY)
+			inode->i_flags |= S_ATOMIC_COPY;
 		INIT_LIST_HEAD(&info->swaplist);
 
 		switch (mode & S_IFMT) {
