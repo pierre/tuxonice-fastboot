@@ -178,7 +178,7 @@ static char *str_message(int message)
 	case 256:
 		return "Running";
 	default:
-		printk("Unrecognised message %d.\n", message);
+		printk(KERN_ERR "Unrecognised message %d.\n", message);
 		return "Unrecognised message (see dmesg)";
 	}
 }
@@ -478,8 +478,8 @@ static int toi_recv(struct sk_buff *skb, struct net_device *dev,
 			new_message = MSG_IMAGE |
 				((index & 1) ? MSG_NACK : MSG_ACK);
 			if (new_message != old_message)
-				printk("Setting whether I can resume to %d.\n",
-						new_message);
+				printk(KERN_ERR "Setting whether I can resume "
+						"to %d.\n", new_message);
 			break;
 		case MSG_IO:
 			new_message = MSG_IO | MSG_ACK;
@@ -802,7 +802,7 @@ static void cluster_startup(void)
 		p = kthread_create(kTOICluster, (void *) initial_message,
 				"ktoiclusterd/%d", i);
 		if (IS_ERR(p)) {
-			printk("Failed to start ktoiclusterd.\n");
+			printk(KERN_ERR "Failed to start ktoiclusterd.\n");
 			return;
 		}
 
