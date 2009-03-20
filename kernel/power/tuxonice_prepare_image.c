@@ -125,8 +125,14 @@ static void pageset2_full(void)
 			if (!zone_page_state(zone, NR_LRU_BASE + i))
 				continue;
 
-			list_for_each_entry(page, &zone->lru[i].list, lru)
-				SetPagePageset2(page);
+			list_for_each_entry(page, &zone->lru[i].list, lru) {
+				struct address_space *mapping;
+			       
+				mapping = page_mapping(page);
+				if (!mapping ||
+				    !(mapping->host->i_flags & S_ATOMIC_COPY))
+					SetPagePageset2(page);
+			}
 		}
 		spin_unlock_irqrestore(&zone->lru_lock, flags);
 	}
@@ -154,14 +160,20 @@ static void toi_mark_task_as_pageset(struct task_struct *t, int pageset2)
 	for (vma = mm->mmap; vma; vma = vma->vm_next) {
 		unsigned long posn;
 
-		if (vma->vm_flags & (VM_PFNMAP | VM_IO | VM_RESERVED) ||
-		    !vma->vm_start)
+		if (!vma->vm_start || vma->vm_flags & VM_SPECIAL)
 			continue;
 
 		for (posn = vma->vm_start; posn < vma->vm_end;
 				posn += PAGE_SIZE) {
 			struct page *page = follow_page(vma, posn, 0);
-			if (!page)
+			struct address_space *mapping;
+
+			if (!page || !pfn_valid(page_to_pfn(page)))
+				continue;
+
+			mapping = page_mapping(page);
+			if (mapping &&
+			    mapping->host->i_flags & S_ATOMIC_COPY)
 				continue;
 
 			if (pageset2)
@@ -177,6 +189,24 @@ static void toi_mark_task_as_pageset(struct task_struct *t, int pageset2)
 		up_read(&mm->mmap_sem);
 }
 
+static void mark_tasks(int pageset)
+{
+	struct task_struct *p;
+
+	read_lock(&tasklist_lock);
+	for_each_process(p) {
+		if (!p->mm)
+			continue;
+
+		if (p->flags & PF_KTHREAD)
+			continue;
+
+		toi_mark_task_as_pageset(p, pageset);
+	}
+	read_unlock(&tasklist_lock);
+
+}
+
 /* mark_pages_for_pageset2
  *
  * Description:	Mark unshared pages in processes not needed for hibernate as
@@ -187,7 +217,6 @@ static void toi_mark_task_as_pageset(struct task_struct *t, int pageset2)
 
 static void toi_mark_pages_for_pageset2(void)
 {
-	struct task_struct *p;
 	struct attention_list *this = attention_list;
 
 	memory_bm_clear(pageset2_map);
@@ -195,18 +224,10 @@ static void toi_mark_pages_for_pageset2(void)
 	if (test_action_state(TOI_NO_PAGESET2) || no_ps2_needed)
 		return;
 
-	if (test_action_state(TOI_PAGESET2_FULL))
+	if (test_action_state(TOI_PAGESET2_FULL)) {
 		pageset2_full();
-	else {
-		read_lock(&tasklist_lock);
-		for_each_process(p) {
-			if (!p->mm || (p->flags & PF_KTHREAD))
-				continue;
-
-			toi_mark_task_as_pageset(p, PAGESET2);
-		}
-		read_unlock(&tasklist_lock);
-	}
+	} else
+		mark_tasks(PAGESET2);
 
 	/*
 	 * Because the tasks in attention_list are ones related to hibernating,
