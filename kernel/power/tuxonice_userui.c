@@ -488,7 +488,7 @@ static int userui_user_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
 		toi_bkd.toi_default_console_level = (*data);
 		return 0;
 	case USERUI_MSG_PRINTK:
-		printk("%s", (char *) data);
+		printk(KERN_INFO "%s", (char *) data);
 		return 0;
 	}
 
@@ -542,7 +542,7 @@ static void userui_prepare_console(void)
 	ui_helper_data.pid = -1;
 
 	if (!userui_ops.enabled) {
-		printk("TuxOnIce: Userui disabled.\n");
+		printk(KERN_INFO "TuxOnIce: Userui disabled.\n");
 		return;
 	}
 
