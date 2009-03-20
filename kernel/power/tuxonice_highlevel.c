@@ -517,12 +517,13 @@ static void do_cleanup(int get_debug_info, int restarting)
 static int check_still_keeping_image(void)
 {
 	if (test_action_state(TOI_KEEP_IMAGE)) {
-		printk("Image already stored: powering down immediately.");
+		printk(KERN_INFO "Image already stored: powering down "
+				"immediately.");
 		do_toi_step(STEP_HIBERNATE_POWERDOWN);
 		return 1;	/* Just in case we're using S3 */
 	}
 
-	printk("Invalidating previous image.\n");
+	printk(KERN_INFO "Invalidating previous image.\n");
 	toiActiveAllocator->remove_image();
 
 	return 0;
@@ -1170,8 +1171,8 @@ int toi_launch_userspace_program(char *command, int channel_no,
 	 * about that here.
 	 */
 	if (retval && retval != 256)
-		printk("Failed to launch userspace program '%s': Error %d\n",
-				command, retval);
+		printk(KERN_ERR "Failed to launch userspace program '%s': "
+				"Error %d\n", command, retval);
 
 	{
 		int i;
