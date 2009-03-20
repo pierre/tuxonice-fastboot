@@ -86,7 +86,7 @@ int toi_attempt_to_parse_resume_device(int quiet)
 
 	if (!resume_file[0]) {
 		if (!quiet)
-			printk("TuxOnIce: Resume= parameter is empty."
+			printk(KERN_INFO "TuxOnIce: Resume= parameter is empty."
 				" Hibernating will be disabled.\n");
 		goto cleanup;
 	}
@@ -123,8 +123,8 @@ int toi_attempt_to_parse_resume_device(int quiet)
 		}
 	}
 	if (!quiet)
-		printk("TuxOnIce: No matching enabled allocator found. "
-				"Resuming disabled.\n");
+		printk(KERN_INFO "TuxOnIce: No matching enabled allocator "
+				"found. Resuming disabled.\n");
 cleanup:
 	toi_deactivate_storage(0);
 	return returning;
@@ -163,7 +163,7 @@ void attempt_to_parse_alt_resume_param(void)
 	if (!strlen(alt_resume_param))
 		return;
 
-	printk("=== Trying Poweroff Resume2 ===\n");
+	printk(KERN_INFO "=== Trying Poweroff Resume2 ===\n");
 	save_restore_alt_param(SAVE, NOQUIET);
 	if (test_toi_state(TOI_CAN_RESUME))
 		ok = 1;
@@ -425,8 +425,8 @@ static int worker_rw_loop(void *data)
 			/* Another thread could have beaten us to it. */
 			if (data_pfn == BM_END_OF_MAP) {
 				if (atomic_read(&io_count)) {
-					printk("Ran out of pfns but io_count "
-						"is still %d.\n",
+					printk(KERN_INFO "Ran out of pfns but "
+						"io_count is still %d.\n",
 						atomic_read(&io_count));
 					BUG();
 				}
@@ -599,7 +599,7 @@ static int start_other_threads(void)
 		p = kthread_create(worker_rw_loop, num_started ? NULL : MONITOR,
 				"ktoi_io/%d", cpu);
 		if (IS_ERR(p)) {
-			printk("ktoi_io for %i failed\n", cpu);
+			printk(KERN_ERR "ktoi_io for %i failed\n", cpu);
 			continue;
 		}
 		kthread_bind(p, cpu);
@@ -931,7 +931,7 @@ static int read_one_module_config(struct toi_module_header *header)
 	result = toiActiveAllocator->rw_header_chunk(READ, NULL, (char *) &len,
 			sizeof(int));
 	if (result) {
-		printk("Failed to read the length of the module %s's"
+		printk(KERN_ERR "Failed to read the length of the module %s's"
 				" configuration data.\n",
 				header->name);
 		return -EINVAL;
@@ -944,8 +944,8 @@ static int read_one_module_config(struct toi_module_header *header)
 	buffer = (char *) toi_get_zeroed_page(23, TOI_ATOMIC_GFP);
 
 	if (!buffer) {
-		printk("Failed to allocate a buffer for reloading module "
-				"configuration info.\n");
+		printk(KERN_ERR "Failed to allocate a buffer for reloading "
+				"module configuration info.\n");
 		return -ENOMEM;
 	}
 
@@ -955,9 +955,9 @@ static int read_one_module_config(struct toi_module_header *header)
 		goto out;
 
 	if (!this_module->save_config_info)
-		printk("Huh? Module %s appears to have a save_config_info, but"
-				" not a load_config_info function!\n",
-				this_module->name);
+		printk(KERN_ERR "Huh? Module %s appears to have a "
+				"save_config_info, but not a load_config_info "
+				"function!\n", this_module->name);
 	else
 		this_module->load_config_info(buffer, len);
 
@@ -1212,7 +1212,8 @@ static int __read_pageset1(void)
 	result = toiActiveAllocator->rw_header_chunk(READ, NULL,
 			header_buffer, sizeof(struct toi_header));
 	if (result < 0) {
-		printk("TuxOnIce: Failed to read the image signature.\n");
+		printk(KERN_ERR "TuxOnIce: Failed to read the image "
+				"signature.\n");
 		goto out_remove_image;
 	}
 

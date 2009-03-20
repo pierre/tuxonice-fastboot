@@ -171,7 +171,7 @@ int toi_load_extent_chain(struct hibernate_extent_chain *chain)
 	ret = toiActiveAllocator->rw_header_chunk_noreadahead(READ, NULL,
 			(char *) chain, 2 * sizeof(int));
 	if (ret) {
-		printk("Failed to read the size of extent chain.\n");
+		printk(KERN_ERR "Failed to read the size of extent chain.\n");
 		return 1;
 	}
 
