@@ -127,7 +127,7 @@ static void pageset2_full(void)
 				struct address_space *mapping;
 			       
 				mapping = page_mapping(page);
-				if (!mapping ||
+				if (!mapping || !mapping->host ||
 				    !(mapping->host->i_flags & S_ATOMIC_COPY))
 					SetPagePageset2(page);
 			}
@@ -170,7 +170,7 @@ static void toi_mark_task_as_pageset(struct task_struct *t, int pageset2)
 				continue;
 
 			mapping = page_mapping(page);
-			if (mapping &&
+			if (mapping && mapping->host &&
 			    mapping->host->i_flags & S_ATOMIC_COPY)
 				continue;
 
