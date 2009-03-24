@@ -1021,6 +1021,7 @@ static int toi_swap_image_exists(int quiet)
 			printk(KERN_INFO "Failed to open resume dev_t (%x).\n",
 				resume_swap_dev_t);
 		return -1;
+	    }
 	}
 
 	signature_found = parse_signature();
