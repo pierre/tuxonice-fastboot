@@ -1400,7 +1400,7 @@ char *check_image_kernel(struct swsusp_info *info)
 		return "machine";
 	return NULL;
 }
-EXPORT_SYMBOL_GPL(check_swsusp_image_kernel);
+EXPORT_SYMBOL_GPL(check_image_kernel);
 #endif /* CONFIG_ARCH_HIBERNATION_HEADER */
 
 unsigned long snapshot_get_image_size(void)
@@ -1418,7 +1418,7 @@ int init_header(struct swsusp_info *info)
 	info->size <<= PAGE_SHIFT;
 	return init_header_complete(info);
 }
-EXPORT_SYMBOL_GPL(init_swsusp_header);
+EXPORT_SYMBOL_GPL(init_header);
 
 /**
  *	pack_pfns - pfns corresponding to the set bits found in the bitmap @bm
