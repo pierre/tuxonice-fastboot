@@ -585,17 +585,21 @@ static int toi_swap_storage_available(void)
 
 static int toi_swap_initialise(int starting_cycle)
 {
+	int result = 0;
+
 	if (!starting_cycle)
 		return 0;
 
 	enable_swapfile();
 
-	if (resume_swap_dev_t && !resume_block_device &&
-	    IS_ERR(resume_block_device =
-			open_bdev(MAX_SWAPFILES, resume_swap_dev_t, 1)))
-		return 1;
+	if (resume_swap_dev_t && !resume_block_device) {
+		resume_block_device = open_bdev(MAX_SWAPFILES,
+				resume_swap_dev_t, 1);
+		if (IS_ERR(resume_block_device))
+			result = 1;
+	}
 
-	return 0;
+	return result;
 }
 
 static void toi_swap_cleanup(int ending_cycle)
@@ -1009,9 +1013,10 @@ static int toi_swap_image_exists(int quiet)
 		return -1;
 	}
 
-	if (!resume_block_device &&
-	    IS_ERR(resume_block_device =
-			open_bdev(MAX_SWAPFILES, resume_swap_dev_t, 1))) {
+	if (!resume_block_device) {
+	    resume_block_device = open_bdev(MAX_SWAPFILES, resume_swap_dev_t,
+			    1);
+	    if (IS_ERR(resume_block_device)) {
 		if (!quiet)
 			printk(KERN_INFO "Failed to open resume dev_t (%x).\n",
 				resume_swap_dev_t);
