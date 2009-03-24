@@ -28,12 +28,12 @@ struct swsusp_info {
 extern int arch_hibernation_header_save(void *addr, unsigned int max_size);
 extern int arch_hibernation_header_restore(void *addr);
 
-static inline int init_swsusp_header_complete(struct swsusp_info *info)
+static inline int init_header_complete(struct swsusp_info *info)
 {
 	return arch_hibernation_header_save(info, MAX_ARCH_HEADER_SIZE);
 }
 
-static inline char *check_swsusp_image_kernel(struct swsusp_info *info)
+static inline char *check_image_kernel(struct swsusp_info *info)
 {
 	return arch_hibernation_header_restore(info) ?
 			"architecture specific data" : NULL;
@@ -41,7 +41,7 @@ static inline char *check_swsusp_image_kernel(struct swsusp_info *info)
 #else
 extern char *check_swsusp_image_kernel(struct swsusp_info *info);
 #endif /* CONFIG_ARCH_HIBERNATION_HEADER */
-extern int init_swsusp_header(struct swsusp_info *info);
+extern int init_header(struct swsusp_info *info);
 
 extern char resume_file[256];
 /*
