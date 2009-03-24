@@ -911,7 +911,7 @@ int toi_bio_queue_flush_pages(int dedicated_thread)
 {
 	unsigned long flags;
 	int result = 0;
-	static int busy = 0;
+	static int busy;
 
 	if (busy)
 		return 0;
