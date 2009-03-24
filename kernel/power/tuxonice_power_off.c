@@ -63,7 +63,8 @@ static void __toi_power_down(int method)
 		 * faster.
 		 */
 		if (read_pageset2(1))
-			panic("Attempt to reload pagedir 2 failed. Try rebooting.");
+			panic("Attempt to reload pagedir 2 failed. "
+					"Try rebooting.");
 
 		error = pm_notifier_call_chain(PM_SUSPEND_PREPARE);
 		if (!error) {
