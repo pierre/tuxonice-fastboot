@@ -125,7 +125,7 @@ static void pageset2_full(void)
 
 			list_for_each_entry(page, &zone->lru[i].list, lru) {
 				struct address_space *mapping;
-			       
+
 				mapping = page_mapping(page);
 				if (!mapping || !mapping->host ||
 				    !(mapping->host->i_flags & S_ATOMIC_COPY))
@@ -222,9 +222,9 @@ static void toi_mark_pages_for_pageset2(void)
 	if (test_action_state(TOI_NO_PAGESET2) || no_ps2_needed)
 		return;
 
-	if (test_action_state(TOI_PAGESET2_FULL)) {
+	if (test_action_state(TOI_PAGESET2_FULL))
 		pageset2_full();
-	} else
+	else
 		mark_tasks(PAGESET2);
 
 	/*
