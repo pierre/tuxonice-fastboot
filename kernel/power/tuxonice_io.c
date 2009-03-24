@@ -207,7 +207,7 @@ static int fill_toi_header(struct toi_header *sh)
 {
 	int i, error;
 
-	error = init_swsusp_header((struct swsusp_info *) sh);
+	error = init_header((struct swsusp_info *) sh);
 	if (error)
 		return error;
 
@@ -1109,7 +1109,7 @@ write_image_header_abort_no_cleanup:
  **/
 static char *sanity_check(struct toi_header *sh)
 {
-	char *reason = check_swsusp_image_kernel((struct swsusp_info *) sh);
+	char *reason = check_image_kernel((struct swsusp_info *) sh);
 
 	if (reason)
 		return reason;
