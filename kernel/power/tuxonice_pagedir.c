@@ -18,6 +18,7 @@
 #include <linux/bootmem.h>
 #include <linux/hardirq.h>
 #include <linux/sched.h>
+#include <linux/cpu.h>
 #include <asm/tlbflush.h>
 
 #include "tuxonice_pageflags.h"
@@ -153,14 +154,23 @@ int toi_get_pageset1_load_addresses(void)
 	int low_direct = 0, high_direct = 0;
 	int high_to_free, low_to_free, result = 0;
 
+	/* 
+	 * We are about to allocate all available memory, and processes
+	 * might not have finished freezing yet. To avoid potential OOMs,
+	 * disable non boot cpus and do this with IRQs disabled
+	 */
+
+	disable_nonboot_cpus();
+	local_irq_disable();
+
 	/*
 	 * We need to duplicate pageset1's map because memory_bm_next_pfn's
 	 * state gets stomped on by the PagePageset1() test in setup_pbes.
 	 */
-	memory_bm_create(&dup_map1, GFP_KERNEL, 0);
+	memory_bm_create(&dup_map1, GFP_ATOMIC, 0);
 	memory_bm_dup(pageset1_map, &dup_map1);
 
-	memory_bm_create(&dup_map2, GFP_KERNEL, 0);
+	memory_bm_create(&dup_map2, GFP_ATOMIC, 0);
 	memory_bm_dup(pageset1_map, &dup_map2);
 
 	memory_bm_position_reset(pageset1_map);
@@ -346,6 +356,10 @@ int toi_get_pageset1_load_addresses(void)
 out:
 	memory_bm_free(&dup_map1, 0);
 	memory_bm_free(&dup_map2, 0);
+
+	local_irq_enable();
+	enable_nonboot_cpus();
+	
 	return result;
 }
 
