@@ -298,8 +298,6 @@ Failed:
 #ifdef CONFIG_HIGHMEM
 	free_pbe_list(&restore_highmem_pblist, 1);
 #endif
-	if (test_action_state(TOI_PM_PREPARE_CONSOLE))
-		pm_restore_console();
 	toi_running = 0;
 	return 1;
 }
