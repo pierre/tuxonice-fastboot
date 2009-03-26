@@ -508,6 +508,9 @@ static int get_main_pool_phys_params(void)
 			get_swap_info_struct(swapfilenum);
 		sector_t new_sector = map_swap_page(sis, offset);
 
+		if (devinfo[swapfilenum].ignored)
+			continue;
+
 		if ((new_sector == extent_max + 1) &&
 		    (last_chain == swapfilenum)) {
 			extent_max++;
@@ -547,29 +550,56 @@ static int toi_swap_storage_allocated(void)
 }
 
 /*
+ * Like si_swapinfo, except that we don't include ram backed swap (compcache!)
+ * and don't need to use the spinlocks (userspace is stopped when this
+ * function is called).
+ */
+void si_swapinfo_no_compcache(struct sysinfo *val)
+{
+	unsigned int i;
+
+	si_swapinfo(&swapinfo);
+	val->freeswap = 0;
+	val->totalswap = 0;
+
+	for (i = 0; i < MAX_SWAPFILES; i++) {
+		struct swap_info_struct *si = get_swap_info_struct(i);
+		if ((si->flags & SWP_USED) &&
+		    (si->flags & SWP_WRITEOK) &&
+		    (strncmp(si->bdev->bd_disk->disk_name, "ram", 3))) {
+			val->totalswap += si->inuse_pages;
+			val->freeswap += si->pages - si->inuse_pages;
+		}
+	}
+}
+/*
  * We can't just remember the value from allocation time, because other
  * processes might have allocated swap in the mean time.
  */
 static int toi_swap_storage_available(void)
 {
-	si_swapinfo(&swapinfo);
+	si_swapinfo_no_compcache(&swapinfo);
 	return (int) raw_to_real((long) swapinfo.freeswap +
 			swap_pages_allocated - header_pages_reserved);
 }
 
 static int toi_swap_initialise(int starting_cycle)
 {
+	int result = 0;
+
 	if (!starting_cycle)
 		return 0;
 
 	enable_swapfile();
 
-	if (resume_swap_dev_t && !resume_block_device &&
-	    IS_ERR(resume_block_device =
-			open_bdev(MAX_SWAPFILES, resume_swap_dev_t, 1)))
-		return 1;
+	if (resume_swap_dev_t && !resume_block_device) {
+		resume_block_device = open_bdev(MAX_SWAPFILES,
+				resume_swap_dev_t, 1);
+		if (IS_ERR(resume_block_device))
+			result = 1;
+	}
 
-	return 0;
+	return result;
 }
 
 static void toi_swap_cleanup(int ending_cycle)
@@ -641,13 +671,18 @@ static int toi_swap_allocate_storage(int request)
 		to_add[i] = 0;
 		if (!si->bdev)
 			continue;
+		if (!strncmp(si->bdev->bd_disk->disk_name, "ram", 3)) {
+			devinfo[i].ignored = 1;
+			continue;
+		}
+		devinfo[i].ignored = 0;
 		devinfo[i].bdev = si->bdev;
 		devinfo[i].dev_t = si->bdev->bd_dev;
 		devinfo[i].bmap_shift = 3;
 		devinfo[i].blocks_per_page = 1;
 	}
 
-	for (i = 0; i < pages_to_get; i++) {
+	while (gotten < pages_to_get) {
 		swp_entry_t entry;
 		unsigned long new_value;
 		unsigned swapfilenum;
@@ -663,13 +698,15 @@ static int toi_swap_allocate_storage(int request)
 			to_add[swapfilenum] = 1;
 			extent_min[swapfilenum] = new_value;
 			extent_max[swapfilenum] = new_value;
-			gotten++;
+			if (!devinfo[swapfilenum].ignored)
+				gotten++;
 			continue;
 		}
 
 		if (new_value == extent_max[swapfilenum] + 1) {
 			extent_max[swapfilenum]++;
-			gotten++;
+			if (!devinfo[swapfilenum].ignored)
+				gotten++;
 			continue;
 		}
 
@@ -682,7 +719,8 @@ static int toi_swap_allocate_storage(int request)
 			free_swap_range(extent_min[swapfilenum],
 					extent_max[swapfilenum]);
 			swap_free(entry);
-			gotten -= (extent_max[swapfilenum] -
+			if (!devinfo[swapfilenum].ignored)
+				gotten -= (extent_max[swapfilenum] -
 					extent_min[swapfilenum] + 1);
 			/* Don't try to add again below */
 			to_add[swapfilenum] = 0;
@@ -690,7 +728,8 @@ static int toi_swap_allocate_storage(int request)
 		} else {
 			extent_min[swapfilenum] = new_value;
 			extent_max[swapfilenum] = new_value;
-			gotten++;
+			if (!devinfo[swapfilenum].ignored)
+				gotten++;
 		}
 	}
 
@@ -700,7 +739,8 @@ static int toi_swap_allocate_storage(int request)
 			continue;
 
 		free_swap_range(extent_min[i], extent_max[i]);
-		gotten -= (extent_max[i] - extent_min[i] + 1);
+		if (!devinfo[i].ignored)
+			gotten -= (extent_max[i] - extent_min[i] + 1);
 		break;
 	}
 
@@ -853,7 +893,7 @@ static int toi_swap_read_header_init(void)
 
 		devinfo[i].bdev = NULL;
 
-		if (!thisdevice)
+		if (!thisdevice || devinfo[i].ignored)
 			continue;
 
 		if (thisdevice == resume_swap_dev_t) {
@@ -923,7 +963,7 @@ static int toi_swap_print_debug_stats(char *buffer, int size)
 			"  Attempting to automatically swapon: %s.\n",
 			swapfilename);
 
-	si_swapinfo(&sysinfo);
+	si_swapinfo_no_compcache(&sysinfo);
 
 	len += scnprintf(buffer+len, size-len,
 			"  Swap available for image: %d pages.\n",
@@ -973,13 +1013,15 @@ static int toi_swap_image_exists(int quiet)
 		return -1;
 	}
 
-	if (!resume_block_device &&
-	    IS_ERR(resume_block_device =
-			open_bdev(MAX_SWAPFILES, resume_swap_dev_t, 1))) {
+	if (!resume_block_device) {
+	    resume_block_device = open_bdev(MAX_SWAPFILES, resume_swap_dev_t,
+			    1);
+	    if (IS_ERR(resume_block_device)) {
 		if (!quiet)
 			printk(KERN_INFO "Failed to open resume dev_t (%x).\n",
 				resume_swap_dev_t);
 		return -1;
+	    }
 	}
 
 	signature_found = parse_signature();

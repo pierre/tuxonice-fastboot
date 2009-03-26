@@ -231,7 +231,7 @@ int allocate_checksum_pages(void)
 		unsigned long *new_page =
 		  (unsigned long *) toi_get_zeroed_page(15, TOI_ATOMIC_GFP);
 		if (!new_page) {
-			printk("Unable to allocate checksum pages.\n");
+			printk(KERN_ERR "Unable to allocate checksum pages.\n");
 			return -ENOMEM;
 		}
 		SetPageNosave(virt_to_page(new_page));

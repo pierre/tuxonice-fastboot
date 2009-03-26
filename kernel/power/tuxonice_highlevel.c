@@ -432,7 +432,7 @@ static int get_toi_debug_info(const char *buffer, int count)
  * Cleanup after attempting to hibernate or resume, possibly getting
  * debugging info as we do so.
  **/
-static void do_cleanup(int get_debug_info)
+static void do_cleanup(int get_debug_info, int restarting)
 {
 	int i = 0;
 	char *buffer = NULL;
@@ -494,11 +494,14 @@ static void do_cleanup(int get_debug_info)
 
 	if (!test_action_state(TOI_LATE_CPU_HOTPLUG))
 		enable_nonboot_cpus();
-	toi_cleanup_console();
+
+	if (!restarting)
+		toi_cleanup_console();
 
 	free_attention_list();
 
-	toi_deactivate_storage(0);
+	if (!restarting)
+		toi_deactivate_storage(0);
 
 	clear_toi_state(TOI_IGNORE_LOGLEVEL);
 	clear_toi_state(TOI_TRYING_TO_RESUME);
@@ -520,12 +523,13 @@ static void do_cleanup(int get_debug_info)
 static int check_still_keeping_image(void)
 {
 	if (test_action_state(TOI_KEEP_IMAGE)) {
-		printk("Image already stored: powering down immediately.");
+		printk(KERN_INFO "Image already stored: powering down "
+				"immediately.");
 		do_toi_step(STEP_HIBERNATE_POWERDOWN);
 		return 1;	/* Just in case we're using S3 */
 	}
 
-	printk("Invalidating previous image.\n");
+	printk(KERN_INFO "Invalidating previous image.\n");
 	toiActiveAllocator->remove_image();
 
 	return 0;
@@ -537,7 +541,7 @@ static int check_still_keeping_image(void)
  * Initialise variables & data structures, in preparation for
  * hibernating to disk.
  **/
-static int toi_init(void)
+static int toi_init(int restarting)
 {
 	int result, i, j;
 
@@ -557,7 +561,8 @@ static int toi_init(void)
 
 	mark_nosave_pages();
 
-	toi_prepare_console();
+	if (!restarting)
+		toi_prepare_console();
 
 	result = pm_notifier_call_chain(PM_HIBERNATION_PREPARE);
 	if (result) {
@@ -792,7 +797,9 @@ static int do_save_image(void)
  **/
 static int do_prepare_image(void)
 {
-	if (toi_activate_storage(0))
+	int restarting = test_result_state(TOI_EXTRA_PAGES_ALLOW_TOO_SMALL);
+
+	if (!restarting && toi_activate_storage(0))
 		return 1;
 
 	/*
@@ -806,7 +813,7 @@ static int do_prepare_image(void)
 	     check_still_keeping_image()))
 		return 1;
 
-	if (toi_init() && !toi_prepare_image() &&
+	if (toi_init(restarting) && !toi_prepare_image() &&
 			!test_result_state(TOI_ABORTED))
 		return 0;
 
@@ -973,10 +980,10 @@ out:
 		save_restore_alt_param(RESTORE, NOQUIET);
 		break;
 	case STEP_CLEANUP:
-		do_cleanup(1);
+		do_cleanup(1, 0);
 		break;
 	case STEP_QUIET_CLEANUP:
-		do_cleanup(0);
+		do_cleanup(0, 0);
 		break;
 	}
 
@@ -1003,7 +1010,7 @@ void __toi_try_resume(void)
 			!do_toi_step(STEP_RESUME_LOAD_PS1))
 		do_toi_step(STEP_RESUME_DO_RESTORE);
 
-	do_cleanup(0);
+	do_cleanup(0, 0);
 
 	current->flags &= ~PF_MEMALLOC;
 
@@ -1088,9 +1095,9 @@ prepare:
 
 	if (test_result_state(TOI_EXTRA_PAGES_ALLOW_TOO_SMALL)) {
 		if (retries < 2) {
-			do_cleanup(0);
+			do_cleanup(0, 1);
 			retries++;
-			toi_result = 0;
+			clear_result_state(TOI_ABORTED);
 			extra_pd1_pages_allowance = extra_pd1_pages_used + 500;
 			printk(KERN_INFO "Automatically adjusting the extra"
 				" pages allowance to %ld and restarting.\n",
@@ -1106,7 +1113,7 @@ prepare:
 	if (!result && toi_in_hibernate)
 		result = do_toi_step(STEP_HIBERNATE_POWERDOWN);
 out:
-	do_cleanup(1);
+	do_cleanup(1, 0);
 	current->flags &= ~PF_MEMALLOC;
 
 	if (sys_power_disk)
@@ -1177,8 +1184,8 @@ int toi_launch_userspace_program(char *command, int channel_no,
 	 * about that here.
 	 */
 	if (retval && retval != 256)
-		printk("Failed to launch userspace program '%s': Error %d\n",
-				command, retval);
+		printk(KERN_ERR "Failed to launch userspace program '%s': "
+				"Error %d\n", command, retval);
 
 	{
 		int i;
