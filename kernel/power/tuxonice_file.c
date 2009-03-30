@@ -1193,7 +1193,6 @@ static struct toi_module_ops toi_fileops = {
 	.noresume_reset		= toi_file_noresume_reset,
 	.storage_available 	= toi_file_storage_available,
 	.storage_allocated	= toi_file_storage_allocated,
-	.release_storage	= toi_file_release_storage,
 	.reserve_header_space	= toi_file_reserve_header_space,
 	.allocate_storage	= toi_file_allocate_storage,
 	.image_exists		= toi_file_image_exists,
