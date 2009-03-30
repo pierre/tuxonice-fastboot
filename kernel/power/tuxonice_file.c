@@ -513,10 +513,6 @@ static int toi_file_storage_allocated(void)
  **/
 static int toi_file_release_storage(void)
 {
-	if (test_action_state(TOI_KEEP_IMAGE) &&
-	    test_toi_state(TOI_NOW_RESUMING))
-		return 0;
-
 	toi_put_extent_chain(&block_chain);
 
 	header_pages_reserved = 0;

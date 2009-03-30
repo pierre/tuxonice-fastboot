@@ -460,7 +460,6 @@ static void do_cleanup(int get_debug_info, int restarting)
 	clear_toi_state(TOI_BOOT_KERNEL);
 	thaw_processes();
 
-#ifdef CONFIG_TOI_KEEP_IMAGE
 	if (test_action_state(TOI_KEEP_IMAGE) &&
 	    !test_result_state(TOI_ABORTED)) {
 		toi_message(TOI_ANY_SECTION, TOI_LOW, 1,
@@ -468,7 +467,6 @@ static void do_cleanup(int get_debug_info, int restarting)
 			"to Keep Image being enabled.\n");
 		set_result_state(TOI_KEPT_IMAGE);
 	} else
-#endif
 		if (toiActiveAllocator)
 			toiActiveAllocator->remove_image();
 
