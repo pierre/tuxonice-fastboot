@@ -613,10 +613,6 @@ static void toi_swap_cleanup(int ending_cycle)
 
 static int toi_swap_release_storage(void)
 {
-	if (test_action_state(TOI_KEEP_IMAGE) &&
-	    test_toi_state(TOI_NOW_RESUMING))
-		return 0;
-
 	header_pages_reserved = 0;
 	swap_pages_allocated = 0;
 
