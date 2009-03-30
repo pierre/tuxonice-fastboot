@@ -1,5 +1,5 @@
 		   TuxOnIce 3.0 Internal Documentation.
-			Updated to 11 March 2008
+			Updated to 26 March 2009
 
 1.  Introduction.
 
@@ -140,12 +140,15 @@
     circumvented by dividing the memory to be saved into two parts, called
     pagesets.
 
-    Pageset2 contains the page cache - the pages on the active and inactive
-    lists. These pages aren't needed or modifed while TuxOnIce is running, so
-    they can be safely written without an atomic copy. They are therefore
-    saved first and reloaded last. While saving these pages, TuxOnIce carefully
-    ensures that the work of writing the pages doesn't make the image
-    inconsistent.
+    Pageset2 contains most of the page cache - the pages on the active and
+    inactive LRU lists that aren't needed or modified while TuxOnIce is
+    running, so they can be safely written without an atomic copy. They are
+    therefore saved first and reloaded last. While saving these pages,
+    TuxOnIce carefully ensures that the work of writing the pages doesn't make
+    the image inconsistent. With the support for Kernel (Video) Mode Setting
+    going into the kernel at the time of writing, we need to check for pages
+    on the LRU that are used by KMS, and exclude them from pageset2. They are
+    atomically copied as part of pageset 1.
 
     Once pageset2 has been saved, we prepare to do the atomic copy of remaining
     memory. As part of the preparation, we power down drivers, thereby providing
@@ -158,7 +161,11 @@
     'extra_pages_allowance', which is used to seek to ensure sufficient memory
     is available for drivers at this point. TuxOnIce also lets the user set this
     value to 0. In this case, a test driver suspend is done while preparing the
-    image, and the difference (plus a margin) used instead.
+    image, and the difference (plus a margin) used instead. TuxOnIce will also
+    automatically restart the hibernation process (twice at most) if it finds
+    that the extra pages allowance is not sufficient. It will then use what was
+    actually needed (plus a margin, again). Failure to hibernate should thus
+    be an extremely rare occurence.
 
     Having suspended the drivers, we save the CPU context before making an
     atomic copy of pageset1, resuming the drivers and saving the atomic copy.
@@ -177,7 +184,7 @@
     and then a sync occurs, the filesystem will be corrupted - at least until
     resume time and another sync of the restored data. Since there is a
     possibility that the user might not resume or (may it never be!) that
-    suspend might oops, we do our utmost to avoid syncing filesystems after
+    TuxOnIce might oops, we do our utmost to avoid syncing filesystems after
     copying pageset1.
 
     e. Power down.
@@ -199,10 +206,8 @@
 
     TuxOnIce records which pages will be in pageset1, pageset2, the destination
     of the atomic copy and the source of the atomically restored image using
-    bitmaps. These bitmaps are created from order zero allocations to maximise
-    reliability. The individual pages are combined together with pointers to
-    form per-zone bitmaps, which are in turn combined with another layer of
-    pointers to construct the overall bitmap.
+    bitmaps. The code used is that written for swsusp, with small improvements
+    to match TuxOnIce's requirements.
 
     The pageset1 bitmap is thus easily stored in the image header for use at
     resume time.
@@ -223,13 +228,12 @@
     the n+1th page, given the location of the nth page. Bitwise optimisations
     help here.
 
-    The data structure is: unsigned long ***.
-
     b) Extents for block data.
 
     TuxOnIce supports writing the image to multiple block devices. In the case
     of swap, multiple partitions and/or files may be in use, and we happily use
-    them all. This is accomplished as follows:
+    them all (with the exception of compcache pages, which we allocate but do
+    not use). This use of multiple block devices is accomplished as follows:
 
     Whatever the actual source of the allocated storage, the destination of the
     image can be viewed in terms of one or more block devices, and on each
@@ -282,8 +286,8 @@
     utilises LVM for storage, as they will need to dmsetup their partitions in
     such a way as to maintain this consistency at resume time.
 
-    bmap_shift and blocks_per_page record apply the effects of variations in
-    blocks per page settings for the filesystem and underlying bdev. For most
+    bmap_shift and blocks_per_page apply the effects of variations in blocks
+    per page settings for the filesystem and underlying bdev. For most
     filesystems, these are the same, but for xfs, they can have independant
     values.
 
@@ -395,8 +399,7 @@
     During the writing of an image, the core code feeds pages one at a time
     to the first module. This module performs whatever transformations it
     implements on the incoming data, completely consuming the incoming data and
-    feeding output in a similar manner to the next module. A module may buffer
-    its output.
+    feeding output in a similar manner to the next module.
 
     All routines are SMP safe, and the final result of the transformations is
     written with an index (provided by the core) and size of the output by the
@@ -447,23 +450,23 @@
 
     This brings us naturally to support for configuring TuxOnIce. We desired to
     provide a way to make TuxOnIce as flexible and configurable as possible.
-    The user shouldn't have to reboot just because they want to now suspend to
+    The user shouldn't have to reboot just because they want to now hibernate to
     a file instead of a partition, for example.
 
     To accomplish this, TuxOnIce implements a very generic means whereby the
     core and modules can register new sysfs entries. All TuxOnIce entries use
-    a single _store and _show routine, both of which are found in sysfs.c in
-    the kernel/power directory. These routines handle the most common operations
-    - getting and setting the values of bits, integers, longs, unsigned longs
-    and strings in one place, and allow overrides for customised get and set
-    options as well as side-effect routines for all reads and writes.
+    a single _store and _show routine, both of which are found in
+    tuxonice_sysfs.c in the kernel/power directory. These routines handle the
+    most common operations - getting and setting the values of bits, integers,
+    longs, unsigned longs and strings in one place, and allow overrides for
+    customised get and set options as well as side-effect routines for all
+    reads and writes.
 
     When combined with some simple macros, a new sysfs entry can then be defined
     in just a couple of lines:
 
-    { TOI_ATTR("progress_granularity", SYSFS_RW),
-      SYSFS_INT(&progress_granularity, 1, 2048)
-    },
+        SYSFS_INT("progress_granularity", SYSFS_RW, &progress_granularity, 1,
+                        2048, 0, NULL),
 
     This defines a sysfs entry named "progress_granularity" which is rw and
     allows the user to access an integer stored at &progress_granularity, giving
