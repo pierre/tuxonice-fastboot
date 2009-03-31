@@ -259,10 +259,13 @@ static int populate_block_list(void)
 		toi_put_extent_chain(&block_chain);
 
 	if (!target_is_normal_file()) {
-		return (target_storage_available > 0) ?
+		result = (target_storage_available > 0) ?
 			__populate_block_list(devinfo.blocks_per_page,
 				(target_storage_available + 1) *
 				devinfo.blocks_per_page - 1) : 0;
+		if (result)
+			return result;
+		goto out;
 	}
 
 	for (i = 0; i < (target_inode->i_size >> PAGE_SHIFT); i++) {
@@ -310,6 +313,7 @@ static int populate_block_list(void)
 			return result;
 	}
 
+out:
 	return apply_header_reservation();
 }
 
