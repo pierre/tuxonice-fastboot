@@ -239,10 +239,10 @@ static int apply_header_reservation(void)
 
 	/* Apply header space reservation */
 	toi_extent_state_goto_start(&toi_writer_posn);
-	toi_bio_ops.forward_one_page(1); /* To first page */
+	toi_bio_ops.forward_one_page(0); /* To first page */
 
 	for (i = 0; i < header_pages_reserved; i++)
-		if (toi_bio_ops.forward_one_page(1))
+		if (toi_bio_ops.forward_one_page(0))
 			return -ENOSPC;
 
 	/* The end of header pages will be the start of pageset 2 */
