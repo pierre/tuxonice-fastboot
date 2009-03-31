@@ -39,7 +39,7 @@ static inline char *check_image_kernel(struct swsusp_info *info)
 			"architecture specific data" : NULL;
 }
 #else
-extern char *check_swsusp_image_kernel(struct swsusp_info *info);
+extern char *check_image_kernel(struct swsusp_info *info);
 #endif /* CONFIG_ARCH_HIBERNATION_HEADER */
 extern int init_header(struct swsusp_info *info);
 

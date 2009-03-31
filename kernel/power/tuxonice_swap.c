@@ -614,10 +614,6 @@ static void toi_swap_cleanup(int ending_cycle)
 
 static int toi_swap_release_storage(void)
 {
-	if (test_action_state(TOI_KEEP_IMAGE) &&
-	    test_toi_state(TOI_NOW_RESUMING))
-		return 0;
-
 	header_pages_reserved = 0;
 	swap_pages_allocated = 0;
 
@@ -1266,7 +1262,6 @@ static struct toi_module_ops toi_swapops = {
 	.noresume_reset		= toi_swap_noresume_reset,
 	.storage_available 	= toi_swap_storage_available,
 	.storage_allocated	= toi_swap_storage_allocated,
-	.release_storage	= toi_swap_release_storage,
 	.reserve_header_space	= toi_swap_reserve_header_space,
 	.allocate_storage	= toi_swap_allocate_storage,
 	.image_exists		= toi_swap_image_exists,

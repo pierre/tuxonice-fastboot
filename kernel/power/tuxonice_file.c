@@ -243,10 +243,10 @@ static int apply_header_reservation(void)
 
 	/* Apply header space reservation */
 	toi_extent_state_goto_start(&toi_writer_posn);
-	toi_bio_ops.forward_one_page(1); /* To first page */
+	toi_bio_ops.forward_one_page(0); /* To first page */
 
 	for (i = 0; i < header_pages_reserved; i++)
-		if (toi_bio_ops.forward_one_page(1))
+		if (toi_bio_ops.forward_one_page(0))
 			return -ENOSPC;
 
 	/* The end of header pages will be the start of pageset 2 */
@@ -263,10 +263,13 @@ static int populate_block_list(void)
 		toi_put_extent_chain(&block_chain);
 
 	if (!target_is_normal_file()) {
-		return (target_storage_available > 0) ?
+		result = (target_storage_available > 0) ?
 			__populate_block_list(devinfo.blocks_per_page,
 				(target_storage_available + 1) *
 				devinfo.blocks_per_page - 1) : 0;
+		if (result)
+			return result;
+		goto out;
 	}
 
 	for (i = 0; i < (target_inode->i_size >> PAGE_SHIFT); i++) {
@@ -314,6 +317,7 @@ static int populate_block_list(void)
 			return result;
 	}
 
+out:
 	return apply_header_reservation();
 }
 
@@ -371,7 +375,7 @@ static void toi_file_get_target_info(char *target, int get_size,
 	if (!target || !strlen(target))
 		return;
 
-	target_file = filp_open(target, O_RDWR|O_LARGEFILE, 0);
+	target_file = filp_open(target, O_RDONLY|O_LARGEFILE, 0);
 
 	if (IS_ERR(target_file) || !target_file) {
 
@@ -519,10 +523,6 @@ static int toi_file_storage_allocated(void)
  **/
 static int toi_file_release_storage(void)
 {
-	if (test_action_state(TOI_KEEP_IMAGE) &&
-	    test_toi_state(TOI_NOW_RESUMING))
-		return 0;
-
 	toi_put_extent_chain(&block_chain);
 
 	header_pages_reserved = 0;
@@ -1203,7 +1203,6 @@ static struct toi_module_ops toi_fileops = {
 	.noresume_reset		= toi_file_noresume_reset,
 	.storage_available 	= toi_file_storage_available,
 	.storage_allocated	= toi_file_storage_allocated,
-	.release_storage	= toi_file_release_storage,
 	.reserve_header_space	= toi_file_reserve_header_space,
 	.allocate_storage	= toi_file_allocate_storage,
 	.image_exists		= toi_file_image_exists,
