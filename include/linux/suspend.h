@@ -13,17 +13,11 @@
 
 #if defined(CONFIG_PM_SLEEP) && defined(CONFIG_VT) && defined(CONFIG_VT_CONSOLE)
 extern void pm_set_vt_switch(int);
-extern int pm_get_vt_switch(void);
 extern int pm_prepare_console(void);
 extern void pm_restore_console(void);
 #else
 static inline void pm_set_vt_switch(int do_switch)
 {
-}
-
-static inline int pm_get_vt_switch(void)
-{
-	return 0;
 }
 
 static inline int pm_prepare_console(void)
