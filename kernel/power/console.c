@@ -31,12 +31,6 @@ void pm_set_vt_switch(int do_switch)
 }
 EXPORT_SYMBOL(pm_set_vt_switch);
 
-int pm_get_vt_switch(void)
-{
-	return disable_vt_switch;
-}
-EXPORT_SYMBOL(pm_get_vt_switch);
-
 int pm_prepare_console(void)
 {
 	acquire_console_sem();
