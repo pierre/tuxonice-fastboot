@@ -389,7 +389,7 @@ static int worker_rw_loop(void *data)
 {
 	unsigned long data_pfn, write_pfn, next_jiffies = jiffies + HZ / 2,
 		      jif_index = 1;
-	int result, my_io_index = 0, temp, last_worker;
+	int result, my_io_index = 0, last_worker;
 	struct toi_module_ops *first_filter = toi_get_next_filter(NULL);
 	struct page *buffer = toi_alloc_page(28, TOI_ATOMIC_GFP);
 
@@ -541,8 +541,6 @@ static int worker_rw_loop(void *data)
 				mutex_unlock(&io_mutex);
 			}
 		}
-
-		temp = my_io_index + io_base - io_nextupdate;
 
 		if (my_io_index + io_base == io_nextupdate)
 			io_nextupdate = toi_update_status(my_io_index +
