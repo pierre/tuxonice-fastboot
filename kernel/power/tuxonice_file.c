@@ -240,7 +240,6 @@ static int apply_header_reservation(void)
 
 	/* Apply header space reservation */
 	toi_extent_state_goto_start(&toi_writer_posn);
-	toi_bio_ops.forward_one_page(0); /* To first page */
 
 	for (i = 0; i < header_pages_reserved; i++)
 		if (toi_bio_ops.forward_one_page(0))
@@ -275,8 +274,7 @@ static int populate_block_list(void)
 		if (!has_contiguous_blocks(i))
 			continue;
 
-		new_sector = bmap(target_inode,
-		(i * devinfo.blocks_per_page));
+		new_sector = bmap(target_inode, (i * devinfo.blocks_per_page));
 
 		/*
 		 * Ignore the first block in the file.
@@ -834,10 +832,10 @@ static int toi_file_print_debug_stats(char *buffer, int size)
  **/
 static int toi_file_storage_needed(void)
 {
-	return sig_size + strlen(toi_file_target) + 1 +
+	return strlen(toi_file_target) + 1 +
 		sizeof(toi_writer_posn_save) +
 		sizeof(devinfo) +
-		sizeof(struct hibernate_extent_chain) - 2 * sizeof(void *) +
+		2 * sizeof(int) +
 		(2 * sizeof(unsigned long) * block_chain.num_extents);
 }
 
@@ -1143,10 +1141,7 @@ static int toi_file_save_config_info(char *buffer)
  **/
 static void toi_file_load_config_info(char *buffer, int size)
 {
-	if (size != 0)
-		strlcpy(toi_file_target, buffer, size);
-	else
-		strcpy(toi_file_target, buffer);
+	strlcpy(toi_file_target, buffer, size);
 }
 
 static int toi_file_initialise(int starting_cycle)

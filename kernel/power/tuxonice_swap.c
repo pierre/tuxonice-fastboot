@@ -447,7 +447,6 @@ static int apply_header_reservation(void)
 	int i;
 
 	toi_extent_state_goto_start(&toi_writer_posn);
-	toi_bio_ops.forward_one_page(0); /* To first page */
 
 	for (i = 0; i < header_pages_reserved; i++)
 		if (toi_bio_ops.forward_one_page(0))
@@ -982,10 +981,11 @@ static int toi_swap_print_debug_stats(char *buffer, int size)
 static int toi_swap_storage_needed(void)
 {
 	int i, result;
-	result = sizeof(toi_writer_posn_save) + sizeof(devinfo);
+	result = sizeof(struct sig_data) + sizeof(toi_writer_posn_save) +
+		sizeof(devinfo);
 
 	for (i = 0; i < MAX_SWAPFILES; i++) {
-		result += 3 * sizeof(int);
+		result += 2 * sizeof(int);
 		result += (2 * sizeof(unsigned long) *
 			block_chain[i].num_extents);
 	}
