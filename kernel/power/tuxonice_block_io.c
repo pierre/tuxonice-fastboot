@@ -1169,7 +1169,7 @@ static int write_header_chunk_finish(void)
  **/
 static int toi_bio_storage_needed(void)
 {
-	return 2 * sizeof(int);
+	return sizeof(int);
 }
 
 /**
