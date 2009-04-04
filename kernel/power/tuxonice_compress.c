@@ -187,7 +187,7 @@ static int toi_compress_write_page(unsigned long index,
 
 	if (ret) {
 		printk(KERN_INFO "Compression failed.\n");
-		goto failure;
+		return ret;
 	}
 
 	mutex_lock(&stats_lock);
@@ -196,14 +196,11 @@ static int toi_compress_write_page(unsigned long index,
 	mutex_unlock(&stats_lock);
 
 	if (ctx->len < buf_size) /* some compression */
-		ret = next_driver->write_page(index,
+		return next_driver->write_page(index,
 				virt_to_page(ctx->page_buffer),
 				ctx->len);
 	else
-		ret = next_driver->write_page(index, buffer_page, buf_size);
-
-failure:
-	return ret;
+		return next_driver->write_page(index, buffer_page, buf_size);
 }
 
 /*
