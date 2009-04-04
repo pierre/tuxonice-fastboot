@@ -38,8 +38,8 @@
 #include "tuxonice_alloc.h"
 #include "tuxonice_atomic_copy.h"
 
-static long num_nosave, header_space_allocated, main_storage_allocated,
-	   storage_available;
+static long num_nosave, main_storage_allocated, storage_available,
+	    header_storage_needed;
 long extra_pd1_pages_allowance = CONFIG_TOI_DEFAULT_EXTRA_PAGES_ALLOWANCE;
 int image_size_limit;
 static int no_ps2_needed;
@@ -412,7 +412,7 @@ static long main_storage_needed(int use_ecr,
 /*
  * Storage needed for the image header, in bytes until the return.
  */
-static long header_storage_needed(void)
+long get_header_storage_needed(void)
 {
 	long bytes = (int) sizeof(struct toi_header) +
 			toi_header_storage_for_modules() +
@@ -456,7 +456,7 @@ static long lowpages_ps1_to_free(void)
 
 static long current_image_size(void)
 {
-	return pagedir1.size + pagedir2.size + header_space_allocated;
+	return pagedir1.size + pagedir2.size + header_storage_needed;
 }
 
 static long storage_still_required(void)
@@ -503,12 +503,10 @@ static long amount_needed(int use_image_size_limit)
 static long image_not_ready(int use_image_size_limit)
 {
 	toi_message(TOI_EAT_MEMORY, TOI_LOW, 1,
-		"Amount still needed (%ld) > 0:%d. Header: %ld < %ld: %d,"
+		"Amount still needed (%ld) > 0:%d,"
 		" Storage allocd: %ld < %ld: %d.\n",
 			amount_needed(use_image_size_limit),
 			(amount_needed(use_image_size_limit) > 0),
-			header_space_allocated, header_storage_needed(),
-			header_space_allocated < header_storage_needed(),
 			main_storage_allocated,
 			main_storage_needed(1, 1),
 			main_storage_allocated < main_storage_needed(1, 1));
@@ -516,7 +514,6 @@ static long image_not_ready(int use_image_size_limit)
 	toi_cond_pause(0, NULL);
 
 	return (amount_needed(use_image_size_limit) > 0) ||
-		header_space_allocated < header_storage_needed() ||
 		 main_storage_allocated < main_storage_needed(1, 1);
 }
 
@@ -539,14 +536,6 @@ static void display_failure_reason(int tries_exceeded)
 		printk(KERN_INFO "- The maximum number of iterations was "
 				"reached without successfully preparing the "
 				"image.\n");
-
-	if (header_space_allocated < header_storage_needed()) {
-		printk(KERN_INFO "- Insufficient header storage allocated. "
-				"Need %ld, have %ld.\n",
-				header_storage_needed(),
-				header_space_allocated);
-		set_abort_result(TOI_INSUFFICIENT_STORAGE);
-	}
 
 	if (storage_required) {
 		printk(KERN_INFO " - We need at least %ld pages of storage "
@@ -592,7 +581,7 @@ static void display_stats(int always, int sub_extra_pd1_allow)
 {
 	char buffer[255];
 	snprintf(buffer, 254,
-		"Free:%ld(%ld). Sets:%ld(%ld),%ld(%ld). Header:%ld/%ld. "
+		"Free:%ld(%ld). Sets:%ld(%ld),%ld(%ld). "
 		"Nosave:%ld-%ld=%ld. Storage:%lu/%lu(%lu=>%lu). "
 		"Needed:%ld,%ld,%ld(%d,%ld,%ld,%ld) (PS2:%s)\n",
 
@@ -603,9 +592,6 @@ static void display_stats(int always, int sub_extra_pd1_allow)
 		/* Sets */
 		pagedir1.size, pagedir1.size - get_highmem_size(pagedir1),
 		pagedir2.size, pagedir2.size - get_highmem_size(pagedir2),
-
-		/* Header */
-		header_space_allocated, header_storage_needed(),
 
 		/* Nosave */
 		num_nosave, extra_pages_allocated,
@@ -818,7 +804,7 @@ void toi_recalculate_image_contents(int atomic_copy)
  */
 static void update_image(int ps2_recalc)
 {
-	int wanted, got;
+	int wanted, got, old_header_req;
 	long seek;
 
 	toi_recalculate_image_contents(0);
@@ -852,17 +838,23 @@ static void update_image(int ps2_recalc)
 	 * don't complain if we can't get the full amount we're after.
 	 */
 
-	storage_available = toiActiveAllocator->storage_available();
+	do {
+		old_header_req = header_storage_needed;
+		toiActiveAllocator->reserve_header_space(header_storage_needed);
 
-	header_space_allocated = header_storage_needed();
+		/* How much storage is free with the reservation applied? */
+		storage_available = toiActiveAllocator->storage_available();
+		seek = min(storage_available, main_storage_needed(0, 0));
 
-	toiActiveAllocator->reserve_header_space(header_space_allocated);
+		toiActiveAllocator->allocate_storage(seek);
 
-	seek = min(storage_available, main_storage_needed(0, 0));
+		main_storage_allocated =
+			toiActiveAllocator->storage_allocated();
 
-	toiActiveAllocator->allocate_storage(seek);
+		/* Need more header because more storage allocated? */
+		header_storage_needed = get_header_storage_needed();
 
-	main_storage_allocated = toiActiveAllocator->storage_allocated();
+	} while (header_storage_needed > old_header_req);
 
 	if (freeze_processes())
 		set_abort_result(TOI_FREEZING_FAILED);
@@ -996,7 +988,6 @@ int toi_prepare_image(void)
 {
 	int result = 1, tries = 1;
 
-	header_space_allocated = 0;
 	main_storage_allocated = 0;
 	no_ps2_needed = 0;
 
