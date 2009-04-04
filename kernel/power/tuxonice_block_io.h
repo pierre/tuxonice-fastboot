@@ -31,8 +31,8 @@ struct toi_bio_ops {
 	void (*check_io_stats) (void);
 	void (*reset_io_stats) (void);
 	void (*update_throughput_throttle) (int jif_index);
-	void (*finish_all_io) (void);
-	int (*forward_one_page) (int writing);
+	int (*finish_all_io) (void);
+	int (*forward_one_page) (int writing, int section_barrier);
 	void (*set_extra_page_forward) (void);
 	void (*set_devinfo) (struct toi_bdev_info *info);
 	int (*read_page) (unsigned long *index, struct page *buffer_page,
@@ -48,7 +48,7 @@ struct toi_bio_ops {
 	int (*write_header_chunk_finish) (void);
 	int (*rw_init) (int rw, int stream_number);
 	int (*rw_cleanup) (int rw);
-	void (*io_flusher) (int rw);
+	int (*io_flusher) (int rw);
 };
 
 extern struct toi_bio_ops toi_bio_ops;
