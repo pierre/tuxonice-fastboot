@@ -20,7 +20,7 @@
 #include <asm/setup.h>
 #include "tuxonice_pageflags.h"
 
-#define TOI_CORE_VERSION "3.0-rc8-20090313"
+#define TOI_CORE_VERSION "3.0"
 
 #define MY_BOOT_KERNEL_DATA_VERSION 1
 

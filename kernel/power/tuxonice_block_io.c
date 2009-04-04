@@ -516,8 +516,35 @@ static void dump_block_chains(void)
 static int go_next_page(int writing)
 {
 	int i, max = (toi_writer_posn.current_chain == -1) ? 1 :
-	  toi_devinfo[toi_writer_posn.current_chain].blocks_per_page;
+	  toi_devinfo[toi_writer_posn.current_chain].blocks_per_page,
+		compare_to = 0;
 
+	/* Have we already used the last page of the stream? */
+	switch (current_stream) {
+	case 0:
+		compare_to = 2;
+		break;
+	case 1:
+		compare_to = 3;
+		break;
+	case 2:
+		compare_to = 1;
+		break;
+	}
+
+	if (toi_writer_posn.current_chain ==
+			toi_writer_posn_save[compare_to].chain_num &&
+	    toi_writer_posn.current_offset ==
+			toi_writer_posn_save[compare_to].offset) {
+		if (writing)
+		       BUG_ON(!current_stream);
+		else {
+			more_readahead = 0;
+			return -ENODATA;
+		}
+	}
+
+	/* Nope. Go foward a page - or maybe two */
 	for (i = 0; i < max; i++)
 		toi_extent_state_next(&toi_writer_posn);
 
@@ -565,56 +592,16 @@ static int toi_bio_rw_page(int writing, struct page *page,
 		int is_readahead, int free_group)
 {
 	struct toi_bdev_info *dev_info;
-	int result;
 
-	if (go_next_page(writing)) {
-		printk(KERN_INFO "Failed to advance a page in the extent "
-				"data.\n");
+	if (go_next_page(writing)) 
 		return -ENODATA;
-	}
-
-	if (current_stream == 0 && writing &&
-		toi_writer_posn.current_chain ==
-			toi_writer_posn_save[2].chain_num &&
-		toi_writer_posn.current_offset ==
-			toi_writer_posn_save[2].offset) {
-		dump_block_chains();
-		BUG();
-	}
 
 	dev_info = &toi_devinfo[toi_writer_posn.current_chain];
 
-	result = toi_do_io(writing, dev_info->bdev,
+	return toi_do_io(writing, dev_info->bdev,
 		toi_writer_posn.current_offset <<
 			dev_info->bmap_shift,
 		page, is_readahead, 0, free_group);
-
-	if (result)
-		return result;
-
-	if (!writing) {
-		int compare_to = 0;
-
-		switch (current_stream) {
-		case 0:
-			compare_to = 2;
-			break;
-		case 1:
-			compare_to = 3;
-			break;
-		case 2:
-			compare_to = 1;
-			break;
-		}
-
-		if (toi_writer_posn.current_chain ==
-				toi_writer_posn_save[compare_to].chain_num &&
-		    toi_writer_posn.current_offset ==
-				toi_writer_posn_save[compare_to].offset) {
-			more_readahead = 0;
-		}
-	}
-	return 0;
 }
 
 /**
@@ -808,19 +795,12 @@ static int toi_start_new_readahead(int dedicated_thread)
 		last_result = toi_start_one_readahead(dedicated_thread);
 
 		if (last_result) {
-			if (last_result == -ENOMEM || last_result == -EIO)
+			if (last_result == -ENOMEM || last_result == -ENODATA)
 				return 0;
 
-			more_readahead = 0;
-
-			/*
-			 * Don't complain about failing to do readahead past
-			 * the end of storage.
-			 */
-			if (last_result != -ENODATA)
-				printk(KERN_INFO
-					"Begin read chunk returned %d.\n",
-					last_result);
+			printk(KERN_INFO
+				"Begin read chunk returned %d.\n",
+				last_result);
 		} else
 			num_submitted++;
 

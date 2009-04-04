@@ -31,12 +31,6 @@ void pm_set_vt_switch(int do_switch)
 }
 EXPORT_SYMBOL(pm_set_vt_switch);
 
-int pm_get_vt_switch(void)
-{
-	return disable_vt_switch;
-}
-EXPORT_SYMBOL(pm_get_vt_switch);
-
 int pm_prepare_console(void)
 {
 	acquire_console_sem();
@@ -74,7 +68,6 @@ int pm_prepare_console(void)
 	kmsg_redirect = SUSPEND_CONSOLE;
 	return 0;
 }
-EXPORT_SYMBOL_GPL(pm_prepare_console);
 
 void pm_restore_console(void)
 {
@@ -93,5 +86,4 @@ void pm_restore_console(void)
 
 	kmsg_redirect = orig_kmsg;
 }
-EXPORT_SYMBOL_GPL(pm_restore_console);
 #endif
