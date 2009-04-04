@@ -81,12 +81,11 @@ struct toi_module_ops {
 	/*
 	 * Calls for allocating storage (allocators only).
 	 *
-	 * Header space is allocated separately. Note that allocation
-	 * of space for the header might result in allocated space
-	 * being stolen from the main pool if there is no unallocated
-	 * space. We have to be able to allocate enough space for
-	 * the header. We can eat memory to ensure there is enough
-	 * for the main pool.
+	 * Header space is requested separately and cannot fail, but the
+	 * reservation is only applied when main storage is allocated.
+	 * The header space reservation is thus always set prior to
+	 * requesting the allocation of storage - and prior to querying
+	 * how much storage is available.
 	 */
 
 	int (*storage_available) (void);
@@ -103,7 +102,7 @@ struct toi_module_ops {
 			unsigned int buf_size);
 	int (*read_page) (unsigned long *index, struct page *buffer_page,
 			unsigned int *buf_size);
-	void (*io_flusher) (int rw);
+	int (*io_flusher) (int rw);
 
 	/* Reset module if image exists but reading aborted */
 	void (*noresume_reset) (void);
@@ -129,7 +128,7 @@ struct toi_module_ops {
 	void (*update_throughput_throttle) (int jif_index);
 
 	/* Flush outstanding I/O */
-	void (*finish_all_io) (void);
+	int (*finish_all_io) (void);
 
 	/* Determine whether image exists that we can restore */
 	int (*image_exists) (int quiet);
@@ -161,6 +160,7 @@ extern void toi_move_module_tail(struct toi_module_ops *module);
 
 extern long toi_header_storage_for_modules(void);
 extern long toi_memory_for_modules(int print_parts);
+extern void print_toi_header_storage_for_modules(void);
 extern int toi_expected_compression_ratio(void);
 
 extern int toi_print_module_debug_info(char *buffer, int buffer_size);

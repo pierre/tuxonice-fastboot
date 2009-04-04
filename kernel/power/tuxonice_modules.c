@@ -51,6 +51,36 @@ long toi_header_storage_for_modules(void)
 	return bytes + sizeof(struct toi_module_header);
 }
 
+void print_toi_header_storage_for_modules(void)
+{
+	struct toi_module_ops *this_module;
+	int bytes = 0;
+
+	printk(KERN_DEBUG "Header storage:\n");
+	list_for_each_entry(this_module, &toi_modules, module_list) {
+		if (!this_module->enabled ||
+		    (this_module->type == WRITER_MODULE &&
+		     toiActiveAllocator != this_module))
+			continue;
+		if (this_module->storage_needed) {
+			int this = this_module->storage_needed() +
+				sizeof(struct toi_module_header) +
+				sizeof(int);
+			this_module->header_requested = this;
+			bytes += this;
+			printk(KERN_DEBUG "+ %16s : %-4d/%d.\n",
+					this_module->name,
+					this_module->header_used, this);
+		}
+	}
+
+	printk(KERN_DEBUG "+ empty terminator : %ld.\n",
+			sizeof(struct toi_module_header));
+	printk(KERN_DEBUG "                     ====\n");
+	printk(KERN_DEBUG "                     %ld\n",
+			bytes + sizeof(struct toi_module_header));
+}
+
 /*
  * toi_memory_for_modules
  *

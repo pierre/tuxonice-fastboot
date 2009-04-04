@@ -381,7 +381,7 @@ static int worker_rw_loop(void *data)
 {
 	unsigned long data_pfn, write_pfn, next_jiffies = jiffies + HZ / 2,
 		      jif_index = 1;
-	int result, my_io_index = 0, last_worker;
+	int result = 0, my_io_index = 0, last_worker;
 	struct toi_module_ops *first_filter = toi_get_next_filter(NULL);
 	struct page *buffer = toi_alloc_page(28, TOI_ATOMIC_GFP);
 
@@ -569,12 +569,12 @@ static int worker_rw_loop(void *data)
 	if (last_worker) {
 		toi_bio_queue_flusher_should_finish = 1;
 		wake_up(&toi_io_queue_flusher);
-		toiActiveAllocator->finish_all_io();
+		result = toiActiveAllocator->finish_all_io();
 	}
 
 	toi__free_page(28, buffer);
 
-	return 0;
+	return result;
 }
 
 static int start_other_threads(void)
@@ -609,7 +609,7 @@ static int start_other_threads(void)
 static int do_rw_loop(int write, int finish_at, struct memory_bitmap *pageflags,
 		int base, int barmax, int pageset)
 {
-	int index = 0, cpu, num_other_threads = 0;
+	int index = 0, cpu, num_other_threads = 0, result = 0;
 	unsigned long pfn;
 
 	if (!finish_at)
@@ -663,7 +663,7 @@ static int do_rw_loop(int write, int finish_at, struct memory_bitmap *pageflags,
 		test_action_state(TOI_NO_FLUSHER_THREAD))
 		worker_rw_loop(num_other_threads ? NULL : MONITOR);
 	else
-		toiActiveAllocator->io_flusher(write);
+		result = toiActiveAllocator->io_flusher(write);
 
 	while (atomic_read(&toi_io_workers))
 		schedule();
@@ -674,7 +674,7 @@ static int do_rw_loop(int write, int finish_at, struct memory_bitmap *pageflags,
 			schedule();
 	}
 
-	if (!io_result && !test_result_state(TOI_ABORTED)) {
+	if (!io_result && !result && !test_result_state(TOI_ABORTED)) {
 		unsigned long next;
 
 		printk("done.\n");
@@ -695,7 +695,7 @@ static int do_rw_loop(int write, int finish_at, struct memory_bitmap *pageflags,
 		}
 	}
 
-	return io_result;
+	return io_result ? io_result : result;
 }
 
 /**
