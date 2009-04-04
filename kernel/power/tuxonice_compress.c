@@ -36,6 +36,7 @@ struct cpu_context {
 	struct crypto_comp *transform;
 	unsigned int len;
 	char *buffer_start;
+	char *output_buffer;
 };
 
 static DEFINE_PER_CPU(struct cpu_context, contexts);
@@ -65,6 +66,11 @@ static void toi_compress_cleanup(int toi_or_resume)
 			toi_free_page(16, (unsigned long) this->page_buffer);
 
 		this->page_buffer = NULL;
+
+		if (this->output_buffer)
+			vfree(this->output_buffer);
+
+		this->output_buffer = NULL;
 	}
 }
 
@@ -100,9 +106,20 @@ static int toi_compress_crypto_prepare(void)
 		if (!this->page_buffer) {
 			printk(KERN_ERR
 			  "Failed to allocate a page buffer for TuxOnIce "
-			  "encryption driver.\n");
+			  "compression driver.\n");
 			return -ENOMEM;
 		}
+
+		this->output_buffer =
+			(char *) vmalloc_32(2 * PAGE_SIZE);
+
+		if (!this->output_buffer) {
+			printk(KERN_ERR
+			  "Failed to allocate a output buffer for TuxOnIce "
+			  "compression driver.\n");
+			return -ENOMEM;
+		}
+
 	}
 
 	return 0;
@@ -180,12 +197,12 @@ static int toi_compress_write_page(unsigned long index,
 
 	ret = crypto_comp_compress(ctx->transform,
 			ctx->buffer_start, buf_size,
-			ctx->page_buffer, &ctx->len);
+			ctx->output_buffer, &ctx->len);
 
 	kunmap(buffer_page);
 
 	if (ret) {
-		printk(KERN_INFO "Compression failed.\n");
+		printk(KERN_INFO "Compression failed (result was %d.).\n", ret);
 		return ret;
 	}
 
@@ -194,11 +211,12 @@ static int toi_compress_write_page(unsigned long index,
 	toi_compress_bytes_out += ctx->len;
 	mutex_unlock(&stats_lock);
 
-	if (ctx->len < buf_size) /* some compression */
+	if (ctx->len < buf_size) { /* some compression */
+		memcpy(ctx->page_buffer, ctx->output_buffer, ctx->len);
 		return next_driver->write_page(index,
 				virt_to_page(ctx->page_buffer),
 				ctx->len);
-	else
+	} else
 		return next_driver->write_page(index, buffer_page, buf_size);
 }
 
