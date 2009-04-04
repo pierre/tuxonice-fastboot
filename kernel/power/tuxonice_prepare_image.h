@@ -33,3 +33,4 @@ extern void free_attention_list(void);
 #define ZONE_HIGHMEM (MAX_NR_ZONES + 1)
 #endif
 
+long get_header_storage_needed(void);

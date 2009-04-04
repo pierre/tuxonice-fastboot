@@ -391,7 +391,7 @@ static int write_modified_signature(int modification)
 
 		/* Get the details of the header first page. */
 		toi_extent_state_goto_start(&toi_writer_posn);
-		toi_bio_ops.forward_one_page(1);
+		toi_bio_ops.forward_one_page(1, 1);
 
 		si = get_swap_info_struct(toi_writer_posn.current_chain);
 
@@ -437,9 +437,6 @@ static int write_modified_signature(int modification)
 
 /*
  * apply_header_reservation
- *
- * Use 0 (READ) to forward_one_page so it doesn't complain if we haven't
- * allocated storage yet.
  */
 static int apply_header_reservation(void)
 {
@@ -448,7 +445,7 @@ static int apply_header_reservation(void)
 	toi_extent_state_goto_start(&toi_writer_posn);
 
 	for (i = 0; i < header_pages_reserved; i++)
-		if (toi_bio_ops.forward_one_page(0))
+		if (toi_bio_ops.forward_one_page(1, 0))
 			return -ENOSPC;
 
 	/* The end of header pages will be the start of pageset 2;
@@ -460,9 +457,6 @@ static int apply_header_reservation(void)
 static void toi_swap_reserve_header_space(int request)
 {
 	header_pages_reserved = (long) request;
-
-	/* If we've already allocated storage (hence ignoring return value): */
-	apply_header_reservation();
 }
 
 static void free_block_chains(void)
@@ -516,8 +510,10 @@ static int get_main_pool_phys_params(void)
 		}
 
 		if (extent_min > -1 && add_blocks_to_extent_chain(last_chain,
-					extent_min, extent_max))
+					extent_min, extent_max)) {
+			printk("Out of memory while making block chains.\n");
 			return -ENOMEM;
+		}
 
 		extent_min = new_sector;
 		extent_max = new_sector;
@@ -525,8 +521,10 @@ static int get_main_pool_phys_params(void)
 	}
 
 	if (extent_min > -1 && add_blocks_to_extent_chain(last_chain,
-				extent_min, extent_max))
+				extent_min, extent_max)) {
+			printk("Out of memory while making block chains.\n");
 			return -ENOMEM;
+	}
 
 	return apply_header_reservation();
 }
@@ -643,22 +641,20 @@ static void free_swap_range(unsigned long min, unsigned long max)
  * Round robin allocation (where swap storage has the same priority).
  * could make this very inefficient, so we track extents allocated on
  * a per-swapfile basis.
- *
- * We ignore here the fact that some space is for the header and doesn't
- * have the overhead. It will only rarely make a 1 page difference.
  */
 static int toi_swap_allocate_storage(int request)
 {
 	int i, result = 0, to_add[MAX_SWAPFILES], pages_to_get, extra_pages,
-	    gotten = 0;
+	    gotten = 0, result2;
 	unsigned long extent_min[MAX_SWAPFILES], extent_max[MAX_SWAPFILES];
 
 	extra_pages = DIV_ROUND_UP(request * (sizeof(unsigned long)
 			       + sizeof(int)), PAGE_SIZE);
-	pages_to_get = request + extra_pages - swapextents.size;
+	pages_to_get = request + extra_pages - swapextents.size +
+		header_pages_reserved;
 
 	if (pages_to_get < 1)
-		return 0;
+		return apply_header_reservation();
 
 	for (i = 0; i < MAX_SWAPFILES; i++) {
 		struct swap_info_struct *si = get_swap_info_struct(i);
@@ -738,12 +734,18 @@ static int toi_swap_allocate_storage(int request)
 		break;
 	}
 
-	if (gotten < pages_to_get)
+	if (gotten < pages_to_get) {
+		printk("Got fewer pages than required "
+				"(%d wanted, %d gotten).\n",
+				pages_to_get, gotten);
 		result = -ENOSPC;
+	}
 
 	swap_pages_allocated += (long) gotten;
 
-	return result ? result : get_main_pool_phys_params();
+	result2 = get_main_pool_phys_params();
+
+	return result ? result : result2;
 }
 
 static int toi_swap_write_header_init(void)
@@ -800,14 +802,13 @@ static int toi_swap_write_header_init(void)
 
 static int toi_swap_write_header_cleanup(void)
 {
-	/* Write any unsaved data */
-	if (toi_writer_buffer_posn)
-		toi_bio_ops.write_header_chunk_finish();
-
-	toi_bio_ops.finish_all_io();
+	int result = toi_bio_ops.write_header_chunk_finish();
 
 	/* Set signature to save we have an image */
-	return write_modified_signature(IMAGE_SIGNATURE);
+	if (!result)
+		result = write_modified_signature(IMAGE_SIGNATURE);
+
+	return result;
 }
 
 /* ------------------------- HEADER READING ------------------------- */
