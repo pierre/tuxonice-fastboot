@@ -134,6 +134,7 @@ static char *result_strings[] = {
 	"Pre-restore preparation failed",
 	"Failed to disable usermode helpers",
 	"Can't resume from alternate image",
+	"Header reservation too small",
 };
 
 /**
