@@ -766,14 +766,6 @@ config CRYPTO_LZO
 	help
 	  This is the LZO algorithm.
 
-config CRYPTO_LZF
-	tristate "LZF compression algorithm"
-	default y
-	select CRYPTO_ALGAPI
-	help
-	  This is the LZF algorithm. It is especially useful for TuxOnIce,
-	  because it achieves good compression quickly.
-
 comment "Random Number Generation"
 
 config CRYPTO_ANSI_CPRNG
