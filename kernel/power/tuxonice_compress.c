@@ -27,7 +27,7 @@ static int toi_expected_compression;
 static struct toi_module_ops toi_compression_ops;
 static struct toi_module_ops *next_driver;
 
-static char toi_compressor_name[32] = "lzf";
+static char toi_compressor_name[32] = "lzo";
 
 static DEFINE_MUTEX(stats_lock);
 
