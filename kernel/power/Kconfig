@@ -237,9 +237,9 @@ menuconfig TOI_CORE
 		default y
 		---help---
 		  This option adds support for using cryptoapi compression
-		  algorithms. Compression is particularly useful as
-		  the LZF support that comes with the TuxOnIce patch can double
-		  your suspend and resume speed.
+		  algorithms. Compression is particularly useful as it can
+		  more than double your suspend and resume speed (depending
+		  upon how well your image compresses).
 
 		  You probably want this, so say Y here.
 
