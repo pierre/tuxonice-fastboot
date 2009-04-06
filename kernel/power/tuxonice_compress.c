@@ -201,17 +201,12 @@ static int toi_compress_write_page(unsigned long index,
 
 	kunmap(buffer_page);
 
-	if (ret) {
-		printk(KERN_INFO "Compression failed (result was %d.).\n", ret);
-		return ret;
-	}
-
 	mutex_lock(&stats_lock);
 	toi_compress_bytes_in += buf_size;
 	toi_compress_bytes_out += ctx->len;
 	mutex_unlock(&stats_lock);
 
-	if (ctx->len < buf_size) { /* some compression */
+	if (!ret && ctx->len < buf_size) { /* some compression */
 		memcpy(ctx->page_buffer, ctx->output_buffer, ctx->len);
 		return next_driver->write_page(index,
 				virt_to_page(ctx->page_buffer),
