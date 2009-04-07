@@ -19,6 +19,7 @@
 #include <linux/highmem.h>
 #include <linux/kthread.h>
 #include <linux/cpu.h>
+#include <linux/fs_struct.h>
 #include <asm/tlbflush.h>
 
 #include "tuxonice.h"
