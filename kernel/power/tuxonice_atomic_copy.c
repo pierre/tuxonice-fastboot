@@ -14,6 +14,7 @@
 #include <linux/cpu.h>
 #include <linux/freezer.h>
 #include <linux/console.h>
+#include <asm/suspend.h>
 #include "tuxonice.h"
 #include "tuxonice_storage.h"
 #include "tuxonice_power_off.h"
@@ -316,7 +317,6 @@ int toi_go_atomic(pm_message_t state, int suspend_time)
 {
 	if (suspend_time && platform_begin(1)) {
 		set_abort_result(TOI_PLATFORM_PREP_FAILED);
-		toi_end_atomic(ATOMIC_STEP_PLATFORM_END, suspend_time, 0);
 		return 1;
 	}
 
@@ -328,35 +328,13 @@ int toi_go_atomic(pm_message_t state, int suspend_time)
 		return 1;
 	}
 
-	if (suspend_time && platform_pre_snapshot(1)) {
-		set_abort_result(TOI_PRE_SNAPSHOT_FAILED);
-		toi_end_atomic(ATOMIC_STEP_PLATFORM_FINISH, suspend_time, 0);
-		return 1;
-	}
-
-	if (!suspend_time && platform_pre_restore(1)) {
-		set_abort_result(TOI_PRE_RESTORE_FAILED);
-		toi_end_atomic(ATOMIC_STEP_DEVICE_RESUME, suspend_time, 0);
-		return 1;
-	}
-
-	if (test_action_state(TOI_LATE_CPU_HOTPLUG)) {
-		if (disable_nonboot_cpus()) {
-			set_abort_result(TOI_CPU_HOTPLUG_FAILED);
-			toi_end_atomic(ATOMIC_STEP_CPU_HOTPLUG,
-					suspend_time, 0);
-			return 1;
-		}
-	}
-
 	if (suspend_time && arch_prepare_suspend()) {
 		set_abort_result(TOI_ARCH_PREPARE_FAILED);
-		toi_end_atomic(ATOMIC_STEP_CPU_HOTPLUG, suspend_time, 0);
+		toi_end_atomic(ATOMIC_STEP_DEVICE_RESUME, suspend_time, 1);
 		return 1;
 	}
 
 	device_pm_lock();
-	local_irq_disable();
 
 	/* At this point, device_suspend() has been called, but *not*
 	 * device_power_down(). We *must* device_power_down() now.
@@ -367,13 +345,36 @@ int toi_go_atomic(pm_message_t state, int suspend_time)
 
 	if (device_power_down(state)) {
 		set_abort_result(TOI_DEVICE_REFUSED);
-		toi_end_atomic(ATOMIC_STEP_IRQS, suspend_time, 0);
+		toi_end_atomic(ATOMIC_STEP_UNLOCK, suspend_time, 1);
 		return 1;
 	}
 
+	if (suspend_time && platform_pre_snapshot(1)) {
+		set_abort_result(TOI_PRE_SNAPSHOT_FAILED);
+		toi_end_atomic(ATOMIC_STEP_PLATFORM_FINISH, suspend_time, 1);
+		return 1;
+	}
+
+	if (!suspend_time && platform_pre_restore(1)) {
+		set_abort_result(TOI_PRE_RESTORE_FAILED);
+		toi_end_atomic(ATOMIC_STEP_PLATFORM_FINISH, suspend_time, 1);
+		return 1;
+	}
+
+	if (test_action_state(TOI_LATE_CPU_HOTPLUG)) {
+		if (disable_nonboot_cpus()) {
+			set_abort_result(TOI_CPU_HOTPLUG_FAILED);
+			toi_end_atomic(ATOMIC_STEP_CPU_HOTPLUG,
+					suspend_time, 1);
+			return 1;
+		}
+	}
+
+	local_irq_disable();
+
 	if (sysdev_suspend(state)) {
 		set_abort_result(TOI_SYSDEV_REFUSED);
-		toi_end_atomic(ATOMIC_STEP_POWER_UP, suspend_time, 0);
+		toi_end_atomic(ATOMIC_STEP_IRQS, suspend_time, 1);
 		return 1;
 	}
 
@@ -393,26 +394,25 @@ void toi_end_atomic(int stage, int suspend_time, int error)
 		if (!suspend_time)
 			platform_leave(1);
 		sysdev_resume();
-	case ATOMIC_STEP_POWER_UP:
-		device_power_up(suspend_time ?
-			(error ? PMSG_RECOVER : PMSG_THAW) : PMSG_RESTORE);
 	case ATOMIC_STEP_IRQS:
 		local_irq_enable();
-		device_pm_unlock();
 	case ATOMIC_STEP_CPU_HOTPLUG:
 		if (test_action_state(TOI_LATE_CPU_HOTPLUG))
 			enable_nonboot_cpus();
+		platform_restore_cleanup(1);
 	case ATOMIC_STEP_PLATFORM_FINISH:
 		platform_finish(1);
+		device_power_up(suspend_time ?
+			(error ? PMSG_RECOVER : PMSG_THAW) : PMSG_RESTORE);
+	case ATOMIC_STEP_UNLOCK:
+		device_pm_unlock();
 	case ATOMIC_STEP_DEVICE_RESUME:
 		if (suspend_time && (error & 2))
 			platform_recover(1);
 		device_resume(suspend_time ?
 			((error & 1) ? PMSG_RECOVER : PMSG_THAW) :
 			PMSG_RESTORE);
-	case ATOMIC_STEP_RESUME_CONSOLE:
 		resume_console();
-	case ATOMIC_STEP_PLATFORM_END:
 		platform_end(1);
 
 		toi_prepare_status(DONT_CLEAR_BAR, "Post atomic.");
