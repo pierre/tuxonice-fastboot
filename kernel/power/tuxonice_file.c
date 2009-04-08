@@ -243,10 +243,9 @@ static int apply_header_reservation(void)
 
 	/* Apply header space reservation */
 	toi_extent_state_goto_start(&toi_writer_posn);
-	toi_bio_ops.forward_one_page(0); /* To first page */
 
 	for (i = 0; i < header_pages_reserved; i++)
-		if (toi_bio_ops.forward_one_page(0))
+		if (toi_bio_ops.forward_one_page(1, 0))
 			return -ENOSPC;
 
 	/* The end of header pages will be the start of pageset 2 */
@@ -278,8 +277,7 @@ static int populate_block_list(void)
 		if (!has_contiguous_blocks(i))
 			continue;
 
-		new_sector = bmap(target_inode,
-		(i * devinfo.blocks_per_page));
+		new_sector = bmap(target_inode, (i * devinfo.blocks_per_page));
 
 		/*
 		 * Ignore the first block in the file.
@@ -534,7 +532,6 @@ static int toi_file_release_storage(void)
 static void toi_file_reserve_header_space(int request)
 {
 	header_pages_reserved = request;
-	apply_header_reservation();
 }
 
 static int toi_file_allocate_storage(int main_space_requested)
@@ -549,7 +546,7 @@ static int toi_file_allocate_storage(int main_space_requested)
 
 	/* Only release_storage reduces the size */
 	if (blocks_to_get < 1)
-		return 0;
+		return apply_header_reservation();
 
 	result = populate_block_list();
 
@@ -616,17 +613,17 @@ static int toi_file_write_header_init(void)
 static int toi_file_write_header_cleanup(void)
 {
 	struct toi_file_header *header;
-	int result;
+	int result, result2;
 	unsigned long sig_page = toi_get_zeroed_page(38, TOI_ATOMIC_GFP);
 
 	/* Write any unsaved data */
-	if (toi_writer_buffer_posn)
-		toi_bio_ops.write_header_chunk_finish();
+	result = toi_bio_ops.write_header_chunk_finish();
 
-	toi_bio_ops.finish_all_io();
+	if (result)
+		goto out;
 
 	toi_extent_state_goto_start(&toi_writer_posn);
-	toi_bio_ops.forward_one_page(1);
+	toi_bio_ops.forward_one_page(1, 1);
 
 	/* Adjust image header */
 	result = toi_bio_ops.bdev_page_io(READ, toi_file_target_bdev,
@@ -646,10 +643,10 @@ static int toi_file_write_header_cleanup(void)
 			virt_to_page(sig_page));
 
 out:
-	toi_bio_ops.finish_all_io();
+	result2 = toi_bio_ops.finish_all_io();
 	toi_free_page(38, sig_page);
 
-	return result;
+	return result ? result : result2;
 }
 
 /* HEADER READING */
@@ -741,7 +738,7 @@ static int toi_file_read_header_cleanup(void)
 static int toi_file_signature_op(int op)
 {
 	char *cur;
-	int result = 0, changed = 0;
+	int result = 0, result2, changed = 0;
 	struct toi_file_header *header;
 
 	if (!toi_file_target_bdev || IS_ERR(toi_file_target_bdev))
@@ -799,9 +796,9 @@ static int toi_file_signature_op(int op)
 	}
 
 out:
-	toi_bio_ops.finish_all_io();
+	result2 = toi_bio_ops.finish_all_io();
 	toi_free_page(17, (unsigned long) cur);
-	return result;
+	return result ? result : result2;
 }
 
 /**
@@ -840,10 +837,10 @@ static int toi_file_print_debug_stats(char *buffer, int size)
  **/
 static int toi_file_storage_needed(void)
 {
-	return sig_size + strlen(toi_file_target) + 1 +
+	return strlen(toi_file_target) + 1 +
 		sizeof(toi_writer_posn_save) +
 		sizeof(devinfo) +
-		sizeof(struct hibernate_extent_chain) - 2 * sizeof(void *) +
+		2 * sizeof(int) +
 		(2 * sizeof(unsigned long) * block_chain.num_extents);
 }
 
@@ -1149,10 +1146,7 @@ static int toi_file_save_config_info(char *buffer)
  **/
 static void toi_file_load_config_info(char *buffer, int size)
 {
-	if (size != 0)
-		strlcpy(toi_file_target, buffer, size);
-	else
-		strcpy(toi_file_target, buffer);
+	strlcpy(toi_file_target, buffer, size);
 }
 
 static int toi_file_initialise(int starting_cycle)

@@ -212,10 +212,11 @@ static void update_throughput_throttle(int jif_index)
  *
  * Flush any queued but unsubmitted I/O and wait for it all to complete.
  **/
-static void toi_finish_all_io(void)
+static int toi_finish_all_io(void)
 {
-	toi_bio_queue_flush_pages(0);
+	int result = toi_bio_queue_flush_pages(0);
 	wait_event(num_in_progress_wait, !TOTAL_OUTSTANDING_IO);
+	return result;
 }
 
 /**
@@ -303,7 +304,7 @@ static int submit(int writing, struct block_device *dev, sector_t first_block,
 	bio->bi_end_io = toi_end_bio;
 
 	if (bio_add_page(bio, page, PAGE_SIZE, 0) < PAGE_SIZE) {
-		printk(KERN_INFO "ERROR: adding page to bio at %lld\n",
+		printk(KERN_DEBUG "ERROR: adding page to bio at %lld\n",
 				(unsigned long long) first_block);
 		bio_put(bio);
 		return -EFAULT;
@@ -487,7 +488,7 @@ static void dump_block_chains(void)
 		if (!this)
 			continue;
 
-		printk(KERN_INFO "Chain %d:", i);
+		printk(KERN_DEBUG "Chain %d:", i);
 
 		while (this) {
 			printk(" [%lu-%lu]%s", this->start,
@@ -499,10 +500,28 @@ static void dump_block_chains(void)
 	}
 
 	for (i = 0; i < 4; i++)
-		printk(KERN_INFO "Posn %d: Chain %d, extent %d, offset %lu.\n",
+		printk(KERN_DEBUG "Posn %d: Chain %d, extent %d, offset %lu.\n",
 				i, toi_writer_posn_save[i].chain_num,
 				toi_writer_posn_save[i].extent_num,
 				toi_writer_posn_save[i].offset);
+}
+
+static int total_header_bytes;
+static int unowned;
+
+static int debug_broken_header(void)
+{
+	printk(KERN_DEBUG "Image header too big for size allocated!\n");
+	print_toi_header_storage_for_modules();
+	printk(KERN_DEBUG "Page flags : %d.\n", toi_pageflags_space_needed());
+	printk(KERN_DEBUG "toi_header : %ld.\n", sizeof(struct toi_header));
+	printk(KERN_DEBUG "Total unowned : %d.\n", unowned);
+	printk(KERN_DEBUG "Total used : %d (%ld pages).\n", total_header_bytes,
+			DIV_ROUND_UP(total_header_bytes, PAGE_SIZE));
+	printk(KERN_DEBUG "Space needed now : %ld.\n", get_header_storage_needed());
+	dump_block_chains();
+	abort_hibernate(TOI_HEADER_TOO_BIG, "Header reservation too small.");
+	return -EIO;
 }
 
 /**
@@ -513,7 +532,7 @@ static void dump_block_chains(void)
  * set at the start of reading the image header, to skip the first page
  * of the header, which is read without using the extent chains.
  **/
-static int go_next_page(int writing)
+static int go_next_page(int writing, int section_barrier)
 {
 	int i, max = (toi_writer_posn.current_chain == -1) ? 1 :
 	  toi_devinfo[toi_writer_posn.current_chain].blocks_per_page,
@@ -532,13 +551,14 @@ static int go_next_page(int writing)
 		break;
 	}
 
-	if (toi_writer_posn.current_chain ==
+	if (section_barrier && toi_writer_posn.current_chain ==
 			toi_writer_posn_save[compare_to].chain_num &&
 	    toi_writer_posn.current_offset ==
 			toi_writer_posn_save[compare_to].offset) {
-		if (writing)
-		       BUG_ON(!current_stream);
-		else {
+		if (writing) {
+		       if (!current_stream)
+			       return debug_broken_header();
+		} else {
 			more_readahead = 0;
 			return -ENODATA;
 		}
@@ -550,8 +570,8 @@ static int go_next_page(int writing)
 
 	if (toi_extent_state_eof(&toi_writer_posn)) {
 		/* Don't complain if readahead falls off the end */
-		if (writing) {
-			printk(KERN_INFO "Extent state eof. "
+		if (writing && section_barrier) {
+			printk(KERN_DEBUG "Extent state eof. "
 				"Expected compression ratio too optimistic?\n");
 			dump_block_chains();
 		}
@@ -560,7 +580,7 @@ static int go_next_page(int writing)
 
 	if (extra_page_forward) {
 		extra_page_forward = 0;
-		return go_next_page(writing);
+		return go_next_page(writing, section_barrier);
 	}
 
 	return 0;
@@ -592,9 +612,10 @@ static int toi_bio_rw_page(int writing, struct page *page,
 		int is_readahead, int free_group)
 {
 	struct toi_bdev_info *dev_info;
+	int result = go_next_page(writing, 1);
 
-	if (go_next_page(writing)) 
-		return -ENODATA;
+	if (result)
+		return result;
 
 	dev_info = &toi_devinfo[toi_writer_posn.current_chain];
 
@@ -681,7 +702,7 @@ static void toi_bio_queue_write(char **full_buffer)
  **/
 static int toi_rw_cleanup(int writing)
 {
-	int i;
+	int i, result;
 
 	if (writing) {
 		int result;
@@ -702,7 +723,7 @@ static int toi_rw_cleanup(int writing)
 					&toi_writer_posn_save[3]);
 	}
 
-	toi_finish_all_io();
+	result = toi_finish_all_io();
 
 	while (readahead_list_head) {
 		void *next = (void *) readahead_list_head->private;
@@ -713,18 +734,18 @@ static int toi_rw_cleanup(int writing)
 	readahead_list_tail = NULL;
 
 	if (!current_stream)
-		return 0;
+		return result;
 
 	for (i = 0; i < NUM_REASONS; i++) {
 		if (!atomic_read(&reasons[i]))
 			continue;
-		printk(KERN_INFO "Waited for i/o due to %s %d times.\n",
+		printk(KERN_DEBUG "Waited for i/o due to %s %d times.\n",
 				reason_name[i], atomic_read(&reasons[i]));
 		atomic_set(&reasons[i], 0);
 	}
 
 	current_stream = 0;
-	return 0;
+	return result;
 }
 
 /**
@@ -798,7 +819,7 @@ static int toi_start_new_readahead(int dedicated_thread)
 			if (last_result == -ENOMEM || last_result == -ENODATA)
 				return 0;
 
-			printk(KERN_INFO
+			printk(KERN_DEBUG
 				"Begin read chunk returned %d.\n",
 				last_result);
 		} else
@@ -816,13 +837,13 @@ static int toi_start_new_readahead(int dedicated_thread)
  * bio_io_flusher - start the dedicated I/O flushing routine
  * @writing: Whether we're writing the image.
  **/
-static void bio_io_flusher(int writing)
+static int bio_io_flusher(int writing)
 {
 
 	if (writing)
-		toi_bio_queue_flush_pages(1);
+		return toi_bio_queue_flush_pages(1);
 	else
-		toi_start_new_readahead(1);
+		return toi_start_new_readahead(1);
 }
 
 /**
@@ -843,7 +864,7 @@ static int toi_bio_get_next_page_read(int no_readahead)
 	 * extents out of the first page.
 	 */
 	if (unlikely(no_readahead && toi_start_one_readahead(0))) {
-		printk(KERN_INFO "No readahead and toi_start_one_readahead "
+		printk(KERN_DEBUG "No readahead and toi_start_one_readahead "
 				"returned non-zero.\n");
 		return -EIO;
 	}
@@ -851,7 +872,7 @@ static int toi_bio_get_next_page_read(int no_readahead)
 	if (unlikely(!readahead_list_head)) {
 		BUG_ON(!more_readahead);
 		if (unlikely(toi_start_one_readahead(0))) {
-			printk(KERN_INFO "No readahead and "
+			printk(KERN_DEBUG "No readahead and "
 			 "toi_start_one_readahead returned non-zero.\n");
 			return -EIO;
 		}
@@ -885,6 +906,9 @@ static int toi_bio_get_next_page_read(int no_readahead)
  * Since that's the case, we must be careful to only have one thread
  * doing this work at a time. Otherwise we have a race and could save
  * pages out of order.
+ *
+ * If an error occurs, free all remaining pages without submitting them
+ * for I/O.
  **/
 
 int toi_bio_queue_flush_pages(int dedicated_thread)
@@ -907,9 +931,10 @@ top:
 			bio_queue_tail = NULL;
 		atomic_dec(&toi_bio_queue_size);
 		spin_unlock_irqrestore(&bio_queue_lock, flags);
-		result = toi_bio_rw_page(WRITE, page, 0, 11);
+		if (!result)
+			result = toi_bio_rw_page(WRITE, page, 0, 11);
 		if (result)
-			goto out;
+			toi__free_page(11 , page);
 		spin_lock_irqsave(&bio_queue_lock, flags);
 	}
 	spin_unlock_irqrestore(&bio_queue_lock, flags);
@@ -922,7 +947,6 @@ top:
 		toi_bio_queue_flusher_should_finish = 0;
 	}
 
-out:
 	busy = 0;
 	return result;
 }
@@ -1021,7 +1045,7 @@ static int toi_bio_read_page(unsigned long *pfn, struct page *buffer_page,
 	if (current == toi_queue_flusher) {
 		int result2 = toi_start_new_readahead(0);
 		if (result2) {
-			printk(KERN_INFO "Queue flusher and "
+			printk(KERN_DEBUG "Queue flusher and "
 			 "toi_start_one_readahead returned non-zero.\n");
 			result = -EIO;
 			goto out;
@@ -1083,7 +1107,7 @@ static int toi_bio_write_page(unsigned long pfn, struct page *buffer_page,
 	if (toi_rw_buffer(WRITE, (char *) &pfn, sizeof(unsigned long), 0) ||
 	    toi_rw_buffer(WRITE, (char *) &buf_size, sizeof(int), 0) ||
 	    toi_rw_buffer(WRITE, buffer_virt, buf_size, 0)) {
-		printk(KERN_INFO "toi_rw_buffer returned non-zero to "
+		printk(KERN_DEBUG "toi_rw_buffer returned non-zero to "
 				"toi_bio_write_page.\n");
 		result = -EIO;
 	}
@@ -1117,7 +1141,8 @@ static int _toi_rw_header_chunk(int writing, struct toi_module_ops *owner,
 	if (owner) {
 		owner->header_used += buffer_size;
 		toi_message(TOI_HEADER, TOI_LOW, 1,
-			"Header: %s : %d bytes (%d/%d).",
+			"Header: %s : %d bytes (%d/%d).\n",
+			owner->name,
 			buffer_size, owner->header_used,
 			owner->header_requested);
 		if (owner->header_used > owner->header_requested) {
@@ -1128,9 +1153,12 @@ static int _toi_rw_header_chunk(int writing, struct toi_module_ops *owner,
 				owner->header_requested);
 			return buffer_size;
 		}
-	} else
+	} else {
+		unowned += buffer_size;
 		toi_message(TOI_HEADER, TOI_LOW, 1,
-			"Header: (No owner): %d bytes.\n", buffer_size);
+			"Header: (No owner): %d bytes (%d total so far)\n",
+			buffer_size, unowned);
+	}
 
 	if (!writing && !no_readahead)
 		result = toi_start_new_readahead(0);
@@ -1139,6 +1167,7 @@ static int _toi_rw_header_chunk(int writing, struct toi_module_ops *owner,
 		result = toi_rw_buffer(writing, buffer, buffer_size,
 				no_readahead);
 
+	total_header_bytes += buffer_size;
 	return result;
 }
 
@@ -1164,8 +1193,10 @@ static int write_header_chunk_finish(void)
 	if (toi_writer_buffer_posn)
 		toi_bio_queue_write(&toi_writer_buffer);
 
-	toi_finish_all_io();
+	result = toi_finish_all_io();
 
+	unowned = 0;
+	total_header_bytes = 0;
 	return result;
 }
 
@@ -1174,7 +1205,7 @@ static int write_header_chunk_finish(void)
  **/
 static int toi_bio_storage_needed(void)
 {
-	return 2 * sizeof(int);
+	return sizeof(int);
 }
 
 /**

@@ -20,7 +20,7 @@
 #include <asm/setup.h>
 #include "tuxonice_pageflags.h"
 
-#define TOI_CORE_VERSION "3.0"
+#define TOI_CORE_VERSION "3.0.1"
 
 #define MY_BOOT_KERNEL_DATA_VERSION 1
 
@@ -98,6 +98,7 @@ enum {
 	TOI_PRE_RESTORE_FAILED,
 	TOI_USERMODE_HELPERS_ERR,
 	TOI_CANT_USE_ALT_RESUME,
+	TOI_HEADER_TOO_BIG,
 	TOI_NUM_RESULT_STATES	/* Used in printing debug info only */
 };
 

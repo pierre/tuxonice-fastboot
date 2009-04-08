@@ -20,7 +20,6 @@
 #include "tuxonice_io.h"
 #include "tuxonice.h"
 #include "tuxonice_extent.h"
-#include "tuxonice_block_io.h"
 #include "tuxonice_netlink.h"
 #include "tuxonice_prepare_image.h"
 #include "tuxonice_ui.h"
