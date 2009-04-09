@@ -37,8 +37,6 @@
 #include <linux/delay.h>
 #include <linux/tick.h>
 #include <linux/kallsyms.h>
-#include <linux/notifier.h>
-#include <linux/suspend.h>
 
 #include <asm/uaccess.h>
 #include <asm/unistd.h>
@@ -1141,59 +1139,6 @@ unsigned long avenrun[3];
 
 EXPORT_SYMBOL(avenrun);
 
-#ifdef CONFIG_PM
-static unsigned long avenrun_save[3];
-/*
- * save_avenrun - Record the values prior to starting a hibernation cycle.
- * We do this to make the work done in hibernation invisible to userspace
- * post-suspend. Some programs, including some MTAs, watch the load average
- * and stop work until it lowers. Without this, they would stop working for
- * a while post-resume, unnecessarily.
- */
-
-static void save_avenrun(void)
-{
-	avenrun_save[0] = avenrun[0];
-	avenrun_save[1] = avenrun[1];
-	avenrun_save[2] = avenrun[2];
-}
-
-static void restore_avenrun(void)
-{
-	if (!avenrun_save[0])
-		return;
-
-	avenrun[0] = avenrun_save[0];
-	avenrun[1] = avenrun_save[1];
-	avenrun[2] = avenrun_save[2];
-
-	avenrun_save[0] = 0;
-}
-
-static int avenrun_pm_callback(struct notifier_block *nfb,
-					unsigned long action,
-					void *ignored)
-{
-	switch (action) {
-	case PM_HIBERNATION_PREPARE:
-		save_avenrun();
-		return NOTIFY_OK;
-	case PM_POST_HIBERNATION:
-		restore_avenrun();
-		return NOTIFY_OK;
-	}
-
-	return NOTIFY_DONE;
-}
-
-static void register_pm_notifier_callback(void)
-{
-	pm_notifier(avenrun_pm_callback, 0);
-}
-#else
-static inline void register_pm_notifier_callback(void) { }
-#endif
-
 /*
  * calc_load - given tick count, update the avenrun load estimates.
  * This is called while holding a write_lock on xtime_lock.
@@ -1688,7 +1633,6 @@ void __init init_timers(void)
 	BUG_ON(err == NOTIFY_BAD);
 	register_cpu_notifier(&timers_nb);
 	open_softirq(TIMER_SOFTIRQ, run_timer_softirq);
-	register_pm_notifier_callback();
 }
 
 /**
