@@ -245,8 +245,6 @@ void memory_bm_position_reset(struct memory_bitmap *bm)
 	bm->iter.bit = 0;
 }
 
-void memory_bm_free(struct memory_bitmap *bm, int clear_nosave_free);
-
 /**
  *	create_bm_block_list - create a list of block bitmap objects
  *	@nr_blocks - number of blocks to allocate

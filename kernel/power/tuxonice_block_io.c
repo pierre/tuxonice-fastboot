@@ -513,7 +513,8 @@ static int debug_broken_header(void)
 	printk(KERN_DEBUG "Total unowned : %d.\n", unowned);
 	printk(KERN_DEBUG "Total used : %d (%ld pages).\n", total_header_bytes,
 			DIV_ROUND_UP(total_header_bytes, PAGE_SIZE));
-	printk(KERN_DEBUG "Space needed now : %ld.\n", get_header_storage_needed());
+	printk(KERN_DEBUG "Space needed now : %ld.\n",
+			get_header_storage_needed());
 	dump_block_chains();
 	abort_hibernate(TOI_HEADER_TOO_BIG, "Header reservation too small.");
 	return -EIO;
