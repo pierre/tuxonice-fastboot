@@ -420,6 +420,7 @@ long get_header_storage_needed(void)
 
 	return DIV_ROUND_UP(bytes, PAGE_SIZE);
 }
+EXPORT_SYMBOL_GPL(get_header_storage_needed);
 
 /*
  * When freeing memory, pages from either pageset might be freed.
