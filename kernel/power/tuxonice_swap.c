@@ -1010,14 +1010,14 @@ static int toi_swap_image_exists(int quiet)
 	}
 
 	if (!resume_block_device) {
-	    resume_block_device = open_bdev(MAX_SWAPFILES, resume_swap_dev_t,
-			    1);
-	    if (IS_ERR(resume_block_device)) {
-		if (!quiet)
-			printk(KERN_INFO "Failed to open resume dev_t (%x).\n",
-				resume_swap_dev_t);
-		return -1;
-	    }
+		resume_block_device = open_bdev(MAX_SWAPFILES,
+				resume_swap_dev_t, 1);
+		if (IS_ERR(resume_block_device)) {
+			if (!quiet)
+				printk(KERN_INFO "Failed to open resume dev_t"
+						" (%x).\n", resume_swap_dev_t);
+			return -1;
+		}
 	}
 
 	signature_found = parse_signature();

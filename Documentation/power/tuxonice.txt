@@ -332,7 +332,7 @@
    writeable ones are accessible only to the root user. You may want to
    configure sudo to allow you to invoke your hibernate script as an ordinary
    user.
- 
+
    - compression/algorithm
 
    Set the cryptoapi algorithm used for compressing the image.
