@@ -204,6 +204,7 @@ static inline int load_direct(struct page *page)
 }
 
 extern int do_check_can_resume(void);
+extern int do_toi_step(int step);
 extern int toi_launch_userspace_program(char *command, int channel_no,
 		enum umh_wait wait, int debug);
 
