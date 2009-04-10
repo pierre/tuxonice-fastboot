@@ -104,7 +104,7 @@ static char post_hibernate_command[256];
 char *tuxonice_signature = "\xed\xc3\x02\xe9\x98\x56\xe5\x0c";
 EXPORT_SYMBOL_GPL(tuxonice_signature);
 
-int do_toi_step(int step);
+static int do_toi_step(int step);
 
 unsigned long boot_kernel_data_buffer;
 
@@ -941,7 +941,7 @@ static void prepare_restore_load_alt_image(int prepare)
  * is in preparation for implementing cluster support, and perhaps replacing
  * uswsusp too (haven't looked whether that's possible yet).
  **/
-int do_toi_step(int step)
+static int do_toi_step(int step)
 {
 	switch (step) {
 	case STEP_HIBERNATE_PREPARE_IMAGE:
