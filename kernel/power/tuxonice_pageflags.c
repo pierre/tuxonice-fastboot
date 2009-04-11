@@ -25,3 +25,4 @@ int toi_pageflags_space_needed(void)
 
 	return total;
 }
+EXPORT_SYMBOL_GPL(toi_pageflags_space_needed);
