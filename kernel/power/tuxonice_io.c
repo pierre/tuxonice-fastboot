@@ -541,8 +541,7 @@ static int worker_rw_loop(void *data)
 				MB(io_base+my_io_index+1), MB(io_barmax));
 
 		if (my_io_index == io_pc) {
-			printk("%s%d%%...", io_pc_step == 1 ? KERN_ERR : "",
-					20 * io_pc_step);
+			printk(KERN_ERR "...%d%%.\n", 20 * io_pc_step);
 			io_pc_step++;
 			io_pc = io_finish_at * io_pc_step / 5;
 		}
@@ -677,8 +676,6 @@ static int do_rw_loop(int write, int finish_at, struct memory_bitmap *pageflags,
 
 	if (!io_result && !result && !test_result_state(TOI_ABORTED)) {
 		unsigned long next;
-
-		printk("done.\n");
 
 		toi_update_status(io_base + io_finish_at, io_barmax,
 				" %d/%d MB ",
