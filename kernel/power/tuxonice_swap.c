@@ -512,7 +512,8 @@ static int get_main_pool_phys_params(void)
 
 		if (extent_min > -1 && add_blocks_to_extent_chain(last_chain,
 					extent_min, extent_max)) {
-			printk("Out of memory while making block chains.\n");
+			printk(KERN_ERR "Out of memory while making block "
+					"chains.\n");
 			return -ENOMEM;
 		}
 
@@ -523,8 +524,8 @@ static int get_main_pool_phys_params(void)
 
 	if (extent_min > -1 && add_blocks_to_extent_chain(last_chain,
 				extent_min, extent_max)) {
-			printk("Out of memory while making block chains.\n");
-			return -ENOMEM;
+		printk(KERN_ERR "Out of memory while making block chains.\n");
+		return -ENOMEM;
 	}
 
 	return apply_header_reservation();
