@@ -1069,13 +1069,21 @@ static int toi_file_parse_sig_location(char *commandline,
 	if (!setting_toi_file_target) /* Concurrent write via /sys? */
 		__test_toi_file_target(toi_file_target, 1, 0);
 
-	if (colon)
-		target_firstblock = (int) simple_strtoul(colon + 1, NULL, 0);
-	else
+	if (colon) {
+		unsigned long block;
+		result = strict_strtoul(colon + 1, 0, &block);
+		if (result)
+			goto out;
+		target_firstblock = (int) block;
+	} else
 		target_firstblock = 0;
 
 	if (at_symbol) {
-		target_blocksize = (int) simple_strtoul(at_symbol + 1, NULL, 0);
+		unsigned long block_size;
+		result = strict_strtoul(at_symbol + 1, 0, &block_size);
+		if (result)
+			goto out;
+		target_blocksize = (int) block_size;
 		if (target_blocksize & (SECTOR_SIZE - 1)) {
 			printk(KERN_INFO "FileAllocator: Blocksizes are "
 					 "multiples of %d.\n", SECTOR_SIZE);
