@@ -229,14 +229,14 @@ void toi_power_down(void)
 			printk(KERN_INFO "Failed to read epoch file (%d).\n",
 					(int) size);
 		else {
-			unsigned long since_epoch =
-				simple_strtol(array, NULL, 0);
+			unsigned long since_epoch;
+			if (!strict_strtoul(array, 0, &since_epoch)) {
+				/* Clear any wakeup time. */
+				write_alarm_file(0);
 
-			/* Clear any wakeup time. */
-			write_alarm_file(0);
-
-			/* Set new wakeup time. */
-			write_alarm_file(since_epoch + wake_delay);
+				/* Set new wakeup time. */
+				write_alarm_file(since_epoch + wake_delay);
+			}
 		}
 	}
 
