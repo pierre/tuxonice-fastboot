@@ -481,7 +481,7 @@ static void do_cleanup(int get_debug_info, int restarting)
 		/* Printk can only handle 1023 bytes, including
 		 * its level mangling. */
 		for (i = 0; i < 3; i++)
-			printk("%s", buffer + (1023 * i));
+			printk(KERN_ERR "%s", buffer + (1023 * i));
 		toi_free_page(20, (unsigned long) buffer);
 	}
 
