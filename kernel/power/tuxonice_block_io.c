@@ -553,8 +553,8 @@ static int go_next_page(int writing, int section_barrier)
 	if (section_barrier && chain_num == compare_chain &&
 	    toi_writer_posn.current_offset == compare_offset) {
 		if (writing) {
-		       if (!current_stream)
-			       return debug_broken_header();
+			if (!current_stream)
+				return debug_broken_header();
 		} else {
 			more_readahead = 0;
 			return -ENODATA;
