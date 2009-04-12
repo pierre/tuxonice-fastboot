@@ -479,7 +479,7 @@ void memory_bm_set_bit(struct memory_bitmap *bm, unsigned long pfn)
 }
 EXPORT_SYMBOL_GPL(memory_bm_set_bit);
 
-int mem_bm_set_bit_check(struct memory_bitmap *bm, unsigned long pfn)
+static int mem_bm_set_bit_check(struct memory_bitmap *bm, unsigned long pfn)
 {
 	void *addr;
 	unsigned int bit;

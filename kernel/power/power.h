@@ -299,7 +299,6 @@ struct memory_bitmap {
 					 */
 };
 
-
 extern int memory_bm_create(struct memory_bitmap *bm, gfp_t gfp_mask,
 		int safe_needed);
 extern void memory_bm_free(struct memory_bitmap *bm, int clear_nosave_free);
