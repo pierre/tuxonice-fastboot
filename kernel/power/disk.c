@@ -22,6 +22,7 @@
 #include <linux/console.h>
 #include <linux/cpu.h>
 #include <linux/freezer.h>
+#include <scsi/scsi_scan.h>
 #include <asm/suspend.h>
 
 #include "power.h"
@@ -666,6 +667,13 @@ int software_resume(void)
 	 */
 	if (noresume)
 		return 0;
+
+	/*
+	 * We can't depend on SCSI devices being available after loading one of
+	 * their modules if scsi_complete_async_scans() is not called and the
+	 * resume device usually is a SCSI one.
+	 */
+	scsi_complete_async_scans();
 
 	/*
 	 * name_to_dev_t() below takes a sysfs buffer mutex when sysfs
