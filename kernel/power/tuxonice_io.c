@@ -1239,6 +1239,8 @@ static int __read_pageset1(void)
 	for (i = 0; i < 4; i++)
 		toi_bkd.toi_io_time[i/2][i%2] =
 			toi_header->io_time[i/2][i%2];
+
+	set_toi_state(TOI_BOOT_KERNEL);
 	boot_kernel_data_buffer = toi_header->bkd;
 
 	/* Read module configurations */
