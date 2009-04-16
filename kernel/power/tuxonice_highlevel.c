@@ -449,10 +449,12 @@ static void do_cleanup(int get_debug_info, int restarting)
 	set_highmem_size(pagedir2, 0);
 
 	if (boot_kernel_data_buffer) {
-		toi_free_page(37, boot_kernel_data_buffer);
+		if (!test_toi_state(TOI_BOOT_KERNEL))
+			toi_free_page(37, boot_kernel_data_buffer);
 		boot_kernel_data_buffer = 0;
 	}
 
+	clear_toi_state(TOI_BOOT_KERNEL);
 	thaw_processes();
 
 	if (test_action_state(TOI_KEEP_IMAGE) &&
