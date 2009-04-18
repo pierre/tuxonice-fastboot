@@ -20,7 +20,6 @@
  *
  */
 
-#include <linux/module.h>
 #include <linux/highmem.h>
 #include <linux/freezer.h>
 #include <linux/hardirq.h>

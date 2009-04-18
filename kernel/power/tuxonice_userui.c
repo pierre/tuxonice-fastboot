@@ -28,7 +28,6 @@
 #include <linux/ctype.h>
 #include <linux/tty.h>
 #include <linux/vt_kern.h>
-#include <linux/module.h>
 #include <linux/reboot.h>
 #include <linux/kmod.h>
 #include <linux/security.h>
