@@ -25,7 +25,6 @@
 #include <scsi/scsi_scan.h>
 #include <asm/suspend.h>
 
-#include "power.h"
 #include "tuxonice.h"
 
 static int noresume = 0;
