@@ -30,7 +30,6 @@
  */
 
 #include <linux/suspend.h>
-#include <linux/module.h>
 #include <linux/blkdev.h>
 #include <linux/file.h>
 #include <linux/stat.h>

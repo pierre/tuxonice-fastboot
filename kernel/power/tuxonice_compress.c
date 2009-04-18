@@ -9,7 +9,6 @@
  * using cryptoapi.
  */
 
-#include <linux/module.h>
 #include <linux/suspend.h>
 #include <linux/highmem.h>
 #include <linux/vmalloc.h>

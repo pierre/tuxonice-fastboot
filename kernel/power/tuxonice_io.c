@@ -17,7 +17,6 @@
 #include <linux/utsname.h>
 #include <linux/mount.h>
 #include <linux/highmem.h>
-#include <linux/module.h>
 #include <linux/kthread.h>
 #include <linux/cpu.h>
 #include <linux/fs_struct.h>

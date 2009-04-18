@@ -6,7 +6,6 @@
  */
 
 #include <linux/suspend.h>
-#include <linux/module.h>
 #include "tuxonice.h"
 #include "tuxonice_modules.h"
 #include "tuxonice_sysfs.h"
