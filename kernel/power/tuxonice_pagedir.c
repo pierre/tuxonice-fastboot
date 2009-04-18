@@ -26,7 +26,6 @@
 #include "tuxonice_pagedir.h"
 #include "tuxonice_prepare_image.h"
 #include "tuxonice.h"
-#include "power.h"
 #include "tuxonice_builtin.h"
 #include "tuxonice_alloc.h"
 

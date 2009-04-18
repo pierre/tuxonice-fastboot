@@ -11,7 +11,6 @@
 
 #include <linux/utsname.h>
 #include "tuxonice_pagedir.h"
-#include "power.h"
 
 /* Non-module data saved in our image header */
 struct toi_header {
