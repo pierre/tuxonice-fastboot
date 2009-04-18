@@ -7,7 +7,6 @@
  */
 
 #include <linux/sysfs.h>
-#include "power.h"
 
 struct toi_sysfs_data {
 	struct attribute attr;
