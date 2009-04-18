@@ -19,7 +19,6 @@
 #include "tuxonice_storage.h"
 #include "tuxonice_power_off.h"
 #include "tuxonice_ui.h"
-#include "power.h"
 #include "tuxonice_io.h"
 #include "tuxonice_prepare_image.h"
 #include "tuxonice_pageflags.h"
