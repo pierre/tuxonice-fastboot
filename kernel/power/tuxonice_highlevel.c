@@ -68,7 +68,6 @@
  */
 
 #include <linux/suspend.h>
-#include <linux/module.h>
 #include <linux/freezer.h>
 #include <linux/utsrelease.h>
 #include <linux/cpu.h>
