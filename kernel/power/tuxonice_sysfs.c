@@ -12,7 +12,6 @@
  */
 
 #include <linux/suspend.h>
-#include <linux/module.h>
 
 #include "tuxonice_sysfs.h"
 #include "tuxonice.h"

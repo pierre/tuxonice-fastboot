@@ -8,7 +8,6 @@
  * These functions encapsulate the manipulation of storage metadata.
  */
 
-#include <linux/module.h>
 #include <linux/suspend.h>
 #include "tuxonice_modules.h"
 #include "tuxonice_extent.h"
