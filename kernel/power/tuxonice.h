@@ -19,6 +19,7 @@
 #include <linux/kmod.h>
 #include <asm/setup.h>
 #include "tuxonice_pageflags.h"
+#include "power.h"
 
 #define TOI_CORE_VERSION "3.0.1"
 

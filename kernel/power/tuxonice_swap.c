@@ -10,7 +10,6 @@
  */
 
 #include <linux/suspend.h>
-#include <linux/module.h>
 #include <linux/blkdev.h>
 #include <linux/swapops.h>
 #include <linux/swap.h>
@@ -512,7 +511,8 @@ static int get_main_pool_phys_params(void)
 
 		if (extent_min > -1 && add_blocks_to_extent_chain(last_chain,
 					extent_min, extent_max)) {
-			printk("Out of memory while making block chains.\n");
+			printk(KERN_ERR "Out of memory while making block "
+					"chains.\n");
 			return -ENOMEM;
 		}
 
@@ -523,8 +523,8 @@ static int get_main_pool_phys_params(void)
 
 	if (extent_min > -1 && add_blocks_to_extent_chain(last_chain,
 				extent_min, extent_max)) {
-			printk("Out of memory while making block chains.\n");
-			return -ENOMEM;
+		printk(KERN_ERR "Out of memory while making block chains.\n");
+		return -ENOMEM;
 	}
 
 	return apply_header_reservation();
@@ -1011,14 +1011,14 @@ static int toi_swap_image_exists(int quiet)
 	}
 
 	if (!resume_block_device) {
-	    resume_block_device = open_bdev(MAX_SWAPFILES, resume_swap_dev_t,
-			    1);
-	    if (IS_ERR(resume_block_device)) {
-		if (!quiet)
-			printk(KERN_INFO "Failed to open resume dev_t (%x).\n",
-				resume_swap_dev_t);
-		return -1;
-	    }
+		resume_block_device = open_bdev(MAX_SWAPFILES,
+				resume_swap_dev_t, 1);
+		if (IS_ERR(resume_block_device)) {
+			if (!quiet)
+				printk(KERN_INFO "Failed to open resume dev_t"
+						" (%x).\n", resume_swap_dev_t);
+			return -1;
+		}
 	}
 
 	signature_found = parse_signature();
@@ -1119,7 +1119,7 @@ static int toi_swap_parse_sig_location(char *commandline,
 		int only_allocator, int quiet)
 {
 	char *thischar, *devstart, *colon = NULL;
-	int signature_found, result = -EINVAL, temp_result;
+	int signature_found, result = -EINVAL, temp_result = 0;
 
 	if (strncmp(commandline, "swap:", 5)) {
 		/*
@@ -1147,15 +1147,19 @@ static int toi_swap_parse_sig_location(char *commandline,
 	while ((thischar - commandline) < 250 && *thischar)
 		thischar++;
 
-	if (colon)
-		resume_firstblock = (int) simple_strtoul(colon + 1, NULL, 0);
-	else
+	if (colon) {
+		unsigned long block;
+		temp_result = strict_strtoul(colon + 1, 0, &block);
+		if (!temp_result)
+			resume_firstblock = (int) block;
+	} else
 		resume_firstblock = 0;
 
 	clear_toi_state(TOI_CAN_HIBERNATE);
 	clear_toi_state(TOI_CAN_RESUME);
 
-	temp_result = try_to_parse_resume_device(devstart, quiet);
+	if (!temp_result)
+		temp_result = try_to_parse_resume_device(devstart, quiet);
 
 	if (colon)
 		*colon = ':';

@@ -12,7 +12,6 @@
  */
 
 #include <linux/suspend.h>
-#include <linux/module.h>
 
 #include "tuxonice_sysfs.h"
 #include "tuxonice.h"
@@ -112,7 +111,10 @@ static ssize_t toi_attr_store(struct kobject *kobj, struct attribute *attr,
 		break;
 	case TOI_SYSFS_DATA_BIT:
 		{
-		int value = simple_strtoul(my_buf, NULL, 0);
+		unsigned long value;
+		result = strict_strtoul(my_buf, 0, &value);
+		if (result)
+			break;
 		if (value)
 			set_bit(sysfs_data->data.bit.bit,
 				(sysfs_data->data.bit.bit_vector));
@@ -123,17 +125,21 @@ static ssize_t toi_attr_store(struct kobject *kobj, struct attribute *attr,
 		break;
 	case TOI_SYSFS_DATA_INTEGER:
 		{
-			int *variable =
-				sysfs_data->data.integer.variable;
-			*variable = simple_strtol(my_buf, NULL, 0);
-			BOUND(variable, integer);
+			long temp;
+			result = strict_strtol(my_buf, 0, &temp);
+			if (result)
+				break;
+			*(sysfs_data->data.integer.variable) = (int) temp;
+			BOUND(sysfs_data->data.integer.variable, integer);
 			break;
 		}
 	case TOI_SYSFS_DATA_LONG:
 		{
 			long *variable =
 				sysfs_data->data.a_long.variable;
-			*variable = simple_strtol(my_buf, NULL, 0);
+			result = strict_strtol(my_buf, 0, variable);
+			if (result)
+				break;
 			BOUND(variable, a_long);
 			break;
 		}
@@ -141,7 +147,9 @@ static ssize_t toi_attr_store(struct kobject *kobj, struct attribute *attr,
 		{
 			unsigned long *variable =
 				sysfs_data->data.ul.variable;
-			*variable = simple_strtoul(my_buf, NULL, 0);
+			result = strict_strtoul(my_buf, 0, variable);
+			if (result)
+				break;
 			BOUND(variable, ul);
 			break;
 		}
@@ -170,8 +178,11 @@ static ssize_t toi_attr_store(struct kobject *kobj, struct attribute *attr,
 		break;
 	}
 
+	if (!result)
+		result = count;
+
 	/* Side effect routine? */
-	if (sysfs_data->write_side_effect)
+	if (result == count && sysfs_data->write_side_effect)
 		sysfs_data->write_side_effect();
 
 	/* Free temporary buffers */

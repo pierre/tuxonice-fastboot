@@ -3,7 +3,6 @@
  *
  * This file is released under the GPLv2.
  */
-#include <linux/module.h>
 #include <linux/resume-trace.h>
 #include <linux/kernel.h>
 #include <linux/swap.h>

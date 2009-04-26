@@ -249,8 +249,6 @@ void memory_bm_position_reset(struct memory_bitmap *bm)
 }
 EXPORT_SYMBOL_GPL(memory_bm_position_reset);
 
-void memory_bm_free(struct memory_bitmap *bm, int clear_nosave_free);
-
 /**
  *	create_bm_block_list - create a list of block bitmap objects
  *	@nr_blocks - number of blocks to allocate
@@ -307,12 +305,9 @@ static int create_mem_extents(struct list_head *list, gfp_t gfp_mask)
 
 	INIT_LIST_HEAD(list);
 
-	for_each_zone(zone) {
+	for_each_populated_zone(zone) {
 		unsigned long zone_start, zone_end;
 		struct mem_extent *ext, *cur, *aux;
-
-		if (!populated_zone(zone))
-			continue;
 
 		zone_start = zone->zone_start_pfn;
 		zone_end = zone->zone_start_pfn + zone->spanned_pages;
@@ -484,7 +479,7 @@ void memory_bm_set_bit(struct memory_bitmap *bm, unsigned long pfn)
 }
 EXPORT_SYMBOL_GPL(memory_bm_set_bit);
 
-int mem_bm_set_bit_check(struct memory_bitmap *bm, unsigned long pfn)
+static int mem_bm_set_bit_check(struct memory_bitmap *bm, unsigned long pfn)
 {
 	void *addr;
 	unsigned int bit;
@@ -930,8 +925,8 @@ static unsigned int count_free_highmem_pages(void)
 	struct zone *zone;
 	unsigned int cnt = 0;
 
-	for_each_zone(zone)
-		if (populated_zone(zone) && is_highmem(zone))
+	for_each_populated_zone(zone)
+		if (is_highmem(zone))
 			cnt += zone_page_state(zone, NR_FREE_PAGES);
 
 	return cnt;

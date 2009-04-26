@@ -6,7 +6,6 @@
  */
 
 #include <linux/suspend.h>
-#include <linux/module.h>
 #include "tuxonice.h"
 #include "tuxonice_modules.h"
 #include "tuxonice_sysfs.h"
@@ -82,6 +81,7 @@ void print_toi_header_storage_for_modules(void)
 	printk(KERN_DEBUG "                     %ld\n",
 			bytes + sizeof(struct toi_module_header));
 }
+EXPORT_SYMBOL_GPL(print_toi_header_storage_for_modules);
 
 /*
  * toi_memory_for_modules

@@ -26,7 +26,6 @@
 #include "tuxonice_pagedir.h"
 #include "tuxonice_prepare_image.h"
 #include "tuxonice.h"
-#include "power.h"
 #include "tuxonice_builtin.h"
 #include "tuxonice_alloc.h"
 
@@ -154,7 +153,7 @@ int toi_get_pageset1_load_addresses(void)
 	int low_direct = 0, high_direct = 0;
 	int high_to_free, low_to_free, result = 0;
 
-	/* 
+	/*
 	 * We are about to allocate all available memory, and processes
 	 * might not have finished freezing yet. To avoid potential OOMs,
 	 * disable non boot cpus and do this with IRQs disabled
@@ -359,7 +358,7 @@ out:
 
 	local_irq_enable();
 	enable_nonboot_cpus();
-	
+
 	return result;
 }
 

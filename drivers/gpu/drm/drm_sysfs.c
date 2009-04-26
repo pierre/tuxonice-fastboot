@@ -132,6 +132,7 @@ void drm_sysfs_destroy(void)
  */
 static void drm_sysfs_device_release(struct device *dev)
 {
+	memset(dev, 0, sizeof(struct device));
 	return;
 }
 
@@ -451,6 +452,7 @@ void drm_sysfs_hotplug_event(struct drm_device *dev)
 
 	kobject_uevent_env(&dev->primary->kdev.kobj, KOBJ_CHANGE, envp);
 }
+EXPORT_SYMBOL(drm_sysfs_hotplug_event);
 
 /**
  * drm_sysfs_device_add - adds a class device to sysfs for a character driver

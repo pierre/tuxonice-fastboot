@@ -68,7 +68,6 @@
  */
 
 #include <linux/suspend.h>
-#include <linux/module.h>
 #include <linux/freezer.h>
 #include <linux/utsrelease.h>
 #include <linux/cpu.h>
@@ -103,8 +102,6 @@ static char post_hibernate_command[256];
 /* Binary signature if an image is present */
 char *tuxonice_signature = "\xed\xc3\x02\xe9\x98\x56\xe5\x0c";
 EXPORT_SYMBOL_GPL(tuxonice_signature);
-
-int do_toi_step(int step);
 
 unsigned long boot_kernel_data_buffer;
 
@@ -487,7 +484,7 @@ static void do_cleanup(int get_debug_info, int restarting)
 		/* Printk can only handle 1023 bytes, including
 		 * its level mangling. */
 		for (i = 0; i < 3; i++)
-			printk("%s", buffer + (1023 * i));
+			printk(KERN_ERR "%s", buffer + (1023 * i));
 		toi_free_page(20, (unsigned long) buffer);
 	}
 

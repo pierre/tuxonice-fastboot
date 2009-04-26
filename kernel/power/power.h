@@ -1,10 +1,3 @@
-/*
- * Copyright (C) 2004-2008 Nigel Cunningham (nigel at tuxonice net)
- */
-
-#ifndef KERNEL_POWER_POWER_H
-#define KERNEL_POWER_POWER_H
-
 #include <linux/suspend.h>
 #include <linux/suspend_ioctls.h>
 #include <linux/utsname.h>
@@ -299,7 +292,6 @@ struct memory_bitmap {
 					 */
 };
 
-
 extern int memory_bm_create(struct memory_bitmap *bm, gfp_t gfp_mask,
 		int safe_needed);
 extern void memory_bm_free(struct memory_bitmap *bm, int clear_nosave_free);
@@ -320,6 +312,4 @@ extern int memory_bm_read(struct memory_bitmap *bm, int (*rw_chunk)
 	(int rw, struct toi_module_ops *owner, char *buffer, int buffer_size));
 extern int memory_bm_write(struct memory_bitmap *bm, int (*rw_chunk)
 	(int rw, struct toi_module_ops *owner, char *buffer, int buffer_size));
-#endif
-
 #endif

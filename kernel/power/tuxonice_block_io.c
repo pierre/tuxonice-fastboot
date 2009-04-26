@@ -518,7 +518,8 @@ static int debug_broken_header(void)
 	printk(KERN_DEBUG "Total unowned : %d.\n", unowned);
 	printk(KERN_DEBUG "Total used : %d (%ld pages).\n", total_header_bytes,
 			DIV_ROUND_UP(total_header_bytes, PAGE_SIZE));
-	printk(KERN_DEBUG "Space needed now : %ld.\n", get_header_storage_needed());
+	printk(KERN_DEBUG "Space needed now : %ld.\n",
+			get_header_storage_needed());
 	dump_block_chains();
 	abort_hibernate(TOI_HEADER_TOO_BIG, "Header reservation too small.");
 	return -EIO;
@@ -534,9 +535,9 @@ static int debug_broken_header(void)
  **/
 static int go_next_page(int writing, int section_barrier)
 {
-	int i, max = (toi_writer_posn.current_chain == -1) ? 1 :
-	  toi_devinfo[toi_writer_posn.current_chain].blocks_per_page,
-		compare_to = 0;
+	int i, chain_num = toi_writer_posn.current_chain,
+	  max = (chain_num == -1) ? 1 : toi_devinfo[chain_num].blocks_per_page,
+	  compare_to = 0, compare_chain, compare_offset;
 
 	/* Have we already used the last page of the stream? */
 	switch (current_stream) {
@@ -551,13 +552,14 @@ static int go_next_page(int writing, int section_barrier)
 		break;
 	}
 
-	if (section_barrier && toi_writer_posn.current_chain ==
-			toi_writer_posn_save[compare_to].chain_num &&
-	    toi_writer_posn.current_offset ==
-			toi_writer_posn_save[compare_to].offset) {
+	compare_chain = toi_writer_posn_save[compare_to].chain_num;
+	compare_offset = toi_writer_posn_save[compare_to].offset;
+
+	if (section_barrier && chain_num == compare_chain &&
+	    toi_writer_posn.current_offset == compare_offset) {
 		if (writing) {
-		       if (!current_stream)
-			       return debug_broken_header();
+			if (!current_stream)
+				return debug_broken_header();
 		} else {
 			more_readahead = 0;
 			return -ENODATA;

@@ -9,8 +9,6 @@
 #ifndef KERNEL_POWER_TUXONICE_PAGEFLAGS_H
 #define KERNEL_POWER_TUXONICE_PAGEFLAGS_H
 
-#include "power.h"
-
 extern struct memory_bitmap *pageset1_map;
 extern struct memory_bitmap *pageset1_copy_map;
 extern struct memory_bitmap *pageset2_map;

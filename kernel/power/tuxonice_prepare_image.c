@@ -20,7 +20,6 @@
  *
  */
 
-#include <linux/module.h>
 #include <linux/highmem.h>
 #include <linux/freezer.h>
 #include <linux/hardirq.h>
@@ -359,10 +358,7 @@ long real_nr_free_pages(unsigned long zone_idx_mask)
 	int result = 0, cpu;
 
 	/* PCP lists */
-	for_each_zone(zone) {
-		if (!populated_zone(zone))
-			continue;
-
+	for_each_populated_zone(zone) {
 		if (!(zone_idx_mask & (1 << zone_idx(zone))))
 			continue;
 
@@ -423,6 +419,7 @@ long get_header_storage_needed(void)
 
 	return DIV_ROUND_UP(bytes, PAGE_SIZE);
 }
+EXPORT_SYMBOL_GPL(get_header_storage_needed);
 
 /*
  * When freeing memory, pages from either pageset might be freed.
@@ -634,10 +631,7 @@ static void generate_free_page_map(void)
 	struct zone *zone;
 	struct list_head *curr;
 
-	for_each_zone(zone) {
-		if (!populated_zone(zone))
-			continue;
-
+	for_each_populated_zone(zone) {
 		spin_lock_irqsave(&zone->lock, flags);
 
 		for (i = 0; i < zone->spanned_pages; i++)
@@ -714,11 +708,8 @@ static void flag_image_pages(int atomic_copy)
 	 * Pages not to be saved are marked Nosave irrespective of being
 	 * reserved.
 	 */
-	for_each_zone(zone) {
+	for_each_populated_zone(zone) {
 		int highmem = is_highmem(zone);
-
-		if (!populated_zone(zone))
-			continue;
 
 		for (loop = 0; loop < zone->spanned_pages; loop++) {
 			unsigned long pfn = ZONE_START(zone) + loop;
