@@ -1,0 +1,37 @@
+= TuxOnIce patches
+
+TuxOnIce is an out-of-tree series of Kernel patches that implements hibernate on Linux. See http://tuxonice.net.
+
+This repository (http://github.com/pierre/tuxonice-fastboot) contains some patches that enable syslinux-fastboot (http://github.com/pierre/syslinux-fastboot)
+to work with TuxOnIce, allowing a Linux based computer, hibernated with TuxOnIce, to resume from Syslinux.
+
+It also has a couple of branches with other code or documentation patches developed along the way, but not tied to syslinux-fastboot.
+On any branch, one can look at the patches by looking for my name:
+
+  git log <branch> --author="Pierre-Alexandre Meyer" --pretty=oneline
+
+= Branches description
+
+== master
+
+Nothing to see here (2.6.30-rc3 tree + TuxOnIce patches). Has one commit to have this README displayed on github.
+
+== fast-boot
+
+Main branch, see http://github.com/pierre/tuxonice-fastboot/commit/96c38cdbc0ca880c339151e498872a8a9e6184af.
+
+Change the TuxOnIce file header for syslinux-fastboot.
+
+== for-nigel
+
+Code and documentation patches for TuxOnIce core.
+
+== hw_detection
+
+Main patch is http://github.com/pierre/tuxonice-fastboot/commit/9705b9e601d610142d31c1c9c49964d89a1b1d7d.
+
+Some situations are not resume safe, for instance when the hard drive is
+put in another machine. In that case, we shouldn't try to resume but
+rather invalidate the image and do a full boot.
+
+This branch aborts a resume if a DMI mismatch is detected.
